@@ -2,10 +2,10 @@
 id: P-20261021-first-learning-loop
 title: A reusable desktop learning loop from a selected text source
 version: 1
-state: implementing
-current_task: T3
-last_evidence: T1 desktop launch and T2 checks passed; T3 in progress
-next_action: Implement and verify T1-T3 only
+state: approved
+current_task: T4
+last_evidence: Player phase verified (T1-T3); typecheck, 36 tests, npm ci and build passed; desktop two-launch resume and keyboard flows witnessed
+next_action: Send implement P-20261021-first-learning-loop v1 --phase generation to start T4
 approval: granted
 approved_version: 1
 approved_by: Project owner (explicit user message)
@@ -155,7 +155,8 @@ Authorized command: `implement P-20261021-first-learning-loop v1 --phase player`
 
 - T1: complete; see [player verification](player-verification.md).
 - T2: complete; 18 targeted tests passed.
-- T3: in progress; original fixtures authored, full UI pending.
+- T3: verified. Both prepared lessons render through one player; 15 interaction tests, 3 desktop store tests, a scripted two-launch desktop resume, and a layout sweep at 375–1440 px. See [player verification](player-verification.md).
 - T4–T7: not started; outside this implementation command.
+- Player phase verified on 2026-10-21; results in [player verification](player-verification.md#verification-run--player-phase).
 
 The approved scope above remains unchanged. Runtime evidence will be recorded here as tasks complete.

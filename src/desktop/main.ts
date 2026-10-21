@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain, net, protocol, session } from 'electron';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { loadPreparedLessons } from '../fixtures/lessons';
+import { ProgressStore } from './progress-store';
+import { progressKeySchema } from '../core/bridge';
+import { stateSchema } from '../core/state';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'btw', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.setName('Break the Wall');
@@ -25,7 +29,7 @@ function createWindow() {
   void window.loadURL(origin + '/');
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   const root = resolve(__dirname, '../dist');
   protocol.handle('btw', request => {
     const url = new URL(request.url);
@@ -37,7 +41,10 @@ void app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   ipcMain.handle('runtime:get', event => { trustedSender(event); return { platform: process.platform, mode: 'desktop' }; });
+  const store = new ProgressStore(join(app.getPath('userData'), 'workspaces'), await loadPreparedLessons());
+  ipcMain.handle('progress:load', (event, key: unknown) => { trustedSender(event); return store.load(progressKeySchema.parse(key)); });
+  ipcMain.handle('progress:save', (event, input: unknown) => { trustedSender(event); return store.save(stateSchema.parse(input)); });
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
-});
+}).catch(error => { console.error('Desktop initialization failed:', error.message); app.quit(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

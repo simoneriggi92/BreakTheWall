@@ -10,7 +10,7 @@ The experience combines deliberately paced pages, concept maps, controlled seque
 
 ## Current state
 
-The `player` phase is in progress. A minimal Electron desktop shell launches on macOS, and runtime-validated lesson/source/state contracts have focused tests. Two original prepared lesson packages are authored; their complete visual player and interaction checks are still being implemented. This checkpoint is not a completed learning application.
+The `player` phase is complete and verified. The Electron desktop app launches on macOS and plays two original prepared lessons, one about a code flow and one about a thermostat, through the same player: concept map, controllable sequence with highlighted source lines, comparisons, concept lenses, predictions, order reconstruction, reflection, notes, minimap and atlas. Guided and exploration modes, and local resume after restarting the app, are covered by automated tests and a scripted desktop check. This checkpoint is not a completed learning application: source import and AI generation are the next phase.
 
 An earlier interactive prototype informed the experience. Its private source material is not distributed here. User-reported usefulness is an early signal, not evidence of general learning effectiveness or market demand.
 
