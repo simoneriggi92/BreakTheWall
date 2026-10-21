@@ -14,13 +14,13 @@ export function EvidenceView({ lesson, ids, compact = false }: { lesson: Lesson;
   const active = ids.includes(selected) ? selected : ids[0];
   const { source, ref, lines } = sourceExcerpt(lesson, active);
   return <section className={`evidence ${compact ? 'compact' : ''}`} aria-label="Collega alla fonte">
-    <div className="evidence-head"><span className="section-label"><Link2 size={16} aria-hidden="true"/> Collega alla fonte</span><span className="micro">TESTO ORIGINALE</span></div>
+    <div className="evidence-head"><span className="section-label"><Link2 size={16} aria-hidden="true"/> Collega alla fonte</span><span className="micro">{lesson.kind === 'generated' ? 'LA TUA FONTE' : 'TESTO ORIGINALE'}</span></div>
     {ids.length > 1 && <div className="evidence-tabs" aria-label="Estratti disponibili">{ids.map((id, i) => <button key={id} aria-pressed={id === active} onClick={() => setSelected(id)}>Estratto {i + 1}</button>)}</div>}
     <div className="source-caption"><Icon name={source.language ? 'code' : 'book'} size={15}/><span>{source.title}</span><span>L{ref.startLine}–{ref.endLine}</span></div>
     <div className={`source-lines ${source.language ? 'code-lines' : ''}`} tabIndex={0} aria-label="Estratto della fonte; righe evidenziate collegate al passo attivo">
       {lines.map((line, i) => <div key={i} className={`source-line ${ref.highlights.includes(ref.startLine + i) ? 'highlight' : ''}`}><span className="line-number" aria-hidden="true">{ref.startLine + i}</span><span>{line || ' '}</span>{ref.highlights.includes(ref.startLine + i) && <span className="sr-only"> · riga evidenziata</span>}</div>)}
     </div>
-    <p className="evidence-note">Fonte didattica originale · rev. {source.revision} · le righe colorate sostengono il punto attivo.</p>
+    <p className="evidence-note">{lesson.kind === 'generated' ? 'Righe citate dal modello, copiate esattamente dalla tua fonte' : 'Fonte didattica originale'} · rev. {source.revision} · le righe colorate sostengono il punto attivo.</p>
   </section>;
 }
 

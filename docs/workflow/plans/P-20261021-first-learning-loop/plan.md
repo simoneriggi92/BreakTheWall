@@ -2,10 +2,10 @@
 id: P-20261021-first-learning-loop
 title: A reusable desktop learning loop from a selected text source
 version: 1
-state: approved
-current_task: T4
-last_evidence: Player phase verified (T1-T3); typecheck, 36 tests, npm ci and build passed; desktop two-launch resume and keyboard flows witnessed
-next_action: Send implement P-20261021-first-learning-loop v1 --phase generation to start T4
+state: blocked
+current_task: T5
+last_evidence: T4 complete; T5/T6 implemented, 68 tests and build pass; owner sign-in witnessed with plan usage granted and 7 models listed; live inference not yet sent
+next_action: When the owner's plan usage resets, resume implement P-20261021-first-learning-loop v1 --phase generation for live generation in both domains and the restart check
 approval: granted
 approved_version: 1
 approved_by: Project owner (explicit user message)
@@ -160,3 +160,12 @@ Authorized command: `implement P-20261021-first-learning-loop v1 --phase player`
 - Player phase verified on 2026-10-21; results in [player verification](player-verification.md#verification-run--player-phase).
 
 The approved scope above remains unchanged. Runtime evidence will be recorded here as tasks complete.
+
+## Generation phase execution
+
+Authorized command: `implement P-20261021-first-learning-loop v1 --phase generation`.
+
+- T4: complete; import cases and preview-equals-request covered by tests. See [generation verification](generation-verification.md).
+- T5: implemented. Owner sign-in witnessed in the production build with plan usage granted and models listed. Blocked on the live inference: the owner's plan usage was exhausted and resets later.
+- T6: implemented and covered by contract and interaction tests. Live generation for both domains, claim review and the restart check depend on T5's inference.
+- T7: not started; outside this implementation command.

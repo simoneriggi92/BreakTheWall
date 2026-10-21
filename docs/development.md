@@ -23,6 +23,8 @@ npm start
 
 The renderer has no Node integration, filesystem API, or credentials. Electron uses sandboxing, context isolation, permission denial, navigation restrictions, and an application-owned `btw://app/` protocol. The preload exposes named operations, never a generic IPC or shell API. The development server is loopback-only; production content policy allows no network connections.
 
+Network access for AI belongs to the main process only: the system browser handles sign-in, a one-shot listener on `127.0.0.1` receives the callback, and `https://auth.openai.com` and `https://api.openai.com/v1` serve tokens and inference. Credentials are encrypted with Electron `safeStorage` under `<userData>/credentials/`; generated lessons live in `<userData>/lessons/`, progress in `<userData>/workspaces/`. Sign-in needs the macOS Keychain; without it the app disables sign-in rather than storing plaintext.
+
 The domain module must remain independent of React and Electron. Lesson content is data rendered with application-owned components; source text is never HTML or executable UI.
 
 ## Toolchain references

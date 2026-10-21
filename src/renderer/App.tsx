@@ -1,33 +1,54 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Compass, Home, LockKeyhole, Map, MessageSquareText, Search, X } from 'lucide-react';
 import type { DesktopBridge } from '../core/bridge';
-import type { Lesson } from '../core/lesson';
+import { validateLesson, type Lesson } from '../core/lesson';
 import { canVisit, initialState, navigate, restoreState, solved, submit, type LearnerState } from '../core/state';
 import { loadPreparedLessons } from '../fixtures/lessons';
 import { Brand, Icon } from './icons';
 import { LessonBlock } from './blocks';
 import { browserBridge } from './storage';
+import { emptyDraft, Studio, type StudioDraft } from './Studio';
 
 export function App({ bridge = window.breakTheWall ?? browserBridge, prepared }: { bridge?: DesktopBridge; prepared?: Lesson[] }) {
   const [lessons, setLessons] = useState<Lesson[]>(prepared ?? []);
   const [selected, setSelected] = useState<string>();
   const [error, setError] = useState('');
   const [runtime, setRuntime] = useState('');
+  const [generated, setGenerated] = useState<Lesson[]>([]);
+  const [skipped, setSkipped] = useState(0);
+  const [draft, setDraft] = useState<StudioDraft>(emptyDraft);
+  useEffect(() => {
+    let active = true;
+    // The host already validated these files; the renderer checks again because IPC data is untrusted here too.
+    void bridge.studio?.listLessons().then(async result => {
+      const checked = await Promise.allSettled(result.lessons.map(x => validateLesson(x)));
+      if (!active) return;
+      setGenerated(checked.flatMap(x => x.status === 'fulfilled' && x.value.kind === 'generated' ? [x.value] : []));
+      setSkipped(result.skipped + checked.filter(x => x.status === 'rejected').length);
+    }).catch(() => { if (active) setError('I percorsi generati non sono leggibili in questo momento.'); });
+    return () => { active = false; };
+  }, [bridge]);
   useEffect(() => {
     let active = true;
     if (!prepared) void loadPreparedLessons().then(data => { if (active) setLessons(data); }).catch(() => { if (active) setError('Gli esempi non hanno superato il controllo del formato. Riapri l’app o segnala il problema.'); });
     void bridge.getRuntime().then(info => { if (active) setRuntime(info.mode === 'desktop' ? 'DESKTOP · LOCALE' : 'ANTEPRIMA BROWSER'); }).catch(() => { if (active) setError('Il collegamento al desktop non è disponibile. Riapri l’app.'); });
     return () => { active = false; };
   }, [bridge, prepared]);
-  const lesson = lessons.find(x => x.id === selected);
+  const lesson = [...generated, ...lessons].find(x => x.id === selected);
+  const created = (item: Lesson) => { setGenerated(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); setSelected(item.id); };
   return <><a href="#main" className="skip-link">Vai al contenuto</a>{lesson ? <Player key={lesson.id} lesson={lesson} bridge={bridge} runtime={runtime} goHome={() => setSelected(undefined)}/> : <>
-    <header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtime || 'APERTURA…'}</span><span className="alpha-tag">PLAYER ALPHA</span></header>
+    <header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtime || 'APERTURA…'}</span><span className="alpha-tag">ALPHA</span></header>
     <main id="main" className="library"><div className="library-intro"><span className="eyebrow">MENO TESTO DA SCORRERE. PIÙ COLLEGAMENTI DA VEDERE.</span><h1>Fai spazio<br/>alla <em>comprensione.</em></h1><p>Esplora un concetto, segui ciò che cambia,<br className="wide-only"/> prova a ricostruirlo. Un passo intenzionale alla volta.</p><div className="learning-loop"><span><Icon name="book" size={16}/> Fonte</span><ChevronRight size={14}/><span><Icon name="route" size={16}/> Esplora</span><ChevronRight size={14}/><span><Icon name="puzzle" size={16}/> Prova</span><ChevronRight size={14}/><span><Icon name="lightbulb" size={16}/> Collega</span></div></div>
+      <Studio studio={bridge.studio} draft={draft} setDraft={setDraft} onCreated={created}/>
+      {(generated.length > 0 || skipped > 0) && <section className="library-section"><div className="library-section-head"><div><span className="eyebrow">I TUOI PERCORSI</span><h2>Generati dalle tue fonti.</h2></div><span className="pill ai-pill">GENERATI CON AI</span></div><p className="library-disclosure">Ogni affermazione cita righe delle tue fonti. Le citazioni sono verificate; la correttezza delle spiegazioni no: controllale.</p>
+        {skipped > 0 && <p className="notice" role="status">{skipped} percorsi salvati non hanno superato il controllo e non sono mostrati. I file restano sul disco.</p>}
+        <div className="lesson-cards">{generated.map(item => <button key={item.id} className="lesson-card generated-card" onClick={() => setSelected(item.id)}><span className="card-head"><span className="card-symbol"><Icon name={item.icon} size={32}/></span><span className="micro">GENERATO · {new Date(item.generation!.createdAt).toLocaleDateString('it-IT')}</span></span><span className="eyebrow">{item.category}</span><h3>{item.title}</h3><p>{item.subtitle}</p><span className="card-meta"><span>{item.pages.length} tappe</span><span>{item.activities.length} attività</span><span>{item.sources.length === 1 ? '1 fonte' : `${item.sources.length} fonti`}</span><span>{item.generation!.model}</span></span><span className="card-enter">Apri il percorso<ArrowRight size={19}/></span></button>)}</div>
+      </section>}
       <section className="library-section"><div className="library-section-head"><div><span className="eyebrow">IL TUO PRIMO PERCORSO</span><h2>Due modi per rompere il muro.</h2></div><span className="pill">ESEMPI PREPARATI</span></div><p className="library-disclosure">Contenuti originali già pronti, sullo stesso player. Non sono lezioni generate dall’AI.</p>
         {error && <p role="alert" className="error-banner">{error}</p>}
-        <div className="lesson-cards">{lessons.map((item, i) => <button key={item.id} className={`lesson-card card-${i}`} onClick={() => setSelected(item.id)}><span className="card-head"><span className="card-symbol"><Icon name={item.icon} size={32}/></span><span className="micro">0{i + 1} / ESEMPIO</span></span><span className="eyebrow">{item.category}</span><h3>{item.title}</h3><p>{item.subtitle}</p><span className="card-meta"><span>{item.pages.length} tappe</span><span>2 attività</span><span>Fonti consultabili</span></span><span className="card-enter">Apri il percorso<ArrowRight size={19}/></span></button>)}</div>
+        <div className="lesson-cards">{lessons.map((item, i) => <button key={item.id} className={`lesson-card card-${i}`} onClick={() => setSelected(item.id)}><span className="card-head"><span className="card-symbol"><Icon name={item.icon} size={32}/></span><span className="micro">0{i + 1} / ESEMPIO</span></span><span className="eyebrow">{item.category}</span><h3>{item.title}</h3><p>{item.subtitle}</p><span className="card-meta"><span>{item.pages.length} tappe</span><span>{item.activities.length} attività</span><span>Fonti consultabili</span></span><span className="card-enter">Apri il percorso<ArrowRight size={19}/></span></button>)}</div>
         {!lessons.length && !error && <p role="status">Controllo del formato e delle fonti…</p>}
-      </section><footer className="library-footer"><Icon name="shield" size={17}/><span>Gli esempi funzionano senza account. Progressi e appunti restano su questo dispositivo.</span></footer><div className="roadmap-note"><span>IN COSTRUZIONE</span> Importazione di fonti e generazione AI sono le prossime fasi.</div>
+      </section><footer className="library-footer"><Icon name="shield" size={17}/><span>Gli esempi funzionano senza account. Progressi e appunti restano su questo dispositivo.</span></footer><div className="roadmap-note"><span>IN COSTRUZIONE</span> Ricerca di fonti sul web, PDF e repository interi sono fasi successive.</div>
     </main></> }</>;
 }
 
@@ -77,7 +98,7 @@ function Player({ lesson, bridge, runtime, goHome }: { lesson: Lesson; bridge: D
   const onAttempt = (id: string, answer: string[]) => setState(s => submit(lesson, s, id, answer));
   const context = <Context lesson={lesson} state={state} tab={contextTab} setTab={setContextTab} go={go}/>;
   return <>
-    <header className="topbar"><button className="brand-button" onClick={goHome} aria-label="Torna ai percorsi"><Brand/></button><div className="course-title"><span>{lesson.category}</span><strong>{lesson.title}</strong></div><span className="prepared-tag">Esempio preparato</span><span className="runtime"><span className="status-dot"/>{runtime}</span></header>
+    <header className="topbar"><button className="brand-button" onClick={goHome} aria-label="Torna ai percorsi"><Brand/></button><div className="course-title"><span>{lesson.category}</span><strong>{lesson.title}</strong></div><span className={`prepared-tag ${lesson.kind === 'generated' ? 'generated-tag' : ''}`}>{lesson.kind === 'generated' ? 'Generato con AI' : 'Esempio preparato'}</span><span className="runtime"><span className="status-dot"/>{runtime}</span></header>
     {!loaded ? <main id="main" className="loading"><p role="status">{notice || 'Riprendo il tuo percorso…'}</p><button onClick={goHome}>Torna ai percorsi</button></main> : <>
       <div className="workspace"><aside className="lesson-sidebar"><button className="back-library" onClick={goHome}><Home size={16}/>I tuoi percorsi</button><div className="sidebar-label">LE TAPPE DEL PERCORSO<span>{String(index + 1).padStart(2, '0')}/{String(lesson.pages.length).padStart(2, '0')}</span></div><nav aria-label="Tappe della lezione"><ol className="lesson-nav">{lesson.pages.map((p, i) => {
         const allowed = canVisit(lesson, state, p.id); const done = p.checkpoint && solved(lesson, state, p.checkpoint);
@@ -105,6 +126,6 @@ function Context({ lesson, state, tab, setTab, go }: { lesson: Lesson; state: Le
   const concept = lesson.concepts.find(x => x.pageId === page.id);
   return <div className="context-content"><div className="context-tabs" role="tablist" aria-label="Contesto"><button role="tab" aria-selected={tab === 'map'} onClick={() => setTab('map')}><Map size={16}/>Minimappa</button><button role="tab" aria-selected={tab === 'atlas'} onClick={() => setTab('atlas')}><BookOpen size={16}/>Atlante</button></div>
     {tab === 'map' ? <div role="tabpanel" aria-label="Minimappa"><span className="eyebrow">IL FILO CHE STAI SEGUENDO</span><div className="mini-root"><Icon name={lesson.icon} size={21}/><strong>{lesson.title}</strong></div><div className="mini-branches">{lesson.pages.map(p => <button key={p.id} aria-current={p.id === page.id ? 'location' : undefined} disabled={!canVisit(lesson, state, p.id)} onClick={() => go(p.id)}><Icon name={p.icon} size={18}/><span>{p.title}</span>{p.checkpoint && solved(lesson, state, p.checkpoint) ? <Check size={13}/> : state.visited.includes(p.id) ? <span className="visited-dot" aria-label="Visitata"/> : null}</button>)}</div><div className="context-now"><span className="eyebrow">ORA STAI COLLEGANDO</span><strong>{concept?.title ?? page.title}</strong><p>{concept?.definition ?? 'Ricostruisci la relazione fra i passaggi e prova a spiegarla con parole tue.'}</p></div><p className="context-legend"><span className="visited-dot"/> visitata <Check size={12}/> attività risolta<br/>Le linee collegano le tappe del percorso.</p></div> : <div role="tabpanel" aria-label="Atlante"><label className="atlas-search"><Search size={15}/><input aria-label="Cerca nell’atlante" placeholder="Cerca un concetto…" value={search} onChange={e => setSearch(e.target.value)}/></label><label className="atlas-all"><input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)}/>Mostra anche i concetti futuri</label><p className="micro">{available.length}/{lesson.concepts.length} concetti disponibili</p>{filtered.map(c => <details className="atlas-concept" key={c.id}><summary><Icon name={c.icon} size={18}/>{c.title}</summary><p>{c.definition}</p><button className="text-button" disabled={!canVisit(lesson, state, c.pageId)} onClick={() => go(c.pageId)}>Vai al collegamento<ArrowRight size={13}/></button>{!canVisit(lesson, state, c.pageId) && <span className="micro">Disponibile dopo l’attività</span>}</details>)}{!filtered.length && <p className="micro">Nessun concetto corrisponde. Prova un’altra parola o includi i concetti futuri.</p>}</div>}
-    <div className="goal-card"><Icon name="target" size={18}/><span className="eyebrow">IL TUO OBIETTIVO</span><p>{lesson.goal.outcome}</p></div><p className="context-origin">Esempio preparato · fonti originali<br/>Nessuna generazione AI in questo percorso.</p>
+    <div className="goal-card"><Icon name="target" size={18}/><span className="eyebrow">IL TUO OBIETTIVO</span><p>{lesson.goal.outcome}</p></div><p className="context-origin">{lesson.generation ? <>Generato con AI · {lesson.generation.model}<br/>Citazioni verificate sulle tue fonti; spiegazioni da controllare.</> : <>Esempio preparato · fonti originali<br/>Nessuna generazione AI in questo percorso.</>}</p>
   </div>;
 }

@@ -7,16 +7,20 @@ import { restoreState, stateSchema, type LearnerState } from '../core/state';
 /** The host chooses all paths. Writes are serialized, bounded, and replaced atomically. */
 export class ProgressStore {
   private queue: Promise<void> = Promise.resolve();
-  constructor(private root: string, private lessons: Lesson[]) {}
-  private resolve(key: ProgressKey) {
+  private lessons: (key: ProgressKey) => Promise<Lesson | undefined>;
+  /** Lessons come from a fixed list (prepared examples) or a lookup that also covers saved generated lessons. */
+  constructor(private root: string, lessons: Lesson[] | ((key: ProgressKey) => Promise<Lesson | undefined>)) {
+    this.lessons = Array.isArray(lessons) ? async key => lessons.find(x => x.id === key.lessonId && x.revision === key.revision) : lessons;
+  }
+  private async resolve(key: ProgressKey) {
     const safe = progressKeySchema.parse(key);
-    const lesson = this.lessons.find(x => x.id === safe.lessonId && x.revision === safe.revision);
-    if (!lesson) throw new Error('Unknown prepared lesson revision');
+    const lesson = await this.lessons(safe);
+    if (!lesson) throw new Error('Unknown lesson revision');
     return { lesson, dir: join(this.root, lesson.id), file: join(this.root, lesson.id, lesson.revision + '.json') };
   }
   async load(key: ProgressKey): Promise<ProgressResult> {
     await this.queue;
-    const { file, lesson } = this.resolve(key);
+    const { file, lesson } = await this.resolve(key);
     let raw: string;
     try { raw = await readFile(file, 'utf8'); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { state: null }; throw error; }
@@ -33,13 +37,14 @@ export class ProgressStore {
     if (restored.notice) return preserve(restored.notice);
     return { state: restored.state };
   }
+  /** Resolution, checks and the write all run inside the queue, so saves land in call order. */
   save(input: LearnerState): Promise<void> {
     const state = stateSchema.parse(input);
-    const { lesson, dir, file } = this.resolve({ lessonId: state.lessonId, revision: state.revision });
-    if (restoreState(lesson, state).notice) throw new Error('Invalid learner references');
-    const payload = JSON.stringify(state);
-    if (Buffer.byteLength(payload) > 300_000) throw new Error('Progress storage limit exceeded');
     const task = this.queue.catch(() => {}).then(async () => {
+      const { lesson, dir, file } = await this.resolve({ lessonId: state.lessonId, revision: state.revision });
+      if (restoreState(lesson, state).notice) throw new Error('Invalid learner references');
+      const payload = JSON.stringify(state);
+      if (Buffer.byteLength(payload) > 300_000) throw new Error('Progress storage limit exceeded');
       await mkdir(dir, { recursive: true });
       const temp = file + '.pending';
       await writeFile(temp, payload, { encoding: 'utf8', mode: 0o600 });

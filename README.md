@@ -10,7 +10,9 @@ The experience combines deliberately paced pages, concept maps, controlled seque
 
 ## Current state
 
-The `player` phase is complete and verified. The Electron desktop app launches on macOS and plays two original prepared lessons, one about a code flow and one about a thermostat, through the same player: concept map, controllable sequence with highlighted source lines, comparisons, concept lenses, predictions, order reconstruction, reflection, notes, minimap and atlas. Guided and exploration modes, and local resume after restarting the app, are covered by automated tests and a scripted desktop check. This checkpoint is not a completed learning application: source import and AI generation are the next phase.
+The `player` phase is complete and verified: the Electron desktop app plays two original prepared lessons, one about a code flow and one about a thermostat, through the same player.
+
+The `generation` phase is implemented but not yet verified live. You can paste text or choose `.txt`/`.md` files, preview exactly what will be sent, state a goal, and sign in with ChatGPT. Generated lessons are validated against their cited source lines before they are saved, and they are labelled as AI-generated. Sign-in has been witnessed; a live generation request has not been sent yet. See the [generation verification](docs/workflow/plans/P-20261021-first-learning-loop/generation-verification.md).
 
 An earlier interactive prototype informed the experience. Its private source material is not distributed here. User-reported usefulness is an early signal, not evidence of general learning effectiveness or market demand.
 

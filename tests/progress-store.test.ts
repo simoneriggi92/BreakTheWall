@@ -47,6 +47,6 @@ describe('desktop progress store', () => {
   it('rejects state for an unknown lesson revision instead of writing it', async () => {
     const { store: s } = await store();
     const state = { ...initialState(lessons[0]), revision: 'v9' };
-    expect(() => s.save(state)).toThrow(/Unknown prepared lesson revision/);
+    await expect(s.save(state)).rejects.toThrow(/Unknown lesson revision/);
   });
 });

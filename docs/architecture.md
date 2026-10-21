@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: design baseline approved in plan P-20261021-first-learning-loop v1 on 2026-10-21. The player phase is being implemented; the desktop shell and runtime contracts exist. Import/provider/generation components below remain planned. See the plan's execution evidence for current completion.
+Status: design baseline approved in plan P-20261021-first-learning-loop v1 on 2026-10-21. The player phase is verified. Import, provider and generation components are implemented (`src/core/source.ts`, `src/core/generation.ts`, `src/desktop/chatgpt/`, `src/desktop/generator.ts`); live inference is not yet witnessed. See the plan's execution evidence for current completion.
 
 ## Entry point and lifecycle
 
