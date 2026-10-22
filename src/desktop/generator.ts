@@ -32,7 +32,7 @@ export class Generator {
       const { route } = request;
       const completer = route.provider === 'local' ? this.routes.local({ runtime: route.runtime, baseUrl: route.baseUrl, model: route.model }) : this.routes.chatgpt;
       const first: CompletionRequest = {
-        model: route.model, instructions: GENERATION_INSTRUCTIONS, schemaName: 'break_the_wall_lesson', schema: draftJsonSchema,
+        model: route.model, instructions: GENERATION_INSTRUCTIONS, schemaName: 'break_the_wall_lesson', schema: draftJsonSchema(sources),
         messages: [{ role: 'user', content: buildGenerationInput(sources, request.goal) }],
       };
       const created = this.now();

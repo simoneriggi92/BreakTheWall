@@ -90,3 +90,55 @@ Claim review of the two live local lessons, checked against their sources:
   - Two pages contain only an activity.
 
 Assessment: the local route works end to end for both domains on this Mac and keeps the source on the device. Its explanations need the same claim review as any generated lesson, and they make more mistakes than the source warrants. The UI labels them as generated locally. T5 (ChatGPT live inference) remains blocked on plan usage.
+
+### Owner report: TeamCity runbook (2026-10-22)
+
+The owner generated from a 340-line operational runbook (TeamCity → ECR → ECS release), asking how the frontend deploy works, with Ollama 0.30.8 and Qwen3.6-35B-A3B. For that model the format check passed: Ollama's enforcement depends on the model, unlike LFM2.5 in the trial. The lesson failed after the repair pass with `Invalid choice solution: choice-correct`: the model had written a description where an option id was expected.
+
+Fix: drafts no longer ask for that cross-reference.
+- Each choice option carries `correct: true/false`, and the host derives `correctId`, requiring exactly one correct option.
+- An order activity lists its steps in the correct order, and the host derives the solution and a rotated starting order. This also replaces the earlier "solved order" rotation.
+- Highlights outside their own excerpt are dropped. Excerpts are never moved.
+- Draft and contract findings are reported together, so the repair pass sees all of them at once.
+
+Reproduction with the app's generator on the same file, question and route, 5 attempts:
+- The choice error did not recur.
+- 2 of 5 produced a valid lesson after the repair pass (141 s and 202 s).
+- The failures were activities placed in no page (twice) and highlights outside their excerpt (once, before the highlight fix).
+- Claim review: both valid lessons are thin. One cites mostly the generic release model (lines 13–32) and has two pages made only of excerpts. The other is in English, although the goal is in Italian.
+
+Assessment: for a long operational document this local model is unreliable, and its lessons are shallow even when valid. The structural errors that remain come from cross-references between parts of the draft (activities placed in blocks, evidence ids).
+
+### Inline draft and schema-enforced route shape (2026-10-22)
+
+Two changes followed the runbook results, both approved by the owner.
+
+**1. No cross-references in drafts.**
+- Citations are written inside the block they support, as `{source, from, to, highlights}`. The source is a closed list in the schema.
+- Activities are written inside pages. A gate is a flag on the activity.
+- Concepts name a page number. The host assigns every id.
+- Findings are reported by page and field, for example "Tappa 3, main (lens)".
+
+**2. The route shape is part of the schema.**
+- The opening is a map and a prediction.
+- Every later page has a required `main` explanation (map, sequence, comparison or lens).
+- The route ends with a required reconstruction.
+- Excerpt, reflection and extra activity are nullable additions. An addition whose citation or answer cannot be used is left out, while required parts stay strict.
+- An empty comparison cell is shown as "—".
+- New quality checks: the lesson must be written in the goal's language, and it must use at least three representations.
+- The instructions now reserve `order` for real sequences and point lists without an order to `choice`.
+
+Runbook results with Ollama + Qwen3.6, same file and question:
+
+| Draft version | Valid | Notes |
+|---|---|---|
+| Separate activities and evidence (before) | 2/5 | Valid lessons were thin: pages made only of excerpts, one in English |
+| Inline only | 0/3 | References held, but the model filled pages with excerpts and left out activities; the new checks rejected them even after repair |
+| Inline + shape in schema, first run | 1/3 | Remaining failures: one 95-line citation in a reflection, one empty comparison cell |
+| Inline + shape + optional additions + empty cells | **3/3** | 162 s and 176 s without repair, 280 s with one repair |
+
+Claim review of the last batch:
+- All three lessons are in Italian, focused on the frontend sections (lines 93–321), and end with an `order` that matches the runbook's sequence.
+- The checked choice answers are correct. Among them: the digest is the release identity, and only the container image changes in the task definition.
+- One inaccuracy: "build Docker multi-piattaforma", where the runbook specifies `linux/amd64` only.
+- Weaknesses that remain: distractors are easy, almost every page uses a comparison, and lesson titles start with "Break the Wall:".

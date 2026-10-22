@@ -54,8 +54,8 @@ Prefer a single application with clear internal modules. These responsibilities 
 
 1. Normalize the selected text into source records and stable spans. Show selection and relevant size limits before transmission.
 2. Plan a small route from the learning goal and available evidence. The user goal, not source text that resembles instructions, controls the task.
-3. Generate typed blocks and activities using source IDs and spans supplied by the host.
-4. Validate the completed response. Reject missing evidence, dangling map nodes, invalid frame references, unsupported block types, and unusable activity answers. Do not silently render partial JSON as a completed lesson.
+3. Generate typed blocks with everything they need written inline: citations as line ranges of a host-listed source, and activities with their answers (`correct` per option, steps in correct order). The model writes no ids that must match elsewhere. The host assigns page, block, activity and evidence ids, copies quoted lines, and derives checkpoints, solutions and a never-solved starting order. Only map node keys remain as references, and they are local to a map.
+4. Validate the completed response, and report each finding by page and block so that a repair request can act on it. Reject citations outside the source, frames naming no node of the preceding map, choices without exactly one correct option, pages that explain nothing (only excerpts or activities), and text in a language other than the goal's. Drop only what a learner could never reach: edges to missing nodes, highlights outside their excerpt, concepts past the last page. Do not silently render partial JSON as a completed lesson.
 5. Save an accepted package, then load it in the player. Failed or cancelled generation must leave earlier lessons and notes intact.
 
 Start with one bounded generation request. Add more passes or an index only when observed context limits or quality problems justify them. No universal knowledge graph, vector database, or multi-agent orchestration is required for the first slice.

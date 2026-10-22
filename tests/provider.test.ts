@@ -218,7 +218,7 @@ describe('generation orchestration and saved lessons (T6)', () => {
   it('saves nothing when the provider result is invalid or the request is cancelled, and keeps earlier lessons', async () => {
     const first = await setup(async () => JSON.stringify(draftFor('src-x')));
     const invalid = await first.generator.generate(first.request, () => {});
-    expect(invalid).toMatchObject({ ok: false, failure: { code: 'invalid-output', issues: expect.arrayContaining(['Missing source: all']) } });
+    expect(invalid).toMatchObject({ ok: false, failure: { code: 'invalid-output', issues: expect.arrayContaining([expect.stringMatching(/source/)]) } });
     expect(await readdir(first.root)).toEqual([]);
 
     const ok = await setup(async () => JSON.stringify(draftFor(ok.source.id)));

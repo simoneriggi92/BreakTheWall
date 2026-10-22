@@ -156,7 +156,7 @@ describe('local generation with one repair pass (T5b)', () => {
     const goal = { outcome: 'Spiegare il ciclo dell’acqua', priorKnowledge: '' };
     return { root, store, seen, local, chatgpt, generator, request: (route: object) => ({ sources: [source], goal, route }) };
   }
-  const broken = (id: string) => JSON.stringify({ ...draftFor(id), activities: draftFor(id).activities.map(a => a.type === 'choice' ? { ...a, correctId: 'missing' } : a) });
+  const broken = (id: string) => { const d = draftFor(id); d.opening.prediction.options.forEach(o => { o.correct = false; }); return JSON.stringify(d); };
   const valid = (id: string) => JSON.stringify(draftFor(id));
   const route = { provider: 'local', runtime: 'llamacpp', baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf' };
 
@@ -168,7 +168,7 @@ describe('local generation with one repair pass (T5b)', () => {
     expect(local).toHaveBeenCalledWith({ runtime: 'llamacpp', baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf' });
     expect(seen).toHaveLength(2);
     expect(seen[1].messages.map(m => m.role)).toEqual(['user', 'assistant', 'user']);
-    expect(seen[1].messages[2].content).toContain('Invalid choice solution: predict');
+    expect(seen[1].messages[2].content).toContain('Tappa 1, prediction: serve esattamente un’opzione con correct=true (ne ha 0).');
     expect(phases).toContain('repairing');
     expect((await store.list()).lessons[0].generation).toMatchObject({ provider: 'local', runtime: 'llamacpp', model: 'qwen.gguf' });
   });
