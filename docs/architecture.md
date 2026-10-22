@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: design baseline approved in plan P-20261021-first-learning-loop v1 on 2026-10-21. The player phase is being implemented; the desktop shell and runtime contracts exist. Import/provider/generation components below remain planned. See the plan's execution evidence for current completion.
+Status: design baseline approved in plan P-20261021-first-learning-loop v1 on 2026-10-21. The player phase is verified. Import, provider and generation components are implemented (`src/core/source.ts`, `src/core/generation.ts`, `src/desktop/chatgpt/`, `src/desktop/generator.ts`); live inference is not yet witnessed. See the plan's execution evidence for current completion.
 
 ## Entry point and lifecycle
 
@@ -67,6 +67,14 @@ Activity feedback is deterministic for the initial structured activities. Free-t
 ## AI access and source discovery
 
 The preferred initial integration is the documented Sign in with ChatGPT route through an isolated provider adapter. Eligibility, supported request features, token refresh, and a completed inference need a witnessed check before the alpha can claim live generation. See the [documentation evidence and limits](workflow/research/R-20261021-foundation.md).
+
+The second route is a model server on the learner's Mac (plan v2, T5b). It is chosen in the generation step and stored in `<userData>/settings.json`.
+
+- **Discovery** probes the default ports of Ollama (11434), LM Studio (1234) and llama.cpp server (8080). It identifies each runtime by its own endpoints, so an unrelated app on the same port is never listed. A manual address is accepted only for `127.0.0.1`, `localhost` or `[::1]`.
+- **Schema mechanism per runtime:** Ollama uses `format`, llama.cpp server uses `/apply-template` followed by `/completion` with `json_schema`, and LM Studio and other compatible servers use `response_format`.
+- **Format check:** a schema can be accepted and still ignored, as the [local inference trial](workflow/research/R-20261022-local-inference.md) showed with Ollama 0.30.8. Before generating, the app therefore sends a tiny probe and shows whether the server enforced the schema.
+- **Repair pass:** local results get one repair request with the validator's findings. The ChatGPT route does not, so it never spends a second request of the learner's plan.
+- **Where the code lives:** `src/desktop/local/runtimes.ts`, `src/desktop/settings-store.ts`, and the route-aware `src/desktop/generator.ts`.
 
 Codex app-server is an integration option if later tool-driven repository exploration needs it. It is not required merely to render lessons or send selected text for generation. Do not tie the core lesson model to an agent runtime.
 

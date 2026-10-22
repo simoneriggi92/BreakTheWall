@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-const id = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
+export const idSchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
+const id = idSchema;
 const text = z.string().min(1).max(2000);
 const short = z.string().min(1).max(200);
 export const iconSchema = z.enum(['route', 'inbox', 'shield', 'database', 'send', 'thermometer', 'target', 'gauge', 'flame', 'loop', 'eye', 'lightbulb', 'warning', 'check', 'layers', 'code', 'book', 'compare', 'puzzle']);
@@ -8,12 +9,13 @@ const tone = z.enum(['green', 'blue', 'amber', 'purple']);
 const point = z.strictObject({ icon: iconSchema, text });
 const points = z.array(point).min(1).max(6);
 const refs = z.array(id).min(1).max(12);
-const source = z.strictObject({
-  id, title: short, origin: z.literal('original-prepared'), revision: id,
+export const sourceOriginSchema = z.enum(['original-prepared', 'user-pasted', 'user-file']);
+export const sourceSchema = z.strictObject({
+  id, title: short, origin: sourceOriginSchema, revision: id,
   text: z.string().min(1).max(100_000), sha256: z.string().regex(/^[a-f0-9]{64}$/),
   language: z.string().max(30).optional(),
 });
-const evidence = z.strictObject({ id, sourceId: id, startLine: z.number().int().positive(), endLine: z.number().int().positive(), quote: z.string().min(1).max(20_000), highlights: z.array(z.number().int().positive()).max(100) });
+export const evidenceSchema = z.strictObject({ id, sourceId: id, startLine: z.number().int().positive(), endLine: z.number().int().positive(), quote: z.string().min(1).max(20_000), highlights: z.array(z.number().int().positive()).max(100) });
 const node = z.strictObject({ id, title: short, icon: iconSchema, tone, summary: short, points, evidenceIds: refs });
 const map = z.strictObject({ type: z.literal('map'), id, title: short, nodes: z.array(node).min(2).max(6), edges: z.array(z.strictObject({ from: id, to: id, label: short })).min(1).max(10) });
 const sequence = z.strictObject({ type: z.literal('sequence'), id, title: short, mapId: id, caveat: text,
@@ -35,20 +37,23 @@ const order = z.strictObject({ type: z.literal('order'), id, title: short, promp
   success: text, retry: text, evidenceIds: refs,
 });
 export const activitySchema = z.discriminatedUnion('type', [choice, order]);
+export const conceptSchema = z.strictObject({ id, title: short, icon: iconSchema, definition: text, pageId: id, evidenceIds: refs });
+export const pageSchema = z.strictObject({ id, title: short, eyebrow: short, icon: iconSchema, intro: text, blocks: z.array(blockSchema).min(1).max(5), checkpoint: id.optional() });
 export const lessonSchema = z.strictObject({
-  schemaVersion: z.literal(1), id, revision: id, kind: z.literal('prepared'),
+  schemaVersion: z.literal(1), id, revision: id, kind: z.enum(['prepared', 'generated']),
+  generation: z.strictObject({ provider: z.enum(['chatgpt', 'local']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime() }).optional(),
   title: short, subtitle: text, category: short, icon: iconSchema,
   goal: z.strictObject({ outcome: text, priorKnowledge: short }),
-  sources: z.array(source).min(1).max(12), evidence: z.array(evidence).min(1).max(200),
-  concepts: z.array(z.strictObject({ id, title: short, icon: iconSchema, definition: text, pageId: id, evidenceIds: refs })).min(1).max(40),
-  pages: z.array(z.strictObject({ id, title: short, eyebrow: short, icon: iconSchema, intro: text, blocks: z.array(blockSchema).min(1).max(5), checkpoint: id.optional() })).min(2).max(30),
+  sources: z.array(sourceSchema).min(1).max(12), evidence: z.array(evidenceSchema).min(1).max(200),
+  concepts: z.array(conceptSchema).min(1).max(40),
+  pages: z.array(pageSchema).min(2).max(30),
   activities: z.array(activitySchema).max(30),
 });
 export type Lesson = z.infer<typeof lessonSchema>;
 export type Block = z.infer<typeof blockSchema>;
 export type Activity = z.infer<typeof activitySchema>;
-export type Evidence = z.infer<typeof evidence>;
-export type Source = z.infer<typeof source>;
+export type Evidence = z.infer<typeof evidenceSchema>;
+export type Source = z.infer<typeof sourceSchema>;
 export type IconName = z.infer<typeof iconSchema>;
 export type Point = z.infer<typeof point>;
 
@@ -78,7 +83,9 @@ export async function validateLesson(input: unknown): Promise<Lesson> {
   unique(lesson.concepts.map(x => x.id), 'concept');
   const blocks = lesson.pages.flatMap(p => p.blocks);
   unique(blocks.map(x => x.id), 'block');
+  if ((lesson.kind === 'generated') !== !!lesson.generation) issues.push('Generation metadata must match the lesson kind');
   for (const source of lesson.sources) {
+    if ((source.origin === 'original-prepared') !== (lesson.kind === 'prepared')) issues.push(`Source origin does not match the lesson kind: ${source.id}`);
     if (source.text.includes('\r') || source.sha256 !== await hashText(source.text)) issues.push(`Source revision/hash mismatch: ${source.id}`);
   }
   for (const ref of lesson.evidence) {
@@ -128,6 +135,8 @@ export async function validateLesson(input: unknown): Promise<Lesson> {
       const ids = activity.items.map(x => x.id);
       unique(ids, `items in ${activity.id}`);
       if (activity.solution.length !== ids.length || new Set(activity.solution).size !== ids.length || activity.solution.some(x => !ids.includes(x))) issues.push(`Invalid order solution: ${activity.id}`);
+      // The player starts from the listed order, so a list already in solution order would hand over the answer.
+      else if (ids.every((x, i) => x === activity.solution[i])) issues.push(`Order activity starts solved: ${activity.id}`);
     }
   }
   if (issues.length) throw new LessonError(issues);

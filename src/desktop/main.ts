@@ -1,6 +1,21 @@
-import { app, BrowserWindow, ipcMain, net, protocol, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, protocol, safeStorage, session, shell } from 'electron';
+import { readFile, stat } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { loadPreparedLessons } from '../fixtures/lessons';
+import { ProgressStore } from './progress-store';
+import { progressKeySchema } from '../core/bridge';
+import { stateSchema } from '../core/state';
+import { failure, localModelSchema, ProviderError, type PickedSources } from '../core/provider';
+import { importSource, SOURCE_LIMITS, SourceImportError } from '../core/source';
+import { ChatGPTAccount } from './chatgpt/account';
+import { AUTH } from './chatgpt/oauth';
+import { Generator } from './generator';
+import { checkFormat, detectServer, discoverServers, localCompleter } from './local/runtimes';
+import { SettingsStore } from './settings-store';
+import { LessonStore } from './lesson-store';
+import { hostIdFile, SafeStorageVault } from './secure-files';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'btw', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.setName('Break the Wall');
@@ -14,6 +29,88 @@ function trustedSender(event: Electron.IpcMainInvokeEvent) {
   if (!url || event.senderFrame !== event.sender.mainFrame || !url.startsWith(origin + '/')) throw new Error('Untrusted sender');
 }
 
+/** Import, account and generation operations. Tokens and file paths never cross into the renderer. */
+function registerStudio(userData: string, lessons: LessonStore) {
+  const account = new ChatGPTAccount({
+    vault: new SafeStorageVault(join(userData, 'credentials', 'chatgpt.bin'), safeStorage),
+    hostId: hostIdFile(join(userData, 'credentials', 'agent-host.json')),
+    fetch: globalThis.fetch.bind(globalThis),
+    openExternal: async url => { if (!url.startsWith(AUTH.authorize + '?')) throw new Error('Unexpected sign-in URL'); await shell.openExternal(url); },
+    log: message => console.info(`[chatgpt] ${message}`),
+  });
+  const localFetch = globalThis.fetch.bind(globalThis);
+  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, lessons);
+  const settings = new SettingsStore(join(userData, 'settings.json'));
+  const asFailure = (error: unknown) => {
+    if (error instanceof ProviderError) return { ok: false as const, failure: error.failure };
+    console.error('[studio]', (error as Error)?.message);
+    return { ok: false as const, failure: failure('unavailable') };
+  };
+  ipcMain.handle('sources:pick', async event => {
+    trustedSender(event);
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const options = { title: 'Scegli fonti di testo', properties: ['openFile', 'multiSelections'] as ('openFile' | 'multiSelections')[], filters: [{ name: 'Testo e Markdown', extensions: ['txt', 'md', 'markdown'] }] };
+    const picked = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+    const result: PickedSources = { sources: [], errors: [] };
+    for (const path of picked.canceled ? [] : picked.filePaths.slice(0, SOURCE_LIMITS.maxSources)) {
+      const name = basename(path);
+      try {
+        // Size is checked before reading; only the selected files are opened, never their folder.
+        const info = await stat(path);
+        if (!info.isFile()) throw new SourceImportError('unsupported-type', `«${name}» non è un file.`);
+        if (info.size > SOURCE_LIMITS.maxFileBytes) throw new SourceImportError('too-large', `«${name}» supera il limite di ${SOURCE_LIMITS.maxFileBytes / 1000} kB.`);
+        result.sources.push(await importSource({ kind: 'file', name, bytes: new Uint8Array(await readFile(path)) }));
+      } catch (error) {
+        result.errors.push({ name, message: error instanceof SourceImportError ? error.message : `«${name}» non è leggibile.` });
+      }
+    }
+    if (picked.filePaths.length > SOURCE_LIMITS.maxSources) result.errors.push({ name: '', message: `Sono stati considerati solo i primi ${SOURCE_LIMITS.maxSources} file.` });
+    return result;
+  });
+  ipcMain.handle('account:status', event => { trustedSender(event); return account.status(); });
+  ipcMain.handle('account:sign-in', async (event, input: unknown) => {
+    trustedSender(event);
+    try { return { ok: true, status: await account.signIn({ consent: (input as { consent?: unknown })?.consent === true }) }; }
+    catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('account:cancel-sign-in', event => { trustedSender(event); account.cancelSignIn(); });
+  ipcMain.handle('account:sign-out', event => { trustedSender(event); return account.signOut(); });
+  ipcMain.handle('account:models', async event => {
+    trustedSender(event);
+    try { return { ok: true, models: await account.models() }; }
+    catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('generation:start', async (event, input: unknown) => {
+    trustedSender(event);
+    let last = 0; let phase = '';
+    try {
+      return await generator.generate(input, progress => {
+        const now = Date.now();
+        // Phase changes are always sent; byte counts are throttled.
+        if (progress.phase !== phase || now - last > 200) { last = now; phase = progress.phase; event.sender.send('generation:progress', progress); }
+      });
+    } catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('settings:get', event => { trustedSender(event); return settings.read(); });
+  ipcMain.handle('settings:save', (event, input: unknown) => { trustedSender(event); return settings.write(input); });
+  ipcMain.handle('local:discover', event => { trustedSender(event); return discoverServers(localFetch); });
+  ipcMain.handle('local:connect', async (event, address: unknown) => {
+    trustedSender(event);
+    try {
+      const server = await detectServer(localFetch, String(address ?? ''));
+      return server ? { ok: true, server } : { ok: false, failure: failure('local-unreachable', { message: 'A questo indirizzo non risponde un server di modelli riconosciuto (Ollama, LM Studio, llama.cpp o compatibile OpenAI).' }) };
+    } catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('local:check', async (event, input: unknown) => {
+    trustedSender(event);
+    try { return { ok: true, check: await checkFormat(localFetch, localModelSchema.parse(input)) }; }
+    catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('generation:cancel', event => { trustedSender(event); generator.cancel(); });
+  ipcMain.handle('lessons:list', event => { trustedSender(event); return lessons.list(); });
+  ipcMain.handle('account:usage-settings', async event => { trustedSender(event); await shell.openExternal('https://chatgpt.com/#settings'); });
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     title: 'Break the Wall', width: 1480, height: 980, minWidth: 720, minHeight: 650,
@@ -25,7 +122,7 @@ function createWindow() {
   void window.loadURL(origin + '/');
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   const root = resolve(__dirname, '../dist');
   protocol.handle('btw', request => {
     const url = new URL(request.url);
@@ -37,7 +134,14 @@ void app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   ipcMain.handle('runtime:get', event => { trustedSender(event); return { platform: process.platform, mode: 'desktop' }; });
+  const userData = app.getPath('userData');
+  const prepared = await loadPreparedLessons();
+  const lessons = new LessonStore(join(userData, 'lessons'));
+  const store = new ProgressStore(join(userData, 'workspaces'), async key => prepared.find(x => x.id === key.lessonId && x.revision === key.revision) ?? lessons.find(key.lessonId, key.revision));
+  ipcMain.handle('progress:load', (event, key: unknown) => { trustedSender(event); return store.load(progressKeySchema.parse(key)); });
+  ipcMain.handle('progress:save', (event, input: unknown) => { trustedSender(event); return store.save(stateSchema.parse(input)); });
+  registerStudio(userData, lessons);
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
-});
+}).catch(error => { console.error('Desktop initialization failed:', error.message); app.quit(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
