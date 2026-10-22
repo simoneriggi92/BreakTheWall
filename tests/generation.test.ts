@@ -27,6 +27,16 @@ describe('generated lesson assembly (T6)', () => {
     expect('checkpoint' in lesson.pages[1]).toBe(false);
   });
 
+  it('never starts an order activity in its solution order', async () => {
+    const lesson = await assemble(d => ({ ...d, activities: d.activities.map(a => a.type === 'order' ? { ...a, items: a.solution.map(id => a.items.find(i => i.id === id)!) } : a) }));
+    const order = lesson.activities.find(a => a.type === 'order')!;
+    if (order.type !== 'order') throw new Error('expected an order activity');
+    expect(order.items.map(i => i.id)).toEqual(['cond', 'rain', 'evap']);
+    expect(order.solution).toEqual(['evap', 'cond', 'rain']);
+    const untouched = await assemble();
+    expect(untouched.activities.find(a => a.id === 'order-steps')).toEqual(draftFor(untouched.sources[0].id).activities[1]);
+  });
+
   it('fails visibly on incomplete, malformed or unsupported output', async () => {
     const full = JSON.stringify(draftFor('x'));
     expect(await issues(full.slice(0, full.length / 2))).toEqual(['La risposta non è JSON completo.']);

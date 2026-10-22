@@ -32,6 +32,7 @@ Defects found and fixed during implementation:
 
 - A sign-in cancelled before the loopback port opened was lost, so the sign-in never ended. The provider test caught it; the listener now honors an already-aborted signal.
 - Progress saves resolved generated lessons asynchronously before queueing, so two quick saves could land out of order. Lookup now runs inside the write queue.
+- Found in the [local inference trial](../../research/R-20261022-local-inference.md): order activities whose items were listed in solution order started already solved, because the player begins from the listed order. Generated drafts now rotate such lists. The lesson contract rejects any order activity that starts solved, prepared or generated. Two tests cover it.
 
 ## Remaining for T5–T6
 

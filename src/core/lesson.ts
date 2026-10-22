@@ -135,6 +135,8 @@ export async function validateLesson(input: unknown): Promise<Lesson> {
       const ids = activity.items.map(x => x.id);
       unique(ids, `items in ${activity.id}`);
       if (activity.solution.length !== ids.length || new Set(activity.solution).size !== ids.length || activity.solution.some(x => !ids.includes(x))) issues.push(`Invalid order solution: ${activity.id}`);
+      // The player starts from the listed order, so a list already in solution order would hand over the answer.
+      else if (ids.every((x, i) => x === activity.solution[i])) issues.push(`Order activity starts solved: ${activity.id}`);
     }
   }
   if (issues.length) throw new LessonError(issues);

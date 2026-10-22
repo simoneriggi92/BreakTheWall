@@ -21,6 +21,7 @@ describe('lesson boundary', () => {
     ['frame map', (x: any) => { x.pages[1].blocks[0].mapId = 'missing'; }],
     ['activity choice', (x: any) => { x.activities[0].correctId = 'missing'; }],
     ['activity order', (x: any) => { x.activities[1].solution = ['a', 'a', 'c']; }],
+    ['order already solved', (x: any) => { x.activities[1].items = ['a', 'b', 'c'].map(id => x.activities[1].items.find((i: any) => i.id === id)); }],
     ['checkpoint', (x: any) => { x.pages[0].checkpoint = 'sort'; }],
     ['duplicate IDs', (x: any) => { x.pages[1].id = 'one'; }],
     ['evidence ref', (x: any) => { x.concepts[0].evidenceIds = ['missing']; }],

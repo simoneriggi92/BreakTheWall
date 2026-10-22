@@ -84,6 +84,12 @@ export function assessGenerated(lesson: Lesson): string[] {
   return issues;
 }
 
+/** Models often list order items in solution order. Rotating keeps the items and the solution; only the starting order changes. */
+function startUnsolved(activity: LessonDraft['activities'][number]): LessonDraft['activities'][number] {
+  if (activity.type !== 'order' || !activity.items.every((x, i) => x.id === activity.solution[i])) return activity;
+  return { ...activity, items: [...activity.items.slice(1), activity.items[0]] };
+}
+
 /** The only path from model output to a lesson: parse, attach host-owned data, validate, assess. */
 export async function assembleLesson(raw: string, sources: UserSource[], goal: LearningGoal, meta: GenerationMeta): Promise<Lesson> {
   let json: unknown;
@@ -105,7 +111,7 @@ export async function assembleLesson(raw: string, sources: UserSource[], goal: L
     goal: { outcome: goal.outcome, priorKnowledge: goal.priorKnowledge || 'Non indicate' },
     sources, evidence, concepts: draft.concepts,
     pages: draft.pages.map(({ checkpoint, ...page }) => checkpoint ? { ...page, checkpoint } : page),
-    activities: draft.activities,
+    activities: draft.activities.map(startUnsolved),
   });
   const issues = assessGenerated(lesson);
   if (issues.length) throw new LessonError(issues);
