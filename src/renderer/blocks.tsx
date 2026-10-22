@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Link2, Search, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, Link2, Pin, Search, TriangleAlert } from 'lucide-react';
 import type { Activity, Block, Lesson, Point } from '../core/lesson';
 import { sourceExcerpt } from '../core/lesson';
 import { evaluate, solved, type LearnerState } from '../core/state';
@@ -24,23 +24,29 @@ export function EvidenceView({ lesson, ids, compact = false }: { lesson: Lesson;
   </section>;
 }
 
-function MapBlock({ block, lesson, state, change }: { block: Extract<Block, { type: 'map' }>; lesson: Lesson; state: LearnerState; change: ChangeState }) {
+interface SourceOptions { sourcePinned: boolean; setSourcePinned: (value: boolean) => void }
+function WithSource({ lesson, ids, sourcePinned, setSourcePinned, children, className }: SourceOptions & { lesson: Lesson; ids: string[]; children: React.ReactNode; className: string }) {
+  const [open, setOpen] = useState(false);
+  const expanded = open || sourcePinned;
+  const hasCode = ids.some(id => sourceExcerpt(lesson, id).source.language);
+  return <div className={`${className} ${expanded ? 'with-source' : ''}`}><div className="explanation-copy">{children}<div className="source-actions"><button className="text-button" aria-expanded={expanded} onClick={() => { setOpen(!expanded); if (expanded) setSourcePinned(false); }}><Link2 size={16}/>{expanded ? 'Chiudi la fonte' : hasCode ? 'Collega al codice' : 'Collega alla fonte'}</button>{expanded && <button className="pin-source" aria-pressed={sourcePinned} onClick={() => { setOpen(true); setSourcePinned(!sourcePinned); }}><Pin size={14}/>{sourcePinned ? 'Fonte fissata' : 'Tieni affiancata'}</button>}</div></div>{expanded && <EvidenceView lesson={lesson} ids={ids} compact/>}</div>;
+}
+
+function MapBlock({ block, lesson, state, change, sourcePinned, setSourcePinned }: SourceOptions & { block: Extract<Block, { type: 'map' }>; lesson: Lesson; state: LearnerState; change: ChangeState }) {
   const selected = block.nodes.find(n => n.id === state.nodes[block.id]) ?? block.nodes[0];
   return <section className="block map-block"><div className="block-heading"><span className="section-label"><Icon name="route" size={17}/> MAPPA DEL CONCETTO</span><span className="micro">SELEZIONA UN BLOCCO</span></div><h2>{block.title}</h2>
     <ol className="map-path">{block.nodes.map((node, i) => <li key={node.id}><button className={`map-node tone-${node.tone}`} aria-pressed={selected.id === node.id} onClick={() => change(s => ({ ...s, nodes: { ...s.nodes, [block.id]: node.id } }))}><span className="node-top"><span className="node-icon"><Icon name={node.icon} size={23}/></span><span className="node-number">0{i + 1}</span></span><strong>{node.title}</strong><small>{node.summary}</small></button>{block.edges.filter(e => e.from === node.id).map(e => <div className="map-relation" key={e.to}><ArrowRight size={14} aria-hidden="true"/><span>{e.label}{i === block.nodes.length - 1 ? ` ${block.nodes.find(n => n.id === e.to)?.title.toLocaleLowerCase()}` : ''}</span></div>)}</li>)}</ol>
-    <div className="map-detail" key={selected.id}><div className="concept-copy"><span className={`concept-symbol tone-${selected.tone}`}><Icon name={selected.icon} size={26}/></span><h3>{selected.title}<small>Che cosa succede qui</small></h3><Points points={selected.points}/></div><EvidenceView lesson={lesson} ids={selected.evidenceIds} compact/></div>
+    <WithSource lesson={lesson} ids={selected.evidenceIds} className="map-detail" sourcePinned={sourcePinned} setSourcePinned={setSourcePinned}><div className="concept-copy"><h3><Icon name={selected.icon} size={23}/>{selected.title}</h3><Points points={selected.points}/></div></WithSource>
   </section>;
 }
 
-function SequenceBlock({ block, lesson, state, change }: { block: Extract<Block, { type: 'sequence' }>; lesson: Lesson; state: LearnerState; change: ChangeState }) {
+function SequenceBlock({ block, lesson, state, change, sourcePinned, setSourcePinned }: SourceOptions & { block: Extract<Block, { type: 'sequence' }>; lesson: Lesson; state: LearnerState; change: ChangeState }) {
   const index = Math.max(0, block.frames.findIndex(f => f.id === state.frames[block.id]));
   const frame = block.frames[index];
-  const map = lesson.pages.flatMap(x => x.blocks).find(x => x.id === block.mapId && x.type === 'map');
   const setFrame = (i: number) => change(s => ({ ...s, frames: { ...s.frames, [block.id]: block.frames[i].id } }));
   return <section className="block sequence-block"><div className="block-heading"><span className="section-label"><Icon name="layers" size={17}/> SEQUENZA CONTROLLABILE</span><span className="micro">MODELLO ILLUSTRATIVO</span></div><h2>{block.title}</h2>
     <div className="frame-tabs" aria-label="Fotogrammi">{block.frames.map((f, i) => <button key={f.id} aria-pressed={i === index} onClick={() => setFrame(i)}><span>{i + 1}</span><Icon name={f.icon} size={17}/><small>{f.title}</small></button>)}</div>
-    {map?.type === 'map' && <div className="sequence-path" aria-label="Posizione nel percorso">{map.nodes.map((node, i) => <span key={node.id} className={node.id === frame.activeNodeId ? 'active' : ''}><Icon name={node.icon} size={16}/>{node.title}{i < map.nodes.length - 1 && <ArrowRight size={13} aria-hidden="true"/>}</span>)}</div>}
-    <div className="frame-layout"><div className="frame-copy" key={frame.id} aria-live="polite"><span className="pill">FOTOGRAMMA {index + 1} / {block.frames.length}</span><h3><Icon name={frame.icon} size={25}/>{frame.title}</h3><dl className="state-flow"><div><dt>PRIMA</dt><dd>{frame.before}</dd></div><div className="state-action"><dt>AZIONE</dt><dd>{frame.action}</dd></div><div><dt>DOPO</dt><dd>{frame.after}</dd></div></dl><Points points={frame.points}/></div><EvidenceView lesson={lesson} ids={frame.evidenceIds} compact/></div>
+    <WithSource lesson={lesson} ids={frame.evidenceIds} className="frame-layout" sourcePinned={sourcePinned} setSourcePinned={setSourcePinned}><div className="frame-copy" key={frame.id} aria-live="polite"><span className="frame-counter">FOTOGRAMMA {index + 1} DI {block.frames.length}</span><h3><Icon name={frame.icon} size={25}/>{frame.title}</h3><dl className="state-flow"><div><dt>PRIMA</dt><dd>{frame.before}</dd></div><div className="state-action"><dt>AZIONE</dt><dd>{frame.action}</dd></div><div><dt>DOPO</dt><dd>{frame.after}</dd></div></dl><Points points={frame.points}/></div></WithSource>
     <div className="frame-controls"><button className="subtle" disabled={!index} onClick={() => setFrame(index - 1)}><ArrowLeft size={16}/>Fotogramma precedente</button><span className="micro">AVANZI TU</span><button className="subtle" disabled={index === block.frames.length - 1} onClick={() => setFrame(index + 1)}>Fotogramma successivo<ArrowRight size={16}/></button></div>
     <p className="caveat"><TriangleAlert size={16} aria-hidden="true"/>{block.caveat}</p>
   </section>;
@@ -65,11 +71,11 @@ function ActivityView({ activity, lesson, state, onAttempt }: { activity: Activi
   </section>;
 }
 
-export function LessonBlock({ block, lesson, state, change, onAttempt }: { block: Block; lesson: Lesson; state: LearnerState; change: ChangeState; onAttempt: (id: string, answer: string[]) => void }) {
+export function LessonBlock({ block, lesson, state, change, onAttempt, sourcePinned, setSourcePinned }: SourceOptions & { block: Block; lesson: Lesson; state: LearnerState; change: ChangeState; onAttempt: (id: string, answer: string[]) => void }) {
   const [showReference, setShowReference] = useState(false);
   switch (block.type) {
-    case 'map': return <MapBlock block={block} lesson={lesson} state={state} change={change}/>;
-    case 'sequence': return <SequenceBlock block={block} lesson={lesson} state={state} change={change}/>;
+    case 'map': return <MapBlock block={block} lesson={lesson} state={state} change={change} sourcePinned={sourcePinned} setSourcePinned={setSourcePinned}/>;
+    case 'sequence': return <SequenceBlock block={block} lesson={lesson} state={state} change={change} sourcePinned={sourcePinned} setSourcePinned={setSourcePinned}/>;
     case 'lens': return <details className="lens"><summary><Search size={21} aria-hidden="true"/><span>Lente sul concetto<strong>{block.title}</strong></span><ChevronDown size={18} aria-hidden="true"/></summary><Points points={[
       { icon: 'lightbulb', text: `Cos’è → ${block.what}` }, { icon: 'target', text: `Perché qui → ${block.why}` }, { icon: 'route', text: `Come funziona → ${block.how}` }, { icon: 'warning', text: `Punto critico → ${block.risk}` },
     ]}/><details className="source-disclosure"><summary><Link2 size={15}/>Riferimenti della lente</summary><EvidenceView lesson={lesson} ids={block.evidenceIds}/></details></details>;

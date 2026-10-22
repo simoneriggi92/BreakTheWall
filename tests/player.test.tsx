@@ -30,7 +30,7 @@ const radio = (label: string) => main().getByRole('radio', { name: literal(label
 async function open(lesson: Lesson, bridge = memoryBridge().bridge) {
   const user = userEvent.setup();
   render(<App bridge={bridge} prepared={lessons}/>);
-  await user.click(screen.getByRole('button', { name: new RegExp(lesson.title) }));
+  await user.click(within(screen.getByRole('region', { name: 'Esplora un esempio' })).getByRole('button', { name: new RegExp(lesson.title) }));
   await screen.findByRole('heading', { level: 1, name: lesson.pages[0].title });
   return user;
 }
@@ -50,6 +50,8 @@ describe.each(lessons.map(lesson => [lesson.title, lesson] as const))('player ·
     await user.click(main().getByRole('button', { name: new RegExp(last.title) }));
     expect(main().getByRole('button', { name: new RegExp(last.title) })).toHaveAttribute('aria-pressed', 'true');
     const ref = lesson.evidence.find(e => e.id === last.evidenceIds[0])!;
+    expect(document.querySelector('.map-detail .evidence')).not.toBeInTheDocument();
+    await user.click(main().getByRole('button', { name: /Collega (al codice|alla fonte)/ }));
     expect(highlighted(document.querySelector('.map-detail')!)).toEqual(ref.highlights);
   });
 
@@ -58,6 +60,8 @@ describe.each(lessons.map(lesson => [lesson.title, lesson] as const))('player ·
     const sequence = blocksOf(lesson).find((b): b is Extract<Block, { type: 'sequence' }> => b.type === 'sequence')!;
     const page = lesson.pages.find(p => p.blocks.includes(sequence))!;
     await goTo(user, lesson, page.id);
+    await user.click(main().getByRole('button', { name: /Collega (al codice|alla fonte)/ }));
+    await user.click(main().getByRole('button', { name: 'Tieni affiancata' }));
     const tabs = within(main().getByLabelText('Fotogrammi')).getAllByRole('button');
     for (const [i, frame] of sequence.frames.entries()) {
       await user.click(tabs[i]);
@@ -75,6 +79,9 @@ describe.each(lessons.map(lesson => [lesson.title, lesson] as const))('player ·
     await goTo(user, lesson, page.id);
     const next = () => main().getByRole('button', { name: /Prossima tappa/ });
     expect(next()).toBeDisabled();
+    expect(main().queryByRole('radio')).not.toBeInTheDocument();
+    await user.click(main().getByRole('button', { name: 'Ora prova tu' }));
+    expect(main().queryByLabelText('Fotogrammi')).not.toBeInTheDocument();
     const wrong = activity.options.find(o => o.id !== activity.correctId)!;
     const right = activity.options.find(o => o.id === activity.correctId)!;
     await user.click(radio(wrong.label));
@@ -93,6 +100,7 @@ describe.each(lessons.map(lesson => [lesson.title, lesson] as const))('player ·
     const page = pageWith(lesson, 'choice');
     const activity = activityOf(lesson, 'choice') as Extract<Activity, { type: 'choice' }>;
     await goTo(user, lesson, page.id);
+    await user.click(main().getByRole('button', { name: 'Ora prova tu' }));
     const right = activity.options.find(o => o.id === activity.correctId)!;
     radio(right.label).focus();
     await user.keyboard(' ');
@@ -135,19 +143,49 @@ describe.each(lessons.map(lesson => [lesson.title, lesson] as const))('player ·
     const page = pageWith(lesson, 'choice');
     const activity = activityOf(lesson, 'choice') as Extract<Activity, { type: 'choice' }>;
     await goTo(user, lesson, page.id);
+    await user.click(main().getByRole('button', { name: 'Ora prova tu' }));
     await user.click(radio(activity.options[0].label));
     await user.click(main().getByRole('button', { name: /Verifica il ragionamento/ }));
-    await user.type(main().getByLabelText('Cosa vuoi ricordare di questa tappa?'), 'Rifare su carta');
+    await user.click(main().getByRole('button', { name: 'Aggiungi un collegamento' }));
+    await user.type(screen.getByLabelText('Cosa vuoi ricordare di questa tappa?'), 'Rifare su carta');
+    await user.click(screen.getByRole('button', { name: 'Chiudi strumenti' }));
     await waitFor(() => expect(memory.saved.get(memory.key({ lessonId: lesson.id, revision: lesson.revision }))?.notes[page.id]).toBe('Rifare su carta'));
     const stored = memory.saved.get(memory.key({ lessonId: lesson.id, revision: lesson.revision }))!;
     expect(stored.pageId).toBe(page.id);
     expect(stored.attempts).toHaveLength(1);
     document.body.innerHTML = '';
     render(<App bridge={memory.bridge} prepared={lessons}/>);
-    await user.click(screen.getByRole('button', { name: new RegExp(lesson.title) }));
+    await user.click(within(screen.getByRole('region', { name: 'Esplora un esempio' })).getByRole('button', { name: new RegExp(lesson.title) }));
     await screen.findByRole('heading', { level: 1, name: page.title });
-    expect(main().getByLabelText('Cosa vuoi ricordare di questa tappa?')).toHaveValue('Rifare su carta');
     expect(main().getByText(/1 tentativo registrato/)).toBeInTheDocument();
+    await user.click(main().getByRole('button', { name: 'Rivedi i tuoi appunti' }));
+    expect(screen.getByLabelText('Cosa vuoi ricordare di questa tappa?')).toHaveValue('Rifare su carta');
+  });
+});
+
+describe('study tools and resume', () => {
+  it('opens a concept map instead of a second page index, switches tabs by keyboard and saves notes', async () => {
+    const memory = memoryBridge();
+    const user = await open(lessons[0], memory.bridge);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Strumenti' }));
+    const tools = within(screen.getByRole('dialog', { name: 'Strumenti' }));
+    const map = blocksOf(lessons[0]).find((b): b is Extract<Block, { type: 'map' }> => b.type === 'map')!;
+    for (const node of map.nodes) expect(tools.getByRole('button', { name: new RegExp(node.title) })).toBeInTheDocument();
+    expect(tools.queryByRole('navigation')).not.toBeInTheDocument();
+    tools.getByRole('tab', { name: 'Mappa' }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tools.getByRole('tab', { name: 'Atlante' })).toHaveFocus();
+    expect(tools.getByLabelText('Cerca nell’atlante')).toBeInTheDocument();
+    await user.keyboard('{ArrowRight}');
+    expect(tools.getByRole('tab', { name: 'Appunti' })).toHaveAttribute('aria-selected', 'true');
+    await user.type(tools.getByLabelText('Cosa vuoi ricordare di questa tappa?'), 'Collega i confini');
+    await user.click(tools.getByRole('button', { name: 'Chiudi strumenti' }));
+    await user.click(screen.getByRole('button', { name: 'Torna ai percorsi' }));
+    const resume = within(await screen.findByRole('region', { name: 'RIPRENDI DA DOVE ERI' }));
+    await user.click(resume.getByRole('button', { name: /Riprendi/ }));
+    await user.click(await screen.findByRole('button', { name: 'Rivedi i tuoi appunti' }));
+    expect(screen.getByLabelText('Cosa vuoi ricordare di questa tappa?')).toHaveValue('Collega i confini');
   });
 });
 

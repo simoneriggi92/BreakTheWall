@@ -7,5 +7,5 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return <Component size={size} strokeWidth={1.7} aria-hidden="true" />;
 }
 export function Brand() {
-  return <span className="brand"><svg width="35" height="32" viewBox="0 0 35 32" fill="currentColor" aria-hidden="true"><rect x="0" y="23" width="14" height="8" rx="2"/><rect x="17" y="23" width="14" height="8" rx="2"/><rect x="4" y="12" width="14" height="8" rx="2"/><rect x="21" y="11" width="12" height="8" rx="2" transform="rotate(-13 21 11)"/><rect x="8" y="1" width="13" height="8" rx="2"/><rect x="26" y="0" width="7" height="6" rx="1.5" transform="rotate(13 26 0)"/></svg><span>Break the Wall<small>UN CONCETTO ALLA VOLTA</small></span></span>;
+  return <span className="brand"><svg width="32" height="29" viewBox="0 0 34 31" fill="currentColor" aria-hidden="true"><g transform="rotate(-6 16 15)"><rect x="1" y="2" width="13" height="9" rx="1.5"/><rect x="17" y="2" width="13" height="9" rx="1.5"/><rect x="1" y="14" width="13" height="9" rx="1.5"/><rect x="21" y="18" width="13" height="9" rx="1.5" opacity=".5" transform="rotate(20 21 18)"/></g></svg><span>Break the Wall<small>UN CONCETTO ALLA VOLTA</small></span></span>;
 }

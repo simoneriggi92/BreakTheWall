@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ClipboardPaste, FileText, KeyRound, LogOut, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, ClipboardPaste, FileText, KeyRound, LogOut, Sparkles, Trash2, X } from 'lucide-react';
 import { buildGenerationInput } from '../core/generation';
 import type { Lesson } from '../core/lesson';
 import type { AccountStatus, ModelOption, ProviderFailure, StudioBridge } from '../core/provider';
@@ -11,12 +11,16 @@ export const emptyDraft: StudioDraft = { sources: [], outcome: '', prior: '' };
 const fmt = (n: number) => n.toLocaleString('it-IT');
 
 /** Source workspace → goal → account and generation. Nothing leaves the device before "Genera il percorso". */
-export function Studio({ studio, draft, setDraft, onCreated }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (lesson: Lesson) => void }) {
+export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (lesson: Lesson) => void; onBusyChange?: (busy: boolean) => void }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [pasting, setPasting] = useState(false);
   const [paste, setPaste] = useState({ title: '', text: '', language: '' });
   const total = draft.sources.reduce((sum, x) => sum + x.text.length, 0);
   const goal = goalSchema.safeParse({ outcome: draft.outcome, priorKnowledge: draft.prior });
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { titleRef.current?.focus({ preventScroll: true }); window.scrollTo({ top: 0 }); }, [step]);
 
   const add = (incoming: UserSource[], extra: string[] = []) => {
     const problems = [...extra];
@@ -42,10 +46,11 @@ export function Studio({ studio, draft, setDraft, onCreated }: { studio?: Studio
   };
 
   return <section className="studio" aria-labelledby="studio-title">
-    <div className="library-section-head"><div><span className="eyebrow">NUOVO PERCORSO</span><h2 id="studio-title">Rompi il muro su una tua fonte.</h2></div><span className="pill">ALPHA · UNA RICHIESTA PER PERCORSO</span></div>
+    <div className="library-section-head"><div><span className="eyebrow">CREA UN PERCORSO</span><h1 id="studio-title" ref={titleRef} tabIndex={-1}>Rompi il muro su una tua fonte.</h1></div></div>
+    <nav className="creation-steps" aria-label="Passaggi di creazione"><ol>{['Materiale', 'Obiettivo', 'Generazione'].map((label, i) => <li key={label}><button aria-current={step === i ? 'step' : undefined} disabled={busy || (i > 0 && !draft.sources.length) || (i > 1 && !goal.success)} onClick={() => setStep(i)}><span>{i + 1}</span>{label}</button></li>)}</ol></nav>
     <div className="studio-steps">
-      <div className="studio-step">
-        <span className="step-label"><span className="step-number">1</span><Icon name="book" size={18}/>Fonti</span>
+      <div className="studio-step" hidden={step !== 0}>
+        <span className="step-label"><Icon name="book" size={18}/>Scegli cosa studiare</span>
         <p className="step-hint">Testo incollato o file .txt e .md. Fino a {SOURCE_LIMITS.maxSources} fonti e {fmt(SOURCE_LIMITS.maxTotalChars)} caratteri.</p>
         <div className="studio-actions">
           <button className="subtle" aria-expanded={pasting} onClick={() => setPasting(x => !x)}><ClipboardPaste size={16}/>Incolla testo</button>
@@ -64,16 +69,19 @@ export function Studio({ studio, draft, setDraft, onCreated }: { studio?: Studio
           <summary><Icon name={source.language ? 'code' : 'book'} size={17}/><span><strong>{source.title}</strong><small>{fmt(source.text.split('\n').length)} righe · {fmt(source.text.length)} caratteri · {source.origin === 'user-file' ? 'file' : 'incollato'}</small></span></summary>
           <SourcePreview source={source}/>
         </details><button className="icon-button" aria-label={`Rimuovi ${source.title}`} onClick={() => setDraft(d => ({ ...d, sources: d.sources.filter(x => x.id !== source.id) }))}><Trash2 size={15}/></button></li>)}</ul>}
-        <div className="meter" aria-label="Spazio usato dalle fonti"><span style={{ width: `${Math.min(100, total / SOURCE_LIMITS.maxTotalChars * 100)}%` }}/></div>
+        <progress className="source-capacity" aria-label="Spazio usato dalle fonti" value={total} max={SOURCE_LIMITS.maxTotalChars}/>
         <p className="micro plain">{draft.sources.length}/{SOURCE_LIMITS.maxSources} fonti · {fmt(total)} / {fmt(SOURCE_LIMITS.maxTotalChars)} caratteri</p>
+        <div className="creation-controls"><span>Il materiale resta sul dispositivo fino alla generazione.</span><button className="primary" disabled={!draft.sources.length} onClick={() => setStep(1)}>Continua con l’obiettivo<ArrowRight size={16}/></button></div>
       </div>
-      <div className="studio-step">
-        <span className="step-label"><span className="step-number">2</span><Icon name="target" size={18}/>Obiettivo</span>
+      <div className="studio-step" hidden={step !== 1}>
+        <span className="step-label"><Icon name="target" size={18}/>Dai una direzione al percorso</span>
+        <p className="step-hint">Hai scelto {draft.sources.length} {draft.sources.length === 1 ? 'fonte' : 'fonti'}. Ora definisci il collegamento che vuoi costruire.</p>
         <label>Alla fine, cosa vuoi saper spiegare o fare?<textarea rows={4} maxLength={400} value={draft.outcome} placeholder="es. Spiegare perché il client invia ACK dopo SYN-ACK e cosa succede se si perde" onChange={e => setDraft(d => ({ ...d, outcome: e.target.value }))}/></label>
         <label><span>Cosa sai già? <span className="optional">facoltativo</span></span><input maxLength={200} value={draft.prior} placeholder="es. Conosco IP, non TCP" onChange={e => setDraft(d => ({ ...d, prior: e.target.value }))}/></label>
         {draft.outcome && !goal.success && <p className="field-error">{goal.error.issues[0]?.message}</p>}
+        <div className="creation-controls"><button className="subtle" onClick={() => setStep(0)}><ArrowLeft size={16}/>Materiale</button><button className="primary" disabled={!goal.success} onClick={() => setStep(2)}>Continua alla generazione<ArrowRight size={16}/></button></div>
       </div>
-      <Generate studio={studio} sources={draft.sources} goal={goal.success ? goal.data : undefined} onCreated={onCreated}/>
+      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{draft.sources.length} {draft.sources.length === 1 ? 'fonte' : 'fonti'}</span><p>{draft.outcome}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>Modifica l’obiettivo</button></div><Generate studio={studio} sources={draft.sources} goal={goal.success ? goal.data : undefined} onCreated={onCreated} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
     </div>
   </section>;
 }
@@ -87,7 +95,7 @@ export function SourcePreview({ source }: { source: UserSource }) {
   </div>;
 }
 
-function Generate({ studio, sources, goal, onCreated }: { studio?: StudioBridge; sources: UserSource[]; goal?: { outcome: string; priorKnowledge: string }; onCreated: (lesson: Lesson) => void }) {
+function Generate({ studio, sources, goal, onCreated, onBusyChange }: { studio?: StudioBridge; sources: UserSource[]; goal?: { outcome: string; priorKnowledge: string }; onCreated: (lesson: Lesson) => void; onBusyChange: (value: boolean) => void }) {
   const [status, setStatus] = useState<AccountStatus>();
   const [models, setModels] = useState<ModelOption[]>([]);
   const [model, setModel] = useState('');
@@ -120,11 +128,12 @@ function Generate({ studio, sources, goal, onCreated }: { studio?: StudioBridge;
   };
   const generate = async () => {
     if (!goal) return;
-    setProblem(undefined); setRunning(true); setReceived(0);
-    const result = await studio.generate({ sources, goal, model });
-    setRunning(false);
-    if (result.ok) onCreated(result.lesson);
-    else { setProblem(result.failure); if (result.failure.action === 'sign-in') setStatus(await studio.accountStatus()); }
+    setProblem(undefined); setRunning(true); setReceived(0); onBusyChange(true);
+    try {
+      const result = await studio.generate({ sources, goal, model });
+      if (result.ok) onCreated(result.lesson);
+      else { setProblem(result.failure); if (result.failure.action === 'sign-in') setStatus(await studio.accountStatus()); }
+    } finally { setRunning(false); onBusyChange(false); }
   };
   const missing = [!sources.length && 'almeno una fonte', !goal && 'un obiettivo', !planReady && 'l’accesso a ChatGPT', planReady && !model && 'un modello'].filter(Boolean);
   const action = (f: ProviderFailure) => f.action === 'sign-in' ? <button onClick={() => void signIn()}>Accedi di nuovo</button>

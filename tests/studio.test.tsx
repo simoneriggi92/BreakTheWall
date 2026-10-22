@@ -43,12 +43,14 @@ const studioRegion = () => within(screen.getByRole('region', { name: /Rompi il m
 async function prepare(bridge: DesktopBridge) {
   const user = userEvent.setup();
   render(<App bridge={bridge} prepared={prepared}/>);
+  await user.click(screen.getByRole('button', { name: 'Crea un percorso' }));
   const studio = studioRegion();
   await user.click(studio.getByRole('button', { name: /Incolla testo/ }));
   await user.type(studio.getByLabelText('Nome della fonte'), 'Appunti sul ciclo');
   await user.click(studio.getByLabelText('Testo'));
   await user.paste(SOURCE_TEXT + '\r\n\r\n');
   await user.click(studio.getByRole('button', { name: 'Aggiungi fonte' }));
+  await user.click(studio.getByRole('button', { name: 'Continua con l’obiettivo' }));
   await user.type(studio.getByLabelText(/cosa vuoi saper spiegare/i), goal);
   return { user, studio };
 }
@@ -57,12 +59,16 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
   it('adds a pasted source, previews its numbered lines and shows exactly the request that will be sent', async () => {
     const { bridge, studio: fake } = desktop();
     const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Materiale' }));
     const item = studio.getByText('Appunti sul ciclo').closest('details')!;
     expect(within(item).getByText(`7 righe · ${SOURCE_TEXT.length.toLocaleString('it-IT')} caratteri · incollato`)).toBeInTheDocument();
     await user.click(within(item).getByText('Appunti sul ciclo'));
     const preview = within(item).getByLabelText('Anteprima di Appunti sul ciclo');
     expect(preview.querySelectorAll('.source-line')).toHaveLength(7);
     expect(preview.textContent).toContain('4In quota il vapore si raffredda e condensa in nuvole.');
+    await user.click(studio.getByRole('button', { name: 'Continua con l’obiettivo' }));
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    await user.click(studio.getByText('Cosa verrà inviato'));
     const sent = studio.getByText(/OBIETTIVO DI APPRENDIMENTO/);
     const source = { ...(await import('../src/core/source').then(m => m.importSource({ kind: 'paste', title: 'Appunti sul ciclo', text: SOURCE_TEXT }))) };
     expect(sent.textContent).toBe(buildGenerationInput([source], { outcome: goal, priorKnowledge: '' }));
@@ -73,6 +79,7 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
     const { bridge } = desktop();
     const user = userEvent.setup();
     render(<App bridge={bridge} prepared={prepared}/>);
+    await user.click(screen.getByRole('button', { name: 'Crea un percorso' }));
     const studio = studioRegion();
     await user.click(studio.getByRole('button', { name: /Incolla testo/ }));
     await user.type(studio.getByLabelText('Nome della fonte'), 'Vuota');
@@ -87,6 +94,7 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
   it('needs sign-in before generating, then opens the validated lesson labelled as AI-generated', async () => {
     const { bridge, studio: fake } = desktop();
     const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     expect(studio.getByRole('button', { name: /Genera il percorso/ })).toBeDisabled();
     expect(studio.getByText(/Serve ancora l’accesso a ChatGPT/)).toBeInTheDocument();
     await user.click(studio.getByRole('button', { name: /Accedi con ChatGPT/ }));
@@ -95,14 +103,17 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
     expect(fake.generate).toHaveBeenCalledWith(expect.objectContaining({ model: 'model-a', goal: { outcome: goal, priorKnowledge: '' } }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Gli attori del ciclo' })).toBeInTheDocument();
     expect(screen.getByText('Generato con AI')).toBeInTheDocument();
-    expect(screen.getAllByText(/Citazioni verificate sulle tue fonti/)[0]).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Strumenti' }));
+    expect(screen.getByText(/Citazioni verificate sulle tue fonti/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Chiudi strumenti' }));
     await user.click(screen.getByRole('button', { name: 'Torna ai percorsi' }));
-    expect(await screen.findByRole('button', { name: /Il ciclo dell’acqua/ })).toHaveTextContent('model-a');
+    expect(await screen.findByRole('region', { name: 'I tuoi percorsi' })).toHaveTextContent('Il ciclo dell’acqua');
   });
 
   it('turns provider failures into a message with the matching recovery, keeping the draft', async () => {
     const { bridge, studio: fake } = desktop({ generate: async () => ({ ok: false, failure: failure('usage-limit') }) });
     const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     await user.click(studio.getByRole('button', { name: /Accedi con ChatGPT/ }));
     await waitFor(() => expect(studio.getByRole('button', { name: /Genera il percorso/ })).toBeEnabled());
     await user.click(studio.getByRole('button', { name: /Genera il percorso/ }));
@@ -110,12 +121,16 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
     expect(alert).toHaveTextContent('limite di utilizzo');
     await user.click(within(alert).getByRole('button', { name: /Apri le impostazioni di ChatGPT/ }));
     expect(fake.openUsageSettings).toHaveBeenCalled();
+    await user.click(studio.getByRole('button', { name: 'Modifica l’obiettivo' }));
+    expect(studio.getByLabelText(/cosa vuoi saper spiegare/i)).toHaveValue(goal);
+    await user.click(studio.getByRole('button', { name: 'Materiale' }));
     expect(studio.getByText('Appunti sul ciclo')).toBeInTheDocument();
   });
 
   it('offers to enable plan usage when sign-in did not grant it', async () => {
     const { bridge, studio: fake } = desktop({ plan: false });
     const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     await user.click(studio.getByRole('button', { name: /Accedi con ChatGPT/ }));
     await user.click(await studio.findByRole('button', { name: /Abilita l’uso del piano ChatGPT/ }));
     expect(fake.signIn).toHaveBeenLastCalledWith({ consent: true });
@@ -124,8 +139,24 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
   it('keeps generation desktop-only in the browser preview', async () => {
     const { bridge } = desktop();
     const { studio: _ignored, ...browser } = bridge;
-    render(<App bridge={browser} prepared={prepared}/>);
-    expect(studioRegion().getByText(/Accesso e generazione sono disponibili nell’app desktop/)).toBeInTheDocument();
+    const { user, studio } = await prepare(browser);
+    await user.click(studio.getByRole('button', { name: 'Materiale' }));
     expect(studioRegion().getByRole('button', { name: /Scegli file/ })).toBeDisabled();
+    await user.click(studio.getByRole('button', { name: 'Continua con l’obiettivo' }));
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    expect(studioRegion().getByText(/Accesso e generazione sono disponibili nell’app desktop/)).toBeInTheDocument();
+  });
+
+  it('keeps creation out of the home, blocks empty steps, and retains an added source and goal in the session draft', async () => {
+    const { bridge, studio: fake } = desktop();
+    const { user, studio } = await prepare(bridge);
+    expect(studio.queryByRole('button', { name: 'Genera il percorso' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Torna ai percorsi' }));
+    expect(screen.queryByRole('region', { name: /Rompi il muro/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Continua la bozza' }));
+    expect(studioRegion().getByText('Appunti sul ciclo')).toBeInTheDocument();
+    await user.click(studioRegion().getByRole('button', { name: 'Continua con l’obiettivo' }));
+    expect(studioRegion().getByLabelText(/cosa vuoi saper spiegare/i)).toHaveValue(goal);
+    expect(fake.generate).not.toHaveBeenCalled();
   });
 });
