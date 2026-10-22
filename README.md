@@ -80,9 +80,14 @@ While a lesson is generated, the app shows an estimated percentage and remaining
 
 ### Validation and citations
 
-- **Citations:** the model cites line ranges only; the app copies the quoted lines from your source.
-- **Contract check:** every lesson must pass it before it is saved. The check rejects missing or out-of-range citations, dangling map and frame references, unusable activities, and routes without a map or with fewer than three representations.
-- **Safe normalizations:** the app never starts an order activity in its solution order, and it drops gates or activities that a learner could never reach.
+- **Citations:** the model writes each citation inside the block it supports, as a line range of one of your sources; the app copies the quoted lines.
+- **No ids to get wrong:** the model marks the correct option and writes steps in their correct order. The app assigns every id and derives answers and gates, which removes the reference errors local models made most often.
+- **Contract and quality checks:** findings are reported by page and block, before saving. The app rejects:
+  - citations outside the source;
+  - choices without exactly one correct answer;
+  - pages that explain nothing;
+  - routes without a map, with fewer than three representations, or written in a different language from your goal.
+- **Safe normalizations:** the app never starts an order activity in its solution order, and it drops only what a learner could never reach.
 - **Failures:** a failed or cancelled generation saves nothing and leaves earlier lessons and notes untouched.
 
 ### Progress and privacy
