@@ -1,17 +1,29 @@
 import { z } from 'zod';
-import { activitySchema, conceptSchema, iconSchema, idSchema, LessonError, pageSchema, validateLesson, type Lesson } from './lesson';
+import { conceptSchema, iconSchema, idSchema, LessonError, pageSchema, validateLesson, type Activity, type Lesson } from './lesson';
 import type { LearningGoal, UserSource } from './source';
 
 /**
  * What the model fills in. It never writes source text, hashes or quotes: it cites line ranges,
  * and the host copies the exact lines. Optional fields are nullable so the JSON Schema stays strict.
  */
+const draftText = z.string().min(1).max(2000);
+const draftShort = z.string().min(1).max(200);
+const draftRefs = z.array(idSchema).min(1).max(12);
+/**
+ * Activities are drafted without cross-references a model can get wrong: each option says whether it is correct,
+ * and an order activity lists its steps already in the right order. The host derives correctId, the solution
+ * and a starting order that is never already solved.
+ */
+const draftActivity = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('choice'), id: idSchema, title: draftShort, prompt: draftText, options: z.array(z.strictObject({ id: idSchema, label: draftText, feedback: draftText, correct: z.boolean() })).min(2).max(5), evidenceIds: draftRefs }),
+  z.strictObject({ type: z.literal('order'), id: idSchema, title: draftShort, prompt: draftText, steps: z.array(z.strictObject({ id: idSchema, label: draftShort })).min(3).max(6), success: draftText, retry: draftText, evidenceIds: draftRefs }),
+]);
 export const draftSchema = z.strictObject({
   title: z.string().min(1).max(200), subtitle: z.string().min(1).max(2000), category: z.string().min(1).max(200), icon: iconSchema,
   evidence: z.array(z.strictObject({ id: idSchema, sourceId: idSchema, startLine: z.number().int().min(1), endLine: z.number().int().min(1), highlights: z.array(z.number().int().min(1)).max(100) })).min(1).max(200),
   concepts: z.array(conceptSchema).min(1).max(40),
   pages: z.array(pageSchema.extend({ checkpoint: idSchema.nullable() })).min(3).max(12),
-  activities: z.array(activitySchema).min(1).max(30),
+  activities: z.array(draftActivity).min(1).max(30),
 });
 export type LessonDraft = z.infer<typeof draftSchema>;
 
@@ -49,7 +61,9 @@ STRUTTURA
 - 3-7 tappe (pages). La prima apre con una mappa (map) dei 3-6 elementi principali e delle loro relazioni (edges con etichette come "dipende da", "invia a", "causa", "contiene").
 - Usa sequence per processi o flussi nel tempo: ogni frame dice prima/azione/dopo e indica activeNodeId, un nodo della mappa indicata da mapId.
 - Usa comparison per alternative o distinzioni, lens per un concetto non immediato (cos'è, perché qui, come funziona, punto critico), source per mostrare un estratto, reflection per far rielaborare con parole proprie.
-- Almeno 2 attività (activities): una choice di previsione e una order di ricostruzione dei passaggi. Ogni opzione sbagliata ha un feedback che nomina l'errore di ragionamento e rimanda alla fonte. Ogni attività compare in esattamente un blocco activity.
+- Almeno 2 attività (activities): una choice di previsione e una order di ricostruzione dei passaggi. Ogni attività compare in esattamente un blocco activity.
+- choice: segna con correct=true esattamente UNA opzione, false tutte le altre. Ogni opzione sbagliata ha un feedback che nomina l'errore di ragionamento e rimanda alla fonte.
+- order: scrivi steps nell'ordine CORRETTO; l'app li presenta mescolati allo studente.
 - checkpoint di una tappa: l'id di un'attività presente in quella tappa, oppure null. Usa checkpoint per le previsioni che devono precedere la tappa successiva.
 - concepts: 3-12 voci dell'atlante, ciascuna con pageId della tappa che la spiega.
 
@@ -78,6 +92,7 @@ export function buildRepairMessage(issues: string[]): string {
     'Restituisci la bozza COMPLETA corretta, con lo stesso schema. Correggi solo ciò che serve:',
     '- ogni id citato (evidenceIds, activityId, checkpoint, mapId, activeNodeId, pageId, sourceId) deve esistere;',
     '- ogni attività compare in esattamente un blocco activity; il checkpoint di una tappa è un’attività presente in quella tappa;',
+    '- in ogni choice esattamente un’opzione ha correct=true; in ogni order gli steps sono nell’ordine corretto;',
     '- startLine, endLine e highlights usano i numeri di riga della fonte.'].join('\n');
 }
 
@@ -117,10 +132,16 @@ export function assessGenerated(lesson: Lesson): string[] {
   return issues;
 }
 
-/** Models often list order items in solution order. Rotating keeps the items and the solution; only the starting order changes. */
-function startUnsolved(activity: LessonDraft['activities'][number]): LessonDraft['activities'][number] {
-  if (activity.type !== 'order' || !activity.items.every((x, i) => x.id === activity.solution[i])) return activity;
-  return { ...activity, items: [...activity.items.slice(1), activity.items[0]] };
+/** Derives the stored activity from its draft. A choice must mark exactly one correct option. */
+function toActivity(draft: LessonDraft['activities'][number], issues: string[]): Activity {
+  if (draft.type === 'choice') {
+    const correct = draft.options.filter(o => o.correct);
+    if (correct.length !== 1) issues.push(`La scelta ${draft.id} deve avere esattamente un’opzione con correct=true (ne ha ${correct.length}).`);
+    return { type: 'choice', id: draft.id, title: draft.title, prompt: draft.prompt, options: draft.options.map(({ correct: _c, ...option }) => option), correctId: correct[0]?.id ?? draft.options[0].id, evidenceIds: draft.evidenceIds };
+  }
+  // Rotating the correct order by one never leaves it solved, and keeps every step.
+  const items = [...draft.steps.slice(1), draft.steps[0]];
+  return { type: 'order', id: draft.id, title: draft.title, prompt: draft.prompt, items, solution: draft.steps.map(x => x.id), success: draft.success, retry: draft.retry, evidenceIds: draft.evidenceIds };
 }
 
 /** The only path from model output to a lesson: parse, attach host-owned data, validate, assess. */
@@ -135,19 +156,29 @@ export async function assembleLesson(raw: string, sources: UserSource[], goal: L
     const source = sources.find(x => x.id === ref.sourceId);
     const quote = source ? source.text.split('\n').slice(ref.startLine - 1, ref.endLine).join('\n') : '';
     // An out-of-range span yields a short quote; validateLesson reports it instead of the excerpt being widened or clipped.
-    return { ...ref, quote: quote || ' ' };
+    // Highlights only emphasize lines inside the excerpt; any outside it are dropped, the cited span itself is never changed.
+    return { ...ref, highlights: ref.highlights.filter(line => line >= ref.startLine && line <= ref.endLine), quote: quote || ' ' };
   });
-  const lesson = await validateLesson({
-    schemaVersion: 1, id: meta.id, revision: 'v1', kind: 'generated',
-    generation: { provider: meta.provider ?? 'chatgpt', ...(meta.runtime ? { runtime: meta.runtime } : {}), model: meta.model, createdAt: meta.createdAt },
-    title: draft.title, subtitle: draft.subtitle, category: draft.category, icon: draft.icon,
-    goal: { outcome: goal.outcome, priorKnowledge: goal.priorKnowledge || 'Non indicate' },
-    sources, evidence, concepts: draft.concepts,
-    // A checkpoint only gates progress. One that names no activity on its own page is dropped rather than failing the lesson.
-    pages: draft.pages.map(({ checkpoint, ...page }) => checkpoint && page.blocks.some(b => b.type === 'activity' && b.activityId === checkpoint) ? { ...page, checkpoint } : page),
-    // An activity no block shows can never be attempted; it is dropped instead of failing the lesson.
-    activities: draft.activities.filter(a => draft.pages.some(p => p.blocks.some(b => b.type === 'activity' && b.activityId === a.id))).map(startUnsolved),
-  });
+  const draftIssues: string[] = [];
+  // An activity no block shows can never be attempted; it is dropped instead of failing the lesson.
+  const activities = draft.activities.filter(a => draft.pages.some(p => p.blocks.some(b => b.type === 'activity' && b.activityId === a.id))).map(a => toActivity(a, draftIssues));
+  let lesson: Lesson;
+  try {
+    lesson = await validateLesson({
+      schemaVersion: 1, id: meta.id, revision: 'v1', kind: 'generated',
+      generation: { provider: meta.provider ?? 'chatgpt', ...(meta.runtime ? { runtime: meta.runtime } : {}), model: meta.model, createdAt: meta.createdAt },
+      title: draft.title, subtitle: draft.subtitle, category: draft.category, icon: draft.icon,
+      goal: { outcome: goal.outcome, priorKnowledge: goal.priorKnowledge || 'Non indicate' },
+      sources, evidence, concepts: draft.concepts,
+      // A checkpoint only gates progress. One that names no activity on its own page is dropped rather than failing the lesson.
+      pages: draft.pages.map(({ checkpoint, ...page }) => checkpoint && page.blocks.some(b => b.type === 'activity' && b.activityId === checkpoint) ? { ...page, checkpoint } : page),
+      activities,
+    });
+  } catch (error) {
+    // All findings together, so a repair request can fix them in one pass.
+    throw error instanceof LessonError ? new LessonError([...draftIssues, ...error.issues]) : error;
+  }
+  if (draftIssues.length) throw new LessonError(draftIssues);
   const issues = assessGenerated(lesson);
   if (issues.length) throw new LessonError(issues);
   return lesson;

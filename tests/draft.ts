@@ -48,11 +48,11 @@ export function draftFor(sourceId: string): LessonDraft {
     ],
     activities: [
       { type: 'choice', id: 'predict', title: 'Previsione', prompt: 'Che cosa succede al vapore in quota?', options: [
-        { id: 'condenses', label: 'Condensa in nuvole', feedback: 'Sì: si raffredda e condensa (riga 4).' },
-        { id: 'heats', label: 'Si scalda ancora', feedback: 'In quota si raffredda: rileggi la riga 4.' },
-      ], correctId: 'condenses', evidenceIds: ['rain'] },
-      { type: 'order', id: 'order-steps', title: 'Ricostruisci', prompt: 'Metti in ordine.', items: [{ id: 'rain', label: 'Pioggia' }, { id: 'evap', label: 'Evaporazione' }, { id: 'cond', label: 'Condensazione' }],
-        solution: ['evap', 'cond', 'rain'], success: 'Ordine corretto.', retry: 'Parti dal calore.', evidenceIds: ['all'] },
+        { id: 'condenses', label: 'Condensa in nuvole', feedback: 'Sì: si raffredda e condensa (riga 4).', correct: true },
+        { id: 'heats', label: 'Si scalda ancora', feedback: 'In quota si raffredda: rileggi la riga 4.', correct: false },
+      ], evidenceIds: ['rain'] },
+      { type: 'order', id: 'order-steps', title: 'Ricostruisci', prompt: 'Metti in ordine.', steps: [{ id: 'evap', label: 'Evaporazione' }, { id: 'cond', label: 'Condensazione' }, { id: 'rain', label: 'Pioggia' }],
+        success: 'Ordine corretto.', retry: 'Parti dal calore.', evidenceIds: ['all'] },
     ],
   };
 }

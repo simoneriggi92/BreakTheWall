@@ -27,14 +27,23 @@ describe('generated lesson assembly (T6)', () => {
     expect('checkpoint' in lesson.pages[1]).toBe(false);
   });
 
-  it('never starts an order activity in its solution order', async () => {
-    const lesson = await assemble(d => ({ ...d, activities: d.activities.map(a => a.type === 'order' ? { ...a, items: a.solution.map(id => a.items.find(i => i.id === id)!) } : a) }));
+  it('derives activity answers from the draft: one marked option, steps written in the correct order and shown rotated', async () => {
+    const lesson = await assemble();
+    const choice = lesson.activities.find(a => a.type === 'choice')!;
+    if (choice.type !== 'choice') throw new Error('expected a choice activity');
+    expect(choice.correctId).toBe('condenses');
+    expect(choice.options.every(o => !('correct' in o))).toBe(true);
     const order = lesson.activities.find(a => a.type === 'order')!;
     if (order.type !== 'order') throw new Error('expected an order activity');
-    expect(order.items.map(i => i.id)).toEqual(['cond', 'rain', 'evap']);
     expect(order.solution).toEqual(['evap', 'cond', 'rain']);
-    const untouched = await assemble();
-    expect(untouched.activities.find(a => a.id === 'order-steps')).toEqual(draftFor(untouched.sources[0].id).activities[1]);
+    expect(order.items.map(i => i.id)).toEqual(['cond', 'rain', 'evap']);
+  });
+
+  it('asks for exactly one correct option, reporting it with the other findings for the repair pass', async () => {
+    const none = await issues(d => ({ ...d, activities: d.activities.map(a => a.type === 'choice' ? { ...a, options: a.options.map(o => ({ ...o, correct: false })) } : a) }));
+    expect(none).toEqual(['La scelta predict deve avere esattamente un’opzione con correct=true (ne ha 0).']);
+    const two = await issues(d => ({ ...d, evidence: d.evidence.map(e => e.id === 'rain' ? { ...e, endLine: 99 } : e), activities: d.activities.map(a => a.type === 'choice' ? { ...a, options: a.options.map(o => ({ ...o, correct: true })) } : a) }));
+    expect(two).toEqual(expect.arrayContaining(['La scelta predict deve avere esattamente un’opzione con correct=true (ne ha 2).', 'Out-of-range span: rain']));
   });
 
   it('fails visibly on incomplete, malformed or unsupported output', async () => {
@@ -47,12 +56,13 @@ describe('generated lesson assembly (T6)', () => {
   it('rejects citations that do not resolve to the source', async () => {
     expect(await issues(d => ({ ...d, evidence: d.evidence.map(e => e.id === 'rain' ? { ...e, endLine: 99 } : e) }))).toContain('Out-of-range span: rain');
     expect(await issues(d => ({ ...d, evidence: d.evidence.map(e => e.id === 'heat' ? { ...e, sourceId: 'src-unknown' } : e) }))).toContain('Missing source: heat');
-    expect(await issues(d => ({ ...d, evidence: d.evidence.map(e => e.id === 'limit' ? { ...e, highlights: [2] } : e) }))).toContain('Out-of-range highlight: limit');
+    // Emphasis outside the excerpt is dropped; the citation is kept.
+    const trimmed = await assemble(d => ({ ...d, evidence: d.evidence.map(e => e.id === 'limit' ? { ...e, highlights: [2, 7] } : e) }));
+    expect(trimmed.evidence.find(e => e.id === 'limit')).toMatchObject({ startLine: 7, endLine: 7, highlights: [7] });
   });
 
   it('rejects broken relationships and unusable activities', async () => {
     expect(await issues(d => { d.pages[1].blocks[0] = { ...d.pages[1].blocks[0], mapId: 'nope' } as never; return d; })).toEqual(expect.arrayContaining([expect.stringMatching(/Dangling frame node\/map/)]));
-    expect(await issues(d => ({ ...d, activities: d.activities.map(a => a.type === 'choice' ? { ...a, correctId: 'missing' } : a) }))).toContain('Invalid choice solution: predict');
     const ungated = await assemble(d => ({ ...d, pages: d.pages.map(p => ({ ...p, checkpoint: p.id === 'flow-page' ? 'predict' : p.checkpoint })) }));
     expect('checkpoint' in ungated.pages[1]).toBe(false);
     expect(ungated.pages[0].checkpoint).toBe('predict');

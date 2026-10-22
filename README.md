@@ -101,7 +101,7 @@ Start a model server, open **Crea un percorso → Generazione → Modello locale
 |---|---|---|---|
 | llama.cpp server | `127.0.0.1:8080` | `/completion` with `json_schema` | ✅ enforced |
 | LM Studio | `127.0.0.1:1234` | `response_format` JSON Schema | not yet tested |
-| Ollama | `127.0.0.1:11434` | `format` | ⚠️ ignored for the models tested; the app warns |
+| Ollama | `127.0.0.1:11434` | `format` | depends on the model: ✅ Qwen3.6, ⚠️ ignored for LFM2.5 (the app warns) |
 | Other OpenAI-compatible server | any loopback port | `response_format` JSON Schema | depends on the server |
 
 Measured on an M4 Pro with 48 GB, using Qwen3.6-35B-A3B (Q4_K_M) through llama.cpp: a lesson takes about 1–2 minutes. A smaller model, LFM2.5-24B-A2B, was faster but did not keep lesson references consistent. Details are in the [local inference trial](docs/workflow/research/R-20261022-local-inference.md).

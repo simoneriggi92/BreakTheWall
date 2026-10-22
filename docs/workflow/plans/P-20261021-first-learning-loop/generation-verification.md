@@ -90,3 +90,21 @@ Claim review of the two live local lessons, checked against their sources:
   - Two pages contain only an activity.
 
 Assessment: the local route works end to end for both domains on this Mac and keeps the source on the device. Its explanations need the same claim review as any generated lesson, and they make more mistakes than the source warrants. The UI labels them as generated locally. T5 (ChatGPT live inference) remains blocked on plan usage.
+
+### Owner report: TeamCity runbook (2026-10-22)
+
+The owner generated from a 340-line operational runbook (TeamCity → ECR → ECS release), asking how the frontend deploy works, with Ollama 0.30.8 and Qwen3.6-35B-A3B. For that model the format check passed: Ollama's enforcement depends on the model, unlike LFM2.5 in the trial. The lesson failed after the repair pass with `Invalid choice solution: choice-correct`: the model had written a description where an option id was expected.
+
+Fix: drafts no longer ask for that cross-reference.
+- Each choice option carries `correct: true/false`, and the host derives `correctId`, requiring exactly one correct option.
+- An order activity lists its steps in the correct order, and the host derives the solution and a rotated starting order. This also replaces the earlier "solved order" rotation.
+- Highlights outside their own excerpt are dropped. Excerpts are never moved.
+- Draft and contract findings are reported together, so the repair pass sees all of them at once.
+
+Reproduction with the app's generator on the same file, question and route, 5 attempts:
+- The choice error did not recur.
+- 2 of 5 produced a valid lesson after the repair pass (141 s and 202 s).
+- The failures were activities placed in no page (twice) and highlights outside their excerpt (once, before the highlight fix).
+- Claim review: both valid lessons are thin. One cites mostly the generic release model (lines 13–32) and has two pages made only of excerpts. The other is in English, although the goal is in Italian.
+
+Assessment: for a long operational document this local model is unreliable, and its lessons are shallow even when valid. The structural errors that remain come from cross-references between parts of the draft (activities placed in blocks, evidence ids).
