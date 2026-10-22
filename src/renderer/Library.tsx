@@ -58,5 +58,5 @@ export function Library({ lessons, generated, bridge, error, skipped, draft, set
 }
 
 function CourseCard({ lesson, onOpen }: { lesson: Lesson; onOpen: (id: string) => void }) {
-  return <button className={`lesson-card ${lesson.kind === 'generated' ? 'generated-card' : ''}`} onClick={() => onOpen(lesson.id)}><span className="card-head"><span className="card-symbol"><Icon name={lesson.icon} size={25}/></span><span className="micro">{lesson.kind === 'generated' ? 'GENERATO CON AI' : lesson.category}</span></span><h3>{lesson.title}</h3><p>{lesson.subtitle}</p><span className="card-bottom"><span>{lesson.pages.length} tappe · {lesson.activities.length} attività</span><ArrowRight size={18}/></span></button>;
+  return <button className={`lesson-card ${lesson.kind === 'generated' ? 'generated-card' : ''}`} onClick={() => onOpen(lesson.id)}><span className="card-head"><span className="card-symbol"><Icon name={lesson.icon} size={25}/></span><span className="micro">{lesson.kind !== 'generated' ? lesson.category : lesson.generation?.provider === 'local' ? 'GENERATO IN LOCALE' : 'GENERATO CON AI'}</span></span><h3>{lesson.title}</h3><p>{lesson.subtitle}</p><span className="card-bottom"><span>{lesson.pages.length} tappe · {lesson.activities.length} attività</span><ArrowRight size={18}/></span></button>;
 }

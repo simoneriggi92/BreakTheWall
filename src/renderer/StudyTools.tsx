@@ -1,5 +1,6 @@
 import { ArrowRight, BookOpen, Map, MessageSquareText, Search } from 'lucide-react';
 import type { Block, Lesson } from '../core/lesson';
+import { generatedBy } from '../core/provider';
 import { canVisit, type LearnerState } from '../core/state';
 import type { ChangeState } from './blocks';
 import { Icon } from './icons';
@@ -36,6 +37,6 @@ export function StudyTools({ lesson, state, tab, setTab, change, go }: {
       <details className="tool-goal"><summary><Icon name="target" size={17}/>Obiettivo del percorso</summary><p>{lesson.goal.outcome}</p></details></>}
       {tab === 'atlas' && <><label className="atlas-search"><Search size={15}/><input aria-label="Cerca nell’atlante" placeholder="Cerca un concetto…" value={search} onChange={e => setSearch(e.target.value)}/></label><label className="atlas-all"><input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)}/>Includi i concetti delle prossime tappe</label><div className="atlas-results">{filtered.map(c => <details className="atlas-concept" key={c.id}><summary><Icon name={c.icon} size={18}/>{c.title}</summary><p>{c.definition}</p><button className="text-button" disabled={!canVisit(lesson, state, c.pageId)} onClick={() => go(c.pageId)}>Vai alla spiegazione<ArrowRight size={13}/></button>{!canVisit(lesson, state, c.pageId) && <span className="micro plain">Disponibile dopo l’attività</span>}</details>)}</div>{!filtered.length && <p className="tools-hint">Nessun concetto corrisponde. Prova un’altra parola o includi le prossime tappe.</p>}</>}
       {tab === 'notes' && <div className="tools-notes"><span className="eyebrow">I TUOI COLLEGAMENTI</span><h3>{page.title}</h3><label htmlFor="page-note">Cosa vuoi ricordare di questa tappa?</label><textarea id="page-note" rows={8} maxLength={4000} value={state.notes[page.id] ?? ''} placeholder="Un perché, una domanda, uno schema da rifare su carta…" onChange={e => { const value = e.target.value; change(s => ({ ...s, notes: { ...s.notes, [page.id]: value } })); }}/><p className="micro plain">{(state.notes[page.id] ?? '').length}/4000 · salvato con il percorso</p></div>}
-    </div><p className="context-origin">{lesson.kind === 'generated' ? 'Citazioni verificate sulle tue fonti. Controlla anche il contenuto delle spiegazioni.' : 'Esempio preparato · fonti didattiche originali.'}</p>
+    </div><p className="context-origin">{lesson.kind === 'generated' ? `${generatedBy(lesson)}. Citazioni verificate sulle tue fonti; controlla anche il contenuto delle spiegazioni.` : 'Esempio preparato · fonti didattiche originali.'}</p>
   </div>;
 }

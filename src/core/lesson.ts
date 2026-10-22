@@ -41,7 +41,7 @@ export const conceptSchema = z.strictObject({ id, title: short, icon: iconSchema
 export const pageSchema = z.strictObject({ id, title: short, eyebrow: short, icon: iconSchema, intro: text, blocks: z.array(blockSchema).min(1).max(5), checkpoint: id.optional() });
 export const lessonSchema = z.strictObject({
   schemaVersion: z.literal(1), id, revision: id, kind: z.enum(['prepared', 'generated']),
-  generation: z.strictObject({ provider: z.literal('chatgpt'), model: short, createdAt: z.iso.datetime() }).optional(),
+  generation: z.strictObject({ provider: z.enum(['chatgpt', 'local']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime() }).optional(),
   title: short, subtitle: text, category: short, icon: iconSchema,
   goal: z.strictObject({ outcome: text, priorKnowledge: short }),
   sources: z.array(sourceSchema).min(1).max(12), evidence: z.array(evidenceSchema).min(1).max(200),

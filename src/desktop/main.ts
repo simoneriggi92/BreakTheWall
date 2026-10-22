@@ -7,11 +7,13 @@ import { loadPreparedLessons } from '../fixtures/lessons';
 import { ProgressStore } from './progress-store';
 import { progressKeySchema } from '../core/bridge';
 import { stateSchema } from '../core/state';
-import { failure, ProviderError, type PickedSources } from '../core/provider';
+import { failure, localModelSchema, ProviderError, type PickedSources } from '../core/provider';
 import { importSource, SOURCE_LIMITS, SourceImportError } from '../core/source';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
 import { Generator } from './generator';
+import { checkFormat, detectServer, discoverServers, localCompleter } from './local/runtimes';
+import { SettingsStore } from './settings-store';
 import { LessonStore } from './lesson-store';
 import { hostIdFile, SafeStorageVault } from './secure-files';
 
@@ -36,7 +38,9 @@ function registerStudio(userData: string, lessons: LessonStore) {
     openExternal: async url => { if (!url.startsWith(AUTH.authorize + '?')) throw new Error('Unexpected sign-in URL'); await shell.openExternal(url); },
     log: message => console.info(`[chatgpt] ${message}`),
   });
-  const generator = new Generator(account, lessons);
+  const localFetch = globalThis.fetch.bind(globalThis);
+  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, lessons);
+  const settings = new SettingsStore(join(userData, 'settings.json'));
   const asFailure = (error: unknown) => {
     if (error instanceof ProviderError) return { ok: false as const, failure: error.failure };
     console.error('[studio]', (error as Error)?.message);
@@ -78,13 +82,29 @@ function registerStudio(userData: string, lessons: LessonStore) {
   });
   ipcMain.handle('generation:start', async (event, input: unknown) => {
     trustedSender(event);
-    let last = 0;
+    let last = 0; let phase = '';
     try {
-      return await generator.generate(input, received => {
+      return await generator.generate(input, progress => {
         const now = Date.now();
-        if (now - last > 200) { last = now; event.sender.send('generation:progress', { received }); }
+        // Phase changes are always sent; byte counts are throttled.
+        if (progress.phase !== phase || now - last > 200) { last = now; phase = progress.phase; event.sender.send('generation:progress', progress); }
       });
     } catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('settings:get', event => { trustedSender(event); return settings.read(); });
+  ipcMain.handle('settings:save', (event, input: unknown) => { trustedSender(event); return settings.write(input); });
+  ipcMain.handle('local:discover', event => { trustedSender(event); return discoverServers(localFetch); });
+  ipcMain.handle('local:connect', async (event, address: unknown) => {
+    trustedSender(event);
+    try {
+      const server = await detectServer(localFetch, String(address ?? ''));
+      return server ? { ok: true, server } : { ok: false, failure: failure('local-unreachable', { message: 'A questo indirizzo non risponde un server di modelli riconosciuto (Ollama, LM Studio, llama.cpp o compatibile OpenAI).' }) };
+    } catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('local:check', async (event, input: unknown) => {
+    trustedSender(event);
+    try { return { ok: true, check: await checkFormat(localFetch, localModelSchema.parse(input)) }; }
+    catch (error) { return asFailure(error); }
   });
   ipcMain.handle('generation:cancel', event => { trustedSender(event); generator.cancel(); });
   ipcMain.handle('lessons:list', event => { trustedSender(event); return lessons.list(); });

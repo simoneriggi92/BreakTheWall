@@ -32,6 +32,7 @@ class MemoryVault implements Vault {
   async clear() { this.record = null; }
 }
 const body: ResponseBody = { model: 'm', instructions: 'i', input: [{ role: 'user', content: 'c' }], text: { format: { type: 'json_schema', name: 'n', strict: true, schema: {} } } };
+const completion = { model: 'm', instructions: 'i', messages: [{ role: 'user' as const, content: 'c' }], schemaName: 'n', schema: {} };
 const fail = async (promise: Promise<unknown>): Promise<ProviderFailure> => {
   try { await promise; } catch (error) { expect(error).toBeInstanceOf(ProviderError); return (error as ProviderError).failure; }
   throw new Error('expected a provider failure');
@@ -105,7 +106,7 @@ describe('account lifecycle (T5)', () => {
   it('keeps the sign-in but blocks inference when ChatGPT plan usage was not granted', async () => {
     const { account } = setup({ scope: 'openid profile email offline_access' });
     expect(await account.signIn({ consent: false })).toMatchObject({ state: 'signed-in', planUsage: false });
-    expect((await fail(account.complete(body, new AbortController().signal, () => {}))).code).toBe('plan-disabled');
+    expect((await fail(account.complete(completion, new AbortController().signal, () => {}))).code).toBe('plan-disabled');
   });
 
   it('treats a browser denial and a cancelled sign-in as recoverable, storing nothing', async () => {
@@ -201,7 +202,7 @@ describe('generation orchestration and saved lessons (T6)', () => {
     const store = new LessonStore(root);
     const generator = new Generator({ complete: (_body, signal) => complete(signal) }, store, () => new Date('2026-10-21T17:00:00Z'));
     const source = await userSource();
-    return { root, store, generator, source, request: { sources: [source], goal: { outcome: 'Spiegare il ciclo dell’acqua', priorKnowledge: '' }, model: 'model-a' } };
+    return { root, store, generator, source, request: { sources: [source], goal: { outcome: 'Spiegare il ciclo dell’acqua', priorKnowledge: '' }, route: { provider: 'chatgpt', model: 'model-a' } } };
   }
 
   it('validates, saves and lists a generated lesson that reopens without another request', async () => {

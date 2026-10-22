@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Home, LockKeyhole, MessageSquareText, PanelRight, X } from 'lucide-react';
 import type { DesktopBridge } from '../core/bridge';
 import { validateLesson, type Lesson } from '../core/lesson';
+import { generatedBy } from '../core/provider';
 import { canVisit, initialState, navigate, restoreState, solved, submit, type LearnerState } from '../core/state';
 import { loadPreparedLessons } from '../fixtures/lessons';
 import { Brand } from './icons';
@@ -94,7 +95,7 @@ function Player({ lesson, bridge, runtime, goHome }: { lesson: Lesson; bridge: D
   const onAttempt = (id: string, answer: string[]) => setState(s => submit(lesson, s, id, answer));
   const openTools = (tab: ToolTab) => { setToolTab(tab); setToolsOpen(true); };
   return <>
-    <header className="topbar"><button className="brand-button" onClick={goHome} aria-label="Torna ai percorsi"><Brand/></button><div className="course-title"><span>{lesson.category}</span><strong>{lesson.title}</strong></div><span className={`prepared-tag ${lesson.kind === 'generated' ? 'generated-tag' : ''}`}>{lesson.kind === 'generated' ? 'Generato con AI' : 'Esempio preparato'}</span>{loaded && <button className="subtle tools-trigger" onClick={() => openTools('map')}><PanelRight size={17}/>Strumenti</button>}</header>
+    <header className="topbar"><button className="brand-button" onClick={goHome} aria-label="Torna ai percorsi"><Brand/></button><div className="course-title"><span>{lesson.category}</span><strong>{lesson.title}</strong></div><span className={`prepared-tag ${lesson.kind === 'generated' ? 'generated-tag' : ''}`} title={generatedBy(lesson)}>{lesson.kind !== 'generated' ? 'Esempio preparato' : lesson.generation?.provider === 'local' ? 'Generato in locale' : 'Generato con AI'}</span>{loaded && <button className="subtle tools-trigger" onClick={() => openTools('map')}><PanelRight size={17}/>Strumenti</button>}</header>
     {!loaded ? <main id="main" className="loading"><p role="status">{notice || 'Riprendo il tuo percorso…'}</p><button onClick={goHome}>Torna ai percorsi</button></main> : <>
       <div className="workspace"><aside className="lesson-sidebar"><button className="back-library" onClick={goHome}><Home size={15}/>I tuoi percorsi</button><div className="sidebar-label">IL PERCORSO<span>{index + 1}/{lesson.pages.length}</span></div><nav aria-label="Tappe della lezione"><ol className="lesson-nav">{lesson.pages.map((p, i) => {
         const allowed = canVisit(lesson, state, p.id); const done = p.checkpoint && solved(lesson, state, p.checkpoint);

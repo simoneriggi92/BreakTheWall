@@ -47,7 +47,7 @@ export async function listModels(fetchImpl: Fetch, token: string): Promise<Model
   return body.models.filter(m => m.visibility === 'list' && typeof m.slug === 'string').map(m => ({ slug: m.slug as string, name: typeof m.display_name === 'string' ? m.display_name : m.slug as string }));
 }
 
-export interface ResponseBody { model: string; instructions: string; input: { role: 'user'; content: string }[]; text: { format: { type: 'json_schema'; name: string; strict: true; schema: Record<string, unknown> } } }
+export interface ResponseBody { model: string; instructions: string; input: { role: 'user' | 'assistant'; content: string }[]; text: { format: { type: 'json_schema'; name: string; strict: true; schema: Record<string, unknown> } } }
 
 /** Server-sent events, one block per blank line. */
 async function* events(body: ReadableStream<Uint8Array>): AsyncGenerator<Record<string, unknown>> {

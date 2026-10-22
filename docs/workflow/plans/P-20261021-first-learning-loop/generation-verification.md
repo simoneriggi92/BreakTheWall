@@ -45,3 +45,48 @@ Known limitations so far:
 - Electron 45 reports the synchronous `safeStorage` calls as deprecated. They work; moving to the async API is a follow-up.
 - Signing in with a different ChatGPT account on the same installation is refused. Switching accounts currently requires clearing the app's credential file.
 - `GET /v1/models` succeeding is not proof that inference with structured output is accepted for this route.
+
+## T5b — Local model route (plan v2)
+
+Date: 2026-10-22. Branch `feature/local-model`, based on `feature/player-clarity`. Machine: M4 Pro, 48 GB.
+
+| Check | Level | Result |
+|---|---|---|
+| `npm run check` | automated test | exit 0, 92 tests. New: 15 local-runtime and generator tests in `tests/local.test.ts`; 6 studio interaction tests for choosing, finding, checking and remembering a local model and for the progress display; progress-estimate, rotation and normalization cases in `tests/generation.test.ts` |
+| `npm run build` | targeted build | exit 0 |
+| Discovery | witnessed in the production build, driven through the DevTools protocol, isolated `BTW_USER_DATA_DIR` | Without an address typed, the app found Ollama 0.30.8 (11434, 3 models) and llama.cpp server (8080, Qwen3.6-35B-A3B Q4_K_M) |
+| Format check | witnessed, same run | Ollama with LFM2.5-24B-A2B: "Formato non garantito" (the probe ran past its budget instead of closing the schema). llama.cpp server: "Formato garantito" |
+| Live generation, non-code (`glicemia.md`) | witnessed | Valid lesson in 108 s, one request, no repair: 6 pages, 2 activities, labelled "Generato in locale" |
+| Live generation, code (`account.ts`) | witnessed | Valid lesson in 68 s, one request. An earlier attempt failed after the repair pass with one remaining issue (an activity no block showed); that led to the normalization below |
+| Repair pass | witnessed | The repair phase and its progress were shown live. It reduced the issues of failed drafts to one, but did not by itself rescue them |
+| Progress estimate | witnessed | For example "66% · circa 22 s rimanenti" during the code lesson, which completed 68 s after starting |
+| Restart | witnessed: two launches with the same data | The generated lesson reopened on the same page with the note and "1 tentativo registrato"; llama.cpp server logged no new completion |
+| Remembered choice | witnessed | The second lesson started with the saved model and format check, without searching again |
+
+Defects found during T5b and fixed:
+
+- **Format probe:** a server that ignores the schema wrote past the probe's token budget. The probe reported this as an interrupted response instead of "format not guaranteed".
+- **Compatible streams:** a stream from LM Studio or another compatible server that ended without `[DONE]` or a stop reason was accepted as complete.
+- **Remaining-time label:** it said "quasi finito" before any rate had been measured.
+
+Host-side normalizations added to `assembleLesson`, for every provider:
+
+- An order activity is never left in solution order (see above).
+- A checkpoint that names no activity on its own page is dropped. It only gates progress.
+- An activity that no block shows is dropped.
+
+None of these adds or rewrites content; they only remove gates or items a learner could never reach.
+
+Claim review of the two live local lessons, checked against their sources:
+
+- **Glicemia:** the route, the actors, both hormone responses, negative feedback and the two diabetes types match the source. Inaccuracies:
+  - "il cervello dipende interamente dal glucosio" (the source says the brain depends on glucose, not that it depends on it entirely);
+  - a lens titled "iper-insulinemia" that actually describes hypoglycaemia;
+  - all map nodes use the same icon.
+- **account.ts:** the two-minute refresh margin and the terminal `session-expired` rule are correct. Errors:
+  - The order activity teaches the sign-out order as revoke → clear → abort, but the code aborts first (line 80).
+  - Sign-out is described as clearing the data, but the registration is kept (line 87).
+  - A map edge says the OAuth server writes to the vault.
+  - Two pages contain only an activity.
+
+Assessment: the local route works end to end for both domains on this Mac and keeps the source on the device. Its explanations need the same claim review as any generated lesson, and they make more mistakes than the source warrants. The UI labels them as generated locally. T5 (ChatGPT live inference) remains blocked on plan usage.

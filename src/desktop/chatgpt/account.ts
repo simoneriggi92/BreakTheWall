@@ -1,7 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { failure, ProviderError, type AccountStatus, type ModelOption } from '../../core/provider';
 import { AUTH, authorizeUrl, base64url, exchangeCode, listenForCallback, pkce, refreshTokens, revokeRefreshToken, verifyIdToken, type Fetch, type TokenResponse } from './oauth';
-import { listModels, streamResponse, type ResponseBody } from './responses';
+import type { CompletionRequest } from '../completion';
+import { listModels, streamResponse } from './responses';
 
 /** Secret record: kept only through the vault (OS-protected encryption), never sent to the renderer or logged. */
 export interface AccountRecord {
@@ -119,8 +120,9 @@ export class ChatGPTAccount {
     return listModels(this.deps.fetch, await this.token());
   }
 
-  async complete(body: ResponseBody, signal: AbortSignal, onProgress: (received: number) => void): Promise<string> {
+  async complete(request: CompletionRequest, signal: AbortSignal, onProgress: (received: number) => void): Promise<string> {
     const token = await this.token();
+    const body = { model: request.model, instructions: request.instructions, input: request.messages, text: { format: { type: 'json_schema' as const, name: request.schemaName, strict: true as const, schema: request.schema } } };
     try { return await streamResponse(this.deps.fetch, token, body, signal, onProgress); }
     catch (error) {
       // A 401 is diagnosed, not treated as a revocation: credentials are kept until a refresh confirms it.

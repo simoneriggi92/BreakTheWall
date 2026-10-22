@@ -18,6 +18,7 @@ The goal is broader than understanding repositories. A code walkthrough, a physi
 - Strong links between explanations and their source. For code, retain exact excerpts and the lines relevant to each frame.
 - Learner responses, feedback, notes, and iteration from both owner and user feedback.
 - The user's ChatGPT account is the preferred AI access direction where supported; unlimited access is not assumed.
+- The learner can instead generate with a model already running on their own Mac, chosen in the app. The source then stays on the device. Local models are slower and less reliable than hosted ones, and the app says which route produced each lesson.
 
 The owner reported that the prototype helped them understand a repository. Use this as evidence of personal usefulness. General effectiveness, repeated adoption, and willingness to pay remain hypotheses.
 

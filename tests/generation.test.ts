@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleLesson, draftJsonSchema, type LessonDraft } from '../src/core/generation';
+import { assembleLesson, draftJsonSchema, estimateProgress, expectedDraftChars, type LessonDraft } from '../src/core/generation';
 import { LessonError, type Lesson } from '../src/core/lesson';
 import { draftFor, SOURCE_TEXT, userSource } from './draft';
 
@@ -53,7 +53,11 @@ describe('generated lesson assembly (T6)', () => {
   it('rejects broken relationships and unusable activities', async () => {
     expect(await issues(d => { d.pages[1].blocks[0] = { ...d.pages[1].blocks[0], mapId: 'nope' } as never; return d; })).toEqual(expect.arrayContaining([expect.stringMatching(/Dangling frame node\/map/)]));
     expect(await issues(d => ({ ...d, activities: d.activities.map(a => a.type === 'choice' ? { ...a, correctId: 'missing' } : a) }))).toContain('Invalid choice solution: predict');
-    expect(await issues(d => ({ ...d, pages: d.pages.map(p => ({ ...p, checkpoint: p.id === 'flow-page' ? 'predict' : p.checkpoint })) }))).toContain('Unreachable checkpoint: flow-page');
+    const ungated = await assemble(d => ({ ...d, pages: d.pages.map(p => ({ ...p, checkpoint: p.id === 'flow-page' ? 'predict' : p.checkpoint })) }));
+    expect('checkpoint' in ungated.pages[1]).toBe(false);
+    expect(ungated.pages[0].checkpoint).toBe('predict');
+    const extra = await assemble(d => ({ ...d, activities: [...d.activities, { ...d.activities[0], id: 'never-shown' }] }));
+    expect(extra.activities.map(a => a.id)).toEqual(['predict', 'order-steps']);
   });
 
   it('requires a route with a map and varied representations, not just valid JSON', async () => {
@@ -76,5 +80,15 @@ describe('generated lesson assembly (T6)', () => {
     };
     visit(draftJsonSchema);
     expect(JSON.stringify(draftJsonSchema)).toContain('"anyOf"');
+  });
+
+  it('estimates progress honestly: slow while the model reads, capped below 100% until complete, with a measured remaining time', () => {
+    expect(expectedDraftChars(3_000)).toBe(10_000);
+    expect(expectedDraftChars(60_000)).toBe(18_000);
+    expect(estimateProgress({ received: 0, expected: 12_000, elapsedMs: 0, streamingMs: 0 })).toEqual({ percent: 0 });
+    expect(estimateProgress({ received: 0, expected: 12_000, elapsedMs: 120_000, streamingMs: 0 })).toEqual({ percent: 8 });
+    // 6,000 of 12,000 characters in 60 s: halfway, about 60 s left at the same rate.
+    expect(estimateProgress({ received: 6_000, expected: 12_000, elapsedMs: 70_000, streamingMs: 60_000 })).toEqual({ percent: 52, remainingSeconds: 60 });
+    expect(estimateProgress({ received: 30_000, expected: 12_000, elapsedMs: 200_000, streamingMs: 190_000 })).toEqual({ percent: 95 });
   });
 });

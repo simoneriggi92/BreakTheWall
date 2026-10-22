@@ -25,6 +25,8 @@ The renderer has no Node integration, filesystem API, or credentials. Electron u
 
 Network access for AI belongs to the main process only: the system browser handles sign-in, a one-shot listener on `127.0.0.1` receives the callback, and `https://auth.openai.com` and `https://api.openai.com/v1` serve tokens and inference. Credentials are encrypted with Electron `safeStorage` under `<userData>/credentials/`; generated lessons live in `<userData>/lessons/`, progress in `<userData>/workspaces/`. Sign-in needs the macOS Keychain; without it the app disables sign-in rather than storing plaintext.
 
+The local-model route talks only to loopback addresses, from the main process. To try it, start a model server before opening the generation step. For example, run `llama-server -m model.gguf -c 32768` (port 8080), or start LM Studio's server (port 1234) or Ollama (port 11434). The app then finds the server by itself. The format check tells you whether that server enforces the lesson schema; Ollama 0.30.8 did not for the models in the local inference trial.
+
 The domain module must remain independent of React and Electron. Lesson content is data rendered with application-owned components; source text is never HTML or executable UI.
 
 ## Toolchain references
