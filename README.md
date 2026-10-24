@@ -136,6 +136,7 @@ npm run check     # strict TypeScript + Vitest
 npm run dev:web   # renderer only, in a browser (no generation)
 ```
 
+npm run eval      # measure generation on fixed cases (see Local development)
 Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your own. More details are in [Local development](docs/development.md).
 
 ## Tech stack

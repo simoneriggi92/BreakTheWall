@@ -17,7 +17,8 @@
     "start": "node scripts/start.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "eval": "node scripts/eval.mjs"
   },
   "dependencies": {
     "lucide-react": "1.61.0",

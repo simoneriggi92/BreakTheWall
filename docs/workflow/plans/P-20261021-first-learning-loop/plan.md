@@ -2,10 +2,10 @@
 id: P-20261021-first-learning-loop
 title: A reusable desktop learning loop from a selected text source
 version: 2
-state: implementing
+state: blocked
 current_task: T5
 last_evidence: T5b verified live (Qwen3.6 via llama.cpp, code and non-code lessons, restart); 92 tests and build pass; T5 live inference still blocked by ChatGPT plan usage
-next_action: When ChatGPT plan usage resets, run the T5 live inference; then implement P-20261021-first-learning-loop v2 --phase alpha-verification for T7
+next_action: Blocked on ChatGPT plan usage for the T5 live inference; resume with implement P-20261021-first-learning-loop v2 --phase generation when usage is available, then T7
 approval: granted
 approved_version: 2
 approved_by: Project owner (explicit user message)
@@ -217,3 +217,7 @@ Version 2, authorized command: `implement P-20261021-first-learning-loop v2 --ph
 - T6: its live-generation, restart and claim-review evidence is now satisfied through T5b's local route. The ChatGPT route is still unwitnessed.
 - T5: implemented; live inference still blocked by plan usage.
 - T7: not started.
+
+## State change
+
+- 2026-10-22T12:58:04+02:00: the owner set this plan to `blocked`. T5's witnessed ChatGPT inference waits for plan usage. This lets [P-20261022-generation-quality](../P-20261022-generation-quality/plan.md) become the active plan. The approved scope of v2 is unchanged.

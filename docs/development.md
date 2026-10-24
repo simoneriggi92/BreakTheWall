@@ -32,3 +32,31 @@ The domain module must remain independent of React and Electron. Lesson content 
 ## Toolchain references
 
 Versions were checked against npm metadata on 2026-10-21. The current [Vite guide](https://vite.dev/guide/) documents its Node requirements. The host follows the relevant boundaries in Electron's [security guide](https://www.electronjs.org/docs/latest/tutorial/security) and [sandbox model](https://www.electronjs.org/docs/latest/tutorial/sandbox). Runtime data validation follows [Zod's parsing model](https://zod.dev/basics). These references explain choices; they are not evidence of a successful app launch.
+
+## Evaluating generation
+
+`npm run eval` runs the app's own generator on fixed cases and writes a report under `.local/eval/runs/<time>-<route>/`. The `.local` folder is ignored by git. Use it to compare a change to prompts, the draft schema, the pipeline or the model against a baseline.
+
+```sh
+npm run eval                                   # all cases, 3 attempts, the local model chosen in the app
+npm run eval -- --cases glucose,release-runbook --runs 1
+npm run eval -- --runtime llamacpp --base http://127.0.0.1:8080 --model qwen3.6
+npm run eval -- --route chatgpt --model <slug> --allow-chatgpt --runs 2
+```
+
+**Cases**
+- **Public:** `eval/cases/*.json`, each a goal plus snapshots of its sources. They are original text or files from this repository, so they never change as the code evolves.
+- **Private:** your own documents go in `.local/eval/cases/` in the same format. They are included unless you pass `--public-only`, and nothing from them leaves `.local/`.
+
+**ChatGPT runs** spend your plan, so:
+- they need `--allow-chatgpt`;
+- they are capped at 2 attempts per case;
+- they stop at the first usage-limit response.
+
+The runner also stops when a local server is unreachable or the model is missing.
+
+**Report contents**
+- `attempts.jsonl`: one line per attempt, with validity, repair, time, output size, page and representation mix, source coverage, and answer-length ratios. A correct answer much longer than the wrong ones gives itself away.
+- `summary.json`: totals per case.
+- The lesson of every valid attempt.
+- One `*.review.md` sheet per case: every statement next to its cited lines, with an empty verdict (✅ correct, ⚠️ imprecise, ❌ wrong). Claim errors are the one metric the runner cannot compute; fill in the sheet to record them.

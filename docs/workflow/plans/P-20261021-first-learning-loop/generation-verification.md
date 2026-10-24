@@ -142,3 +142,12 @@ Claim review of the last batch:
 - The checked choice answers are correct. Among them: the digest is the release identity, and only the container image changes in the task definition.
 - One inaccuracy: "build Docker multi-piattaforma", where the runbook specifies `linux/amd64` only.
 - Weaknesses that remain: distractors are easy, almost every page uses a comparison, and lesson titles start with "Break the Wall:".
+
+### T5 — first completed ChatGPT inferences (2026-10-22)
+
+The evaluation runner of [P-20261022-generation-quality](../P-20261022-generation-quality/evaluation-baseline.md#baseline-chatgpt-route) used the app's `ChatGPTAccount` inside Electron, with the owner's session in the default data folder:
+- it listed 7 models;
+- it completed 9 generations: 8 with `gpt-6-sol`, 1 with `gpt-6.1-sol`;
+- every generation was a valid lesson, with `store: false`, `stream: true` and a strict JSON Schema, and none needed a repair.
+
+The open question of T5, whether this route accepts structured output, is answered: it does. This is an integration check through the app's own provider code. A witnessed generation from the app's interface, and the restart check on a ChatGPT lesson, remain for T5's acceptance.
