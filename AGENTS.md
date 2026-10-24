@@ -4,6 +4,7 @@ This repository uses the `project-workflow` skills for research → plan → rev
 
 ## Repository constraints
 
+- Product identity: BreakTheWall takes material apart into source-linked parts, lets the learner run the mechanism, and asks them to reassemble it (disassemble → run → reassemble). It is not a course, chatbot, summarizer or gamified study app; review is opt-in. Judge new features against this. Source: [product definition](docs/product.md#identity).
 - Product boundary: BreakTheWall supports general subjects as well as code. Sources may be user supplied or retrieved with AI assistance. Preserve this distinction when designing contracts and UI. Source: [product definition](docs/product.md).
 - Current owners: `src/core` owns shell-independent lesson validation/state, `src/fixtures` owns original prepared content, `src/renderer` owns React UI, and `src/desktop` owns Electron access. Documentation lives under `docs/`; workflow evidence lives under `docs/workflow/`.
 - Build and test runners: npm with `package-lock.json`. Use `npm run check` for TypeScript and Vitest, `npm run build` for production bundles, `npm start` for the local production desktop, and `npm run dev` for development. See [development](docs/development.md).

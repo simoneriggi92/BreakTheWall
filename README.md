@@ -1,6 +1,8 @@
 # Break the Wall
 
-Turn your own material into a paced, visual, interactive lesson: concept maps, controllable sequences, comparisons, concept lenses and activities. Every claim links to the exact lines of your source. Lessons are generated with your ChatGPT account or with a model running on your own Mac.
+**Take apart whatever you want to understand (a source, a repository, a topic) and see how its parts work together. You have understood it when you can put it back together.**
+
+Break the Wall turns a wall of text into bricks: a map of the parts, one part at a time in the representation that suits it (sequence, comparison, concept lens), and activities to rebuild it. Every part links to the exact lines of your source. It runs with your ChatGPT account or with a model on your own Mac.
 
 **[Product](docs/product.md)** · **[Architecture](docs/architecture.md)** · **[Development](docs/development.md)** · **[Plan](docs/workflow/plans/P-20261021-first-learning-loop/plan.md)** · **[Status](STATUS.md)**
 
@@ -35,7 +37,7 @@ Turn your own material into a paced, visual, interactive lesson: concept maps, c
 
 ## Why Break the Wall?
 
-AI answers often arrive as a wall of text: correct-sounding, hard to retain and hard to check. Break the Wall turns the same material into a route you walk one step at a time, and asks you to rebuild it.
+AI answers often arrive as a wall of text: correct-sounding, hard to retain and hard to check. Reverse engineering takes software apart, with evidence for every finding, so you can understand and rebuild it. Break the Wall applies the same principle to knowledge: **disassemble → run → reassemble**, with every part tied to its source. It is not a course, a summarizer or a flashcard app; review is there only if you want it. See the [product definition](docs/product.md).
 
 | | A chat answer | Break the Wall |
 |---|:---:|:---:|
@@ -134,9 +136,9 @@ npm start
 npm run dev       # Vite + Electron with reload
 npm run check     # strict TypeScript + Vitest
 npm run dev:web   # renderer only, in a browser (no generation)
+npm run eval      # measure generation on fixed cases (see Local development)
 ```
 
-npm run eval      # measure generation on fixed cases (see Local development)
 Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your own. More details are in [Local development](docs/development.md).
 
 ## Tech stack
