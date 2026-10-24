@@ -18,11 +18,39 @@ The idea comes from reverse engineering: tools such as [REA](https://github.com/
 ```
 
 - **Disassemble.** The AI breaks the material into 3–7 main parts and the relations between them. Every part keeps a link to the lines it comes from.
-- **Run.** The learner makes a mechanism move: a sequence, a scenario, a prediction about what happens next.
+- **Run.** The learner puts a joint under load: changes an input and watches what moves, removes a premise and checks whether the conclusion still holds, or applies a part to a new case. It is always an action by the learner that tests a connection, never more text from the AI.
 - **Reassemble.** The learner puts the parts back in place. It is optional, and it is the real test.
 - **Parts store.** Every part understood goes into a personal atlas that grows across disassemblies. The learner decides whether and when to come back to it.
 
 **⚠ Where the metaphor stops.** Taking software apart has an objective answer: the binary is what it is. Taking a topic apart involves interpretation, and the model can be wrong. This is why every part stays attached to its source and why model inferences must stay distinguishable from quoted content. Evidence is this product's equivalent of reverse engineering's proof.
+
+### One disassembly, three kinds of joint
+
+The app does not change with the subject. What changes is **what holds the parts together**: the joints. The loop, the exploded view, the source links and the activities stay the same; the vocabulary of joints and the form of "run" follow the material.
+
+```
+                  DISASSEMBLY (always the same)
+   parts with sources → named joints → exploded view → run → reassemble
+                              │
+              the kind of joint depends on the material
+        ┌─────────────────────┼─────────────────────┐
+    MECHANISM             ARGUMENT                STORY
+  "sends to", "causes"  "supports", "objects"  "leads to", "because"
+```
+
+| Kind | Examples | Parts | Joints | Run = put a joint under load | Reassemble |
+|---|---|---|---|---|---|
+| **Mechanism** | a deploy, code, anatomy, a physiological process | components | sends to, causes, depends on | change an input and watch what moves | reconnect the flow |
+| **Argument** | philosophy, law, essays, design rationale | premises, conclusion, objections | supports, attacks | remove a premise: does the conclusion hold? Find the counterexample | rebuild the argument map |
+| **Story** | history, narrative, a sequence of decisions | events, actors, motives | leads to, because | follow the causal chain; apply a motive to a new case | put causes and effects back in order |
+
+An argument is a structure too: premises are load-bearing walls and the conclusion is the roof. Example, Descartes' cogito: (1) I can doubt everything; (2) doubting is thinking; (3) to think one must exist; → I exist. *Which brick, if removed, brings the roof down?* (2) and (3) bear the load; (1) motivates the argument but does not hold it up.
+
+One source can mix kinds: an operational runbook is a mechanism ("the build sends the artifact to…") with arguments inside it ("we deploy X first because Y"). Joints are typed per relation, not per lesson.
+
+Metaphors and transfer scenarios are not a separate mode: a metaphor is a representation of a part, like a concept lens, with its limit stated; a scenario that applies a part to a new case is a form of run.
+
+⚠ **Counterfactuals.** "What if this event had not happened" is speculation in a story. If offered, it is labelled as a model inference, never as content from the source.
 
 ### What it is not
 
@@ -32,6 +60,9 @@ The idea comes from reverse engineering: tools such as [REA](https://github.com/
 | a course or a study app | it has no curriculum; it works on *your* material, when you need it |
 | a summarizer | a summary is a shorter wall; here the wall is taken apart |
 | gamified | no points or streaks: the reward is seeing the mechanism work and being able to rebuild it |
+| a memorization tool | material without structure (a vocabulary list, a list of dates, a poem to experience) has nothing to take apart; the app says so instead of forcing it |
+
+**Scope:** Break the Wall works on anything with a structure: mechanisms, arguments and stories.
 
 ### Learning science under the hood
 
@@ -80,9 +111,9 @@ The owner reported that the prototype helped them understand a repository. Use t
 ## The disassembly loop
 
 1. **Choose what to take apart.** The learner's question is the goal ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
-2. **See the exploded view.** The whole, what it does and why it matters, then its 3–7 parts with named relations ("depends on", "sends to", "causes").
-3. **Open a part.** One main idea, a suitable representation, a short explanation, and the source lines beside it.
-4. **Run the mechanism.** Predict what happens, step through a sequence or scenario, watch what changes. Not every part needs an activity.
+2. **See the exploded view.** The whole, what it does and why it matters, then its 3–7 parts with named joints of the right kind ("sends to", "supports", "leads to").
+3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), a short explanation, and the source lines beside it.
+4. **Run.** Put a joint under load: predict what happens, step through a sequence or scenario, remove a premise, apply the part to a new case. Not every part needs an activity.
 5. **Reassemble.** Put the parts or steps back in place; feedback names the precise missing connection, with a hint or worked example. Progress is preserved.
 
 Exploration mode allows navigation without answers. Guided mode can require a response at selected checkpoints. Opening a part, completing an activity and demonstrated understanding are separate concepts.
@@ -96,11 +127,12 @@ The first alpha shipped before the identity was fixed. The mapping below guides 
 | lesson / percorso | disassembly | smontaggio |
 | opening map | exploded view | esploso |
 | page | part | pezzo |
-| prediction, sequence | run the mechanism | fai girare |
+| map relations (free labels) | joints typed as mechanism, argument or story | giunti |
+| prediction, sequence | run: put a joint under load | fai girare / metti sotto carico |
 | reconstruction | reassemble | rimonta |
 | atlas of concepts | parts store across disassemblies | magazzino dei pezzi |
 
-Not yet built: scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), parts recognized across disassemblies, and opt-in review from the parts store.
+Not yet built: typed joints, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the learner when material has no structure to take apart.
 
 ## Sources and explanation
 
@@ -127,7 +159,7 @@ Not yet built: scenarios (a declarative state machine whose rules cite source li
 
 The alpha delivers one complete text-source loop in a macOS desktop app. A shared set of visual blocks must handle a code example and a non-code example without topic-specific UI code. Prepared fixtures support development; at least one real generation per domain is required to verify the alpha.
 
-Next: a hand-made lab prototype of one disassembly (the owner's TeamCity frontend deploy) to test the exploded view, one runnable mechanism and reassembly before changing contracts. Later slices include scenarios, the cross-disassembly parts store, AI-assisted web discovery, additional input adapters, contextual regeneration, and richer feedback. These are direction, not completed features. Whole-repository analysis, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
+Next: a hand-made lab prototype of two disassemblies, before changing contracts: the owner's TeamCity frontend deploy (a mechanism) and a short argumentative text (an argument, possibly on paper first). Each tests the exploded view, one run and reassembly, so that one contract is shown to hold for both kinds of joint. Later slices include scenarios, the cross-disassembly parts store, AI-assisted web discovery, additional input adapters, contextual regeneration, and richer feedback. These are direction, not completed features. Whole-repository analysis, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
 
 ## Learn from use
 
