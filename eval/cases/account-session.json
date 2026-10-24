@@ -1,0 +1,15 @@
+{
+  "id": "account-session",
+  "title": "Sessione ChatGPT nell’app (codice, un file)",
+  "goal": {
+    "outcome": "Capire come l’app ottiene un token valido, quando lo rinnova e quando considera finita la sessione",
+    "priorKnowledge": "Conosco le basi della programmazione"
+  },
+  "sources": [
+    {
+      "path": "sources/account.ts.txt",
+      "title": "account.ts",
+      "language": "TypeScript"
+    }
+  ]
+}

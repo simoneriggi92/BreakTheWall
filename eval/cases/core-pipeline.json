@@ -1,0 +1,30 @@
+{
+  "id": "core-pipeline",
+  "title": "Dalla risposta del modello alla lezione validata (codice, quattro file)",
+  "goal": {
+    "outcome": "Capire come la risposta del modello diventa una lezione validata e in quali punti viene rifiutata",
+    "priorKnowledge": "Conosco TypeScript"
+  },
+  "sources": [
+    {
+      "path": "sources/core-generation.ts.txt",
+      "title": "generation.ts",
+      "language": "TypeScript"
+    },
+    {
+      "path": "sources/core-lesson.ts.txt",
+      "title": "lesson.ts",
+      "language": "TypeScript"
+    },
+    {
+      "path": "sources/core-source.ts.txt",
+      "title": "source.ts",
+      "language": "TypeScript"
+    },
+    {
+      "path": "sources/core-state.ts.txt",
+      "title": "state.ts",
+      "language": "TypeScript"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "glucose",
+  "title": "Regolazione della glicemia (testo, italiano)",
+  "goal": {
+    "outcome": "Spiegare come insulina e glucagone mantengono stabile la glicemia e cosa succede quando il meccanismo si rompe",
+    "priorKnowledge": ""
+  },
+  "sources": [
+    {
+      "path": "sources/glucose.md",
+      "title": "glicemia.md"
+    }
+  ]
+}
