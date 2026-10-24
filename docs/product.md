@@ -87,6 +87,44 @@ Engineering manuals use the exploded-view drawing: the assembly with its parts p
 
 One level of the exploded view opens at a time, so the map never overwhelms.
 
+### Large sources: sub-assemblies and the bill of materials
+
+The 3–7 parts rule applies **per level**, not per disassembly. Each screen stays manageable; depth grows with the size of the source. Engineers handle complexity the same way, with sub-assemblies: an engine has five groups, each group has its parts, and a group can stay closed.
+
+```
+  Frontend deploy (disassembly)
+   ├─ Build            ← open sub-assembly (the learner's question goes through it)
+   │   ├─ install
+   │   ├─ test
+   │   └─ artifact
+   ├─ Publication      ← open
+   ├─ Configuration    ← CLOSED: a black box with its function and its source
+   └─ Rollback         ← open
+```
+
+- **The learner's question decides what opens.** Relevant parts are taken apart in depth; the others stay closed sub-assemblies, visible with their function and source, openable on demand.
+- **Nothing disappears silently: the bill of materials.** Every section of the source is either assigned to a part or listed as **not taken apart**, with a reason (outside the question, repetition, context). The host checks it as it checks citations: a line range neither assigned nor excluded is a finding.
+
+| Approach | What happens to what is left out |
+|---|---|
+| Summary | it disappears, and the learner does not know |
+| Bill of materials | it is visible: "these 40 lines were not taken apart, because…" |
+
+⚠ The bill of materials guarantees that nothing vanishes, not that the choice of what to open is right. That still needs claim review and the coverage metrics measured by `npm run eval`.
+
+Generation follows the same shape: a first request produces the bill of materials (parts, sub-assemblies, assigned and excluded line ranges); the host validates it; then each part is written separately. This is the two-phase pipeline of plan P-20261022-generation-quality (Q3), and the path to sources larger than one request.
+
+### Visual direction: the technical drawing
+
+Status: hypothesis, to be validated in the lab prototype. The style must favor clarity, reading and focus, and suit every subject.
+
+- **Technical drawing.** Light paper, ink lines, leader lines from each part to its source, generous white space. It is the language of the exploded view itself, and it fits an argument as well as a machine.
+- **Blueprint** as the dark theme: light lines on blue, a variant with its own character rather than an inverted palette.
+- **One color per kind of joint** (mechanism, argument, story), always paired with shape and label.
+- **Icons:** lucide for the interface, which the app already uses; a dedicated set only for kinds of joint and part, the product's own visual language.
+
+Order of work: write the principles, express them as tokens in code, test them on the real content of the prototype, and use Figma only to explore variants. Rejected: an electronic-circuit theme, which reads as "for technicians only", contradicts the any-subject scope and tires the eye on long text.
+
 ## Purpose
 
 The goal is broader than understanding repositories. A code path, a physical process, an operational runbook and a historical sequence share one player and one disassembly model, each with the representations that suit it. Do not classify people into fixed learning styles.
@@ -132,7 +170,7 @@ The first alpha shipped before the identity was fixed. The mapping below guides 
 | reconstruction | reassemble | rimonta |
 | atlas of concepts | parts store across disassemblies | magazzino dei pezzi |
 
-Not yet built: typed joints, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the learner when material has no structure to take apart.
+Not yet built: typed joints, sub-assemblies and the verified bill of materials, the technical-drawing style, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the learner when material has no structure to take apart.
 
 ## Sources and explanation
 
@@ -159,7 +197,7 @@ Not yet built: typed joints, scenarios (a declarative state machine whose rules 
 
 The alpha delivers one complete text-source loop in a macOS desktop app. A shared set of visual blocks must handle a code example and a non-code example without topic-specific UI code. Prepared fixtures support development; at least one real generation per domain is required to verify the alpha.
 
-Next: a hand-made lab prototype of two disassemblies, before changing contracts: the owner's TeamCity frontend deploy (a mechanism) and a short argumentative text (an argument, possibly on paper first). Each tests the exploded view, one run and reassembly, so that one contract is shown to hold for both kinds of joint. Later slices include scenarios, the cross-disassembly parts store, AI-assisted web discovery, additional input adapters, contextual regeneration, and richer feedback. These are direction, not completed features. Whole-repository analysis, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
+Next: a hand-made lab prototype of two disassemblies, before changing contracts: the owner's TeamCity frontend deploy (a mechanism) and a short argumentative text (an argument, possibly on paper first). Each tests the exploded view, one run and reassembly, so that one contract is shown to hold for both kinds of joint. The prototype starts in the technical-drawing style. Later slices include scenarios, the cross-disassembly parts store, AI-assisted web discovery, additional input adapters, contextual regeneration, and richer feedback. These are direction, not completed features. Whole-repository analysis, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
 
 ## Learn from use
 
