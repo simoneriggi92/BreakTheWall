@@ -116,7 +116,7 @@ Generation follows the same shape: a first request produces the bill of material
 
 ### Visual direction: the technical drawing
 
-Status: hypothesis, to be validated in the lab prototype. The style must favor clarity, reading and focus, and suit every subject.
+Status: **adopted** by the owner on 2026-10-24, after the [lab prototype](workflow/research/R-20261024-lab-prototype.md). The app must support both themes; blueprint is the dark theme. The style must favor clarity, reading and focus, and suit every subject.
 
 - **Technical drawing.** Light paper, ink lines, leader lines from each part to its source, generous white space. It is the language of the exploded view itself, and it fits an argument as well as a machine.
 - **Blueprint** as the dark theme: light lines on blue, a variant with its own character rather than an inverted palette.
@@ -150,7 +150,7 @@ The owner reported that the prototype helped them understand a repository. Use t
 
 1. **Choose what to take apart.** The learner's question is the goal ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
 2. **See the exploded view.** The whole, what it does and why it matters, then its 3–7 parts with named joints of the right kind ("sends to", "supports", "leads to").
-3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), a short explanation, and the source lines beside it.
+3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), and the source lines beside it. The explanation is 2–4 short points, not prose. A point may carry a meaning mark: → a step or consequence, = what stays unchanged, ⚠ a warning. There are no decorative icons per point, because those would not work for narrative or argumentative material.
 4. **Run.** Put a joint under load: predict what happens, step through a sequence or scenario, remove a premise, apply the part to a new case. Not every part needs an activity.
 5. **Reassemble.** Put the parts or steps back in place; feedback names the precise missing connection, with a hint or worked example. Progress is preserved.
 
