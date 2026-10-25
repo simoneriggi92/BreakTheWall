@@ -64,7 +64,8 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
   const created = (item: Lesson) => { setGenerated(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); open(item.id); };
   const runtimeLabel = runtime === 'desktop' ? t.common.desktopRuntime : runtime === 'browser' ? t.common.browserRuntime : '';
   return <><a href="#main" className="skip-link">{t.common.skip}</a>{disassembly
-    ? <DisassemblyPlayer key={disassembly.id} d={disassembly} bridge={bridge} goHome={() => setSelected(undefined)}/>
+    ? <DisassemblyPlayer key={disassembly.id} d={disassembly} bridge={bridge} goHome={() => setSelected(undefined)}
+        versions={disassembly.family ? allDisassemblies.filter(x => x.family === disassembly.family && x.id !== disassembly.id) : []} openVersion={openDisassembly}/>
     : lesson
     ? <Player key={lesson.id} lesson={lesson} bridge={bridge} runtime={runtimeLabel} goHome={() => setSelected(undefined)}/>
     : <><header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtimeLabel || t.common.opening}</span><PreferencesMenu/></header><Library lessons={lessons} generated={generated} disassemblies={allDisassemblies} bridge={bridge} error={error ? t.shell[error] : ''} skipped={skipped} draft={draft} setDraft={setDraft} onOpen={open} onOpenDisassembly={openDisassembly} onCreated={created}/></>}

@@ -6,6 +6,7 @@
   "title": "Il principio del danno (Mill, 1859)",
   "question": "Secondo Mill, quando la società può legittimamente costringere un individuo?",
   "language": "it",
+  "family": "mill-harm",
   "sources": [
     {
       "id": "mill",

@@ -6,6 +6,7 @@
   "title": "The harm principle (Mill, 1859)",
   "question": "According to Mill, when is society entitled to coerce an individual?",
   "language": "en",
+  "family": "mill-harm",
   "sources": [
     {
       "id": "mill",

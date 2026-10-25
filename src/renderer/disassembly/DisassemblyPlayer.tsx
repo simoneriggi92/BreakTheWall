@@ -20,8 +20,12 @@ type Mode = 'explode' | 'run' | 'reassemble' | 'bom';
 const MODES: Mode[] = ['explode', 'run', 'reassemble', 'bom'];
 
 /** Plays one disassembly: exploded view, runs, reassembly and bill of materials, with progress kept on the device. */
-export function DisassemblyPlayer({ d, bridge, goHome }: { d: Disassembly; bridge: DesktopBridge; goHome: () => void }) {
-  const { t } = usePreferences();
+/** How long a step shows as running before its effects land; zero when the system asks for reduced motion. */
+const STEP_MS = 900;
+const stepDelay = () => typeof window.matchMedia === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? STEP_MS : 0;
+
+export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersion }: { d: Disassembly; bridge: DesktopBridge; goHome: () => void; versions?: Disassembly[]; openVersion?: (id: string) => void }) {
+  const { t, language } = usePreferences();
   const [state, setState] = useState<DisassemblyState>(() => initialDisassemblyState(d));
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -33,6 +37,10 @@ export function DisassemblyPlayer({ d, bridge, goHome }: { d: Disassembly; bridg
   const [focus, setFocus] = useState<Cite>();
   const [sourceId, setSourceId] = useState(d.sources[0].id);
   const [feedback, setFeedback] = useState<{ wrong?: { part: string; hint: string }; complete: boolean }>();
+  // A step runs in two beats: first its parts show as running, then its effects and explanation land.
+  const [running, setRunning] = useState<{ runId: string; step: number }>();
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
   const layouts = useMemo(() => layoutDisassembly(d), [d]);
   const saveQueue = useRef(Promise.resolve());
   const saveVersion = useRef(0);
@@ -73,13 +81,20 @@ export function DisassemblyPlayer({ d, bridge, goHome }: { d: Disassembly; bridg
   const leave = (depth: number) => { setState(s => openPath(d, s, s.path.slice(0, depth))); setFocus(undefined); };
   // Runs act on the whole: the drawing returns to the top level while a run is open.
   const setModeAndLevel = (next: Mode) => { setMode(next); setFeedback(undefined); if (next === 'run' || next === 'reassemble') setState(s => openPath(d, s, [])); };
-  const runDecor = mode === 'run' && run.type === 'scenario' ? (() => { const v = scenarioView(run, state.runs[run.id]); return { states: v.states, flow: v.flow }; })()
+  const runDecor = mode === 'run' && run.type === 'scenario' ? (() => {
+    const v = scenarioView(run, state.runs[run.id]);
+    const step = running?.runId === run.id ? run.steps[running.step] : undefined;
+    if (!step) return { states: v.states, flow: v.flow };
+    return { states: { ...v.states, ...Object.fromEntries(Object.keys(step.effect ?? {}).map(id => [id, 'active'])) }, flow: step.flow ?? [] };
+  })()
     : mode === 'run' && run.type === 'load' ? (() => {
       const removed = state.runs[run.id]?.tried.at(-1); const brick = run.bricks.find(b => b.part === removed);
       return { bricks: run.bricks.map(b => b.part), removed, target: brick ? { id: run.target, verdict: brick.verdict } : undefined };
     })() : {};
   const save = { opening: t.player.opening, saving: t.player.saving, saved: t.player.saved, failed: t.player.saveFailed }[saveStatus];
   const index = (id: string) => level.findIndex(p => p.id === id) + 1;
+  // Content never changes language by itself; when a version in the interface language exists, the player offers it.
+  const other = d.language !== language ? versions.find(v => v.language === language) : undefined;
 
   return <>
     <header className="topbar"><button className="brand-button" onClick={goHome} aria-label={t.player.backToLibrary}><Brand/></button>
@@ -96,6 +111,7 @@ export function DisassemblyPlayer({ d, bridge, goHome }: { d: Disassembly; bridg
           <div className="mode-tabs" role="group" aria-label={t.d.modesLabel}>{MODES.map(m => <button key={m} aria-pressed={mode === m} onClick={() => setModeAndLevel(m)}>{t.d.modes[m]}</button>)}</div>
         </div>
         <p className="question" lang={d.language}>{d.question}</p>
+        {other && openVersion && <div className="notice version-notice" role="status"><span>{t.d.otherVersion(t.languageNames[other.language])}</span><button onClick={() => openVersion(other.id)}>{t.d.openVersion}</button></div>}
         {notice && <div className="notice" role="status">{restoreText(t, notice, 'disassembly')}<button aria-label={t.common.closeNotice} onClick={() => setNotice(undefined)}><X size={15}/></button></div>}
         {saveStatus === 'failed' && <div className="error-banner" role="alert">{t.player.unsaved} <button onClick={() => setRetry(x => x + 1)}>{t.player.retrySave}</button></div>}
         {mode === 'bom' ? <div className="d-wide"><BillOfMaterials d={d} onFocus={focusCite}/><SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus} cited={[]}/></div>
@@ -114,13 +130,16 @@ export function DisassemblyPlayer({ d, bridge, goHome }: { d: Disassembly; bridg
             <aside className="d-side">
               {mode === 'explode' && <PartCard d={d} part={part} owner={owner} joints={joints} level={level} number={part && index(part.id)} focus={focus} onFocus={focusCite} onEnter={enter}
                 note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}/>}
-              {mode === 'run' && <RunPanel d={d} run={run} state={state} focus={focus} actions={{
-                choose: id => setRunId(id), focus: focusCite,
+              {mode === 'run' && <RunPanel d={d} run={run} state={state} focus={focus} running={running?.runId === run.id} actions={{
+                choose: id => { if (!running) setRunId(id); }, focus: focusCite,
                 predict: (step, option) => setState(s => predict(d, s, run.id, step, option)),
                 execute: () => {
-                  const next = run.type === 'scenario' ? run.steps[(state.runs[run.id]?.step ?? -1) + 1] : undefined;
-                  setState(s => execute(d, s, run.id));
-                  if (next?.cites?.[0]) focusCite(next.cites[0]);
+                  if (running || run.type !== 'scenario') return;
+                  const index = (state.runs[run.id]?.step ?? -1) + 1; const next = run.steps[index];
+                  const land = () => { setState(s => execute(d, s, run.id)); setRunning(undefined); if (next?.cites?.[0]) focusCite(next.cites[0]); };
+                  const delay = stepDelay();
+                  if (!delay) { land(); return; }
+                  setRunning({ runId: run.id, step: index }); timer.current = setTimeout(land, delay);
                 },
                 restart: () => setState(s => restartRun(s, run.id)),
                 remove: p => setState(s => removeBrick(d, s, run.id, p)),

@@ -1,4 +1,4 @@
-/* Disassembly player: a technical sheet on the left, the open part or run and the source on the right.
+/* Disassembly player: the technical sheet across the full width, then the open part or run beside the source.
    Joint labels use the 11px monospaced face the automatic layout measures (LAYOUT.label in src/core/layout.ts). */
 .disassembly { display: flex; flex-direction: column; gap: 10px; padding: 14px 22px 22px; min-height: calc(100vh - 72px); }
 .d-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
@@ -12,14 +12,15 @@
 .mode-tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 700; }
 .question { font-size: 15px; color: var(--muted); max-width: 70ch; }
 .disassembly .save-status { margin-left: auto; }
-.d-work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 18px; align-items: start; }
+.d-work { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .d-drawing { min-width: 0; border: 1px solid var(--line); border-radius: 4px; padding: 10px;
   background-color: var(--bg);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px),
     linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
   background-size: 12px 12px, 12px 12px, 60px 60px, 60px 60px; }
-.d-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; position: sticky; top: 84px; max-height: calc(100vh - 100px); }
-.d-side > :first-child { overflow: auto; min-height: 0; flex: 1 1 auto; }
+.d-side { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
+.d-side > :only-child { grid-column: 1 / -1; }
+.d-side .source-pane { position: sticky; top: 84px; }
 .d-wide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 18px; align-items: start; }
 .d-wide .source-pane { position: sticky; top: 84px; }
 
@@ -73,6 +74,13 @@
 .joint.muted { opacity: .3; }
 .joint.broken .joint-line { stroke-dasharray: 2 6; opacity: .5; }
 @keyframes flow { to { stroke-dashoffset: -16; } }
+/* The running beat of a step: its parts carry a pulsing amber dot until the effects land. */
+.state-mark.s-active circle { animation: pulse .9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { 50% { transform: scale(1.35); opacity: .65; } }
+.run-running { display: flex; gap: 8px; align-items: center; font-weight: 700; color: var(--amber); }
+.running-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--active); animation: pulse .9s ease-in-out infinite; }
+.version-notice { justify-content: space-between; }
+.version-notice button { background: var(--surface); border: 1px solid var(--amber); border-radius: 8px; padding: 4px 10px; }
 
 /* the side: part card, run, source */
 .part-card, .run-panel { display: flex; flex-direction: column; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 16px; }
@@ -99,7 +107,7 @@
 .source-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--code-line); flex-wrap: wrap; }
 .source-head select { max-width: 100%; font: inherit; font-size: 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 3px 6px; }
 .source-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
-.source-text { list-style: none; margin: 0; padding: 6px 0; overflow: auto; max-height: 34vh; font-size: 13px; line-height: 1.55; color: var(--code-ink); }
+.source-text { list-style: none; margin: 0; padding: 6px 0; overflow: auto; max-height: 60vh; font-size: 13px; line-height: 1.55; color: var(--code-ink); }
 .source-text.code { font-family: var(--f-mono); font-size: 12px; white-space: pre; }
 .source-text li { display: grid; grid-template-columns: 42px 1fr; padding: 0 10px 0 0; border-left: 3px solid transparent; }
 .source-text li.cited { background: var(--excluded); }
@@ -171,7 +179,8 @@
 
 @media (max-width: 960px) {
   .d-work, .d-wide { grid-template-columns: minmax(0, 1fr); }
-  .d-side, .d-wide .source-pane { position: static; max-height: none; }
+  .d-side { grid-template-columns: minmax(0, 1fr); }
+  .d-side .source-pane, .d-wide .source-pane { position: static; }
   .disassembly { padding: 12px 16px 20px; }
 }
-@media (prefers-reduced-motion: reduce) { .plate, .joint.flowing .joint-line { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .plate, .joint.flowing .joint-line, .state-mark.s-active circle, .running-dot { animation: none; } }

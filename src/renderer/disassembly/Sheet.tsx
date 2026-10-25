@@ -68,8 +68,9 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
       const state = target?.id === id ? (target.verdict === 'falls' ? 'failed' : target.verdict === 'weakens' ? 'active' : 'ok') : states[id];
       const cls = ['plate', part.parts && 'assembly', part.parts && part.relevant === false && 'closed', selected === id && 'selected', state && `state-${state}`,
         bricks.includes(id) && 'brick', removed === id && 'removed'].filter(Boolean).join(' ');
-      const lines = wrap(part.name, 20);
-      const top = rect.h / 2 - (lines.length * 15) / 2 + 13;
+      const lines = wrap(part.name, 17);
+      // The name is centred in the band below the kind label, so three lines never touch it.
+      const band = 22; const top = band + (rect.h - band - lines.length * 15) / 2 + 11;
       const tilt = target?.id === id && target.verdict !== 'holds' ? `rotate(${target.verdict === 'falls' ? 3 : 1.2} ${rect.w / 2} ${rect.h})` : undefined;
       return <g key={id} className={cls} data-id={id} transform={`translate(${rect.x} ${rect.y})`} role="button" tabIndex={0}
         aria-pressed={selected === id} aria-label={`${index + 1}. ${part.name} · ${t.d.kinds[part.kind]}${state ? ` · ${t.d.states[state as keyof typeof t.d.states]}` : ''}`}
@@ -80,7 +81,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
           {part.parts && part.relevant === false && <rect className="hatch" width={rect.w} height={rect.h} rx={3}/>}
           <text className="kind-tag" x={10} y={15}>{t.d.kinds[part.kind]}</text>
           {part.parts && <text className="sub-count" x={rect.w - 8} y={15} textAnchor="end">{part.relevant === false ? '▨' : '⊕'} {t.d.subParts(part.parts.length)}</text>}
-          <g className="plate-icon"><PartIcon name={part.icon} size={20} x={10} y={rect.h / 2 - 6}/></g>
+          <g className="plate-icon"><PartIcon name={part.icon} size={20} x={10} y={band + (rect.h - band - 20) / 2}/></g>
           <text className="name" lang={language}>{lines.map((line, i) => <tspan key={i} x={40} y={top + i * 15}>{line}</tspan>)}</text>
         </g>
         <g className="balloon" aria-hidden="true"><line x1={-9} y1={-9} x2={6} y2={6}/><circle cx={-15} cy={-15} r={10}/><text x={-15} y={-11} textAnchor="middle">{index + 1}</text></g>

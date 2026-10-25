@@ -6,6 +6,7 @@
   "title": "Rilascio di Atlas Reader in staging",
   "question": "Come si rilascia una nuova versione del client web in staging, e come si torna indietro se qualcosa va storto?",
   "language": "it",
+  "family": "atlas-release",
   "sources": [
     {
       "id": "runbook",

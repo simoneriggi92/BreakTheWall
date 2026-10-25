@@ -144,6 +144,7 @@ export const it = {
     reasons: { context: 'contesto', 'outside-question': 'fuori dalla domanda', repetition: 'ripetizione', detail: 'dettaglio', secrets: 'contiene segreti', generated: 'generato' },
     states: { ok: 'fatto', active: 'in corso', failed: 'fallito', restored: 'ripristinato' },
     tag: 'Smontaggio preparato', tagGenerated: 'Smontaggio generato',
+    otherVersion: (language: string) => `Questo smontaggio esiste anche in ${language}. I progressi restano separati per ogni versione.`, openVersion: 'Apri quella versione',
     breadcrumbs: 'Livelli dello smontaggio', sheetLabel: (title: string) => `Esploso: ${title}`,
     sheetSub: (mode: string, level: number, parts: number) => `${mode} · livello ${level} · ${parts} pezzi`,
     whole: 'Smontaggio', subassembly: (kind: string) => `Sottoassieme · ${kind}`, partOf: (n: number, kind: string) => `Pezzo ${n} · ${kind}`,
@@ -159,7 +160,7 @@ export const it = {
     run: {
       choose: 'Scegli una prova', scenario: 'Scenario', load: 'Prova di carico', case: 'Caso nuovo', setup: 'Situazione', instruments: 'Strumenti',
       stepOf: (n: number, total: number) => `Passo ${n} di ${total}`, predict: 'Prima di eseguire: cosa succede?', execute: 'Esegui il passo', start: 'Inizia lo scenario',
-      right: 'Previsione giusta.', wrong: 'Non proprio.', done: 'Scenario completato.', restart: 'Ricomincia', changed: 'cambiato',
+      right: 'Previsione giusta.', wrong: 'Non proprio.', done: 'Scenario completato.', restart: 'Ricomincia', changed: 'cambiato', running: 'In esecuzione…',
       removeHint: 'Togli un mattone alla volta: guarda cosa succede al bersaglio.', bricks: 'Mattoni', target: (name: string) => `Bersaglio: ${name}`,
       remove: (name: string) => `Togli «${name}»`, removed: 'tolto',
       verdicts: { falls: 'CROLLA', weakens: 'SI INDEBOLISCE', holds: 'REGGE' },

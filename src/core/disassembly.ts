@@ -84,6 +84,8 @@ export const disassemblySchema = z.strictObject({
   schemaVersion: z.literal(1), id, revision: id, kind: z.enum(['prepared', 'generated']),
   generation: z.strictObject({ provider: z.enum(['chatgpt', 'local']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime() }).optional(),
   title: short, question: text, language: z.enum(['it', 'en']),
+  /** Versions of one disassembly in different languages share a family, so the player can offer the other one. */
+  family: id.optional(),
   scope: scopeSchema.optional(),
   sources: z.array(disassemblySourceSchema).min(1).max(64),
   whole: z.strictObject({ name: short, does: text, why: text, cites }),

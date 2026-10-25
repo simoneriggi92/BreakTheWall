@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge, ProgressKey } from '../src/core/bridge';
 import { validateDisassembly, type Disassembly } from '../src/core/disassembly';
 import { trayOrder } from '../src/core/disassembly-state';
@@ -8,6 +8,7 @@ import { App } from '../src/renderer/App';
 import { DisassemblyPlayer } from '../src/renderer/disassembly/DisassemblyPlayer';
 import { PreferencesProvider } from '../src/renderer/preferences';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
+import { loadPreparedDisassemblies } from '../src/fixtures/disassemblies';
 
 /** An in-memory bridge with the same contract as the preload; `locale` sets the interface language. */
 function memoryBridge(locale = 'it-IT') {
@@ -119,6 +120,27 @@ describe('run', () => {
     expect(side().getByText('Passo 1 di 5')).toBeInTheDocument();
     expect(side().getByText('Passo 2 di 5')).toBeInTheDocument();
   });
+  it('runs a step in two beats: its parts show as running, then the effects and explanation land', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      const d = await validateDisassembly(atlas()); await play(d);
+      const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await u.click(screen.getByRole('button', { name: 'Fai girare' }));
+      await u.click(side().getAllByRole('radio')[1]);
+      await u.click(side().getByRole('button', { name: /Esegui il passo/ }));
+      expect(side().getByText('In esecuzione…')).toBeInTheDocument();
+      expect(plate(/^2\. check · passo · in corso/)).toBeInTheDocument();
+      const run = d.runs[0]; if (run.type !== 'scenario') throw new Error('fixture');
+      expect(side().queryByText(run.steps[0].explain)).not.toBeInTheDocument();
+      await act(async () => { vi.advanceTimersByTime(950); });
+      expect(side().getByText(run.steps[0].explain)).toBeInTheDocument();
+      expect(plate(/^2\. check · passo · fatto/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+      delete (window as { matchMedia?: unknown }).matchMedia;
+    }
+  });
   it('words load-test verdicts in English too', async () => {
     const d = await validateDisassembly(story()); await play(d, memoryBridge('en-GB').bridge);
     await user().click(screen.getByRole('button', { name: 'Run' }));
@@ -189,6 +211,16 @@ describe('content language and interface language', () => {
     await user().click(plate(/^4\. deploy-staging · step/));
     expect(side().getByText('Part 4 · step')).toBeInTheDocument();
     expect(side().getByRole('heading', { name: /deploy-staging/ }).closest('[lang]')).toHaveAttribute('lang', 'it');
+  });
+  it('offers the version in the interface language, keeping progress separate', async () => {
+    const { bridge } = memoryBridge('en-US');
+    render(<App bridge={bridge} prepared={[]} disassemblies={await loadPreparedDisassemblies()}/>);
+    await user().click(await screen.findByRole('checkbox', { name: /Also show the examples in Italian/ }));
+    await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
+    expect(await screen.findByText(/This disassembly also exists in English/)).toBeInTheDocument();
+    await user().click(screen.getByRole('button', { name: 'Open that version' }));
+    expect(await screen.findByText('How do you release a new version of the web client to staging, and how do you go back if something goes wrong?')).toBeInTheDocument();
+    expect(screen.queryByText(/also exists in/)).not.toBeInTheDocument();
   });
   it('shows English content under an Italian interface', async () => {
     const { bridge } = memoryBridge('it-IT');

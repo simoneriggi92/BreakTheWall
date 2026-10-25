@@ -5,7 +5,7 @@ import { JOINT_FAMILY, type Disassembly, type Joint, type Part } from './disasse
  * so the renderer must draw joint labels in that font for the geometry to hold.
  */
 export const LAYOUT = {
-  plate: { w: 176, h: 76 },
+  plate: { w: 176, h: 84 },
   label: { charW: 6.6, h: 18, padX: 6, clear: 6 },
   margin: 40, rankGap: 72, itemGap: { flow: 28, stack: 44 }, lane: 8, sideGap: 56, grow: 24,
 } as const;

@@ -13,20 +13,20 @@ export interface RunActions {
 }
 
 /** One run at a time: its controls sit next to the drawing, and feedback stays apart from the controls. */
-export function RunPanel({ d, run, state, focus, actions }: { d: Disassembly; run: Run; state: DisassemblyState; focus?: Cite; actions: RunActions }) {
+export function RunPanel({ d, run, state, focus, running = false, actions }: { d: Disassembly; run: Run; state: DisassemblyState; focus?: Cite; running?: boolean; actions: RunActions }) {
   const { t } = usePreferences();
   return <section className="run-panel" aria-labelledby="run-title">
     {d.runs.length > 1 && <div className="run-tabs" role="group" aria-label={t.d.run.choose}>{d.runs.map(r => <button key={r.id} aria-pressed={r.id === run.id} onClick={() => actions.choose(r.id)}>
       <span className="micro">{t.d.run[r.type]}</span><span lang={d.language}>{r.title}</span></button>)}</div>}
     <span className="eyebrow">{t.d.run[run.type]}</span>
     <h2 id="run-title" lang={d.language}>{run.title}</h2>
-    {run.type === 'scenario' && <ScenarioRun d={d} run={run} state={state} focus={focus} actions={actions}/>}
+    {run.type === 'scenario' && <ScenarioRun d={d} run={run} state={state} focus={focus} running={running} actions={actions}/>}
     {run.type === 'load' && <LoadRun d={d} run={run} state={state} focus={focus} actions={actions}/>}
     {run.type === 'case' && <CaseRun d={d} run={run} state={state} focus={focus} actions={actions}/>}
   </section>;
 }
 
-function ScenarioRun({ d, run, state, focus, actions }: { d: Disassembly; run: Scenario; state: DisassemblyState; focus?: Cite; actions: RunActions }) {
+function ScenarioRun({ d, run, state, focus, running, actions }: { d: Disassembly; run: Scenario; state: DisassemblyState; focus?: Cite; running: boolean; actions: RunActions }) {
   const { t } = usePreferences();
   const progress = state.runs[run.id];
   const { vars, changed, last } = scenarioView(run, progress);
@@ -50,7 +50,8 @@ function ScenarioRun({ d, run, state, focus, actions }: { d: Disassembly; run: S
       {next.predict && <fieldset className="predict"><legend>{t.d.run.predict}</legend><p lang={d.language}>{next.predict.question}</p>
         {next.predict.options.map((o, i) => <label key={i} className={choice === i ? 'selected' : undefined}><input type="radio" name={`${run.id}-${nextIndex}`} checked={choice === i} disabled={choice !== undefined} onChange={() => actions.predict(nextIndex, i)}/><span lang={d.language}>{o.text}</span></label>)}
       </fieldset>}
-      <button className="primary" disabled={!!next.predict && choice === undefined} onClick={actions.execute}><Play size={15}/>{nextIndex === 0 && !next.predict ? t.d.run.start : t.d.run.execute}</button>
+      {running ? <p className="run-running" role="status"><span className="running-dot" aria-hidden="true"/>{t.d.run.running}</p>
+        : <button className="primary" disabled={!!next.predict && choice === undefined} onClick={actions.execute}><Play size={15}/>{nextIndex === 0 && !next.predict ? t.d.run.start : t.d.run.execute}</button>}
     </div> : <p className="run-done" role="status"><Check size={16}/>{t.d.run.done}</p>}
     {progress && <button className="text-button" onClick={actions.restart}><RotateCcw size={14}/>{t.d.run.restart}</button>}
   </>;

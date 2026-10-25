@@ -46,7 +46,7 @@ export function Reassemble({ d, layout, state, place, check, clear, feedback }: 
       {layout.joints.map((j, i) => <JointPath key={i} joint={{ type: d.joints[i].type, label: '' }} points={j.points} muted/>)}
       {d.reassemble.slots.map(slot => {
         const rect = rects.get(slot.id)!; const part = placements[slot.id]; const isLocked = locked.includes(slot.id);
-        const lines = part ? wrap(name(part), 20) : [];
+        const lines = part ? wrap(name(part), 19) : [];
         return <g key={slot.id} className={`slot${part ? ' filled' : ''}${isLocked ? ' state-ok' : ''}${feedback?.wrong && placements[slot.id] === feedback.wrong.part ? ' state-failed' : ''}`}
           transform={`translate(${rect.x} ${rect.y})`} role="button" tabIndex={isLocked ? -1 : 0} aria-disabled={isLocked}
           aria-label={part ? t.d.reassemble.filledSlot(slot.label, name(part)) : t.d.reassemble.emptySlot(slot.label)}
@@ -54,7 +54,7 @@ export function Reassemble({ d, layout, state, place, check, clear, feedback }: 
           onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id && !isLocked) drop(slot.id, id); }}>
           <rect className="body" width={rect.w} height={rect.h} rx={3}/>
           <text className="kind-tag" x={10} y={15}>{slot.label}</text>
-          <text className="name" lang={d.language}>{lines.map((line, i) => <tspan key={i} x={14} y={rect.h / 2 - (lines.length * 15) / 2 + 13 + i * 15}>{line}</tspan>)}</text>
+          <text className="name" lang={d.language}>{lines.map((line, i) => <tspan key={i} x={14} y={22 + (rect.h - 22 - lines.length * 15) / 2 + 11 + i * 15}>{line}</tspan>)}</text>
           {isLocked && <g className="state-mark s-ok" aria-hidden="true"><circle cx={rect.w} cy={0} r={10}/><text x={rect.w} y={4} textAnchor="middle">✓</text></g>}
         </g>;
       })}

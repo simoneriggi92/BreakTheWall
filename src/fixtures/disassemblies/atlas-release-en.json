@@ -6,6 +6,7 @@
   "title": "Releasing Atlas Reader to staging",
   "question": "How do you release a new version of the web client to staging, and how do you go back if something goes wrong?",
   "language": "en",
+  "family": "atlas-release",
   "sources": [
     {
       "id": "runbook",

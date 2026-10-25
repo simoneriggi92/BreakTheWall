@@ -145,6 +145,7 @@ export const en: Messages = {
     reasons: { context: 'context', 'outside-question': 'outside the question', repetition: 'repetition', detail: 'detail', secrets: 'contains secrets', generated: 'generated' },
     states: { ok: 'done', active: 'in progress', failed: 'failed', restored: 'restored' },
     tag: 'Prepared disassembly', tagGenerated: 'Generated disassembly',
+    otherVersion: (language: string) => `This disassembly also exists in ${language}. Progress stays separate for each version.`, openVersion: 'Open that version',
     breadcrumbs: 'Levels of the disassembly', sheetLabel: (title: string) => `Exploded view: ${title}`,
     sheetSub: (mode: string, level: number, parts: number) => `${mode} · level ${level} · ${parts} parts`,
     whole: 'Disassembly', subassembly: (kind: string) => `Sub-assembly · ${kind}`, partOf: (n: number, kind: string) => `Part ${n} · ${kind}`,
@@ -160,7 +161,7 @@ export const en: Messages = {
     run: {
       choose: 'Choose a run', scenario: 'Scenario', load: 'Load test', case: 'New case', setup: 'Situation', instruments: 'Instruments',
       stepOf: (n: number, total: number) => `Step ${n} of ${total}`, predict: 'Before you run it: what happens?', execute: 'Run the step', start: 'Start the scenario',
-      right: 'Right prediction.', wrong: 'Not quite.', done: 'Scenario complete.', restart: 'Start again', changed: 'changed',
+      right: 'Right prediction.', wrong: 'Not quite.', done: 'Scenario complete.', restart: 'Start again', changed: 'changed', running: 'Running…',
       removeHint: 'Remove one brick at a time and watch what happens to the target.', bricks: 'Bricks', target: (name: string) => `Target: ${name}`,
       remove: (name: string) => `Remove "${name}"`, removed: 'removed',
       verdicts: { falls: 'FALLS', weakens: 'WEAKENS', holds: 'HOLDS' },
