@@ -10,11 +10,11 @@ import { App } from '../src/renderer/App';
 /** An in-memory desktop bridge: the same contract the Electron preload exposes. */
 function memoryBridge() {
   const saved = new Map<string, LearnerState>();
-  const key = (k: ProgressKey) => `${k.lessonId}:${k.revision}`;
+  const key = (k: ProgressKey) => `${'lessonId' in k ? k.lessonId : k.disassemblyId}:${k.revision}`;
   const bridge: DesktopBridge = {
     getRuntime: async () => ({ platform: 'test', mode: 'browser' }),
     loadProgress: async k => ({ state: saved.get(key(k)) ?? null }),
-    saveProgress: async s => { saved.set(key(s), structuredClone(s)); },
+    saveProgress: async s => { saved.set(key(s), structuredClone(s) as LearnerState); },
   };
   return { bridge, saved, key };
 }

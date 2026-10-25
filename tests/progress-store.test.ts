@@ -1,17 +1,20 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProgressStore } from '../src/desktop/progress-store';
+import { initialDisassemblyState } from '../src/core/disassembly-state';
+import { loadPreparedDisassemblies } from '../src/fixtures/disassemblies';
 import { loadPreparedLessons } from '../src/fixtures/lessons';
 import { initialState, navigate, submit } from '../src/core/state';
 
 const lessons = await loadPreparedLessons();
+const disassemblies = await loadPreparedDisassemblies();
 const dirs: string[] = [];
 async function store() {
   const root = await mkdtemp(join(tmpdir(), 'btw-progress-'));
   dirs.push(root);
-  return { root, store: new ProgressStore(root, lessons) };
+  return { root, store: new ProgressStore(root, lessons, disassemblies) };
 }
 afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
 
@@ -48,5 +51,46 @@ describe('desktop progress store', () => {
     const { store: s } = await store();
     const state = { ...initialState(lessons[0]), revision: 'v9' };
     await expect(s.save(state)).rejects.toThrow(/Unknown lesson revision/);
+  });
+
+  it('still loads lesson progress saved before disassemblies existed', async () => {
+    const { root, store: s } = await store();
+    const lesson = lessons[0];
+    await mkdir(join(root, lesson.id), { recursive: true });
+    // The exact shape the previous version wrote: no kind field, lesson keys only.
+    const saved = { schemaVersion: 1, lessonId: lesson.id, revision: lesson.revision, pageId: lesson.pages[0].id, mode: 'explore', visited: [lesson.pages[0].id], frames: {}, nodes: {}, notes: { [lesson.pages[0].id]: 'Nota scritta prima' }, reflections: {}, attempts: [] };
+    await writeFile(join(root, lesson.id, `${lesson.revision}.json`), JSON.stringify(saved));
+    expect(await s.load({ lessonId: lesson.id, revision: lesson.revision })).toEqual({ state: saved });
+  });
+
+  it('keeps disassembly progress apart and round-trips it', async () => {
+    const { root, store: s } = await store();
+    const d = disassemblies[0];
+    const state = { ...initialDisassemblyState(d), path: ['image'], runs: { 'failed-smoke': { step: 1, choices: { 0: 1 }, tried: [] } }, notes: { deploy: 'Solo il digest cambia' } };
+    await s.save(state);
+    expect(await readdir(root)).toEqual(['_disassemblies']);
+    expect(await readdir(join(root, '_disassemblies', d.id))).toEqual([`${d.revision}.json`]);
+    expect(await new ProgressStore(root, lessons, disassemblies).load({ disassemblyId: d.id, revision: d.revision })).toEqual({ state });
+  });
+
+  it('preserves disassembly progress whose references no longer hold, and says why with a code', async () => {
+    const { root, store: s } = await store();
+    const d = disassemblies[1];
+    const dir = join(root, '_disassemblies', d.id);
+    await mkdir(dir, { recursive: true });
+    const stale = JSON.stringify({ ...initialDisassemblyState(d), notes: { removed: 'old note' } });
+    await writeFile(join(dir, `${d.revision}.json`), stale);
+    expect(await s.load({ disassemblyId: d.id, revision: d.revision })).toEqual({ state: null, noticeCode: 'references-changed' });
+    await writeFile(join(dir, `${d.revision}.json`), '{ broken');
+    expect(await s.load({ disassemblyId: d.id, revision: d.revision })).toEqual({ state: null, noticeCode: 'unreadable' });
+    const kept = (await readdir(dir)).filter(f => f.includes('.preserved-'));
+    expect(await Promise.all(kept.map(f => readFile(join(dir, f), 'utf8')))).toEqual(expect.arrayContaining([stale, '{ broken']));
+  });
+
+  it('refuses disassembly progress for an unknown revision or with dangling references', async () => {
+    const { store: s } = await store();
+    const d = disassemblies[0];
+    await expect(s.save({ ...initialDisassemblyState(d), revision: 'v9' })).rejects.toThrow(/Unknown disassembly revision/);
+    await expect(s.save({ ...initialDisassemblyState(d), selected: 'missing' })).rejects.toThrow(/Invalid learner references/);
   });
 });

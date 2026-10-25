@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { progressKeySchema, type DesktopBridge } from '../core/bridge';
+import { progressKeySchema, progressStateSchema, type DesktopBridge } from '../core/bridge';
 import type { StudioBridge } from '../core/provider';
-import { stateSchema } from '../core/state';
 
 const studio = Object.freeze<StudioBridge>({
   pickSources: () => ipcRenderer.invoke('sources:pick'),
@@ -28,7 +27,7 @@ const studio = Object.freeze<StudioBridge>({
 const bridge = Object.freeze<DesktopBridge>({
   getRuntime: () => ipcRenderer.invoke('runtime:get'),
   loadProgress: key => ipcRenderer.invoke('progress:load', progressKeySchema.parse(key)),
-  saveProgress: state => ipcRenderer.invoke('progress:save', stateSchema.parse(state)),
+  saveProgress: state => ipcRenderer.invoke('progress:save', progressStateSchema.parse(state)),
   studio,
 });
 contextBridge.exposeInMainWorld('breakTheWall', bridge);

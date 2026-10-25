@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "id": "kessmouth-quay",
+  "revision": "v1",
+  "kind": "prepared",
+  "title": "How the Kessmouth market reached the quay",
+  "question": "How did the Kessmouth market end up on the quay, and which decision made it happen?",
+  "language": "en",
+  "sources": [
+    {
+      "id": "kessmouth",
+      "title": "The harbour bell of Kessmouth",
+      "origin": "original-prepared",
+      "revision": "v1",
+      "text": "# The harbour bell of Kessmouth\n\nAn original, fictional account written for Break the Wall. Kessmouth and its people are invented.\n\nIn the spring of 1871 a storm broke the harbour wall of Kessmouth.\nTwo boats sank at their moorings, and the fishermen blamed the wall, not the storm.\nThe council could afford one repair: the wall or the old market hall.\nThe harbour master, Ada Pell, argued for the wall, because without boats there would be nothing to sell.\nThe merchants argued for the hall, because their stalls stood in the rain.\nAda Pell won the vote by one voice, after she promised to ring the harbour bell whenever a storm was coming.\n\nThe wall was rebuilt over the summer with stone from the closed quarry at Hale.\nReopening the quarry brought twenty workers to the town, and they needed somewhere to eat.\nWith no market hall, the merchants moved their stalls to the quay beside the new wall.\nThe quay was busier than the hall had ever been, because every boat now landed its catch there.\n\nIn October the bell rang for the first storm of the season.\nThe boats came in early, and the merchants carried their stalls back from the quay.\nNothing was lost, and the council ordered the bell to be rung before every storm from then on.\n\nBy 1875 the old market hall had become a storehouse, and nobody asked to repair it again.\nThe town remembers Ada Pell for the wall; the merchants remember her for the quay.\n\nHistorians of the town disagree about the quay.\nSome say the market would have moved anyway, once the railway reached the harbour in 1874.\nOthers point out that the stalls were already on the quay three years before the railway came.",
+      "sha256": "c2cbadc1c14491b99dacd843c2244be38f15900ac4c391130004dd2b23dcd687"
+    }
+  ],
+  "whole": {
+    "name": "From storm to quay",
+    "does": "Follows one vote after a storm through its consequences, until the market sits on the quay and the old hall is forgotten.",
+    "why": "Nobody decided to move the market. It moved because a vote spent the only repair on the wall, and the quay filled the gap.",
+    "cites": [
+      {
+        "source": "kessmouth",
+        "from": 5,
+        "to": 22
+      }
+    ]
+  },
+  "parts": [
+    {
+      "id": "storm",
+      "name": "The storm breaks the wall",
+      "kind": "event",
+      "icon": "flag",
+      "role": "The event that forces a choice.",
+      "points": [
+        {
+          "text": "A spring storm breaks the harbour wall and two boats sink."
+        },
+        {
+          "text": "The fishermen blame the wall, not the storm.",
+          "mark": "caveat"
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 5,
+          "to": 6
+        }
+      ]
+    },
+    {
+      "id": "vote",
+      "name": "One repair, one vote",
+      "kind": "event",
+      "icon": "scale",
+      "role": "The council can repair the wall or the market hall, not both.",
+      "points": [
+        {
+          "text": "Only one repair is affordable: the wall or the hall."
+        },
+        {
+          "text": "Ada Pell wins by one voice, after promising the storm bell.",
+          "mark": "step"
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 7,
+          "to": 10
+        }
+      ],
+      "parts": [
+        {
+          "id": "for-wall",
+          "name": "Ada Pell, for the wall",
+          "kind": "actor",
+          "icon": "user-round",
+          "role": "The harbour master.",
+          "explain": "Without boats there would be nothing to sell, so the wall comes first.",
+          "cites": [
+            {
+              "source": "kessmouth",
+              "from": 8,
+              "to": 8
+            }
+          ]
+        },
+        {
+          "id": "for-hall",
+          "name": "The merchants, for the hall",
+          "kind": "actor",
+          "icon": "users",
+          "role": "The stallholders.",
+          "explain": "Their stalls stood in the rain, so they wanted the hall repaired.",
+          "cites": [
+            {
+              "source": "kessmouth",
+              "from": 9,
+              "to": 9
+            }
+          ]
+        },
+        {
+          "id": "promise",
+          "name": "The bell promise",
+          "kind": "event",
+          "icon": "flag",
+          "role": "The concession that wins the vote.",
+          "explain": "Ada Pell promises to ring the harbour bell before every storm, and wins by one voice.",
+          "cites": [
+            {
+              "source": "kessmouth",
+              "from": 10,
+              "to": 10
+            }
+          ]
+        }
+      ],
+      "joints": [
+        {
+          "from": "for-wall",
+          "to": "promise",
+          "type": "leads-to",
+          "label": "wins with"
+        },
+        {
+          "from": "for-hall",
+          "to": "promise",
+          "type": "because",
+          "label": "one voice short"
+        }
+      ]
+    },
+    {
+      "id": "wall",
+      "name": "The wall is rebuilt",
+      "kind": "event",
+      "icon": "hammer",
+      "role": "The repair that was chosen, and its side effect.",
+      "points": [
+        {
+          "text": "The wall is rebuilt with stone from the reopened quarry.",
+          "mark": "step"
+        },
+        {
+          "text": "Twenty quarry workers arrive and need somewhere to eat.",
+          "mark": "step"
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 12,
+          "to": 13
+        }
+      ]
+    },
+    {
+      "id": "bell",
+      "name": "The bell proves itself",
+      "kind": "event",
+      "icon": "triangle-alert",
+      "role": "The promise is kept at the first storm.",
+      "points": [
+        {
+          "text": "The bell rings before the first October storm.",
+          "mark": "step"
+        },
+        {
+          "text": "Boats and stalls are moved in time, and nothing is lost.",
+          "mark": "keeps"
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 17,
+          "to": 19
+        }
+      ]
+    },
+    {
+      "id": "quay",
+      "name": "The market moves to the quay",
+      "kind": "consequence",
+      "icon": "map",
+      "role": "The outcome nobody voted for.",
+      "points": [
+        {
+          "text": "With no hall, the merchants set up on the quay beside the new wall.",
+          "mark": "step"
+        },
+        {
+          "text": "The quay is busier than the hall, because every boat lands there."
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 14,
+          "to": 15
+        }
+      ]
+    },
+    {
+      "id": "hall",
+      "name": "The hall is forgotten",
+      "kind": "consequence",
+      "icon": "ban",
+      "role": "What the vote cost, years later.",
+      "points": [
+        {
+          "text": "By 1875 the hall is a storehouse and nobody asks to repair it."
+        },
+        {
+          "text": "The town remembers the wall; the merchants remember the quay."
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 21,
+          "to": 22
+        }
+      ]
+    },
+    {
+      "id": "railway",
+      "name": "The railway, a rival cause",
+      "kind": "objection",
+      "icon": "message-circle",
+      "role": "Another explanation for the quay.",
+      "points": [
+        {
+          "text": "Some historians say the railway of 1874 would have moved the market anyway."
+        },
+        {
+          "text": "But the stalls were on the quay three years earlier.",
+          "mark": "caveat"
+        }
+      ],
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 24,
+          "to": 26
+        }
+      ]
+    }
+  ],
+  "joints": [
+    {
+      "from": "storm",
+      "to": "vote",
+      "type": "leads-to",
+      "label": "one repair only",
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 7,
+          "to": 7
+        }
+      ]
+    },
+    {
+      "from": "vote",
+      "to": "wall",
+      "type": "leads-to",
+      "label": "wall chosen"
+    },
+    {
+      "from": "vote",
+      "to": "bell",
+      "type": "leads-to",
+      "label": "the promise"
+    },
+    {
+      "from": "wall",
+      "to": "quay",
+      "type": "leads-to",
+      "label": "no hall, new quay"
+    },
+    {
+      "from": "bell",
+      "to": "quay",
+      "type": "because",
+      "label": "keeps the quay safe"
+    },
+    {
+      "from": "quay",
+      "to": "hall",
+      "type": "leads-to",
+      "label": "hall not needed"
+    },
+    {
+      "from": "railway",
+      "to": "quay",
+      "type": "because",
+      "label": "rival cause"
+    }
+  ],
+  "bom": {
+    "excluded": [
+      {
+        "source": "kessmouth",
+        "from": 1,
+        "to": 3,
+        "reason": "context",
+        "note": "Title and the note that the account is invented."
+      }
+    ]
+  },
+  "runs": [
+    {
+      "type": "load",
+      "id": "remove-event",
+      "title": "Remove an event",
+      "target": "quay",
+      "question": "Which event, if it had not happened, would keep the market off the quay?",
+      "bricks": [
+        {
+          "part": "wall",
+          "verdict": "falls",
+          "explain": "It falls. Spending the repair on the wall is what left the merchants without a hall.",
+          "cites": [
+            {
+              "source": "kessmouth",
+              "from": 14,
+              "to": 14
+            }
+          ]
+        },
+        {
+          "part": "bell",
+          "verdict": "weakens",
+          "inference": true,
+          "explain": "It weakens. The market still moves, but without the warning a storm could have ruined the stalls. The text does not say what would have happened.",
+          "cites": [
+            {
+              "source": "kessmouth",
+              "from": 17,
+              "to": 19
+            }
+          ]
+        },
+        {
+          "part": "railway",
+          "verdict": "holds",
+          "explain": "It holds. The stalls were on the quay three years before the railway arrived.",
+          "cites": [
+            {
+              "source": "kessmouth",
+              "from": 26,
+              "to": 26
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "case",
+      "id": "rival-town",
+      "title": "Apply it to a new case",
+      "scenario": "In a nearby town a fire destroys the market hall, and the council rebuilds it at once.",
+      "question": "Following the Kessmouth account, would that market move to the quay?",
+      "options": [
+        {
+          "text": "Yes: markets always move towards the boats",
+          "correct": false,
+          "why": "Kessmouth's market moved because it had no hall, not because of a general rule."
+        },
+        {
+          "text": "Probably not: the hall it relied on is still there",
+          "correct": true,
+          "why": "In Kessmouth the move filled a gap left by the vote. Here there is no gap."
+        }
+      ],
+      "inference": true,
+      "cites": [
+        {
+          "source": "kessmouth",
+          "from": 14,
+          "to": 14
+        }
+      ]
+    }
+  ],
+  "reassemble": {
+    "title": "Rebuild the chain of events",
+    "instruction": "Put each event in its place, from the storm to the forgotten hall, and set the rival cause aside.",
+    "slots": [
+      {
+        "id": "r1",
+        "label": "1",
+        "accepts": "storm"
+      },
+      {
+        "id": "r2",
+        "label": "2",
+        "accepts": "vote"
+      },
+      {
+        "id": "r3",
+        "label": "3",
+        "accepts": [
+          "wall",
+          "bell"
+        ]
+      },
+      {
+        "id": "r4",
+        "label": "3",
+        "accepts": [
+          "wall",
+          "bell"
+        ]
+      },
+      {
+        "id": "r5",
+        "label": "4",
+        "accepts": "quay"
+      },
+      {
+        "id": "r6",
+        "label": "5",
+        "accepts": "hall"
+      },
+      {
+        "id": "r7",
+        "label": "Rival",
+        "accepts": "railway"
+      }
+    ],
+    "hints": {
+      "storm": "Everything starts with what broke.",
+      "vote": "A choice had to be made before any repair.",
+      "wall": "This followed from the vote.",
+      "bell": "This was the price of winning the vote.",
+      "quay": "It happened because something was missing.",
+      "hall": "Years later, this is what the vote cost.",
+      "railway": "It came after the move it is said to explain."
+    }
+  }
+}
