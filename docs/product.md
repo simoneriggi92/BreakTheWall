@@ -138,6 +138,7 @@ The test for every feature: would the owner, the first user, use it on a real pr
 - Deliberately paced: a coherent exploded view of the whole, and one part opened at a time.
 - Variety: maps, sequences, comparisons, worked examples, concept lenses, scenarios and meaningful activities. Simulations, animations and games are optional and never forced on the learner.
 - A pleasant, clean interface with consistent icons and colors. Progressive disclosure should reduce simultaneous detail.
+- Two interface languages, English and Italian (owner, 2026-10-25). The default follows the system and the learner can change it. The interface language is independent of a disassembly's content: each disassembly is written in one language and says which, and the app never translates sources or content.
 - Strong links between every part and its source. For code, retain exact excerpts and the lines relevant to each frame.
 - A sense of progression without pressure: no streaks, no mandatory review.
 - Learner responses, feedback, notes, and iteration from both owner and user feedback.
@@ -160,15 +161,16 @@ Exploration mode allows navigation without answers. Guided mode can require a re
 
 The first alpha shipped before the identity was fixed. The mapping below guides the next plans; none of the new names or behaviors is implemented yet.
 
-| Today (shipped) | Direction | UI term (Italian) |
-|---|---|---|
-| lesson / percorso | disassembly | smontaggio |
-| opening map | exploded view | esploso |
-| page | part | pezzo |
-| map relations (free labels) | joints typed as mechanism, argument or story | giunti |
-| prediction, sequence | run: put a joint under load | fai girare / metti sotto carico |
-| reconstruction | reassemble | rimonta |
-| atlas of concepts | parts store across disassemblies | magazzino dei pezzi |
+| Today (shipped) | Direction | UI term (Italian) | UI term (English) |
+|---|---|---|---|
+| lesson / percorso | disassembly | smontaggio | disassembly |
+| opening map | exploded view | esploso | exploded view |
+| page | part | pezzo | part |
+| map relations (free labels) | joints typed as mechanism, argument or story | giunti | joints |
+| prediction, sequence | run: put a joint under load | fai girare / metti sotto carico | run / put under load |
+| reconstruction | reassemble | rimonta | reassemble |
+| — | bill of materials | distinta base | bill of materials |
+| atlas of concepts | parts store across disassemblies | magazzino dei pezzi | parts store |
 
 Not yet built: typed joints, sub-assemblies and the verified bill of materials, the technical-drawing style, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the learner when material has no structure to take apart.
 

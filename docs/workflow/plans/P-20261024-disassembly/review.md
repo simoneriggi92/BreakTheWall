@@ -1,6 +1,30 @@
 # Plan review: disassembly v2
 
-Plan: [P-20261024-disassembly v2](plan.md). Version 1 reviewed on 2026-10-24; version 2 on 2026-10-25. Review type: author self-review and static checks. There was no independent reviewer and no implementation.
+Plan: [P-20261024-disassembly v3](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2 before v3 was written.
+
+## Version 3: changes and findings resolved
+
+Version 3 adds the owner's requirement of 2026-10-25: an interface in English and Italian.
+
+| Finding | Resolution in v3 |
+|---|---|
+| The v2 player is "all in Italian", and every current string is hard-coded in Italian. | D4 moves every string into two catalogs with the same keys; D5–D10 take their wording from them. |
+| Messages from the core and the desktop host are Italian sentences, so a catalog in the renderer would not reach them. | They travel as codes with parameters. Import errors and provider failures already have codes; D3 already made disassembly notices codes; lesson notices get codes in D4. |
+| Interface language and content language could be confused, e.g. by translating a disassembly on the fly. | The plan separates them: the interface follows the setting, content keeps its `language`, the app never translates content, and content blocks carry their own `lang`. |
+| An English interface with only Italian examples would feel unfinished. | D8 adds English versions of Atlas and Mill, whose sources are English already. |
+| The validator's findings are English, and they also serve as repair instructions for models. | They stay English. D10 shows a summary in the interface language and the findings as technical detail; D7 words the bill-of-materials check from data. |
+| Generated content could come back in the wrong language. | D9 names the content language in every request and adds a repairable finding when `detectLanguage` disagrees. |
+| An i18n library would be a dependency change. | Excluded: a small catalog and `t()` in the renderer; the approval boundary names it. |
+| Untranslated strings are easy to miss in review. | D4 acceptance: key parity, and a render test that reads each screen with `detectLanguage` in both languages. |
+
+Checks (v3):
+- D1–D3 text is unchanged; their v2 evidence stays valid.
+- Task IDs are unchanged. D4 grows into "themes and languages", so no task is renumbered and dependencies still point backwards.
+- Relative links resolve, including the new anchor to the implementation record.
+
+Residual risks added in v3:
+- `detectLanguage` is coarse: it checks function words. It catches a screen left in the other language, not a single stray label. Review of each task still reads both catalogs.
+- The English versions of Atlas and Mill are hand-written content. They add review work in D8, and their quality is judged by the owner.
 
 ## Version 2: changes and findings resolved
 
