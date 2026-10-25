@@ -18,7 +18,7 @@ describe('disassembly fixtures', () => {
     expect(await findings(fixture(path))).toEqual([]);
   });
   it('loads the prepared disassemblies through the boundary', async () => {
-    expect((await loadPreparedDisassemblies()).map(x => x.id)).toEqual(['atlas-release', 'mill-harm']);
+    expect((await loadPreparedDisassemblies()).map(x => `${x.id}:${x.language}`)).toEqual(['atlas-release:it', 'mill-harm:it', 'atlas-release-en:en', 'mill-harm-en:en']);
   });
   it.skipIf(!PRIVATE_FIXTURES.length).each(PRIVATE_FIXTURES)('local-only %s validates', async path => {
     expect(await findings(fixture(path))).toEqual([]);

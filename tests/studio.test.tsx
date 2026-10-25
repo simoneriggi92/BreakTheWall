@@ -114,7 +114,7 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
     expect(screen.getByText(/Citazioni verificate sulle tue fonti/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Chiudi strumenti' }));
     await user.click(screen.getByRole('button', { name: 'Torna ai percorsi' }));
-    expect(await screen.findByRole('region', { name: 'I tuoi percorsi' })).toHaveTextContent('Il ciclo dell’acqua');
+    expect(await screen.findByRole('region', { name: 'Percorsi precedenti' })).toHaveTextContent('Il ciclo dell’acqua');
   });
 
   it('turns provider failures into a message with the matching recovery, keeping the draft', async () => {

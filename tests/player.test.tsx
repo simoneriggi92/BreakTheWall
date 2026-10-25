@@ -30,7 +30,7 @@ const radio = (label: string) => main().getByRole('radio', { name: literal(label
 async function open(lesson: Lesson, bridge = memoryBridge().bridge) {
   const user = userEvent.setup();
   render(<App bridge={bridge} prepared={lessons}/>);
-  await user.click(within(screen.getByRole('region', { name: 'Esplora un esempio' })).getByRole('button', { name: new RegExp(lesson.title) }));
+  await user.click(within(screen.getByRole('region', { name: 'Percorsi precedenti' })).getByRole('button', { name: new RegExp(lesson.title) }));
   await screen.findByRole('heading', { level: 1, name: lesson.pages[0].title });
   return user;
 }
@@ -155,7 +155,7 @@ describe.each(lessons.map(lesson => [lesson.title, lesson] as const))('player ·
     expect(stored.attempts).toHaveLength(1);
     document.body.innerHTML = '';
     render(<App bridge={memory.bridge} prepared={lessons}/>);
-    await user.click(within(screen.getByRole('region', { name: 'Esplora un esempio' })).getByRole('button', { name: new RegExp(lesson.title) }));
+    await user.click(within(screen.getByRole('region', { name: 'Percorsi precedenti' })).getByRole('button', { name: new RegExp(lesson.title) }));
     await screen.findByRole('heading', { level: 1, name: page.title });
     expect(main().getByText(/1 tentativo registrato/)).toBeInTheDocument();
     await user.click(main().getByRole('button', { name: 'Rivedi i tuoi appunti' }));
@@ -190,10 +190,14 @@ describe('study tools and resume', () => {
 });
 
 describe('library', () => {
-  it('lists both prepared lessons through the same renderer, with no account required', async () => {
+  it('lists prepared disassemblies first and keeps lessons as earlier paths, with no account required', async () => {
     render(<App bridge={memoryBridge().bridge} prepared={lessons}/>);
-    for (const lesson of lessons) expect(screen.getByRole('button', { name: new RegExp(lesson.title) })).toBeInTheDocument();
-    expect(screen.getByText(/Non sono lezioni generate dall’AI/)).toBeInTheDocument();
+    const examples = within(screen.getByRole('region', { name: 'Smontaggi' }));
+    expect(await examples.findByRole('button', { name: /Rilascio di Atlas Reader in staging/ })).toBeInTheDocument();
+    expect(examples.getByRole('button', { name: /Il principio del danno/ })).toBeInTheDocument();
+    expect(examples.queryByRole('button', { name: /Releasing Atlas Reader/ })).not.toBeInTheDocument();
+    const earlier = within(screen.getByRole('region', { name: 'Percorsi precedenti' }));
+    for (const lesson of lessons) expect(earlier.getByRole('button', { name: new RegExp(lesson.title) })).toBeInTheDocument();
     expect(screen.getByText(/funzionano senza account/)).toBeInTheDocument();
   });
 });

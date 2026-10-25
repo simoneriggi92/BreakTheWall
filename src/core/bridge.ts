@@ -13,8 +13,9 @@ export type ProgressKey = z.infer<typeof progressKeySchema>;
 export const progressStateSchema = z.union([stateSchema, disassemblyStateSchema]);
 export type ProgressState = LearnerState | DisassemblyState;
 /** Lesson notices are sentences; disassembly notices are codes, worded by the interface. */
-export interface ProgressResult { state: unknown | null; notice?: string; noticeCode?: StateNotice | 'unreadable'; }
-export interface RuntimeInfo { platform: string; mode: 'desktop' | 'browser'; }
+export interface ProgressResult { state: unknown | null; notice?: string; noticeCode?: StateNotice | 'unreadable' | 'empty'; }
+/** `locale` is the operating system's preferred language, when the host knows it. */
+export interface RuntimeInfo { platform: string; mode: 'desktop' | 'browser'; locale?: string }
 export interface DesktopBridge {
   getRuntime(): Promise<RuntimeInfo>;
   loadProgress(key: ProgressKey): Promise<ProgressResult>;

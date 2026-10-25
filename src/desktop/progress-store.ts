@@ -56,10 +56,10 @@ export class ProgressStore {
       const restored = restoreDisassemblyState(target.disassembly, parsed);
       return restored.notice ? preserve({ noticeCode: restored.notice }) : { state: restored.state };
     }
-    if (parsed === undefined) return preserve({ notice: 'Il file dei progressi non è leggibile. Una copia è stata conservata; questa sessione riparte dall’inizio.' });
-    if (parsed === null) return preserve({ notice: 'File vuoto conservato; sessione riavviata.' });
+    if (parsed === undefined) return preserve({ notice: 'Il file dei progressi non è leggibile. Una copia è stata conservata; questa sessione riparte dall’inizio.', noticeCode: 'unreadable' });
+    if (parsed === null) return preserve({ notice: 'File vuoto conservato; sessione riavviata.', noticeCode: 'empty' });
     const restored = restoreState(target.lesson, parsed);
-    if (restored.notice) return preserve({ notice: restored.notice });
+    if (restored.notice) return preserve({ notice: restored.notice, noticeCode: restored.noticeCode });
     return { state: restored.state };
   }
   /** Resolution, checks and the write all run inside the queue, so saves land in call order. */

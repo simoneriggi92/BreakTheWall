@@ -70,3 +70,98 @@ export function restoreDisassemblyState(d: Disassembly, input: unknown): Restore
   if (!referencesHold(d, parsed.data)) return reset('references-changed');
   return { state: parsed.data };
 }
+
+// ---------- Transitions: pure, so the player only draws what they return ----------
+
+type RunProgress = DisassemblyState['runs'][string];
+const progressOf = (state: DisassemblyState, runId: string): RunProgress => state.runs[runId] ?? { step: -1, choices: {}, tried: [] };
+const withRun = (state: DisassemblyState, runId: string, next: RunProgress): DisassemblyState => ({ ...state, runs: { ...state.runs, [runId]: next } });
+type Scenario = Extract<Disassembly['runs'][number], { type: 'scenario' }>;
+
+/** Opens a level: the path changes and the selection resets, since parts belong to one level. */
+export function openPath(d: Disassembly, state: DisassemblyState, path: string[]): DisassemblyState {
+  return openLevel(d, path) ? { ...state, path, selected: undefined } : state;
+}
+export function selectPart(d: Disassembly, state: DisassemblyState, id: string | undefined): DisassemblyState {
+  if (id !== undefined && !openLevel(d, state.path)?.some(p => p.id === id)) return state;
+  return { ...state, selected: id };
+}
+/** A prediction is recorded once per step: a second answer would hide the first one. */
+export function predict(d: Disassembly, state: DisassemblyState, runId: string, step: number, option: number): DisassemblyState {
+  const run = d.runs.find(r => r.id === runId);
+  const progress = progressOf(state, runId);
+  if (run?.type !== 'scenario' || step !== progress.step + 1 || !run.steps[step]?.predict || option >= run.steps[step].predict!.options.length || String(step) in progress.choices) return state;
+  return withRun(state, runId, { ...progress, choices: { ...progress.choices, [step]: option } });
+}
+/** Executes the next step; a step with a prediction runs only after the learner has predicted. */
+export function execute(d: Disassembly, state: DisassemblyState, runId: string): DisassemblyState {
+  const run = d.runs.find(r => r.id === runId);
+  const progress = progressOf(state, runId);
+  const next = progress.step + 1;
+  if (run?.type !== 'scenario' || next >= run.steps.length || (run.steps[next].predict && !(String(next) in progress.choices))) return state;
+  return withRun(state, runId, { ...progress, step: next });
+}
+export function restartRun(state: DisassemblyState, runId: string): DisassemblyState {
+  const runs = { ...state.runs }; delete runs[runId];
+  return { ...state, runs };
+}
+/** What the drawing shows after the executed steps: states and instruments accumulate, flows belong to the last step. */
+export function scenarioView(run: Scenario, progress: RunProgress | undefined) {
+  const done = run.steps.slice(0, (progress?.step ?? -1) + 1);
+  const states: Record<string, string> = {}; const vars: Record<string, string> = { ...run.vars };
+  for (const step of done) { Object.assign(states, step.effect); Object.assign(vars, step.vars); }
+  const last = done.at(-1);
+  return { states, vars, flow: last?.flow ?? [], changed: new Set(Object.keys(last?.vars ?? {})), last };
+}
+/** Removing a brick tests it; every brick can be tried, in any order. */
+export function removeBrick(d: Disassembly, state: DisassemblyState, runId: string, part: string): DisassemblyState {
+  const run = d.runs.find(r => r.id === runId);
+  const progress = progressOf(state, runId);
+  if (run?.type !== 'load' || !run.bricks.some(b => b.part === part)) return state;
+  return withRun(state, runId, { ...progress, step: 0, tried: [...progress.tried.filter(x => x !== part), part] });
+}
+export function answerCase(d: Disassembly, state: DisassemblyState, runId: string, option: number): DisassemblyState {
+  const run = d.runs.find(r => r.id === runId);
+  if (run?.type !== 'case' || option >= run.options.length) return state;
+  return withRun(state, runId, { step: 0, choices: { 0: option }, tried: [] });
+}
+
+/** A part goes to one slot at a time; locked slots keep their part. */
+export function place(d: Disassembly, state: DisassemblyState, slot: string, part: string | undefined): DisassemblyState {
+  const { placements, locked } = state.reassembly;
+  if (!d.reassemble.slots.some(s => s.id === slot) || locked.includes(slot)) return state;
+  if (part !== undefined && (!d.parts.some(p => p.id === part) || Object.entries(placements).some(([s, p]) => p === part && locked.includes(s)))) return state;
+  const next = Object.fromEntries(Object.entries(placements).filter(([s, p]) => s !== slot && p !== part));
+  if (part !== undefined) next[slot] = part;
+  return { ...state, reassembly: { placements: next, locked } };
+}
+export function clearReassembly(state: DisassemblyState): DisassemblyState {
+  return { ...state, reassembly: { placements: {}, locked: [] } };
+}
+/**
+ * Checks the placed parts in slot order: correct ones lock, and the first misplaced part is named with its hint.
+ * An empty slot is not an error: the learner may check while still working.
+ */
+export function checkReassembly(d: Disassembly, state: DisassemblyState): { state: DisassemblyState; wrong?: { slot: string; part: string; hint: string }; complete: boolean } {
+  const { placements } = state.reassembly;
+  const locked = new Set(state.reassembly.locked);
+  let wrong: { slot: string; part: string; hint: string } | undefined;
+  for (const slot of d.reassemble.slots) {
+    const part = placements[slot.id];
+    if (!part) continue;
+    if (accepts(slot).includes(part)) locked.add(slot.id);
+    else wrong ??= { slot: slot.id, part, hint: d.reassemble.hints[part] ?? '' };
+  }
+  const next = { ...state, reassembly: { placements, locked: d.reassemble.slots.map(s => s.id).filter(id => locked.has(id)) } };
+  return { state: next, wrong, complete: next.reassembly.locked.length === d.reassemble.slots.length };
+}
+/**
+ * The tray order: deterministic, so tests and reloads agree, and never the solution order,
+ * which would hand over the answer.
+ */
+export function trayOrder(d: Disassembly): string[] {
+  const solution = d.reassemble.slots.flatMap(s => [s.accepts].flat()).filter((x, i, all) => all.indexOf(x) === i);
+  const score = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9973, 7);
+  const order = [...solution].sort((a, b) => score(a) - score(b) || a.localeCompare(b));
+  return order.every((x, i) => x === solution[i]) ? [...order.slice(1), order[0]] : order;
+}

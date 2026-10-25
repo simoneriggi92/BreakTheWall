@@ -7,6 +7,8 @@ import { loadPreparedDisassemblies } from '../fixtures/disassemblies';
 import { loadPreparedLessons } from '../fixtures/lessons';
 import { ProgressStore } from './progress-store';
 import { progressKeySchema, progressStateSchema } from '../core/bridge';
+import { resolveLanguage } from '../core/language';
+import { idSchema } from '../core/lesson';
 import { failure, localModelSchema, ProviderError, type PickedSources } from '../core/provider';
 import { importSource, SOURCE_LIMITS, SourceImportError } from '../core/source';
 import { ChatGPTAccount } from './chatgpt/account';
@@ -14,6 +16,7 @@ import { AUTH } from './chatgpt/oauth';
 import { Generator } from './generator';
 import { checkFormat, detectServer, discoverServers, localCompleter } from './local/runtimes';
 import { SettingsStore } from './settings-store';
+import { DisassemblyStore } from './disassembly-store';
 import { LessonStore } from './lesson-store';
 import { hostIdFile, SafeStorageVault } from './secure-files';
 
@@ -30,7 +33,7 @@ function trustedSender(event: Electron.IpcMainInvokeEvent) {
 }
 
 /** Import, account and generation operations. Tokens and file paths never cross into the renderer. */
-function registerStudio(userData: string, lessons: LessonStore) {
+function registerStudio(userData: string, lessons: LessonStore, disassemblies: DisassemblyStore) {
   const account = new ChatGPTAccount({
     vault: new SafeStorageVault(join(userData, 'credentials', 'chatgpt.bin'), safeStorage),
     hostId: hostIdFile(join(userData, 'credentials', 'agent-host.json')),
@@ -41,6 +44,8 @@ function registerStudio(userData: string, lessons: LessonStore) {
   const localFetch = globalThis.fetch.bind(globalThis);
   const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, lessons);
   const settings = new SettingsStore(join(userData, 'settings.json'));
+  // Host-side text (file dialog, sign-in page) follows the same setting as the interface.
+  const language = async () => resolveLanguage((await settings.read()).language, systemLocale());
   const asFailure = (error: unknown) => {
     if (error instanceof ProviderError) return { ok: false as const, failure: error.failure };
     console.error('[studio]', (error as Error)?.message);
@@ -49,7 +54,8 @@ function registerStudio(userData: string, lessons: LessonStore) {
   ipcMain.handle('sources:pick', async event => {
     trustedSender(event);
     const window = BrowserWindow.fromWebContents(event.sender);
-    const options = { title: 'Scegli fonti di testo', properties: ['openFile', 'multiSelections'] as ('openFile' | 'multiSelections')[], filters: [{ name: 'Testo e Markdown', extensions: ['txt', 'md', 'markdown'] }] };
+    const en = await language() === 'en';
+    const options = { title: en ? 'Choose text sources' : 'Scegli fonti di testo', properties: ['openFile', 'multiSelections'] as ('openFile' | 'multiSelections')[], filters: [{ name: en ? 'Text and Markdown' : 'Testo e Markdown', extensions: ['txt', 'md', 'markdown'] }] };
     const picked = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
     const result: PickedSources = { sources: [], errors: [] };
     for (const path of picked.canceled ? [] : picked.filePaths.slice(0, SOURCE_LIMITS.maxSources)) {
@@ -57,20 +63,20 @@ function registerStudio(userData: string, lessons: LessonStore) {
       try {
         // Size is checked before reading; only the selected files are opened, never their folder.
         const info = await stat(path);
-        if (!info.isFile()) throw new SourceImportError('unsupported-type', `«${name}» non è un file.`);
-        if (info.size > SOURCE_LIMITS.maxFileBytes) throw new SourceImportError('too-large', `«${name}» supera il limite di ${SOURCE_LIMITS.maxFileBytes / 1000} kB.`);
+        if (!info.isFile()) throw new SourceImportError('unsupported-type', `«${name}» non è un file.`, { name });
+        if (info.size > SOURCE_LIMITS.maxFileBytes) throw new SourceImportError('too-large', `«${name}» supera il limite di ${SOURCE_LIMITS.maxFileBytes / 1000} kB.`, { name, kb: Math.ceil(info.size / 1000), limit: SOURCE_LIMITS.maxFileBytes / 1000 });
         result.sources.push(await importSource({ kind: 'file', name, bytes: new Uint8Array(await readFile(path)) }));
       } catch (error) {
-        result.errors.push({ name, message: error instanceof SourceImportError ? error.message : `«${name}» non è leggibile.` });
+        result.errors.push(error instanceof SourceImportError ? { name, message: error.message, code: error.code, params: { name, ...error.params } } : { name, message: `«${name}» non è leggibile.`, code: 'unreadable', params: { name } });
       }
     }
-    if (picked.filePaths.length > SOURCE_LIMITS.maxSources) result.errors.push({ name: '', message: `Sono stati considerati solo i primi ${SOURCE_LIMITS.maxSources} file.` });
+    if (picked.filePaths.length > SOURCE_LIMITS.maxSources) result.errors.push({ name: '', message: `Sono stati considerati solo i primi ${SOURCE_LIMITS.maxSources} file.`, code: 'truncated', params: { limit: SOURCE_LIMITS.maxSources } });
     return result;
   });
   ipcMain.handle('account:status', event => { trustedSender(event); return account.status(); });
   ipcMain.handle('account:sign-in', async (event, input: unknown) => {
     trustedSender(event);
-    try { return { ok: true, status: await account.signIn({ consent: (input as { consent?: unknown })?.consent === true }) }; }
+    try { return { ok: true, status: await account.signIn({ consent: (input as { consent?: unknown })?.consent === true, language: await language() }) }; }
     catch (error) { return asFailure(error); }
   });
   ipcMain.handle('account:cancel-sign-in', event => { trustedSender(event); account.cancelSignIn(); });
@@ -98,7 +104,7 @@ function registerStudio(userData: string, lessons: LessonStore) {
     trustedSender(event);
     try {
       const server = await detectServer(localFetch, String(address ?? ''));
-      return server ? { ok: true, server } : { ok: false, failure: failure('local-unreachable', { message: 'A questo indirizzo non risponde un server di modelli riconosciuto (Ollama, LM Studio, llama.cpp o compatibile OpenAI).' }) };
+      return server ? { ok: true, server } : { ok: false, failure: failure('local-unreachable', { reason: 'local-not-a-server', message: 'A questo indirizzo non risponde un server di modelli riconosciuto (Ollama, LM Studio, llama.cpp o compatibile OpenAI).' }) };
     } catch (error) { return asFailure(error); }
   });
   ipcMain.handle('local:check', async (event, input: unknown) => {
@@ -108,6 +114,12 @@ function registerStudio(userData: string, lessons: LessonStore) {
   });
   ipcMain.handle('generation:cancel', event => { trustedSender(event); generator.cancel(); });
   ipcMain.handle('lessons:list', event => { trustedSender(event); return lessons.list(); });
+  ipcMain.handle('disassemblies:list', event => { trustedSender(event); return disassemblies.list(); });
+  ipcMain.handle('disassemblies:find', async (event, key: unknown) => {
+    trustedSender(event);
+    const id = idSchema.safeParse((key as { id?: unknown })?.id); const revision = idSchema.safeParse((key as { revision?: unknown })?.revision);
+    return id.success && revision.success ? (await disassemblies.find(id.data, revision.data)) ?? null : null;
+  });
   ipcMain.handle('account:usage-settings', async event => { trustedSender(event); await shell.openExternal('https://chatgpt.com/#settings'); });
 }
 
@@ -122,6 +134,9 @@ function createWindow() {
   void window.loadURL(origin + '/');
 }
 
+/** The first preferred language of the operating system, which `system` settings follow. */
+const systemLocale = () => app.getPreferredSystemLanguages()[0] ?? app.getLocale();
+
 void app.whenReady().then(async () => {
   const root = resolve(__dirname, '../dist');
   protocol.handle('btw', request => {
@@ -133,14 +148,17 @@ void app.whenReady().then(async () => {
   });
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
-  ipcMain.handle('runtime:get', event => { trustedSender(event); return { platform: process.platform, mode: 'desktop' }; });
+  ipcMain.handle('runtime:get', event => { trustedSender(event); return { platform: process.platform, mode: 'desktop', locale: systemLocale() }; });
   const userData = app.getPath('userData');
   const prepared = await loadPreparedLessons();
   const lessons = new LessonStore(join(userData, 'lessons'));
-  const store = new ProgressStore(join(userData, 'workspaces'), async key => prepared.find(x => x.id === key.lessonId && x.revision === key.revision) ?? lessons.find(key.lessonId, key.revision), await loadPreparedDisassemblies());
+  const disassemblies = new DisassemblyStore(join(userData, 'disassemblies'));
+  const preparedDisassemblies = await loadPreparedDisassemblies();
+  const store = new ProgressStore(join(userData, 'workspaces'), async key => prepared.find(x => x.id === key.lessonId && x.revision === key.revision) ?? lessons.find(key.lessonId, key.revision),
+    async key => preparedDisassemblies.find(x => x.id === key.disassemblyId && x.revision === key.revision) ?? disassemblies.find(key.disassemblyId, key.revision));
   ipcMain.handle('progress:load', (event, key: unknown) => { trustedSender(event); return store.load(progressKeySchema.parse(key)); });
   ipcMain.handle('progress:save', (event, input: unknown) => { trustedSender(event); return store.save(progressStateSchema.parse(input)); });
-  registerStudio(userData, lessons);
+  registerStudio(userData, lessons, disassemblies);
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 }).catch(error => { console.error('Desktop initialization failed:', error.message); app.quit(); });

@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, randomBytes, verify, type JsonWebKey } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
+import type { Language } from '../../core/language';
 import { failure, ProviderError } from '../../core/provider';
 
 /** Endpoints from https://auth.openai.com/.well-known/openid-configuration and the Sign in with ChatGPT guide. */
@@ -46,10 +47,15 @@ export function authorizeUrl(p: AuthorizeParams): string {
   return url.toString();
 }
 
-const page = (title: string, body: string) => `<!doctype html><html lang="it"><meta charset="utf-8"><title>${title}</title><body style="font:16px system-ui;margin:15vh auto;max-width:28rem;text-align:center;color:#1d2a26"><h1 style="font-size:1.4rem">${title}</h1><p>${body}</p></body></html>`;
+const page = (lang: Language, [title, body]: readonly [string, string]) => `<!doctype html><html lang="${lang}"><meta charset="utf-8"><title>${title}</title><body style="font:16px system-ui;margin:15vh auto;max-width:28rem;text-align:center;color:#1d2a26"><h1 style="font-size:1.4rem">${title}</h1><p>${body}</p></body></html>`;
+
+const PAGES: Record<Language, Record<'unknown' | 'denied' | 'done', readonly [string, string]>> = {
+  it: { unknown: ['Richiesta non riconosciuta', 'Questa pagina non appartiene all’accesso in corso.'], denied: ['Accesso non autorizzato', 'Puoi chiudere questa scheda e tornare a Break the Wall.'], done: ['Accesso completato', 'Puoi chiudere questa scheda e tornare a Break the Wall.'] },
+  en: { unknown: ['Request not recognized', 'This page does not belong to the sign-in in progress.'], denied: ['Sign-in not authorized', 'You can close this tab and return to Break the Wall.'], done: ['Sign-in complete', 'You can close this tab and return to Break the Wall.'] },
+};
 
 /** A one-shot listener on 127.0.0.1 that resolves with the callback query whose state matches. */
-export async function listenForCallback(state: string, signal: AbortSignal, ports: number[] = [AUTH.preferredPort, 0]) {
+export async function listenForCallback(state: string, signal: AbortSignal, ports: number[] = [AUTH.preferredPort, 0], lang: Language = 'it') {
   let server: Server | undefined;
   for (const port of ports) {
     const candidate = createServer();
@@ -59,15 +65,15 @@ export async function listenForCallback(state: string, signal: AbortSignal, port
     });
     if (ok) { server = candidate; break; }
   }
-  if (!server) throw new ProviderError(failure('network', { message: 'Non è stato possibile aprire la porta locale per completare l’accesso.' }));
+  if (!server) throw new ProviderError(failure('network', { reason: 'sign-in-port', message: 'Non è stato possibile aprire la porta locale per completare l’accesso.' }));
   const address = server.address();
   const port = typeof address === 'object' && address ? address.port : AUTH.preferredPort;
   const redirectUri = `http://127.0.0.1:${port}${AUTH.callbackPath}`;
   const close = () => { server!.closeAllConnections(); server!.close(); };
   const result = new Promise<URLSearchParams>((resolve, reject) => {
-    const timeout = setTimeout(() => { close(); reject(new ProviderError(failure('cancelled', { message: 'Accesso non completato entro 10 minuti.' }))); }, 10 * 60_000);
+    const timeout = setTimeout(() => { close(); reject(new ProviderError(failure('cancelled', { reason: 'sign-in-timeout', message: 'Accesso non completato entro 10 minuti.' }))); }, 10 * 60_000);
     const stop = () => { clearTimeout(timeout); close(); };
-    const abort = () => { stop(); reject(new ProviderError(failure('cancelled', { message: 'Accesso annullato.' }))); };
+    const abort = () => { stop(); reject(new ProviderError(failure('cancelled', { reason: 'sign-in-cancelled', message: 'Accesso annullato.' }))); };
     // A cancel that arrived while the port was opening has already fired its event.
     if (signal.aborted) { abort(); return; }
     signal.addEventListener('abort', abort, { once: true });
@@ -75,9 +81,9 @@ export async function listenForCallback(state: string, signal: AbortSignal, port
       const url = new URL(req.url ?? '/', redirectUri);
       if (req.method !== 'GET' || url.pathname !== AUTH.callbackPath) { res.writeHead(404).end(); return; }
       // A callback for another attempt is ignored; only the matching state ends this one.
-      if (url.searchParams.get('state') !== state) { res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' }).end(page('Richiesta non riconosciuta', 'Questa pagina non appartiene all’accesso in corso.')); return; }
+      if (url.searchParams.get('state') !== state) { res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' }).end(page(lang, PAGES[lang].unknown)); return; }
       const denied = url.searchParams.has('error');
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(denied ? page('Accesso non autorizzato', 'Puoi chiudere questa scheda e tornare a Break the Wall.') : page('Accesso completato', 'Puoi chiudere questa scheda e tornare a Break the Wall.'));
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page(lang, PAGES[lang][denied ? 'denied' : 'done']));
       stop();
       resolve(url.searchParams);
     });
@@ -100,10 +106,10 @@ async function tokenRequest(fetchImpl: Fetch, form: Record<string, string>, sign
   if (res.ok && typeof body.access_token === 'string' && typeof body.expires_in === 'number') return body as TokenResponse;
   const code = typeof body.error === 'string' ? body.error : body.error?.code;
   if (code && TERMINAL_REFRESH.has(code)) throw new ProviderError(failure('session-expired'));
-  if (code === 'invalid_client') throw new ProviderError(failure('forbidden', { message: 'La registrazione dell’app non è valida. Accedi di nuovo.', action: 'sign-in' }));
+  if (code === 'invalid_client') throw new ProviderError(failure('forbidden', { reason: 'sign-in-invalid-client', message: 'La registrazione dell’app non è valida. Accedi di nuovo.', action: 'sign-in' }));
   if (res.status >= 500 || res.status === 429) throw new ProviderError(failure('unavailable'));
   // Unknown refusals keep the stored credentials: only the documented terminal codes end a session.
-  throw new ProviderError(failure('forbidden', { message: 'Il server di accesso ha rifiutato la richiesta. Riprova o accedi di nuovo.', action: 'sign-in' }));
+  throw new ProviderError(failure('forbidden', { reason: 'sign-in-refused', message: 'Il server di accesso ha rifiutato la richiesta. Riprova o accedi di nuovo.', action: 'sign-in' }));
 }
 
 export function exchangeCode(fetchImpl: Fetch, p: { clientId: string; code: string; verifier: string; redirectUri: string }, signal?: AbortSignal) {
@@ -129,7 +135,7 @@ export interface IdClaims { sub: string; email?: string; exp: number; nonce?: st
 let jwksCache: { keys: (JsonWebKey & { kid?: string })[] } | undefined;
 /** Verifies the RS256 signature against OpenAI's published keys, then issuer, audience, expiry and nonce. */
 export async function verifyIdToken(fetchImpl: Fetch, idToken: string, expected: { clientId: string; nonce?: string; now?: number }): Promise<IdClaims> {
-  const bad = () => new ProviderError(failure('forbidden', { message: 'Il token di identità non ha superato la verifica. Accedi di nuovo.', action: 'sign-in' }));
+  const bad = () => new ProviderError(failure('forbidden', { reason: 'identity-unverified', message: 'Il token di identità non ha superato la verifica. Accedi di nuovo.', action: 'sign-in' }));
   const parts = idToken.split('.');
   if (parts.length !== 3) throw bad();
   const header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8')) as { alg?: string; kid?: string };

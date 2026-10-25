@@ -17,6 +17,8 @@ const studio = Object.freeze<StudioBridge>({
     return () => { ipcRenderer.removeListener('generation:progress', handler); };
   },
   listLessons: () => ipcRenderer.invoke('lessons:list'),
+  listDisassemblies: () => ipcRenderer.invoke('disassemblies:list'),
+  findDisassembly: key => ipcRenderer.invoke('disassemblies:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),
   openUsageSettings: () => ipcRenderer.invoke('account:usage-settings'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: settings => ipcRenderer.invoke('settings:save', settings),
