@@ -256,6 +256,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .strip .assigned { background: var(--ok); opacity: 0.55; }
 .strip .excluded { background: var(--ink-3); opacity: 0.4; }
 .strip .missing { background: var(--fail); }
+.strip.small { height: 9px; margin: 2px 0 8px; }
+.strip-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; margin-top: 4px; }
+.strip-head .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lines li.pagebreak { border-top: 1px dashed var(--ink-3); margin-top: 6px; padding-top: 2px; }
+.lines li.pagebreak .t { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-2); }
+.source-pick { font: 12px ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink); background: var(--paper-2); border: 1px solid var(--ink-3); border-radius: 3px; max-width: 62%; }
+.feedback.weak { border-color: var(--active); }
+.verdict.weak { fill: var(--active); }
 .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
 .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
 .findings { margin: 12px 0; padding: 0; list-style: none; }

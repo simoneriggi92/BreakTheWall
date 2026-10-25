@@ -15,7 +15,17 @@ const VERB = {
   'sends-to': 'invia a', causes: 'causa', 'depends-on': 'dipende da', supports: 'sostiene', attacks: 'attacca',
   limits: 'limita', 'leads-to': 'porta a', because: 'spiega',
 };
-const REASON = { context: 'contesto', 'outside-question': 'fuori dalla domanda', repetition: 'ripetizione', detail: 'dettaglio' };
+const REASON = {
+  context: 'contesto', 'outside-question': 'fuori dalla domanda', repetition: 'ripetizione', detail: 'dettaglio',
+  secrets: 'contiene segreti', generated: 'generato',
+};
+// A load test has three outcomes: arguments with independent supports weaken rather than fall.
+const VERDICT = {
+  falls: { state: 'failed', label: 'CROLLA', cls: 'fail', feedback: 'wrong', text: 'La tesi crolla. ', mark: '✕ ' },
+  weakens: { state: 'active', label: 'SI INDEBOLISCE', cls: 'weak', feedback: 'weak', text: 'La tesi si indebolisce. ', mark: '◐ ' },
+  holds: { state: 'ok', label: 'REGGE', cls: 'hold', feedback: 'right', text: 'La tesi regge. ', mark: '✓ ' },
+};
+const verdictOf = brick => VERDICT[brick.verdict || (brick.bears ? 'falls' : 'holds')];
 const MARK = { ok: '✓', failed: '✕', active: '…', restored: '↺' };
 // Point marks carry meaning, so they work for any subject; unmarked points get a plain bullet.
 const POINT = { step: ['→', 'poi'], keeps: ['=', 'resta uguale'], caveat: ['⚠', 'attenzione'] };
@@ -75,6 +85,22 @@ function wrap(text, max) {
   return lines;
 }
 const range = c => c.from === c.to ? `r. ${c.from}` : `r. ${c.from}–${c.to}`;
+// Documents keep a page map (first line of each page), so a citation can name its pages too.
+function pageOf(src, line) {
+  let page = null;
+  for (const x of src?.pages || []) if (x.from <= line) page = x.page;
+  return page;
+}
+// A citation as the learner reads it: file (when there are several), page (for documents), lines.
+function locator(c) {
+  const src = app.d?.sources.find(x => x.id === c.source);
+  const out = [];
+  if (app.d?.sources.length > 1 && src) out.push(src.title.split('/').pop());
+  const first = pageOf(src, c.from), last = pageOf(src, c.to);
+  if (first) out.push(last && last !== first ? `pp. ${first}–${last}` : `p. ${first}`);
+  out.push(range(c));
+  return out.join(' · ');
+}
 
 // ---------- Data ----------
 async function json(path) {
@@ -86,9 +112,15 @@ async function boot() {
   try { app.theme = localStorage.getItem('btw-lab-theme') || 'paper'; } catch { app.theme = 'paper'; }
   document.documentElement.dataset.theme = app.theme;
   const index = await json('/prototypes/lab/data/index.json');
+  // A private index under the ignored .local folder lists the owner's own disassemblies, if present.
+  const entries = [];
   for (const entry of index.disassemblies) {
+    if (!entry.index) { entries.push(entry); continue; }
+    try { entries.push(...(await json(entry.index)).disassemblies.map(x => ({ ...x, private: true }))); } catch { /* no private index */ }
+  }
+  for (const entry of entries) {
     try { const d = await json(entry.path); d.private = !!entry.private; app.list.push(d); }
-    catch (error) { if (!entry.private) console.warn(error); }
+    catch (error) { console.warn(error); }
   }
   const picker = $('#picker');
   for (const d of app.list) picker.append(h('option', { value: d.id }, (d.private ? '🔒 ' : '') + d.title));
@@ -177,6 +209,7 @@ function validate(d) {
     if (!REASON[x.reason]) findings.push(`Esclusione ${range(x)}: motivo sconosciuto «${x.reason}»`);
     for (let i = x.from; i <= x.to; i++) excluded[x.source][i - 1] = x;
   }
+  for (const x of d.bom?.excludedFiles || []) if (!REASON[x.reason]) findings.push(`File ${x.path}: motivo sconosciuto «${x.reason}»`);
   const status = {}; const missing = [];
   for (const src of d.sources) {
     status[src.id] = app.lines[src.id].map((t, i) => !t.trim() ? 'blank' : covered[src.id][i].length ? 'assigned' : excluded[src.id][i] ? 'excluded' : 'missing');
@@ -290,10 +323,10 @@ function sheet({ parts, joints, owner, run }) {
     if (lit.has(p.id)) cls.push('lit');
     if (run?.type === 'load' && run.bricks.some(b => b.part === p.id)) cls.push('brick');
     if (removed === p.id) cls.push('removed');
-    if (brick && p.id === run.target) cls.push(brick.bears ? 'state-failed' : 'state-ok');
+    if (brick && p.id === run.target) cls.push('state-' + verdictOf(brick).state);
     const g = plate(p, cls.join(' '), states[p.id]);
-    if (brick && p.id === run.target) g.append(s('text', { x: G.w / 2, y: -10, 'text-anchor': 'middle', class: 'verdict ' + (brick.bears ? 'fail' : 'hold') }, brick.bears ? 'CROLLA' : 'REGGE'));
-    if (brick?.bears && p.id === run.target) g.querySelector('.body').setAttribute('transform', `rotate(3 ${G.w / 2} ${G.h})`);
+    if (brick && p.id === run.target) g.append(s('text', { x: G.w / 2, y: -10, 'text-anchor': 'middle', class: 'verdict ' + verdictOf(brick).cls }, verdictOf(brick).label));
+    if (brick && p.id === run.target && verdictOf(brick) !== VERDICT.holds) g.querySelector('.body').setAttribute('transform', `rotate(${verdictOf(brick) === VERDICT.falls ? 3 : 1.2} ${G.w / 2} ${G.h})`);
     const start = app.animate ? center : at;
     g.style.transform = `translate(${start.x}px, ${start.y}px)`;
     if (app.animate) g.style.opacity = '0.3';
@@ -422,24 +455,31 @@ function points(list) {
   }));
 }
 function cites(list = []) {
-  return h('div', { class: 'cites' }, list.map(c => h('button', { class: 'cite', onclick: () => { app.focus = c; app.source = c.source; renderSource(); } }, range(c))));
+  return h('div', { class: 'cites' }, list.map(c => h('button', { class: 'cite', onclick: () => { app.focus = c; app.source = c.source; renderSource(); } }, locator(c))));
 }
 
 // ---------- Source: the numbered lines, with the focused citation highlighted ----------
 function renderSource() {
   const d = app.d, src = d.sources.find(x => x.id === app.source) || d.sources[0];
   const lines = app.lines[src.id];
+  // Few sources get buttons; a repository's files get a list.
+  const switcher = d.sources.length > 3
+    ? h('select', { class: 'source-pick', 'aria-label': 'File della fonte', onchange: e => { app.source = e.target.value; app.focus = null; renderSource(); } },
+      d.sources.map(x => h('option', { value: x.id, selected: x.id === src.id }, x.title)))
+    : d.sources.length > 1 ? h('span', {}, d.sources.map(x => h('button', { class: 'cite', onclick: () => { app.source = x.id; renderSource(); } }, x.title))) : '';
   $('#source-head').replaceChildren(
-    h('span', {}, `${src.title} · ${src.language} · ${lines.length} righe`),
-    d.sources.length > 1 ? h('span', {}, d.sources.map(x => h('button', { class: 'cite', onclick: () => { app.source = x.id; renderSource(); } }, x.title))) : '');
+    h('span', {}, `${d.sources.length > 3 ? '' : src.title + ' · '}${src.language} · ${lines.length} righe${src.pages ? ` · pp. ${src.pages[0].page}–${src.pages.at(-1).page}` : ''}`),
+    switcher);
   const hl = new Set();
   const marks = app.selected ? (findPart(app.selected)?.cites || []) : app.focus ? [app.focus] : [];
   for (const c of marks) if (c.source === src.id) for (let i = c.from; i <= c.to; i++) hl.add(i);
   if (app.focus && app.focus.source === src.id) for (let i = app.focus.from; i <= app.focus.to; i++) hl.add(i);
   const status = app.report.status[src.id];
   const ol = $('#source'); ol.replaceChildren();
+  const pageStarts = new Map((src.pages || []).map(x => [x.from, x.page]));
   lines.forEach((t, i) => {
-    const cls = [hl.has(i + 1) ? 'hl' : '', app.mode === 'bom' && status[i] !== 'blank' ? 'bom-' + status[i] : ''].join(' ').trim();
+    if (pageStarts.has(i + 1)) ol.append(h('li', { class: 'pagebreak', 'aria-hidden': 'true' }, h('span', { class: 'n' }, ''), h('span', { class: 't' }, `pagina ${pageStarts.get(i + 1)}`)));
+    const cls =[hl.has(i + 1) ? 'hl' : '', app.mode === 'bom' && status[i] !== 'blank' ? 'bom-' + status[i] : ''].join(' ').trim();
     ol.append(h('li', { id: `L${i + 1}`, class: cls || null }, h('span', { class: 'n' }, String(i + 1)), h('span', { class: 't' }, t)));
   });
   const first = app.focus?.source === src.id ? app.focus.from : Math.min(...hl);
@@ -551,15 +591,20 @@ function loadPanel(run) {
     h('p', {}, run.question),
     h('p', { class: 'kind' }, `Il tetto è «${target.name}». I mattoni tratteggiati si possono togliere: clicca sul disegno o qui sotto.`),
     h('div', { class: 'actions' }, run.bricks.map(b => h('button', { class: rs.removed === b.part ? 'primary' : null, onclick: () => removeBrick(b.part) },
-      `${rs.tried.has(b.part) ? (b.bears ? '✕ ' : '✓ ') : ''}Togli «${findPart(b.part).name}»`)))];
+      `${rs.tried.has(b.part) ? verdictOf(b).mark : ''}Togli «${findPart(b.part).name}»`)))];
   const brick = run.bricks.find(b => b.part === rs.removed);
   if (brick) {
-    out.push(h('div', { class: 'feedback ' + (brick.bears ? 'wrong' : 'right') }, h('b', {}, brick.bears ? 'La tesi crolla. ' : 'La tesi regge. '), brick.explain));
+    out.push(h('div', { class: 'feedback ' + verdictOf(brick).feedback }, h('b', {}, verdictOf(brick).text), brick.explain));
     if (brick.inference) out.push(h('div', { class: 'box inference' }, h('span', { class: 'label' }, 'Interpretazione · non viene dalla fonte'), 'Il giudizio su questo mattone è una lettura del testo, non una citazione.'));
     out.push(cites(brick.cites), h('div', { class: 'actions' }, h('button', { onclick: () => { rs.removed = null; app.focus = null; drawOnly(); renderPanel(); renderSource(); } }, '↺ Rimetti il mattone')));
   }
   if (rs.tried.size === run.bricks.length) {
-    out.push(h('p', { class: 'kind', style: 'margin-top:10px' }, `Portanti: ${run.bricks.filter(b => b.bears).map(b => findPart(b.part).name).join(', ')}. Non portanti: ${run.bricks.filter(b => !b.bears).map(b => findPart(b.part).name).join(', ')}.`));
+    const named = v => run.bricks.filter(b => verdictOf(b) === v).map(b => findPart(b.part).name).join(', ');
+    out.push(h('p', { class: 'kind', style: 'margin-top:10px' }, [
+      named(VERDICT.falls) && `Portanti: ${named(VERDICT.falls)}.`,
+      named(VERDICT.weakens) && `Di rinforzo: ${named(VERDICT.weakens)}.`,
+      named(VERDICT.holds) && `Non portanti: ${named(VERDICT.holds)}.`,
+    ].filter(Boolean).join(' ')));
   }
   return out;
 }
@@ -588,7 +633,8 @@ function casePanel(run) {
 // ---------- Reassemble: put the parts back in their slots ----------
 function resetReassemble() {
   const r = app.d.reassemble;
-  const pieces = r ? r.slots.map(x => x.accepts) : [];
+  // A slot accepts one part, or any of a set of interchangeable parts (e.g. three independent supports).
+  const pieces = r ? [...new Set(r.slots.flatMap(x => [].concat(x.accepts)))] : [];
   // Deterministic shuffle, so the tray never starts in solution order.
   const tray = pieces.map((id, i) => ({ id, k: (i * 7 + 3) % pieces.length })).sort((a, b) => a.k - b.k).map(x => x.id);
   if (tray.every((id, i) => id === pieces[i]) && tray.length > 1) tray.push(tray.shift());
@@ -609,9 +655,14 @@ function reassembleDrawing() {
   const { pos, W, H } = geometry(r.slots);
   app.geom = { pos };
   const svg = canvas(W, H, r.title, `rimonta · ${r.slots.length} posti · facoltativa`);
-  const slotOf = Object.fromEntries(r.slots.map(x => [x.accepts, x.id]));
+  const slotsFor = id => r.slots.filter(x => [].concat(x.accepts).includes(id)).map(x => x.id);
   const sk = s('g', { class: 'skeleton' });
-  for (const j of app.d.joints || []) if (slotOf[j.from] && slotOf[j.to]) sk.append(joint(pos.get(slotOf[j.from]), pos.get(slotOf[j.to]), j, { label: false }));
+  const drawn = new Set();
+  for (const j of app.d.joints || []) for (const a of slotsFor(j.from)) for (const b of slotsFor(j.to)) {
+    if (drawn.has(a + '>' + b)) continue;
+    drawn.add(a + '>' + b);
+    sk.append(joint(pos.get(a), pos.get(b), j, { label: false }));
+  }
   svg.append(sk);
   for (const slot of r.slots) {
     const at = pos.get(slot.id);
@@ -661,7 +712,7 @@ function check() {
   for (const slot of r.slots) {
     const id = re.placed[slot.id];
     if (!id || re.locked.has(slot.id)) continue;
-    if (id === slot.accepts) re.locked.add(slot.id); else wrong.push(slot);
+    if ([].concat(slot.accepts).includes(id)) re.locked.add(slot.id); else wrong.push(slot);
   }
   re.wrong = new Set(wrong.map(x => x.id));
   if (wrong.length) {
@@ -680,29 +731,41 @@ function check() {
 function bomView() {
   const d = app.d, rep = app.report;
   const wrapEl = h('div', { class: 'bom' });
+  // The scope says what was looked at: a repository snapshot or the pages of a document.
+  if (d.scope) wrapEl.append(h('div', { class: 'box' }, h('span', { class: 'label' }, d.scope.kind === 'repository' ? 'Ambito · repository' : 'Ambito · documento'),
+    h('p', { style: 'margin:0' }, d.scope.root), d.scope.note ? h('p', { class: 'kind', style: 'margin:4px 0 0' }, d.scope.note) : null));
+  const many = d.sources.length > 3;
+  const all = { assigned: 0, excluded: 0, missing: 0, blank: 0 };
+  wrapEl.append(h('h3', {}, many ? `Distinta base · ${d.sources.length} file` : 'Distinta base'));
   for (const src of d.sources) {
     const status = rep.status[src.id];
-    const strip = h('div', { class: 'strip', title: 'Ogni tacca è una riga della fonte' }, status.map(st => h('span', { class: st })));
+    const strip = h('div', { class: 'strip' + (many ? ' small' : ''), title: 'Ogni tacca è una riga della fonte' }, status.map(st => h('span', { class: st })));
     strip.addEventListener('click', e => {
       const i = Math.floor((e.offsetX / strip.clientWidth) * status.length) + 1;
       app.focus = { source: src.id, from: i, to: i }; app.source = src.id; renderSource();
     });
     const count = k => status.filter(x => x === k).length;
-    wrapEl.append(h('h3', {}, `Distinta base · ${src.title}`), strip,
-      h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'strip-assigned', style: 'background:var(--ok);opacity:.55' }), `in un pezzo ${count('assigned')}`),
-        h('span', {}, h('i', { style: 'background:var(--ink-3);opacity:.4' }), `non smontate ${count('excluded')}`),
-        h('span', {}, h('i', { style: 'background:var(--fail)' }), `dimenticate ${count('missing')}`),
-        h('span', {}, `vuote ${count('blank')}`)));
+    for (const k of Object.keys(all)) all[k] += count(k);
+    wrapEl.append(h('div', { class: 'strip-head' }, h('span', { class: 'mono' }, src.title), h('span', { class: 'kind' }, `${status.length} righe${count('missing') ? ` · ${count('missing')} dimenticate` : ''}`)), strip);
+  }
+  wrapEl.append(h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:var(--ok);opacity:.55' }), `in un pezzo ${all.assigned}`),
+    h('span', {}, h('i', { style: 'background:var(--ink-3);opacity:.4' }), `non smontate ${all.excluded}`),
+    h('span', {}, h('i', { style: 'background:var(--fail)' }), `dimenticate ${all.missing}`),
+    h('span', {}, `vuote ${all.blank}`)));
+  if (d.bom?.excludedFiles?.length) {
+    wrapEl.append(h('h3', { style: 'margin-top:14px' }, 'File non smontati'),
+      h('table', {}, h('thead', {}, h('tr', {}, ['File', 'Motivo', 'Note'].map(t => h('th', {}, t)))),
+        h('tbody', {}, d.bom.excludedFiles.map(x => h('tr', { class: 'excluded' }, h('td', { class: 'mono' }, x.path), h('td', {}, REASON[x.reason] || x.reason), h('td', {}, x.note || ''))))));
   }
   wrapEl.append(h('ul', { class: 'findings' }, rep.findings.length
     ? rep.findings.map(f => h('li', {}, f))
     : h('li', { class: 'ok' }, 'Controllo dell\'app: ogni riga è in un pezzo o esclusa con un motivo; citazioni e giunti sono validi; ogni livello ha 3–7 pezzi.')));
   const rows = flat().map(({ part, depth, pos }) => h('tr', { class: depth ? 'child' : null, onclick: () => { app.selected = part.id; app.focus = part.cites?.[0]; if (app.focus) app.source = app.focus.source; renderCard(); renderSource(); } },
     h('td', { class: 'mono' }, pos), h('td', {}, part.name), h('td', {}, KIND[part.kind] || part.kind),
-    h('td', { class: 'mono' }, (part.cites || []).map(range).join(', ')),
+    h('td', { class: 'mono' }, (part.cites || []).map(locator).join(', ')),
     h('td', {}, part.parts ? (part.relevant ? 'sottoassieme aperto' : 'sottoassieme chiuso') : depth ? '' : (part.relevant ? '' : 'fuori dal percorso'))));
   const excluded = (d.bom?.excluded || []).map(x => h('tr', { class: 'excluded', onclick: () => { app.selected = null; app.focus = x; app.source = x.source; renderCard(); renderSource(); } },
-    h('td', { class: 'mono' }, '—'), h('td', {}, x.note), h('td', {}, `non smontato · ${REASON[x.reason] || x.reason}`), h('td', { class: 'mono' }, range(x)), h('td', {}, '')));
+    h('td', { class: 'mono' }, '—'), h('td', {}, x.note), h('td', {}, `non smontato · ${REASON[x.reason] || x.reason}`), h('td', { class: 'mono' }, locator(x)), h('td', {}, '')));
   wrapEl.append(h('table', {}, h('thead', {}, h('tr', {}, ['Pos.', 'Pezzo', 'Tipo', 'Righe', 'Note'].map(t => h('th', {}, t)))), h('tbody', {}, rows, excluded)));
   return wrapEl;
 }

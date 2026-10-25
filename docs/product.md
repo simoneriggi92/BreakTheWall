@@ -197,7 +197,20 @@ Not yet built: typed joints, sub-assemblies and the verified bill of materials, 
 
 The alpha delivers one complete text-source loop in a macOS desktop app. A shared set of visual blocks must handle a code example and a non-code example without topic-specific UI code. Prepared fixtures support development; at least one real generation per domain is required to verify the alpha.
 
-Next: a hand-made lab prototype of two disassemblies, before changing contracts: the owner's TeamCity frontend deploy (a mechanism) and a short argumentative text (an argument, possibly on paper first). Each tests the exploded view, one run and reassembly, so that one contract is shown to hold for both kinds of joint. The prototype starts in the technical-drawing style. Later slices include scenarios, the cross-disassembly parts store, AI-assisted web discovery, additional input adapters, contextual regeneration, and richer feedback. These are direction, not completed features. Whole-repository analysis, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
+Done: a hand-made [lab prototype](../prototypes/lab/README.md), in the technical-drawing style. It holds mechanisms, an argument, a code repository and a PDF chapter, all with one engine. The owner's verdict is recorded in research [R-20261024](workflow/research/R-20261024-lab-prototype.md) and [R-20261025](workflow/research/R-20261025-repository-and-document.md): a solid starting point; consolidate the core of the alpha first.
+
+Next: [plan P-20261024-disassembly](workflow/plans/P-20261024-disassembly/plan.md). It builds, in order:
+- the contract;
+- the player;
+- two-phase generation;
+- then, as gated phases, repositories and PDF documents as sources.
+
+Later, after the alpha core:
+- **Dependency map for repositories.** It shows where a part lives (solution, project, namespace, file) and who references, registers or resolves it, one level at a time. The app computes it from the code, not the model; with dependency injection, the container's registration and resolution are edges too.
+- **Simulated reassembly.** After each placed part, the mechanism runs with the current assembly. The learner sees what breaks when a part is in the wrong place, and why: a part placed before its input arrives is missing what its incoming joint carries.
+- The cross-disassembly parts store, AI-assisted web discovery, further document formats, contextual regeneration, and richer feedback.
+
+These are direction, not completed features. Analysis of a whole repository without a question, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
 
 ## Learn from use
 

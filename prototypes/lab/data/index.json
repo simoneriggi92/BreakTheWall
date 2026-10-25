@@ -2,6 +2,6 @@
   "disassemblies": [
     { "path": "/prototypes/lab/data/atlas-release.json" },
     { "path": "/prototypes/lab/data/mill-harm.json" },
-    { "path": "/.local/prototypes/lab/teamcity-frontend.json", "private": true }
+    { "index": "/.local/prototypes/lab/index.json", "private": true }
   ]
 }
