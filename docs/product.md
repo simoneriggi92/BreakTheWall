@@ -116,7 +116,7 @@ Generation follows the same shape: a first request produces the bill of material
 
 ### Visual direction: the technical drawing
 
-Status: hypothesis, to be validated in the lab prototype. The style must favor clarity, reading and focus, and suit every subject.
+Status: **adopted** by the owner on 2026-10-24, after the [lab prototype](workflow/research/R-20261024-lab-prototype.md). The app must support both themes; blueprint is the dark theme. The style must favor clarity, reading and focus, and suit every subject.
 
 - **Technical drawing.** Light paper, ink lines, leader lines from each part to its source, generous white space. It is the language of the exploded view itself, and it fits an argument as well as a machine.
 - **Blueprint** as the dark theme: light lines on blue, a variant with its own character rather than an inverted palette.
@@ -138,6 +138,7 @@ The test for every feature: would the owner, the first user, use it on a real pr
 - Deliberately paced: a coherent exploded view of the whole, and one part opened at a time.
 - Variety: maps, sequences, comparisons, worked examples, concept lenses, scenarios and meaningful activities. Simulations, animations and games are optional and never forced on the learner.
 - A pleasant, clean interface with consistent icons and colors. Progressive disclosure should reduce simultaneous detail.
+- Two interface languages, English and Italian (owner, 2026-10-25). The default follows the system and the learner can change it. The interface language is independent of a disassembly's content: each disassembly is written in one language and says which, and the app never translates sources or content.
 - Strong links between every part and its source. For code, retain exact excerpts and the lines relevant to each frame.
 - A sense of progression without pressure: no streaks, no mandatory review.
 - Learner responses, feedback, notes, and iteration from both owner and user feedback.
@@ -150,7 +151,7 @@ The owner reported that the prototype helped them understand a repository. Use t
 
 1. **Choose what to take apart.** The learner's question is the goal ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
 2. **See the exploded view.** The whole, what it does and why it matters, then its 3–7 parts with named joints of the right kind ("sends to", "supports", "leads to").
-3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), a short explanation, and the source lines beside it.
+3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), and the source lines beside it. The explanation is 2–4 short points, not prose. A point may carry a meaning mark: → a step or consequence, = what stays unchanged, ⚠ a warning. There are no decorative icons per point, because those would not work for narrative or argumentative material.
 4. **Run.** Put a joint under load: predict what happens, step through a sequence or scenario, remove a premise, apply the part to a new case. Not every part needs an activity.
 5. **Reassemble.** Put the parts or steps back in place; feedback names the precise missing connection, with a hint or worked example. Progress is preserved.
 
@@ -160,15 +161,16 @@ Exploration mode allows navigation without answers. Guided mode can require a re
 
 The first alpha shipped before the identity was fixed. The mapping below guides the next plans; none of the new names or behaviors is implemented yet.
 
-| Today (shipped) | Direction | UI term (Italian) |
-|---|---|---|
-| lesson / percorso | disassembly | smontaggio |
-| opening map | exploded view | esploso |
-| page | part | pezzo |
-| map relations (free labels) | joints typed as mechanism, argument or story | giunti |
-| prediction, sequence | run: put a joint under load | fai girare / metti sotto carico |
-| reconstruction | reassemble | rimonta |
-| atlas of concepts | parts store across disassemblies | magazzino dei pezzi |
+| Today (shipped) | Direction | UI term (Italian) | UI term (English) |
+|---|---|---|---|
+| lesson / percorso | disassembly | smontaggio | disassembly |
+| opening map | exploded view | esploso | exploded view |
+| page | part | pezzo | part |
+| map relations (free labels) | joints typed as mechanism, argument or story | giunti | joints |
+| prediction, sequence | run: put a joint under load | fai girare / metti sotto carico | run / put under load |
+| reconstruction | reassemble | rimonta | reassemble |
+| — | bill of materials | distinta base | bill of materials |
+| atlas of concepts | parts store across disassemblies | magazzino dei pezzi | parts store |
 
 Not yet built: typed joints, sub-assemblies and the verified bill of materials, the technical-drawing style, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the learner when material has no structure to take apart.
 
@@ -197,7 +199,20 @@ Not yet built: typed joints, sub-assemblies and the verified bill of materials, 
 
 The alpha delivers one complete text-source loop in a macOS desktop app. A shared set of visual blocks must handle a code example and a non-code example without topic-specific UI code. Prepared fixtures support development; at least one real generation per domain is required to verify the alpha.
 
-Next: a hand-made lab prototype of two disassemblies, before changing contracts: the owner's TeamCity frontend deploy (a mechanism) and a short argumentative text (an argument, possibly on paper first). Each tests the exploded view, one run and reassembly, so that one contract is shown to hold for both kinds of joint. The prototype starts in the technical-drawing style. Later slices include scenarios, the cross-disassembly parts store, AI-assisted web discovery, additional input adapters, contextual regeneration, and richer feedback. These are direction, not completed features. Whole-repository analysis, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
+Done: a hand-made [lab prototype](../prototypes/lab/README.md), in the technical-drawing style. It holds mechanisms, an argument, a code repository and a PDF chapter, all with one engine. The owner's verdict is recorded in research [R-20261024](workflow/research/R-20261024-lab-prototype.md) and [R-20261025](workflow/research/R-20261025-repository-and-document.md): a solid starting point; consolidate the core of the alpha first.
+
+Next: [plan P-20261024-disassembly](workflow/plans/P-20261024-disassembly/plan.md). It builds, in order:
+- the contract;
+- the player;
+- two-phase generation;
+- then, as gated phases, repositories and PDF documents as sources.
+
+Later, after the alpha core:
+- **Dependency map for repositories.** It shows where a part lives (solution, project, namespace, file) and who references, registers or resolves it, one level at a time. The app computes it from the code, not the model; with dependency injection, the container's registration and resolution are edges too.
+- **Simulated reassembly.** After each placed part, the mechanism runs with the current assembly. The learner sees what breaks when a part is in the wrong place, and why: a part placed before its input arrives is missing what its incoming joint carries.
+- The cross-disassembly parts store, AI-assisted web discovery, further document formats, contextual regeneration, and richer feedback.
+
+These are direction, not completed features. Analysis of a whole repository without a question, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
 
 ## Learn from use
 

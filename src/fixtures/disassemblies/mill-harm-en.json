@@ -1,0 +1,561 @@
+{
+  "schemaVersion": 1,
+  "id": "mill-harm-en",
+  "revision": "v1",
+  "kind": "prepared",
+  "title": "The harm principle (Mill, 1859)",
+  "question": "According to Mill, when is society entitled to coerce an individual?",
+  "language": "en",
+  "family": "mill-harm",
+  "sources": [
+    {
+      "id": "mill",
+      "title": "On Liberty, cap. I (estratto)",
+      "origin": "public-domain",
+      "revision": "v1",
+      "text": "# John Stuart Mill, On Liberty (1859), Chapter I (excerpt)\n\nPublic-domain text of the 1859 essay: the statement of the harm principle and the region of human liberty.\n\nThe object of this Essay is to assert one very simple principle, as\nentitled to govern absolutely the dealings of society with the\nindividual in the way of compulsion and control, whether the means used\nbe physical force in the form of legal penalties, or the moral coercion\nof public opinion. That principle is, that the sole end for which\nmankind are warranted, individually or collectively, in interfering with\nthe liberty of action of any of their number, is self-protection. That\nthe only purpose for which power can be rightfully exercised over any\nmember of a civilised community, against his will, is to prevent harm to\nothers. His own good, either physical or moral, is not a sufficient\nwarrant. He cannot rightfully be compelled to do or forbear because it\nwill be better for him to do so, because it will make him happier,\nbecause, in the opinions of others, to do so would be wise, or even\nright. These are good reasons for remonstrating with him, or reasoning\nwith him, or persuading him, or entreating him, but not for compelling\nhim, or visiting him with any evil in case he do otherwise. To justify\nthat, the conduct from which it is desired to deter him must be\ncalculated to produce evil to some one else. The only part of the\nconduct of any one, for which he is amenable to society, is that which\nconcerns others. In the part which merely concerns himself, his\nindependence is, of right, absolute. Over himself, over his own body and\nmind, the individual is sovereign.\n\nIt is, perhaps, hardly necessary to say that this doctrine is meant to\napply only to human beings in the maturity of their faculties. We are\nnot speaking of children, or of young persons below the age which the\nlaw may fix as that of manhood or womanhood. Those who are still in a\nstate to require being taken care of by others, must be protected\nagainst their own actions as well as against external injury. For the\nsame reason, we may leave out of consideration those backward states of\nsociety in which the race itself may be considered as in its nonage. The\nearly difficulties in the way of spontaneous progress are so great, that\nthere is seldom any choice of means for overcoming them; and a ruler\nfull of the spirit of improvement is warranted in the use of any\nexpedients that will attain an end, perhaps otherwise unattainable.\nDespotism is a legitimate mode of government in dealing with\nbarbarians, provided the end be their improvement, and the means\njustified by actually effecting that end. Liberty, as a principle, has\nno application to any state of things anterior to the time when mankind\nhave become capable of being improved by free and equal discussion.\nUntil then, there is nothing for them but implicit obedience to an Akbar\nor a Charlemagne, if they are so fortunate as to find one. But as soon\nas mankind have attained the capacity of being guided to their own\nimprovement by conviction or persuasion (a period long since reached in\nall nations with whom we need here concern ourselves), compulsion,\neither in the direct form or in that of pains and penalties for\nnon-compliance, is no longer admissible as a means to their own good,\nand justifiable only for the security of others.\n\nIt is proper to state that I forego any advantage which could be derived\nto my argument from the idea of abstract right, as a thing independent\nof utility. I regard utility as the ultimate appeal on all ethical\nquestions; but it must be utility in the largest sense, grounded on the\npermanent interests of man as a progressive being. Those interests, I\ncontend, authorise the subjection of individual spontaneity to external\ncontrol, only in respect to those actions of each, which concern the\ninterest of other people. If any one does an act hurtful to others,\nthere is a _primâ facie_ case for punishing him, by law, or, where legal\npenalties are not safely applicable, by general disapprobation. There\nare also many positive acts for the benefit of others, which he may\nrightfully be compelled to perform; such as, to give evidence in a court\nof justice; to bear his fair share in the common defence, or in any\nother joint work necessary to the interest of the society of which he\nenjoys the protection; and to perform certain acts of individual\nbeneficence, such as saving a fellow-creature's life, or interposing to\nprotect the defenceless against ill-usage, things which whenever it is\nobviously a man's duty to do, he may rightfully be made responsible to\nsociety for not doing. A person may cause evil to others not only by his\nactions but by his inaction, and in either case he is justly accountable\nto them for the injury. The latter case, it is true, requires a much\nmore cautious exercise of compulsion than the former. To make any one\nanswerable for doing evil to others, is the rule; to make him answerable\nfor not preventing evil, is, comparatively speaking, the exception. Yet\nthere are many cases clear enough and grave enough to justify that\nexception. In all things which regard the external relations of the\nindividual, he is _de jure_ amenable to those whose interests are\nconcerned, and if need be, to society as their protector. There are\noften good reasons for not holding him to the responsibility; but these\nreasons must arise from the special expediencies of the case: either\nbecause it is a kind of case in which he is on the whole likely to act\nbetter, when left to his own discretion, than when controlled in any way\nin which society have it in their power to control him; or because the\nattempt to exercise control would produce other evils, greater than\nthose which it would prevent. When such reasons as these preclude the\nenforcement of responsibility, the conscience of the agent himself\nshould step into the vacant judgment seat, and protect those interests\nof others which have no external protection; judging himself all the\nmore rigidly, because the case does not admit of his being made\naccountable to the judgment of his fellow-creatures.\n\nBut there is a sphere of action in which society, as distinguished from\nthe individual, has, if any, only an indirect interest; comprehending\nall that portion of a person's life and conduct which affects only\nhimself, or if it also affects others, only with their free, voluntary,\nand undeceived consent and participation. When I say only himself, I\nmean directly, and in the first instance: for whatever affects himself,\nmay affect others _through_ himself; and the objection which may be\ngrounded on this contingency, will receive consideration in the sequel.\nThis, then, is the appropriate region of human liberty. It comprises,\nfirst, the inward domain of consciousness; demanding liberty of\nconscience, in the most comprehensive sense; liberty of thought and\nfeeling; absolute freedom of opinion and sentiment on all subjects,\npractical or speculative, scientific, moral, or theological. The liberty\nof expressing and publishing opinions may seem to fall under a different\nprinciple, since it belongs to that part of the conduct of an individual\nwhich concerns other people; but, being almost of as much importance as\nthe liberty of thought itself, and resting in great part on the same\nreasons, is practically inseparable from it. Secondly, the principle\nrequires liberty of tastes and pursuits; of framing the plan of our life\nto suit our own character; of doing as we like, subject to such\nconsequences as may follow: without impediment from our\nfellow-creatures, so long as what we do does not harm them, even though\nthey should think our conduct foolish, perverse, or wrong. Thirdly, from\nthis liberty of each individual, follows the liberty, within the same\nlimits, of combination among individuals; freedom to unite, for any\npurpose not involving harm to others: the persons combining being\nsupposed to be of full age, and not forced or deceived.\n\nNo society in which these liberties are not, on the whole, respected, is\nfree, whatever may be its form of government; and none is completely\nfree in which they do not exist absolute and unqualified. The only\nfreedom which deserves the name, is that of pursuing our own good in our\nown way, so long as we do not attempt to deprive others of theirs, or\nimpede their efforts to obtain it. Each is the proper guardian of his\nown health, whether bodily, or mental and spiritual. Mankind are greater\ngainers by suffering each other to live as seems good to themselves,\nthan by compelling each to live as seems good to the rest.",
+      "sha256": "e400487a18fc1db233b0fd81e542380ad2bd4ceb59c653cb7950d2212688a0b1",
+      "language": "en"
+    }
+  ],
+  "whole": {
+    "name": "The harm principle",
+    "does": "Sets one single test for every kind of coercion, whether a legal penalty or the pressure of public opinion: you may coerce someone only to prevent harm to others.",
+    "why": "It splits each person's life into two zones: what concerns only you, where you are sovereign, and what concerns others, where society may step in. The whole essay rests on this boundary.",
+    "cites": [
+      {
+        "source": "mill",
+        "from": 5,
+        "to": 14
+      }
+    ]
+  },
+  "parts": [
+    {
+      "id": "claim",
+      "name": "Only to prevent harm to others",
+      "kind": "conclusion",
+      "relevant": true,
+      "role": "The thesis: the only legitimate purpose of coercion.",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 5,
+          "to": 14
+        },
+        {
+          "source": "mill",
+          "from": 61,
+          "to": 63
+        }
+      ],
+      "icon": "scale",
+      "points": [
+        {
+          "text": "Power over an individual, against their will, is legitimate only to prevent harm to others."
+        },
+        {
+          "text": "This applies to legal penalties and to the pressure of public opinion."
+        },
+        {
+          "text": "Whoever harms others may be punished, at least in principle.",
+          "mark": "step"
+        }
+      ]
+    },
+    {
+      "id": "utility",
+      "name": "Utility, in the widest sense",
+      "kind": "ground",
+      "relevant": true,
+      "role": "The foundation: the permanent interests of people as beings who can progress.",
+      "metaphor": {
+        "text": "It is the foundation of the building: you cannot see it from the street, but it holds everything up.",
+        "limit": "Nobody argues with a foundation; people do argue with utility. Many critics think that, on its own, it would justify paternalism too."
+      },
+      "cites": [
+        {
+          "source": "mill",
+          "from": 56,
+          "to": 61
+        }
+      ],
+      "icon": "sprout",
+      "points": [
+        {
+          "text": "For Mill, utility is the \"ultimate appeal\" on every ethical question."
+        },
+        {
+          "text": "But in a wide sense: the permanent interests of those who can progress."
+        },
+        {
+          "text": "These interests allow control only over actions that affect others.",
+          "mark": "step"
+        }
+      ]
+    },
+    {
+      "id": "abstract-right",
+      "name": "Abstract right",
+      "kind": "rejected",
+      "relevant": true,
+      "role": "A brick Mill sets aside on purpose.",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 54,
+          "to": 56
+        }
+      ],
+      "icon": "ban",
+      "points": [
+        {
+          "text": "Mill gives up any advantage from an abstract right independent of utility."
+        },
+        {
+          "text": "He does not lean on it: it is a brick discarded on purpose.",
+          "mark": "caveat"
+        }
+      ]
+    },
+    {
+      "id": "sovereignty",
+      "name": "Over themselves, individuals are sovereign",
+      "kind": "premise",
+      "relevant": true,
+      "role": "Your own good is not enough to coerce you: others may persuade you, not compel you.",
+      "metaphor": {
+        "text": "It is the boundary of a property: inside it you decide, and the neighbours can give advice from the gate.",
+        "limit": "A property has surveyed boundaries; conduct does not. Where \"what concerns only me\" ends is exactly what is in dispute."
+      },
+      "cites": [
+        {
+          "source": "mill",
+          "from": 14,
+          "to": 27
+        }
+      ],
+      "icon": "user-round",
+      "points": [
+        {
+          "text": "Your own good is not enough to coerce you: it is a reason to argue and persuade."
+        },
+        {
+          "text": "You answer to society only for conduct that concerns others."
+        },
+        {
+          "text": "In what concerns only you, your independence is absolute.",
+          "mark": "keeps"
+        }
+      ]
+    },
+    {
+      "id": "bounds",
+      "name": "Bounds of the principle",
+      "kind": "limit",
+      "relevant": false,
+      "role": "Who it applies to, and what can still be required.",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 28,
+          "to": 53
+        },
+        {
+          "source": "mill",
+          "from": 63,
+          "to": 82
+        }
+      ],
+      "icon": "ruler",
+      "points": [
+        {
+          "text": "It applies only to adults in full possession of their faculties."
+        },
+        {
+          "text": "Some acts towards others can be required: failing to act can also cause harm.",
+          "mark": "caveat"
+        }
+      ],
+      "parts": [
+        {
+          "id": "bounds-maturity",
+          "name": "Only adults able to discuss",
+          "kind": "limit",
+          "role": "Children, and anyone who still needs protecting, are excluded.",
+          "explain": "Those who still need care must be protected from their own actions too. The principle applies once people can improve through free discussion.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 28,
+              "to": 33
+            },
+            {
+              "source": "mill",
+              "from": 46,
+              "to": 53
+            }
+          ],
+          "icon": "book-open"
+        },
+        {
+          "id": "bounds-colonial",
+          "name": "Excluding \"backward\" societies",
+          "kind": "limit",
+          "role": "Mill accepts despotism over peoples he judges \"backward\".",
+          "explain": "In the text, the principle does not apply to societies Mill regards as \"in their nonage\", where he accepts despotism if it aims at their improvement.",
+          "critique": "This exclusion is now considered indefensible: it uses the same paternalist logic the principle rejects and applies it to whole peoples, with colonial-style justifications.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 34,
+              "to": 46
+            }
+          ],
+          "icon": "triangle-alert"
+        },
+        {
+          "id": "bounds-duties",
+          "name": "Acts owed to others",
+          "kind": "limit",
+          "role": "Giving evidence, common defence, saving a life.",
+          "explain": "You can be compelled to perform some positive acts for the benefit of others, because failing to act can also cause harm. Answering for harm done is the rule; for harm not prevented, the exception.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 63,
+              "to": 82
+            }
+          ],
+          "icon": "users"
+        }
+      ],
+      "joints": []
+    },
+    {
+      "id": "region",
+      "name": "The region of liberty",
+      "kind": "consequence",
+      "relevant": false,
+      "role": "What stays free once the principle is applied.",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 95,
+          "to": 99
+        },
+        {
+          "source": "mill",
+          "from": 103,
+          "to": 131
+        }
+      ],
+      "icon": "map",
+      "points": [
+        {
+          "text": "A sphere in which society has only an indirect interest."
+        },
+        {
+          "text": "Three liberties: conscience and opinion, tastes and life plans, association."
+        },
+        {
+          "text": "Only a society that respects them is free.",
+          "mark": "step"
+        }
+      ],
+      "parts": [
+        {
+          "id": "region-conscience",
+          "name": "Conscience and opinion",
+          "kind": "consequence",
+          "role": "Thought, feeling and their expression.",
+          "explain": "Freedom of conscience and of opinion on every subject. Expressing and publishing opinions also affects others, but Mill treats it as practically inseparable from freedom of thought.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 103,
+              "to": 112
+            }
+          ],
+          "icon": "message-circle"
+        },
+        {
+          "id": "region-pursuits",
+          "name": "Tastes and life plans",
+          "kind": "consequence",
+          "role": "Living your own way, even if others think it wrong.",
+          "explain": "Freedom to shape your own plan of life, as long as it does not harm others, even if others judge it foolish or wrong.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 112,
+              "to": 117
+            }
+          ],
+          "icon": "map"
+        },
+        {
+          "id": "region-association",
+          "name": "Association",
+          "kind": "consequence",
+          "role": "Uniting for any purpose that does not harm others.",
+          "explain": "Among adults who are neither forced nor deceived.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 117,
+              "to": 121
+            }
+          ],
+          "icon": "users"
+        }
+      ],
+      "joints": []
+    },
+    {
+      "id": "objection",
+      "name": "What affects me affects others too",
+      "kind": "objection",
+      "relevant": true,
+      "role": "The objection Mill himself anticipates: the line between \"only me\" and \"others\" is porous.",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 99,
+          "to": 102
+        }
+      ],
+      "icon": "message-circle",
+      "points": [
+        {
+          "text": "Almost every choice about yourself reaches others through you."
+        },
+        {
+          "text": "If that is enough, the boundary disappears.",
+          "mark": "caveat"
+        },
+        {
+          "text": "Mill narrows \"only me\" to \"directly, and in the first instance\" and defers his answer."
+        }
+      ]
+    }
+  ],
+  "joints": [
+    {
+      "from": "utility",
+      "to": "claim",
+      "type": "supports",
+      "label": "grounds",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 58,
+          "to": 61
+        }
+      ]
+    },
+    {
+      "from": "sovereignty",
+      "to": "claim",
+      "type": "supports",
+      "label": "rules out paternalism",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 14,
+          "to": 21
+        }
+      ]
+    },
+    {
+      "from": "bounds",
+      "to": "claim",
+      "type": "limits",
+      "label": "narrows and extends"
+    },
+    {
+      "from": "objection",
+      "to": "claim",
+      "type": "attacks",
+      "label": "the line is porous",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 99,
+          "to": 102
+        }
+      ]
+    },
+    {
+      "from": "claim",
+      "to": "region",
+      "type": "supports",
+      "label": "follows from it"
+    }
+  ],
+  "bom": {
+    "excluded": [
+      {
+        "source": "mill",
+        "from": 1,
+        "to": 3,
+        "reason": "context",
+        "note": "Title and note on the excerpt."
+      },
+      {
+        "source": "mill",
+        "from": 82,
+        "to": 94,
+        "reason": "detail",
+        "note": "When it is better not to enforce responsibility, and conscience as judge where the law does not reach: a detail, not a load-bearing part."
+      }
+    ]
+  },
+  "runs": [
+    {
+      "type": "load",
+      "id": "bricks",
+      "title": "Pull out a brick",
+      "target": "claim",
+      "question": "Which brick, if you pull it out, brings the thesis down? Try them one at a time.",
+      "bricks": [
+        {
+          "part": "utility",
+          "explain": "It falls. Mill has given up abstract right: without utility, the thesis has no foundation left.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 54,
+              "to": 61
+            }
+          ],
+          "verdict": "falls"
+        },
+        {
+          "part": "abstract-right",
+          "explain": "It holds. This is the brick Mill discarded on purpose: removing it changes nothing.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 54,
+              "to": 56
+            }
+          ],
+          "verdict": "holds"
+        },
+        {
+          "part": "sovereignty",
+          "inference": true,
+          "explain": "It falls into a different thesis. Without sovereignty over oneself, only utility is left, and on its own it could justify coercion \"for your own good\" whenever that increases well-being. This is the classic criticism of the principle: an interpretation, not something the text says.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 14,
+              "to": 27
+            }
+          ],
+          "verdict": "falls"
+        },
+        {
+          "part": "region",
+          "explain": "It holds. The region of liberty is a consequence: it sits on top of the thesis, not underneath. Removing it does not touch what holds the thesis up.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 103,
+              "to": 104
+            }
+          ],
+          "verdict": "holds"
+        }
+      ]
+    },
+    {
+      "type": "case",
+      "id": "helmet",
+      "title": "Apply it to a new case",
+      "scenario": "A law requires motorcyclists to wear a helmet, even though the risk falls only on the rider.",
+      "question": "Under the harm principle, as stated here, is the law justified?",
+      "options": [
+        {
+          "text": "Yes: it protects the rider's health",
+          "correct": false,
+          "why": "This is exactly the reason Mill rules out: a person's own good, physical or moral, is not enough to coerce them."
+        },
+        {
+          "text": "No: you may persuade the rider, but not compel them",
+          "correct": true,
+          "why": "That it would be better for the rider is a good reason to argue and persuade, not to compel."
+        },
+        {
+          "text": "Yes: every risk to yourself falls on others too",
+          "correct": false,
+          "why": "This is the objection Mill himself anticipates. If it were enough, the boundary would disappear; he deals with it later, by singling out direct harm."
+        }
+      ],
+      "inference": true,
+      "cites": [
+        {
+          "source": "mill",
+          "from": 14,
+          "to": 21
+        },
+        {
+          "source": "mill",
+          "from": 99,
+          "to": 102
+        }
+      ]
+    }
+  ],
+  "reassemble": {
+    "title": "Reassemble the argument",
+    "instruction": "Put each brick in its role: what holds the thesis up, what limits it, what attacks it, what follows from it and what Mill set aside.",
+    "slots": [
+      {
+        "id": "s-claim",
+        "label": "Thesis",
+        "accepts": "claim"
+      },
+      {
+        "id": "s-ground",
+        "label": "Ground",
+        "accepts": "utility"
+      },
+      {
+        "id": "s-premise",
+        "label": "Premise",
+        "accepts": "sovereignty"
+      },
+      {
+        "id": "s-limit",
+        "label": "Limits",
+        "accepts": "bounds"
+      },
+      {
+        "id": "s-objection",
+        "label": "Objection",
+        "accepts": "objection"
+      },
+      {
+        "id": "s-consequence",
+        "label": "Consequence",
+        "accepts": "region"
+      },
+      {
+        "id": "s-rejected",
+        "label": "Set aside",
+        "accepts": "abstract-right"
+      }
+    ],
+    "hints": {
+      "claim": "It is what all the other bricks hold up, limit or attack.",
+      "utility": "Mill calls it the \"ultimate appeal\": it sits under everything.",
+      "sovereignty": "It explains why your own good is not enough to coerce you.",
+      "bounds": "It says who the principle applies to and what is still owed.",
+      "objection": "It questions the line between \"only me\" and \"others\".",
+      "region": "It does not hold the thesis up: it follows from it.",
+      "abstract-right": "Mill says explicitly that he gives it up."
+    }
+  }
+}

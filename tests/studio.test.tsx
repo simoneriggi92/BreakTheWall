@@ -15,7 +15,7 @@ const goal = 'Spiegare il ciclo dell’acqua';
 /** The desktop contract with a scripted account and provider; no tokens ever appear on this side. */
 function desktop(options: { generate?: (request: GenerationRequest) => ReturnType<StudioBridge['generate']>; plan?: boolean; servers?: LocalServer[]; settings?: StudioSettings } = {}) {
   const saved = new Map<string, LearnerState>();
-  const key = (k: ProgressKey) => `${k.lessonId}:${k.revision}`;
+  const key = (k: ProgressKey) => `${'lessonId' in k ? k.lessonId : k.disassemblyId}:${k.revision}`;
   let status: AccountStatus = { state: 'signed-out', storage: true };
   let settings: StudioSettings = options.settings ?? defaultSettings;
   const listeners: ((progress: GenerationProgress) => void)[] = [];
@@ -40,7 +40,7 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
   const bridge: DesktopBridge = {
     getRuntime: async () => ({ platform: 'test', mode: 'desktop' }),
     loadProgress: async k => ({ state: saved.get(key(k)) ?? null }),
-    saveProgress: async s => { saved.set(key(s), structuredClone(s)); },
+    saveProgress: async s => { saved.set(key(s), structuredClone(s) as LearnerState); },
     studio,
   };
   return { bridge, studio, emit: (progress: GenerationProgress) => listeners.forEach(l => l(progress)) };
@@ -114,7 +114,7 @@ describe('source workspace and generation in the renderer (T4–T6)', () => {
     expect(screen.getByText(/Citazioni verificate sulle tue fonti/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Chiudi strumenti' }));
     await user.click(screen.getByRole('button', { name: 'Torna ai percorsi' }));
-    expect(await screen.findByRole('region', { name: 'I tuoi percorsi' })).toHaveTextContent('Il ciclo dell’acqua');
+    expect(await screen.findByRole('region', { name: 'Percorsi precedenti' })).toHaveTextContent('Il ciclo dell’acqua');
   });
 
   it('turns provider failures into a message with the matching recovery, keeping the draft', async () => {

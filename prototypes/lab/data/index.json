@@ -1,0 +1,7 @@
+{
+  "disassemblies": [
+    { "path": "/prototypes/lab/data/atlas-release.json" },
+    { "path": "/prototypes/lab/data/mill-harm.json" },
+    { "index": "/.local/prototypes/lab/index.json", "private": true }
+  ]
+}

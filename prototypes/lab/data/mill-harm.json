@@ -1,0 +1,625 @@
+{
+  "schema": "btw-disassembly/0.1",
+  "id": "mill-harm",
+  "title": "Il principio del danno (Mill, 1859)",
+  "question": "Secondo Mill, quando la società può legittimamente costringere un individuo?",
+  "language": "it",
+  "sources": [
+    {
+      "id": "mill",
+      "title": "On Liberty, cap. I (estratto)",
+      "path": "/prototypes/lab/sources/mill-harm-principle.md",
+      "language": "en"
+    }
+  ],
+  "whole": {
+    "name": "Il principio del danno",
+    "does": "Fissa un unico criterio per ogni costrizione, che sia una pena legale o la pressione dell'opinione pubblica: si può costringere qualcuno solo per impedire un danno ad altri.",
+    "why": "Divide la vita di ciascuno in due zone: ciò che riguarda solo te, dove sei sovrano, e ciò che riguarda gli altri, dove la società può intervenire. Tutto il saggio poggia su questo confine.",
+    "cites": [
+      {
+        "source": "mill",
+        "from": 5,
+        "to": 14
+      }
+    ]
+  },
+  "parts": [
+    {
+      "id": "claim",
+      "n": 1,
+      "name": "Solo per impedire danni ad altri",
+      "icon": "scale",
+      "kind": "conclusion",
+      "at": [
+        1,
+        0
+      ],
+      "relevant": true,
+      "role": "La tesi: l'unico scopo legittimo della costrizione.",
+      "points": [
+        "Il potere su un individuo, contro la sua volontà, è legittimo solo per impedire un danno ad altri.",
+        "Vale per le pene legali e per la pressione dell'opinione pubblica.",
+        {
+          "text": "Chi danneggia altri può essere punito, almeno in linea di principio.",
+          "mark": "step"
+        }
+      ],
+      "cites": [
+        {
+          "source": "mill",
+          "from": 5,
+          "to": 14
+        },
+        {
+          "source": "mill",
+          "from": 61,
+          "to": 63
+        }
+      ]
+    },
+    {
+      "id": "utility",
+      "n": 2,
+      "name": "L'utilità, nel senso più ampio",
+      "icon": "sprout",
+      "kind": "ground",
+      "at": [
+        0,
+        2
+      ],
+      "relevant": true,
+      "role": "Il fondamento: gli interessi permanenti dell'uomo come essere che progredisce.",
+      "points": [
+        "Per Mill l'utilità è l'«appello ultimo» di ogni questione etica.",
+        "Ma in senso ampio: gli interessi permanenti di chi può progredire.",
+        {
+          "text": "Sono questi interessi ad autorizzare il controllo solo sulle azioni che toccano gli altri.",
+          "mark": "step"
+        }
+      ],
+      "metaphor": {
+        "text": "È la fondazione dell'edificio: non si vede dalla strada, ma regge tutto.",
+        "limit": "Una fondazione non si discute; l'utilità sì. Molti critici pensano che, da sola, giustifichi anche il paternalismo."
+      },
+      "cites": [
+        {
+          "source": "mill",
+          "from": 56,
+          "to": 61
+        }
+      ]
+    },
+    {
+      "id": "abstract-right",
+      "n": 3,
+      "name": "Il diritto astratto",
+      "icon": "ban",
+      "kind": "rejected",
+      "at": [
+        2,
+        2
+      ],
+      "relevant": true,
+      "role": "Un mattone che Mill mette da parte di proposito.",
+      "points": [
+        "Mill rinuncia ai vantaggi di un diritto astratto, indipendente dall'utilità.",
+        {
+          "text": "Non lo usa come appoggio: è un mattone scartato di proposito.",
+          "mark": "caveat"
+        }
+      ],
+      "cites": [
+        {
+          "source": "mill",
+          "from": 54,
+          "to": 56
+        }
+      ]
+    },
+    {
+      "id": "sovereignty",
+      "n": 4,
+      "name": "Su se stesso, l'individuo è sovrano",
+      "icon": "user-round",
+      "kind": "premise",
+      "at": [
+        1,
+        2
+      ],
+      "relevant": true,
+      "role": "Il proprio bene non basta per costringere: si può persuadere, non obbligare.",
+      "points": [
+        "Il tuo bene non basta per costringerti: è un motivo per discutere e persuadere.",
+        "Rispondi alla società solo della condotta che riguarda gli altri.",
+        {
+          "text": "In ciò che riguarda solo te, la tua indipendenza è assoluta.",
+          "mark": "keeps"
+        }
+      ],
+      "metaphor": {
+        "text": "È il confine di una proprietà: dentro decidi tu, i vicini possono darti consigli dal cancello.",
+        "limit": "Una proprietà ha confini catastali; la condotta no. Dove finisca «ciò che riguarda solo me» è proprio il punto conteso."
+      },
+      "cites": [
+        {
+          "source": "mill",
+          "from": 14,
+          "to": 27
+        }
+      ]
+    },
+    {
+      "id": "bounds",
+      "n": 5,
+      "name": "Confini del principio",
+      "icon": "ruler",
+      "kind": "limit",
+      "at": [
+        2,
+        1
+      ],
+      "relevant": false,
+      "role": "A chi si applica, e cosa si può comunque pretendere.",
+      "points": [
+        "Vale solo per adulti nel pieno delle loro facoltà.",
+        {
+          "text": "Si possono pretendere alcuni atti verso gli altri: anche non agire può danneggiare.",
+          "mark": "caveat"
+        }
+      ],
+      "cites": [
+        {
+          "source": "mill",
+          "from": 28,
+          "to": 53
+        },
+        {
+          "source": "mill",
+          "from": 63,
+          "to": 82
+        }
+      ],
+      "parts": [
+        {
+          "id": "bounds-maturity",
+          "n": 1,
+          "name": "Solo adulti capaci di discutere",
+          "icon": "graduation-cap",
+          "kind": "limit",
+          "at": [
+            0,
+            0
+          ],
+          "role": "Esclusi i minori e chi deve ancora essere protetto.",
+          "explain": "Chi deve essere ancora protetto va difeso anche dalle proprie azioni. Il principio vale da quando le persone possono migliorare attraverso la discussione libera.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 28,
+              "to": 33
+            },
+            {
+              "source": "mill",
+              "from": 46,
+              "to": 53
+            }
+          ]
+        },
+        {
+          "id": "bounds-colonial",
+          "n": 2,
+          "name": "L'esclusione delle società «arretrate»",
+          "icon": "triangle-alert",
+          "kind": "limit",
+          "at": [
+            1,
+            0
+          ],
+          "role": "Mill ammette il dispotismo verso popoli che giudica «arretrati».",
+          "explain": "Nel testo, il principio non si applica alle società che Mill considera «nella loro infanzia», dove ammette il dispotismo se mira al loro miglioramento.",
+          "critique": "Questa esclusione è oggi considerata indifendibile: usa la stessa logica paternalista che il principio rifiuta e la applica a interi popoli, con giustificazioni di tipo coloniale.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 34,
+              "to": 46
+            }
+          ]
+        },
+        {
+          "id": "bounds-duties",
+          "n": 3,
+          "name": "Atti dovuti agli altri",
+          "icon": "hand-helping",
+          "kind": "limit",
+          "at": [
+            2,
+            0
+          ],
+          "role": "Testimoniare, difesa comune, salvare una vita.",
+          "explain": "Si può essere costretti ad alcuni atti positivi a beneficio degli altri, perché anche non agire può causare un danno. Rendere conto del male fatto è la regola; del male non impedito, l'eccezione.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 63,
+              "to": 82
+            }
+          ]
+        }
+      ],
+      "joints": []
+    },
+    {
+      "id": "region",
+      "n": 6,
+      "name": "La regione della libertà",
+      "icon": "map",
+      "kind": "consequence",
+      "at": [
+        1,
+        -1
+      ],
+      "relevant": false,
+      "role": "Cosa resta libero quando si applica il principio.",
+      "points": [
+        "Una sfera in cui la società ha solo un interesse indiretto.",
+        "Tre libertà: coscienza e opinione, gusti e progetti di vita, associazione.",
+        {
+          "text": "È libera solo la società che le rispetta.",
+          "mark": "step"
+        }
+      ],
+      "cites": [
+        {
+          "source": "mill",
+          "from": 95,
+          "to": 99
+        },
+        {
+          "source": "mill",
+          "from": 103,
+          "to": 131
+        }
+      ],
+      "parts": [
+        {
+          "id": "region-conscience",
+          "n": 1,
+          "name": "Coscienza e opinione",
+          "icon": "message-circle",
+          "kind": "consequence",
+          "at": [
+            0,
+            0
+          ],
+          "role": "Pensiero, sentimento e la loro espressione.",
+          "explain": "Libertà di coscienza e di opinione su ogni tema. Esprimere e pubblicare le opinioni tocca anche gli altri, ma Mill la considera praticamente inseparabile dalla libertà di pensiero.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 103,
+              "to": 112
+            }
+          ]
+        },
+        {
+          "id": "region-pursuits",
+          "n": 2,
+          "name": "Gusti e progetti di vita",
+          "icon": "compass",
+          "kind": "consequence",
+          "at": [
+            1,
+            0
+          ],
+          "role": "Vivere a modo proprio, anche se agli altri sembra sbagliato.",
+          "explain": "Libertà di costruire il proprio piano di vita, purché non danneggi altri, anche se gli altri lo giudicano sciocco o sbagliato.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 112,
+              "to": 117
+            }
+          ]
+        },
+        {
+          "id": "region-association",
+          "n": 3,
+          "name": "Associazione",
+          "icon": "users",
+          "kind": "consequence",
+          "at": [
+            2,
+            0
+          ],
+          "role": "Unirsi per qualsiasi scopo che non danneggi altri.",
+          "explain": "Tra adulti, non costretti né ingannati.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 117,
+              "to": 121
+            }
+          ]
+        }
+      ],
+      "joints": []
+    },
+    {
+      "id": "objection",
+      "n": 7,
+      "name": "Ciò che tocca me tocca anche gli altri",
+      "icon": "message-square-warning",
+      "kind": "objection",
+      "at": [
+        0,
+        0
+      ],
+      "relevant": true,
+      "role": "L'obiezione che Mill stesso anticipa: il confine tra «solo me» e «gli altri» è poroso.",
+      "points": [
+        "Quasi ogni scelta su di sé arriva agli altri attraverso di sé.",
+        {
+          "text": "Se basta questo, il confine scompare.",
+          "mark": "caveat"
+        },
+        "Mill precisa «solo me» come «direttamente e in prima istanza» e rimanda la risposta."
+      ],
+      "cites": [
+        {
+          "source": "mill",
+          "from": 99,
+          "to": 102
+        }
+      ]
+    }
+  ],
+  "joints": [
+    {
+      "from": "utility",
+      "to": "claim",
+      "type": "supports",
+      "label": "fonda",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 58,
+          "to": 61
+        }
+      ]
+    },
+    {
+      "from": "sovereignty",
+      "to": "claim",
+      "type": "supports",
+      "label": "esclude il paternalismo",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 14,
+          "to": 21
+        }
+      ]
+    },
+    {
+      "from": "bounds",
+      "to": "claim",
+      "type": "limits",
+      "label": "restringe ed estende"
+    },
+    {
+      "from": "objection",
+      "to": "claim",
+      "type": "attacks",
+      "label": "il confine è poroso",
+      "cites": [
+        {
+          "source": "mill",
+          "from": 99,
+          "to": 102
+        }
+      ]
+    },
+    {
+      "from": "claim",
+      "to": "region",
+      "type": "supports",
+      "label": "ne segue"
+    }
+  ],
+  "bom": {
+    "excluded": [
+      {
+        "source": "mill",
+        "from": 1,
+        "to": 3,
+        "reason": "context",
+        "note": "Titolo e nota dell'estratto."
+      },
+      {
+        "source": "mill",
+        "from": 82,
+        "to": 94,
+        "reason": "detail",
+        "note": "Quando conviene non far valere la responsabilità, e la coscienza come giudice dove la legge non arriva: un dettaglio, non un pezzo portante."
+      }
+    ]
+  },
+  "runs": [
+    {
+      "type": "load",
+      "id": "bricks",
+      "title": "Togli un mattone",
+      "target": "claim",
+      "question": "Quale mattone, se lo togli, fa cadere la tesi? Provane uno alla volta.",
+      "bricks": [
+        {
+          "part": "utility",
+          "bears": true,
+          "explain": "Crolla. Mill ha rinunciato al diritto astratto: senza l'utilità, la tesi resta senza fondamento.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 54,
+              "to": 61
+            }
+          ]
+        },
+        {
+          "part": "abstract-right",
+          "bears": false,
+          "explain": "Regge. È il mattone che Mill ha scartato di proposito: toglierlo non cambia nulla.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 54,
+              "to": 56
+            }
+          ]
+        },
+        {
+          "part": "sovereignty",
+          "bears": true,
+          "inference": true,
+          "explain": "Crolla in un'altra tesi. Senza sovranità su di sé resta solo l'utilità, che da sola potrebbe giustificare la costrizione «per il tuo bene» quando aumenta il benessere. È la critica classica al principio: un'interpretazione, il testo non lo dice.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 14,
+              "to": 27
+            }
+          ]
+        },
+        {
+          "part": "region",
+          "bears": false,
+          "explain": "Regge. La regione della libertà è una conseguenza: sta sopra la tesi, non sotto. Toglierla non tocca ciò che la regge.",
+          "cites": [
+            {
+              "source": "mill",
+              "from": 103,
+              "to": 104
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "case",
+      "id": "helmet",
+      "title": "Applica a un caso nuovo",
+      "scenario": "Una legge obbliga chi va in moto a indossare il casco, anche se il rischio riguarda solo chi guida.",
+      "question": "Secondo il principio del danno, così come è enunciato qui, la legge è giustificata?",
+      "options": [
+        {
+          "text": "Sì: protegge la salute di chi guida",
+          "correct": false,
+          "why": "È esattamente la ragione che Mill esclude: il proprio bene, fisico o morale, non basta per costringere."
+        },
+        {
+          "text": "No: si può persuadere chi guida, ma non costringerlo",
+          "correct": true,
+          "why": "Che sia meglio per lui è una buona ragione per discutere e persuadere, non per obbligare."
+        },
+        {
+          "text": "Sì: ogni rischio per sé ricade sugli altri",
+          "correct": false,
+          "why": "È l'obiezione che Mill stesso anticipa. Se bastasse, il confine sparirebbe; lui la affronta più avanti, distinguendo il danno diretto."
+        }
+      ],
+      "inference": true,
+      "cites": [
+        {
+          "source": "mill",
+          "from": 14,
+          "to": 21
+        },
+        {
+          "source": "mill",
+          "from": 99,
+          "to": 102
+        }
+      ]
+    }
+  ],
+  "reassemble": {
+    "title": "Rimonta l'argomento",
+    "instruction": "Metti ogni mattone nel suo ruolo: chi regge la tesi, chi la limita, chi la attacca, cosa ne segue e cosa Mill ha scartato.",
+    "layout": "tree",
+    "slots": [
+      {
+        "id": "s-claim",
+        "label": "Tesi",
+        "accepts": "claim",
+        "at": [
+          1,
+          0
+        ]
+      },
+      {
+        "id": "s-ground",
+        "label": "Fondamento",
+        "accepts": "utility",
+        "at": [
+          0,
+          2
+        ]
+      },
+      {
+        "id": "s-premise",
+        "label": "Premessa",
+        "accepts": "sovereignty",
+        "at": [
+          1,
+          2
+        ]
+      },
+      {
+        "id": "s-limit",
+        "label": "Limiti",
+        "accepts": "bounds",
+        "at": [
+          2,
+          1
+        ]
+      },
+      {
+        "id": "s-objection",
+        "label": "Obiezione",
+        "accepts": "objection",
+        "at": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "s-consequence",
+        "label": "Conseguenza",
+        "accepts": "region",
+        "at": [
+          1,
+          -1
+        ]
+      },
+      {
+        "id": "s-rejected",
+        "label": "Scartato",
+        "accepts": "abstract-right",
+        "at": [
+          2,
+          2
+        ]
+      }
+    ],
+    "hints": {
+      "claim": "È ciò che tutti gli altri mattoni reggono, limitano o attaccano.",
+      "utility": "Mill la chiama «appello ultimo»: sta sotto tutto.",
+      "sovereignty": "Spiega perché il tuo bene non basta per costringerti.",
+      "bounds": "Dice a chi si applica il principio e cosa resta dovuto.",
+      "objection": "Mette in dubbio il confine tra «solo me» e «gli altri».",
+      "region": "Non regge la tesi: ne deriva.",
+      "abstract-right": "Mill dice esplicitamente di rinunciarci."
+    }
+  }
+}

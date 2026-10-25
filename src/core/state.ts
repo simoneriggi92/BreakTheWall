@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Activity, Lesson } from './lesson';
+import type { StateNotice } from './disassembly-state';
 
 const key = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 export const stateSchema = z.strictObject({
@@ -48,15 +49,16 @@ export function submit(lesson: Lesson, state: LearnerState, activityId: string, 
   }
   return { ...state, attempts };
 }
-export type RestoredState = { state: LearnerState; notice?: string };
+/** `notice` keeps the Italian sentence; `noticeCode` lets the interface word it in either language. */
+export type RestoredState = { state: LearnerState; notice?: string; noticeCode?: StateNotice };
 /** A revision change preserves notes in the stored old file; never silently applies old answers. */
 export function restoreState(lesson: Lesson, input: unknown): RestoredState {
   if (input == null) return { state: initialState(lesson) };
   const parsed = stateSchema.safeParse(input);
-  const reset = (notice: string) => ({ state: initialState(lesson), notice });
-  if (!parsed.success) return reset('I progressi salvati non sono validi. La copia su disco è stata conservata; questa sessione riparte dall’inizio.');
+  const reset = (notice: string, noticeCode: StateNotice) => ({ state: initialState(lesson), notice, noticeCode });
+  if (!parsed.success) return reset('I progressi salvati non sono validi. La copia su disco è stata conservata; questa sessione riparte dall’inizio.', 'invalid');
   const state = parsed.data;
-  if (state.lessonId !== lesson.id || state.revision !== lesson.revision) return reset('La lezione è cambiata. I progressi della revisione precedente sono conservati separatamente; questa revisione riparte dall’inizio.');
+  if (state.lessonId !== lesson.id || state.revision !== lesson.revision) return reset('La lezione è cambiata. I progressi della revisione precedente sono conservati separatamente; questa revisione riparte dall’inizio.', 'revision-changed');
   const blocks = lesson.pages.flatMap(x => x.blocks);
   const pageExists = (id: string) => lesson.pages.some(p => p.id === id);
   const valid = pageExists(state.pageId) && state.visited.every(pageExists)
@@ -65,6 +67,6 @@ export function restoreState(lesson: Lesson, input: unknown): RestoredState {
     && Object.entries(state.nodes).every(([id, node]) => blocks.some(x => x.type === 'map' && x.id === id && x.nodes.some(n => n.id === node)))
     && Object.keys(state.reflections).every(id => blocks.some(x => x.id === id && x.type === 'reflection'))
     && state.attempts.every(x => { const a = lesson.activities.find(a => a.id === x.activityId); const ids = a?.type === 'choice' ? a.options.map(x => x.id) : a?.items.map(x => x.id); return ids && x.answer.every(id => ids.includes(id)) && (a?.type === 'choice' ? x.answer.length === 1 : x.answer.length === ids.length && new Set(x.answer).size === ids.length); });
-  if (!valid || !canVisit(lesson, state, state.pageId)) return reset('I riferimenti dei progressi non corrispondono alla lezione. Copia conservata; sessione riavviata.');
+  if (!valid || !canVisit(lesson, state, state.pageId)) return reset('I riferimenti dei progressi non corrispondono alla lezione. Copia conservata; sessione riavviata.', 'references-changed');
   return { state };
 }

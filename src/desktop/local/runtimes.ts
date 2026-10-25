@@ -46,7 +46,7 @@ export async function discoverServers(fetchImpl: Fetch): Promise<LocalServer[]> 
 function transport(error: unknown): ProviderError {
   if (error instanceof ProviderError) return error;
   const name = (error as Error)?.name;
-  return new ProviderError(name === 'AbortError' ? failure('cancelled') : name === 'TimeoutError' ? failure('local-unreachable', { message: 'Il modello locale non ha risposto in tempo. Controlla che il server sia avviato e il modello caricato.' }) : failure('local-unreachable'));
+  return new ProviderError(name === 'AbortError' ? failure('cancelled') : name === 'TimeoutError' ? failure('local-unreachable', { reason: 'local-timeout', message: 'Il modello locale non ha risposto in tempo. Controlla che il server sia avviato e il modello caricato.' }) : failure('local-unreachable'));
 }
 async function httpFailure(res: Response): Promise<ProviderError> {
   const text = await res.text().catch(() => '');
@@ -67,7 +67,7 @@ async function* lines(res: Response): AsyncGenerator<string> {
   let buffer = '';
   for (;;) {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const idle = new Promise<never>((_, reject) => { timer = setTimeout(() => { void reader.cancel(); reject(new ProviderError(failure('local-unreachable', { message: 'Il server locale ha smesso di rispondere. Nessun percorso è stato salvato.' }))); }, IDLE_MS); });
+    const idle = new Promise<never>((_, reject) => { timer = setTimeout(() => { void reader.cancel(); reject(new ProviderError(failure('local-unreachable', { reason: 'local-stopped', message: 'Il server locale ha smesso di rispondere. Nessun percorso è stato salvato.' }))); }, IDLE_MS); });
     const { value, done } = await Promise.race([reader.read(), idle]).finally(() => clearTimeout(timer));
     buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
     let index: number;
@@ -121,7 +121,7 @@ export async function completeLocal(fetchImpl: Fetch, target: LocalModel, reques
     } else if (target.runtime === 'llamacpp') {
       // The OpenAI-compatible route of llama-server did not enforce schemas in the trial; /completion with json_schema does.
       const template = await (await post(fetchImpl, `${baseUrl}/apply-template`, { messages }, signal)).json() as { prompt?: string };
-      if (typeof template.prompt !== 'string') throw new ProviderError(failure('unsupported', { message: 'Il server llama.cpp non espone il template della chat.' }));
+      if (typeof template.prompt !== 'string') throw new ProviderError(failure('unsupported', { reason: 'local-no-template', message: 'Il server llama.cpp non espone il template della chat.' }));
       const res = await post(fetchImpl, `${baseUrl}/completion`, { prompt: closeReasoning(template.prompt), json_schema: request.schema, n_predict: request.maxTokens ?? 24_000, stream: true, cache_prompt: true }, signal);
       for await (const line of lines(res)) {
         const data = sseData(line);
@@ -152,7 +152,7 @@ export async function completeLocal(fetchImpl: Fetch, target: LocalModel, reques
       if (finished) return text;
     }
   } catch (error) {
-    if (error instanceof SyntaxError) throw new ProviderError(failure('incomplete', { message: 'Il server locale ha inviato dati illeggibili. Nessun percorso è stato salvato.' }));
+    if (error instanceof SyntaxError) throw new ProviderError(failure('incomplete', { reason: 'local-unreadable', message: 'Il server locale ha inviato dati illeggibili. Nessun percorso è stato salvato.' }));
     throw transport(error);
   }
   // A stream that ends without its completion marker is never treated as a result.
@@ -173,7 +173,7 @@ export async function checkFormat(fetchImpl: Fetch, target: LocalModel, now = ()
   catch (error) {
     // An enforced schema closes this tiny object within a few tokens. Running out of budget means the model wrote freely.
     if (!(error instanceof ProviderError) || error.failure.code !== 'incomplete') throw error;
-    return { enforced: false, checkedAt: now().toISOString(), detail: 'Il server non ha chiuso la risposta di prova entro il limite: ha ignorato lo schema. Il formato del percorso non è garantito.' };
+    return { enforced: false, reason: 'timeout', checkedAt: now().toISOString(), detail: 'Il server non ha chiuso la risposta di prova entro il limite: ha ignorato lo schema. Il formato del percorso non è garantito.' };
   }
   let enforced = false;
   try {
@@ -182,6 +182,7 @@ export async function checkFormat(fetchImpl: Fetch, target: LocalModel, now = ()
   } catch { enforced = false; }
   return {
     enforced, checkedAt: now().toISOString(),
+    reason: enforced ? 'respected' : 'ignored', ...(enforced ? {} : { sample: raw.replace(/\s+/g, ' ').trim().slice(0, 80) }),
     detail: enforced ? 'Il server ha rispettato lo schema di prova: il formato del percorso viene imposto.' : `Il server ha ignorato lo schema di prova (ha risposto: ${raw.replace(/\s+/g, ' ').trim().slice(0, 80) || 'niente'}). Il formato del percorso non è garantito.`,
   };
 }

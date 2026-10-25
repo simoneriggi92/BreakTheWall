@@ -2,11 +2,11 @@
 id: P-20261022-generation-quality
 title: Measured generation quality - evaluation set, structural distractors, two-phase pipeline
 version: 2
-state: awaiting_approval
+state: superseded
 current_task: Q1b
 last_evidence: Q1 complete - npm run eval, 4 public + 1 private case, 101 tests; local baseline 5/15 valid in three failure classes; first-pass claim review 0 false claims in 3 lessons
-next_action: Review v2 (adds Q1b, fixes for the three baseline failure classes) and send Approve P-20261022-generation-quality v2
-approval: pending
+next_action: None - superseded by P-20261024-disassembly v2
+approval: superseded
 ---
 
 # Generation quality
@@ -186,3 +186,13 @@ Authorized command: `implement P-20261022-generation-quality v1 --phase evaluati
 - Q1: complete. See the [evaluation baseline](evaluation-baseline.md): the runner, cases, ChatGPT policy, a local baseline of 5/15 valid lessons, three failure classes, and a first-pass claim review. The ChatGPT baseline waits for plan usage.
 - Q2, Q3: not started.
 - Version 2 adds Q1b, requested by the owner after the baseline: "aggiungi al piano (v2) le correzioni per le tre classi di errore, misurate contro la baseline, prima di Q2".
+
+## Superseded
+
+On 2026-10-25 the owner superseded this plan, in the same message that approved [P-20261024-disassembly v2](../P-20261024-disassembly/plan.md): `Approve P-20261024-disassembly v2 and supersede P-20261022-generation-quality`.
+
+- Q1 (evaluation runner, cases, baselines) is complete and kept as infrastructure. P-20261024 D9 adapts it to disassemblies.
+- Q1b and Q2 were never approved or started. They tuned the lesson draft that P-20261024 replaces.
+- Q3 (two-phase generation) is absorbed by P-20261024 D9.
+
+Version 2 of this plan was never approved.

@@ -1,17 +1,25 @@
 import { z } from 'zod';
 import type { Lesson } from './lesson';
-import type { LearningGoal, UserSource } from './source';
+import type { ImportErrorCode, ImportErrorParams, LearningGoal, UserSource } from './source';
 
 /** What the renderer may know about the account: never tokens, only state and capabilities. */
+/** Notices travel as codes; `notice` keeps the Italian text for logs. */
+export type AccountNotice = 'plan-not-authorized' | 'revoke-unconfirmed' | 'session-expired';
 export type AccountStatus =
-  | { state: 'signed-out'; notice?: string; storage: boolean }
+  | { state: 'signed-out'; notice?: string; noticeCode?: AccountNotice; storage: boolean }
   | { state: 'signing-in'; storage: boolean }
-  | { state: 'signed-in'; email?: string; planUsage: boolean; notice?: string; storage: boolean };
+  | { state: 'signed-in'; email?: string; planUsage: boolean; notice?: string; noticeCode?: AccountNotice; storage: boolean };
 export interface ModelOption { slug: string; name: string }
 
 export type FailureCode = 'cancelled' | 'signed-out' | 'session-expired' | 'plan-disabled' | 'not-eligible' | 'usage-limit' | 'unavailable' | 'model-unavailable' | 'unsupported' | 'forbidden' | 'incomplete' | 'refused' | 'invalid-output' | 'network' | 'storage' | 'busy' | 'desktop-only' | 'local-address' | 'local-unreachable' | 'local-model-missing' | 'local-context';
 export type RecoveryAction = 'sign-in' | 'enable-plan' | 'retry' | 'usage-settings' | 'choose-model' | 'local-setup';
-export interface ProviderFailure { code: FailureCode; message: string; action?: RecoveryAction; issues?: string[]; requestId?: string }
+/** A more specific cause than the code, where the host knows one. The interface words `reason ?? code`. */
+export type FailureReason = 'local-not-a-server' | 'local-timeout' | 'local-stopped' | 'local-no-template' | 'local-unreadable'
+  | 'sign-in-busy' | 'sign-in-denied' | 'sign-in-other-app' | 'sign-in-no-code' | 'sign-in-no-identity' | 'sign-in-other-account'
+  | 'session-rejected' | 'models-format' | 'stream-unreadable' | 'sign-in-port' | 'sign-in-timeout' | 'sign-in-cancelled'
+  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified';
+/** `message` stays Italian for logs and tests; the interface words the failure from `reason` or `code`. */
+export interface ProviderFailure { code: FailureCode; reason?: FailureReason; message: string; action?: RecoveryAction; issues?: string[]; requestId?: string }
 
 const MESSAGES: Record<FailureCode, [string, RecoveryAction?]> = {
   cancelled: ['Generazione annullata. Percorsi e appunti già salvati non sono stati toccati.', 'retry'],
@@ -68,7 +76,7 @@ export const localModelSchema = z.strictObject({ runtime: z.enum(LOCAL_RUNTIMES)
 export type LocalModel = z.infer<typeof localModelSchema>;
 export interface LocalServer { runtime: LocalRuntime; baseUrl: string; models: string[]; version?: string }
 /** Whether the server constrained a tiny request to the given JSON Schema. Observed, not assumed per runtime. */
-export interface FormatCheck { enforced: boolean; detail: string; checkedAt: string }
+export interface FormatCheck { enforced: boolean; detail: string; checkedAt: string; reason?: 'timeout' | 'respected' | 'ignored'; sample?: string }
 
 export const routeSchema = z.discriminatedUnion('provider', [
   z.strictObject({ provider: z.literal('chatgpt'), model: z.string().min(1).max(100) }),
@@ -78,7 +86,10 @@ export type GenerationRoute = z.infer<typeof routeSchema>;
 export const settingsSchema = z.strictObject({
   version: z.literal(1), provider: z.enum(['chatgpt', 'local']),
   chatgptModel: z.string().max(100).optional(),
-  local: localModelSchema.extend({ check: z.strictObject({ enforced: z.boolean(), detail: z.string().max(300), checkedAt: z.string().max(40) }).optional() }).optional(),
+  local: localModelSchema.extend({ check: z.strictObject({ enforced: z.boolean(), detail: z.string().max(300), checkedAt: z.string().max(40), reason: z.enum(['timeout', 'respected', 'ignored']).optional(), sample: z.string().max(100).optional() }).optional() }).optional(),
+  /** Optional, so settings files written before themes and languages stay valid. `system` follows the operating system. */
+  theme: z.enum(['system', 'paper', 'blueprint']).optional(),
+  language: z.enum(['system', 'it', 'en']).optional(),
 });
 export type StudioSettings = z.infer<typeof settingsSchema>;
 export const defaultSettings: StudioSettings = { version: 1, provider: 'chatgpt' };
@@ -93,7 +104,8 @@ export function generatedBy(lesson: Lesson): string {
 
 export interface GenerationRequest { sources: UserSource[]; goal: LearningGoal; route: GenerationRoute }
 export type GenerationResult = { ok: true; lesson: Lesson } | { ok: false; failure: ProviderFailure };
-export interface PickedSources { sources: UserSource[]; errors: { name: string; message: string }[] }
+export type PickError = { name: string; message: string; code?: ImportErrorCode | 'not-a-file' | 'unreadable' | 'truncated'; params?: ImportErrorParams };
+export interface PickedSources { sources: UserSource[]; errors: PickError[] }
 
 /** Desktop-only operations. Absent in the browser preview. */
 export interface StudioBridge {
@@ -107,6 +119,9 @@ export interface StudioBridge {
   cancelGeneration(): Promise<void>;
   onGenerationProgress(listener: (progress: GenerationProgress) => void): () => void;
   listLessons(): Promise<{ lessons: unknown[]; skipped: number }>;
+  /** Saved generated disassemblies; the renderer validates them again before showing them. */
+  listDisassemblies?(): Promise<{ disassemblies: unknown[]; skipped: number }>;
+  findDisassembly?(key: { id: string; revision: string }): Promise<unknown | null>;
   openUsageSettings(): Promise<void>;
   getSettings(): Promise<StudioSettings>;
   saveSettings(settings: StudioSettings): Promise<StudioSettings>;

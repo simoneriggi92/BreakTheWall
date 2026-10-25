@@ -42,7 +42,7 @@ export async function listModels(fetchImpl: Fetch, token: string): Promise<Model
   catch (error) { throw transportError(error); }
   if (!res.ok) throw await errorFrom(res);
   const body = await res.json() as { models?: { slug?: unknown; display_name?: unknown; visibility?: unknown }[] };
-  if (!Array.isArray(body.models)) throw new ProviderError(failure('unsupported', { message: 'L’elenco dei modelli non ha il formato documentato.' }));
+  if (!Array.isArray(body.models)) throw new ProviderError(failure('unsupported', { reason: 'models-format', message: 'L’elenco dei modelli non ha il formato documentato.' }));
   // Server order is kept: it is the account's own ranking.
   return body.models.filter(m => m.visibility === 'list' && typeof m.slug === 'string').map(m => ({ slug: m.slug as string, name: typeof m.display_name === 'string' ? m.display_name : m.slug as string }));
 }
@@ -64,7 +64,7 @@ async function* events(body: ReadableStream<Uint8Array>): AsyncGenerator<Record<
       const data = block.split(/\r?\n/).filter(l => l.startsWith('data:')).map(l => l.slice(5).trimStart()).join('\n');
       if (!data || data === '[DONE]') continue;
       try { yield JSON.parse(data) as Record<string, unknown>; }
-      catch { throw new ProviderError(failure('incomplete', { message: 'Il flusso della risposta contiene dati illeggibili. Nessun percorso è stato salvato.' })); }
+      catch { throw new ProviderError(failure('incomplete', { reason: 'stream-unreadable', message: 'Il flusso della risposta contiene dati illeggibili. Nessun percorso è stato salvato.' })); }
     }
     if (done) return;
   }

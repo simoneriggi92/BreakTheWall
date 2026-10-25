@@ -1,0 +1,966 @@
+{
+  "schema": "btw-disassembly/0.1",
+  "id": "atlas-release",
+  "title": "Rilascio di Atlas Reader in staging",
+  "question": "Come si rilascia una nuova versione del client web in staging, e come si torna indietro se qualcosa va storto?",
+  "language": "it",
+  "sources": [
+    {
+      "id": "runbook",
+      "title": "release-runbook.md",
+      "path": "/eval/cases/sources/release-runbook.md",
+      "language": "en"
+    }
+  ],
+  "whole": {
+    "name": "Catena di rilascio",
+    "does": "Porta un commit esatto in staging sotto forma di immagine, identificata da un digest, e tiene pronto il digest precedente per tornare indietro.",
+    "why": "Un rilascio non copia file su un server: sostituisce un'identità (il digest) con un'altra. Capito questo, sia il rilascio sia il rollback diventano «cambia il digest».",
+    "cites": [
+      {
+        "source": "runbook",
+        "from": 8,
+        "to": 22
+      }
+    ]
+  },
+  "parts": [
+    {
+      "id": "start",
+      "n": 1,
+      "name": "Preparazione e avvio",
+      "icon": "play",
+      "kind": "step",
+      "at": [
+        0,
+        1
+      ],
+      "relevant": true,
+      "role": "Fissa il commit e avvia l'intera catena su quel commit.",
+      "points": [
+        "Annoti lo SHA completo che vuoi rilasciare.",
+        "Decidi prima quali smoke test farai e cosa ti farà tornare indietro.",
+        {
+          "text": "Avvii deploy-staging «con dipendenze», con il riuso delle build spento.",
+          "mark": "step"
+        },
+        {
+          "text": "Le tre pipeline girano così sullo stesso commit.",
+          "mark": "step"
+        }
+      ],
+      "metaphor": {
+        "text": "È la bolla di accompagnamento di un pacco: dice quale merce parte, prima che parta.",
+        "limit": "Una bolla si può correggere dopo; un commit sbagliato no: va fermato prima di avviare."
+      },
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 35,
+          "to": 58
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "n": 2,
+      "name": "check",
+      "icon": "list-checks",
+      "kind": "step",
+      "at": [
+        1,
+        1
+      ],
+      "relevant": false,
+      "role": "Dice se il sorgente è rilasciabile. Non cambia nulla fuori dal server di build.",
+      "points": [
+        "Sette controlli, tutti obbligatori: dal lockfile esatto a una pagina per ogni rotta.",
+        {
+          "text": "Se uno fallisce, il sorgente non è rilasciabile.",
+          "mark": "caveat"
+        },
+        {
+          "text": "Fuori dal server di build non cambia nulla.",
+          "mark": "keeps"
+        }
+      ],
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 28,
+          "to": 28
+        },
+        {
+          "source": "runbook",
+          "from": 60,
+          "to": 72
+        },
+        {
+          "source": "runbook",
+          "from": 167,
+          "to": 167
+        }
+      ],
+      "parts": [
+        {
+          "id": "check-lock",
+          "n": 1,
+          "name": "Lockfile esatto",
+          "icon": "lock",
+          "kind": "component",
+          "at": [
+            0,
+            0
+          ],
+          "role": "Nessun aggiornamento durante l'installazione.",
+          "explain": "Le dipendenze si installano esattamente come scritte nel lockfile.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 64,
+              "to": 64
+            }
+          ]
+        },
+        {
+          "id": "check-static",
+          "n": 2,
+          "name": "Lint e tipi",
+          "icon": "scan-search",
+          "kind": "component",
+          "at": [
+            1,
+            0
+          ],
+          "role": "Errori statici bloccano il rilascio.",
+          "explain": "Linter senza errori e type checker superato.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 65,
+              "to": 66
+            }
+          ]
+        },
+        {
+          "id": "check-tests",
+          "n": 3,
+          "name": "Test e build",
+          "icon": "flask-conical",
+          "kind": "component",
+          "at": [
+            2,
+            0
+          ],
+          "role": "Il codice funziona e si compila.",
+          "explain": "I test unitari passano e la build di produzione si completa.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 67,
+              "to": 68
+            }
+          ]
+        },
+        {
+          "id": "check-bundle",
+          "n": 4,
+          "name": "Bundle pulito",
+          "icon": "shield-check",
+          "kind": "component",
+          "at": [
+            1,
+            1
+          ],
+          "role": "Niente endpoint di sviluppo, ogni rotta ha la sua pagina.",
+          "explain": "Il bundle non contiene URL localhost né endpoint di sviluppo, e ogni rotta di routes.json ha una pagina.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 69,
+              "to": 70
+            }
+          ]
+        }
+      ],
+      "joints": []
+    },
+    {
+      "id": "image",
+      "n": 3,
+      "name": "image → release.json",
+      "icon": "package",
+      "kind": "artifact",
+      "at": [
+        2,
+        1
+      ],
+      "relevant": true,
+      "role": "Produce l'immagine e il documento che la autorizza al deploy.",
+      "points": [
+        {
+          "text": "Costruisce un'immagine minima: solo asset compilati e server web.",
+          "mark": "step"
+        },
+        {
+          "text": "La spinge nel registry.",
+          "mark": "step"
+        },
+        {
+          "text": "Scrive release.json con commit e digest.",
+          "mark": "step"
+        },
+        {
+          "text": "È release.json, non l'immagine, a rendere il rilascio distribuibile.",
+          "mark": "caveat"
+        }
+      ],
+      "lens": {
+        "what": "Il digest è l'impronta del contenuto dell'immagine (sha256:…).",
+        "why": "È l'identità del rilascio: due build non condividono mai un digest, mentre un tag si può spostare.",
+        "how": "release.json lo registra; deploy-staging imposta l'immagine per digest, non per tag.",
+        "critical": "Un'immagine nel registry senza release.json esiste ma non è approvata: è un'orfana."
+      },
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 29,
+          "to": 29
+        },
+        {
+          "source": "runbook",
+          "from": 74,
+          "to": 98
+        },
+        {
+          "source": "runbook",
+          "from": 168,
+          "to": 169
+        }
+      ],
+      "parts": [
+        {
+          "id": "image-build",
+          "n": 1,
+          "name": "Build a due stadi",
+          "icon": "layers",
+          "kind": "step",
+          "at": [
+            0,
+            0
+          ],
+          "role": "Il primo stadio compila, il secondo copia solo il necessario.",
+          "explain": "L'immagine finale gira come utente non root sulla porta 8080, senza sorgenti né test, e risponde 200 su /healthz quando è pronta.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 76,
+              "to": 83
+            }
+          ]
+        },
+        {
+          "id": "image-push",
+          "n": 2,
+          "name": "Push nel registry",
+          "icon": "upload",
+          "kind": "step",
+          "at": [
+            1,
+            0
+          ],
+          "role": "Da qui l'immagine esiste, ma non è ancora approvata.",
+          "explain": "Se la pipeline si ferma dopo il push e prima di release.json, l'immagine è orfana: si rilancia image, non la si distribuisce a mano.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 85,
+              "to": 85
+            },
+            {
+              "source": "runbook",
+              "from": 169,
+              "to": 169
+            }
+          ]
+        },
+        {
+          "id": "image-record",
+          "n": 3,
+          "name": "release.json",
+          "icon": "file-check",
+          "kind": "artifact",
+          "at": [
+            2,
+            0
+          ],
+          "role": "Commit, tag e digest: l'autorizzazione al deploy.",
+          "explain": "Controlla che il commit sia quello atteso e che il digest ci sia. Senza questo file il rilascio non è approvato.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 86,
+              "to": 98
+            }
+          ]
+        }
+      ],
+      "joints": [
+        {
+          "from": "image-build",
+          "to": "image-push",
+          "type": "sends-to",
+          "label": "immagine"
+        },
+        {
+          "from": "image-push",
+          "to": "image-record",
+          "type": "sends-to",
+          "label": "digest"
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "n": 4,
+      "name": "deploy-staging",
+      "icon": "rocket",
+      "kind": "step",
+      "at": [
+        3,
+        1
+      ],
+      "relevant": true,
+      "role": "Cambia una sola cosa: il digest dell'immagine del container web.",
+      "points": [
+        {
+          "text": "Legge release.json e imposta per digest l'immagine del container web.",
+          "mark": "step"
+        },
+        {
+          "text": "Repliche, limiti, variabili e probe restano uguali.",
+          "mark": "keeps"
+        },
+        "I pod si sostituiscono uno alla volta: per un po' convivono vecchio e nuovo.",
+        {
+          "text": "Alla fine scrive rollout.json con il digest precedente e quello nuovo.",
+          "mark": "step"
+        }
+      ],
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 30,
+          "to": 33
+        },
+        {
+          "source": "runbook",
+          "from": 100,
+          "to": 115
+        },
+        {
+          "source": "runbook",
+          "from": 170,
+          "to": 172
+        }
+      ]
+    },
+    {
+      "id": "smoke",
+      "n": 5,
+      "name": "Smoke test",
+      "icon": "clipboard-check",
+      "kind": "step",
+      "at": [
+        4,
+        1
+      ],
+      "relevant": true,
+      "role": "Il controllo umano dopo il rollout.",
+      "points": [
+        "Dalla rete di staging, con la cache del browser disattivata.",
+        "Home, link diretti dopo il refresh, 404 per gli asset mancanti.",
+        "Cache: HTML no-store, asset con hash immutabili.",
+        "Accesso, apertura di un documento, console e log senza nuovi errori."
+      ],
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 117,
+          "to": 128
+        }
+      ]
+    },
+    {
+      "id": "rollback",
+      "n": 6,
+      "name": "Rollback",
+      "icon": "rotate-ccw",
+      "kind": "step",
+      "at": [
+        4,
+        0
+      ],
+      "relevant": true,
+      "role": "Torna al digest che girava prima, senza ricostruire nulla.",
+      "points": [
+        {
+          "text": "Ridistribuisci il release.json precedente con «Deploy recorded release».",
+          "mark": "step"
+        },
+        {
+          "text": "Non ricostruire il vecchio commit: una nuova build ha un digest diverso.",
+          "mark": "caveat"
+        },
+        {
+          "text": "Non annulla dati scritti, messaggi inviati, configurazione condivisa.",
+          "mark": "caveat"
+        }
+      ],
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 130,
+          "to": 161
+        }
+      ],
+      "parts": [
+        {
+          "id": "rb-when",
+          "n": 1,
+          "name": "Quando",
+          "icon": "siren",
+          "kind": "component",
+          "at": [
+            0,
+            0
+          ],
+          "role": "Un controllo fallisce e non c'è una correzione in tempo.",
+          "explain": "Rollout che non finisce, pod che si riavviano, digest diverso da release.json, smoke test fallito, regressione segnalata.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 132,
+              "to": 140
+            }
+          ]
+        },
+        {
+          "id": "rb-claim",
+          "n": 2,
+          "name": "Ridistribuisci il digest precedente",
+          "icon": "rotate-ccw",
+          "kind": "conclusion",
+          "at": [
+            1,
+            0
+          ],
+          "role": "Il rollback è un deploy del rilascio registrato prima.",
+          "explain": "Avvisi i tester, prendi il digest precedente da rollout.json, rilanci deploy-staging con il release.json precedente, ripeti gli smoke test e annoti tutto.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 142,
+              "to": 151
+            }
+          ]
+        },
+        {
+          "id": "rb-rebuild",
+          "n": 3,
+          "name": "Una build crea un'immagine nuova",
+          "icon": "hammer",
+          "kind": "premise",
+          "at": [
+            0,
+            1
+          ],
+          "role": "Ricostruire non riporta indietro: produce un terzo digest.",
+          "explain": "Per questo il runbook vieta di ricostruire il vecchio commit.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 148,
+              "to": 149
+            }
+          ]
+        },
+        {
+          "id": "rb-identity",
+          "n": 4,
+          "name": "Il digest è l'identità",
+          "icon": "fingerprint",
+          "kind": "premise",
+          "at": [
+            1,
+            1
+          ],
+          "role": "I tag si spostano, i digest no.",
+          "explain": "Tornare indietro significa tornare a un'identità precisa, non a un'etichetta.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 21,
+              "to": 22
+            }
+          ]
+        },
+        {
+          "id": "rb-limits",
+          "n": 5,
+          "name": "Cosa non annulla",
+          "icon": "triangle-alert",
+          "kind": "limit",
+          "at": [
+            2,
+            1
+          ],
+          "role": "Dati scritti, messaggi inviati, configurazione condivisa.",
+          "explain": "Ridistribuire l'immagine non annulla gli effetti già prodotti. Se un rilascio cambia dati, il suo rollback va progettato prima.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 153,
+              "to": 161
+            }
+          ]
+        }
+      ],
+      "joints": [
+        {
+          "from": "rb-when",
+          "to": "rb-claim",
+          "type": "causes",
+          "label": "fa scattare"
+        },
+        {
+          "from": "rb-rebuild",
+          "to": "rb-claim",
+          "type": "supports",
+          "label": "non ricostruire"
+        },
+        {
+          "from": "rb-identity",
+          "to": "rb-claim",
+          "type": "supports",
+          "label": "torna al digest"
+        },
+        {
+          "from": "rb-limits",
+          "to": "rb-claim",
+          "type": "limits",
+          "label": "non basta per i dati"
+        }
+      ]
+    }
+  ],
+  "joints": [
+    {
+      "from": "start",
+      "to": "check",
+      "type": "sends-to",
+      "label": "commit fissato",
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 49,
+          "to": 58
+        }
+      ]
+    },
+    {
+      "from": "check",
+      "to": "image",
+      "type": "sends-to",
+      "label": "stesso commit",
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 32,
+          "to": 33
+        }
+      ]
+    },
+    {
+      "from": "image",
+      "to": "deploy",
+      "type": "sends-to",
+      "label": "release.json",
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 102,
+          "to": 103
+        }
+      ]
+    },
+    {
+      "from": "deploy",
+      "to": "smoke",
+      "type": "sends-to",
+      "label": "staging aggiornato",
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 115,
+          "to": 115
+        }
+      ]
+    },
+    {
+      "from": "smoke",
+      "to": "rollback",
+      "type": "causes",
+      "label": "test fallito",
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 139,
+          "to": 139
+        }
+      ]
+    },
+    {
+      "from": "rollback",
+      "to": "deploy",
+      "type": "depends-on",
+      "label": "release.json precedente",
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 146,
+          "to": 147
+        }
+      ]
+    }
+  ],
+  "bom": {
+    "excluded": [
+      {
+        "source": "runbook",
+        "from": 1,
+        "to": 6,
+        "reason": "context",
+        "note": "Intestazione: scopo, cosa non copre, proprietario."
+      },
+      {
+        "source": "runbook",
+        "from": 24,
+        "to": 27,
+        "reason": "repetition",
+        "note": "Titolo e intestazione della tabella delle pipeline: il contenuto è nei pezzi."
+      },
+      {
+        "source": "runbook",
+        "from": 163,
+        "to": 166,
+        "reason": "repetition",
+        "note": "Intestazione della tabella dei guasti: ogni riga è assegnata alla sua pipeline."
+      },
+      {
+        "source": "runbook",
+        "from": 174,
+        "to": 177,
+        "reason": "outside-question",
+        "note": "Produzione: congelata, e la domanda riguarda lo staging."
+      }
+    ]
+  },
+  "runs": [
+    {
+      "type": "scenario",
+      "id": "failed-smoke",
+      "title": "Un rilascio con uno smoke test fallito",
+      "setup": "In staging gira il digest A. Il commit X è stato unito in main e vuoi rilasciarlo.",
+      "vars": {
+        "staging": "digest A",
+        "release.json": "—",
+        "rollout.json": "—"
+      },
+      "steps": [
+        {
+          "action": "Avvia deploy-staging «con dipendenze»",
+          "predict": {
+            "question": "Quale pipeline lavora per prima?",
+            "options": [
+              {
+                "text": "deploy-staging, perché è quella che hai avviato",
+                "correct": false,
+                "why": "L'hai avviata tu, ma dipende da image, che dipende da check: la catena parte dall'inizio."
+              },
+              {
+                "text": "check, sullo stesso commit di tutta la catena",
+                "correct": true,
+                "why": "deploy-staging dipende da image, che dipende da check, e tutte usano lo stesso commit."
+              },
+              {
+                "text": "image, perché check è facoltativo",
+                "correct": false,
+                "why": "check non è facoltativo: se fallisce, il sorgente non è rilasciabile."
+              }
+            ]
+          },
+          "effect": {
+            "start": "ok",
+            "check": "ok",
+            "image": "active"
+          },
+          "flow": [
+            [
+              "start",
+              "check"
+            ],
+            [
+              "check",
+              "image"
+            ]
+          ],
+          "explain": "La catena parte da check sul commit fissato. check passa: il sorgente è rilasciabile.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 32,
+              "to": 33
+            }
+          ]
+        },
+        {
+          "action": "image spinge l'immagine nel registry",
+          "predict": {
+            "question": "La pipeline si ferma subito dopo il push, prima di scrivere release.json. Puoi distribuire quell'immagine?",
+            "options": [
+              {
+                "text": "Sì: l'immagine è nel registry, quindi è pronta",
+                "correct": false,
+                "why": "Esistere nel registry non basta: senza release.json l'immagine non è approvata. È un'orfana."
+              },
+              {
+                "text": "No: si rilancia image, mai il deploy a mano dell'orfana",
+                "correct": true,
+                "why": "È la riga della tabella dei guasti: un'immagine senza release.json non è approvata."
+              }
+            ]
+          },
+          "effect": {
+            "image": "ok"
+          },
+          "vars": {
+            "release.json": "commit X · digest B"
+          },
+          "explain": "Questa volta la pipeline arriva in fondo e scrive release.json con il digest B.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 97,
+              "to": 98
+            },
+            {
+              "source": "runbook",
+              "from": 169,
+              "to": 169
+            }
+          ]
+        },
+        {
+          "action": "deploy-staging imposta il digest B",
+          "effect": {
+            "deploy": "ok"
+          },
+          "flow": [
+            [
+              "image",
+              "deploy"
+            ]
+          ],
+          "vars": {
+            "staging": "digest B",
+            "rollout.json": "prima A · ora B"
+          },
+          "explain": "Cambia solo l'immagine del container web. I pod si sostituiscono uno alla volta; quando tutti sono pronti e /healthz risponde 200, rollout.json registra A e B.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 102,
+              "to": 115
+            }
+          ]
+        },
+        {
+          "action": "Smoke test: un asset mancante restituisce la home invece di 404",
+          "effect": {
+            "smoke": "failed"
+          },
+          "flow": [
+            [
+              "deploy",
+              "smoke"
+            ]
+          ],
+          "predict": {
+            "question": "Non c'è una correzione pronta in tempo. Cosa fai?",
+            "options": [
+              {
+                "text": "Ricostruisci il commit precedente e distribuiscilo",
+                "correct": false,
+                "why": "Una nuova build produce un'immagine nuova, con un terzo digest: non torni a ciò che girava prima."
+              },
+              {
+                "text": "Ridistribuisci il release.json precedente (digest A)",
+                "correct": true,
+                "why": "Il rollback è un deploy del rilascio registrato: torni all'identità esatta di prima."
+              },
+              {
+                "text": "Ritagga staging-141 sull'immagine vecchia",
+                "correct": false,
+                "why": "I tag sono etichette per le persone e si spostano; il deploy lavora per digest."
+              }
+            ]
+          },
+          "explain": "Uno smoke test fallito e nessuna correzione in tempo: si torna indietro.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 123,
+              "to": 123
+            },
+            {
+              "source": "runbook",
+              "from": 134,
+              "to": 139
+            }
+          ]
+        },
+        {
+          "action": "Rollback: deploy del release.json precedente",
+          "effect": {
+            "rollback": "ok",
+            "deploy": "restored",
+            "smoke": "ok"
+          },
+          "flow": [
+            [
+              "smoke",
+              "rollback"
+            ],
+            [
+              "rollback",
+              "deploy"
+            ]
+          ],
+          "vars": {
+            "staging": "digest A"
+          },
+          "explain": "Staging torna al digest A. Ripeti gli smoke test e annota digest fallito, digest ripristinato, motivo e orari. ⚠ Se B avesse scritto dati, il rollback non li annullerebbe.",
+          "cites": [
+            {
+              "source": "runbook",
+              "from": 142,
+              "to": 161
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "case",
+      "id": "tag-shortcut",
+      "title": "Applica a un caso nuovo",
+      "scenario": "Un collega propone: «Per fare prima, spostiamo il tag staging-142 sulla nuova immagine e lasciamo che staging lo segua».",
+      "question": "Cosa rispondi, secondo il runbook?",
+      "options": [
+        {
+          "text": "Va bene: il tag indica comunque la versione",
+          "correct": false,
+          "why": "Un tag si può spostare, quindi non dice con certezza cosa gira. Il runbook identifica un rilascio solo per digest."
+        },
+        {
+          "text": "No: il deploy imposta l'immagine per digest, letta da release.json",
+          "correct": true,
+          "why": "Il digest è l'identità del rilascio e deploy-staging lo legge da release.json; i tag servono alle persone."
+        }
+      ],
+      "inference": true,
+      "cites": [
+        {
+          "source": "runbook",
+          "from": 21,
+          "to": 22
+        },
+        {
+          "source": "runbook",
+          "from": 102,
+          "to": 103
+        }
+      ]
+    }
+  ],
+  "reassemble": {
+    "title": "Rimonta la catena",
+    "instruction": "Rimetti ogni pezzo al suo posto: prima la catena di rilascio, poi la via di ritorno.",
+    "layout": "chain",
+    "slots": [
+      {
+        "id": "s1",
+        "label": "1",
+        "accepts": "start",
+        "at": [
+          0,
+          1
+        ]
+      },
+      {
+        "id": "s2",
+        "label": "2",
+        "accepts": "check",
+        "at": [
+          1,
+          1
+        ]
+      },
+      {
+        "id": "s3",
+        "label": "3",
+        "accepts": "image",
+        "at": [
+          2,
+          1
+        ]
+      },
+      {
+        "id": "s4",
+        "label": "4",
+        "accepts": "deploy",
+        "at": [
+          3,
+          1
+        ]
+      },
+      {
+        "id": "s5",
+        "label": "5",
+        "accepts": "smoke",
+        "at": [
+          4,
+          1
+        ]
+      },
+      {
+        "id": "s6",
+        "label": "↺",
+        "accepts": "rollback",
+        "at": [
+          4,
+          0
+        ]
+      }
+    ],
+    "hints": {
+      "start": "Tutto parte dal commit che hai fissato.",
+      "check": "Prima di costruire qualsiasi cosa, si verifica che il sorgente sia rilasciabile.",
+      "image": "Il deploy legge un documento: chi lo scrive?",
+      "deploy": "Cambia una cosa sola, il digest: viene dopo che il digest esiste.",
+      "smoke": "Il controllo umano ha senso solo quando il nuovo digest gira.",
+      "rollback": "Non è un passo della catena: è la via di ritorno, e riusa il deploy."
+    }
+  }
+}
