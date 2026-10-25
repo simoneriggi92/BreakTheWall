@@ -4,7 +4,7 @@ title: Disassemblies replace lessons - contract, player, two-phase generation, t
 version: 3
 state: implementing
 current_task: D8
-last_evidence: Phase player (D4-D8) implemented - npm run check 221 tests passed, npm run build passed; both themes and both languages seen in the browser preview; the desktop app starts
+last_evidence: Phase player (D4-D8) implemented and revised after the owner's first desktop use - npm run check 223 tests passed, npm run build passed
 next_action: Owner witnesses the desktop flow of D8 (library, disassembly, restart, resume, language switch); then implement P-20261024-disassembly v3 --phase generation
 approval: approved
 ---
@@ -635,3 +635,28 @@ Owner steps for the open D8 check (`npm start`):
 2. Quit the app and start it again: "Riprendi" leads back to the same state.
 3. Switch the language in the header: the interface changes, while progress and content stay.
 4. Repeat steps 1–3 with the other language and with the blueprint theme.
+
+#### Owner's first desktop use, and the fixes (2026-10-25)
+
+The owner ran the desktop app, from Rider and `npm start`, and reported four points.
+
+| Report | Response |
+|---|---|
+| After a language switch on "Run", the parts' text stayed Italian | This is by design, since content keeps its language. But two versions of Atlas and Mill exist, so the player now offers the other one. The contract gains an optional `family`, shared by the language versions of one disassembly. When the disassembly's language differs from the interface's and a version in the interface language exists, a notice offers to open it. Progress stays separate for each version |
+| "Esegui" changes everything at once; the prototype's yellow dot is missing | A step now runs in two beats. Its parts first show the pulsing amber "running" mark, with the step's flow animated and the controls replaced by "In esecuzione…". After 0.9 s the effects, instruments and explanation land. The delay is zero under `prefers-reduced-motion` |
+| Everything is squeezed into the right column | The drawing now takes the full width. Below it, the card or run sits on the left and the source on the right; the source is taller. Narrow windows stack them |
+| Rename to "WreckIt" | Not done. A quick search found Disney's "Wreck-It Ralph" and a US application for "WRECK-IT" covering an app. The owner chose to keep "Break the Wall" |
+
+Also found while taking screenshots:
+- Long part names overflowed the plate's right edge, and three-line names touched the kind label.
+- The names now wrap at 17 characters and sit in a band below the label.
+- Plates are 84 px tall instead of 76; the layout geometry tests pass with the new size.
+- A browser check found no name outside its plate or over its label on the prepared sheets.
+
+New tests:
+- the two-beat step, with fake timers and a non-reduced-motion media query;
+- the offer of the other version under an English interface.
+
+The README now describes the disassembly product, with a new blueprint screenshot of Mill. It says plainly that Studio still generates lessons until the generation phase.
+
+D8's witnessed desktop flow stays open until the owner confirms it on this version.
