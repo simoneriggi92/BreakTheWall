@@ -2,10 +2,10 @@
 id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
 version: 3
-state: approved
-current_task: D4
-last_evidence: Phase contract (D1-D3) implemented under v2 - npm run check 185 tests passed, npm run build passed; v3 (English and Italian interface) approved 2026-10-25
-next_action: Send a separate implement command, for example implement P-20261024-disassembly v3 --phase player
+state: implementing
+current_task: D8
+last_evidence: Phase player (D4-D8) implemented - npm run check 221 tests passed, npm run build passed; both themes and both languages seen in the browser preview; the desktop app starts
+next_action: Owner witnesses the desktop flow of D8 (library, disassembly, restart, resume, language switch); then implement P-20261024-disassembly v3 --phase generation
 approval: approved
 ---
 
@@ -566,3 +566,72 @@ Decisions taken within the approved scope:
 - **Conversion.** The lab files were converted once by a scratch script. Its output was checked by the tests above. The script was not committed.
 
 Owner requirement raised during this phase (2026-10-25), and addressed by v3: the app must be **multilingual, English and Italian**. Disassembly content already carries its own `language`, and this phase keeps interface text out of `src/core`. The plan, however, says the player is "all in Italian" (Scope, D5–D8). Making the interface bilingual is a material change: it needs a plan v3 and a new approval before the `player` phase starts.
+
+### Phase player (D4–D8)
+
+Received command: `implement P-20261024-disassembly v3 --phase player`, on 2026-10-25. The plan ID, version and approval digest matched the v3 approval record.
+
+| Task | Status | Evidence |
+|---|---|---|
+| D4 | Done | `styles.css` tokens, `src/renderer/i18n/`, `preferences.tsx`, codes on host messages; `tests/theme.test.ts`, `tests/i18n.test.tsx` (automated test); browser preview in paper, blueprint, Italian and English (witnessed by the agent, not the owner) |
+| D5 | Done | `src/renderer/disassembly/` (Sheet, PartCard, SourcePane, DisassemblyPlayer); `tests/disassembly-player.test.tsx` |
+| D6 | Done | `RunPanel.tsx` and pure transitions in `src/core/disassembly-state.ts`; `tests/disassembly-player.test.tsx` |
+| D7 | Done | `Reassemble.tsx`, `BillOfMaterials.tsx`; `tests/disassembly-player.test.tsx` |
+| D8 | Done except the witnessed desktop flow | `src/desktop/disassembly-store.ts`, IPC `disassemblies:list` and `disassemblies:find`, library sections, English Atlas and Mill; `tests/disassembly-store.test.ts`. The desktop flow is **not yet witnessed**: the app starts without errors, but the agent cannot see or drive its window |
+
+Checks:
+- `npm run check`: passed, 16 files, 221 tests.
+- `npm run build`: passed. New warning: the renderer bundle is 592 kB, above Vite's 500 kB hint, because the four prepared disassemblies, with their sources, are bundled. The lucide-react warning was already there.
+- `npm start`: the desktop app started, loaded the prepared disassemblies in the main process, and printed no error.
+- Static scan of the new and changed files: no names, code or text from the private cases.
+
+Acceptance, by task:
+- **D4.**
+  - Every text/background pair, including joint labels in their kind's color, reaches WCAG AA in both themes. The test reads the tokens from the stylesheet itself. The lowest ratios are 4.54 on paper and 5.25 on blueprint.
+  - Settings files with or without `theme` and `language` load.
+  - The two catalogs have the same keys and no empty text.
+  - Library, Studio and the lesson player read as English or Italian by `detectLanguage` when rendered in that interface language.
+  - Switching language and theme from the header saves them together with the existing settings.
+  - Every failure code, failure reason, import error and account notice has wording in both catalogs. The type checker enforces this, because the interface indexes the catalogs by those codes.
+- **D5.**
+  - Selecting a part shows its marked points and highlights its first citation, scrolling only the source pane.
+  - A citation button moves the highlight.
+  - A closed sub-assembly is hatched, says so, and opens; breadcrumbs lead back.
+  - Plates open from the keyboard, and the card shows no stray text when lens, metaphor or critique are absent.
+  - An Italian disassembly under an English interface keeps English controls and `lang="it"` content, and the reverse holds with the story fixture.
+- **D6.**
+  - The full Atlas scenario runs. Each predicted step asks before executing, then shows states, instruments and the explanation.
+  - Every brick of the Mill load test gives its verdict, with the inference label only where the fixture marks one.
+  - The new case is labelled as constructed.
+  - A half-finished scenario resumes after closing the player.
+  - The verdicts are worded in English too.
+- **D7.**
+  - The tray never starts in solution order (all public fixtures), and no item number is drawn.
+  - A wrong placement names the part and its hint; a full reassembly locks all six Atlas slots.
+  - The bill-of-materials view of every public fixture shows the app's check with 0 forgotten lines, and lists scope and file-level exclusions.
+- **D8.**
+  - The store tests mirror the lesson store: validate, save, list newest first, find, refuse prepared or invalid input, skip and keep unreadable or misplaced files.
+  - The prepared disassemblies are listed in the interface language first, and the other language is one checkbox away.
+  - Saved lessons are listed under "Percorsi precedenti" and open in the lesson player. The existing lesson tests pass against that section.
+  - The English Atlas and Mill pass D1 and D2: validation, 0 forgotten lines, and no layout findings.
+  - **Still open: the witnessed desktop flow** of library → disassembly → restart → resume, in each interface language, including a language switch with progress intact.
+
+Decisions taken within the approved scope:
+- **Prepared lessons leave the library**, as the plan's assumption says. `App` shows lessons only from the store, or from its `prepared` prop, which the tests use to keep exercising the lesson player.
+- **Settings have one owner in the renderer**: a preferences provider that Studio and the header share. This way a theme switch cannot be overwritten by Studio's older copy of the settings.
+- **Codes on host messages.** Messages from the host now carry codes. The Italian `message` stays for logs and older tests:
+  - provider failures carry a `reason` code;
+  - account notices carry a `noticeCode`;
+  - import errors carry a `code` and `params`;
+  - local format checks carry `reason` and `sample`.
+
+  Lesson restore notices also carry a code. The lesson player's own controls follow the interface language; lesson content is shown unchanged, without a `lang` attribute, because a lesson does not record its language.
+- **Run and reassembly logic** lives in `src/core/disassembly-state.ts` as pure transitions. The components only draw what those transitions return.
+- **Sheets keep a minimum scale of 0.7.** A wide drawing scrolls sideways inside its own frame instead of shrinking below readable lettering.
+- **English fixtures** were written by a helper agent from the Italian files and checked by the agent: identical sources and structure, and English questions.
+
+Owner steps for the open D8 check (`npm start`):
+1. Open a disassembly, select a part, run two scenario steps, and write a note.
+2. Quit the app and start it again: "Riprendi" leads back to the same state.
+3. Switch the language in the header: the interface changes, while progress and content stay.
+4. Repeat steps 1–3 with the other language and with the blueprint theme.
