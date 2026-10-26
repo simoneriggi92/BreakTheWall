@@ -32,7 +32,9 @@ export const sceneStateSchema = z.enum(['ok', 'active', 'failed', 'restored']);
 export const verdictSchema = z.enum(['falls', 'weakens', 'holds']);
 
 /** Text lengths the automatic layout depends on. */
-export const DISASSEMBLY_LIMITS = { partName: 48, jointLabel: 24, point: 130, minParts: 3, maxParts: 7, minPoints: 2, maxPoints: 4 } as const;
+export const DISASSEMBLY_LIMITS = { partName: 48, jointLabel: 24, point: 130, minParts: 3, maxParts: 7, minPoints: 2, maxPoints: 4, minLinesToSplit: 6 } as const;
+/** Why a line of a part stays out of its sub-parts. Secrets and generated text are whole-source decisions, not a part's. */
+export const partExclusionReasonSchema = z.enum(['context', 'outside-question', 'repetition', 'detail']);
 
 const cite = z.strictObject({ source: id, from: line, to: line });
 const cites = z.array(cite).max(20);
@@ -47,10 +49,18 @@ const partBase = z.strictObject({
   critique: text.optional(),
   cites,
 });
-// Depth is at most three levels, so the schema nests explicitly instead of recursing.
-const leafPart = partBase;
-const midPart = partBase.extend({ parts: z.array(leafPart).max(12).optional(), joints: z.array(jointSchema).max(20).optional() });
-const topPart = partBase.extend({ parts: z.array(midPart).max(12).optional(), joints: z.array(jointSchema).max(20).optional() });
+const partExclusion = z.strictObject({ source: id, from: line, to: line, reason: partExclusionReasonSchema, note: text.optional() });
+/**
+ * Parts nest without a fixed depth: the source stops the descent. A part splits only when it has enough lines of its
+ * own, and every level accounts for its parent's lines (see checkDisassembly).
+ */
+const partSchema: z.ZodType<Part> = z.strictObject({
+  ...partBase.shape,
+  get parts() { return z.array(partSchema).max(12).optional(); },
+  joints: z.array(jointSchema).max(20).optional(),
+  /** Lines of this part that none of its sub-parts takes apart, each with a reason. */
+  excluded: z.array(partExclusion).max(200).optional(),
+});
 
 export const disassemblySourceSchema = sourceSchema.extend({
   origin: z.enum([...sourceOriginSchema.options, 'public-domain']),
@@ -89,7 +99,7 @@ export const disassemblySchema = z.strictObject({
   scope: scopeSchema.optional(),
   sources: z.array(disassemblySourceSchema).min(1).max(64),
   whole: z.strictObject({ name: short, does: text, why: text, cites }),
-  parts: z.array(topPart).min(1).max(12),
+  parts: z.array(partSchema).min(1).max(12),
   joints: z.array(jointSchema).max(20),
   bom: z.strictObject({
     excluded: z.array(z.strictObject({ source: id, from: line, to: line, reason: exclusionReasonSchema, note: text.optional() })).max(1000),
@@ -97,6 +107,10 @@ export const disassemblySchema = z.strictObject({
     excludedFiles: z.array(z.strictObject({ path: short, reason: exclusionReasonSchema, note: text.optional() })).max(2000).optional(),
   }),
   runs: z.array(runSchema).min(1).max(10),
+  /** Parts taken apart after generation, with the route that did it: the origin of every level stays visible. */
+  expansions: z.array(z.strictObject({
+    part: id, provider: z.enum(['chatgpt', 'local']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime(),
+  })).max(500).optional(),
   reassemble: z.strictObject({
     title: short, instruction: text,
     /** A slot accepts one part, or any of a set of interchangeable parts. */
@@ -109,7 +123,8 @@ export type DisassemblySource = z.infer<typeof disassemblySourceSchema>;
 export type Cite = z.infer<typeof cite>;
 export type Joint = z.infer<typeof jointSchema>;
 export type Run = z.infer<typeof runSchema>;
-export type Part = z.infer<typeof partBase> & { parts?: Part[]; joints?: Joint[] };
+export type PartExclusion = z.infer<typeof partExclusion>;
+export type Part = z.infer<typeof partBase> & { parts?: Part[]; joints?: Joint[]; excluded?: PartExclusion[] };
 
 /** A finding names the exact place to fix, e.g. `parts[2].parts[0].cites[1]`. */
 export type Finding = { path: string; message: string };
@@ -137,6 +152,34 @@ export function pagesOf(source: DisassemblySource, c: Pick<Cite, 'from' | 'to'>)
   if (!source.pages) return undefined;
   const at = (n: number) => source.pages!.reduce((page, x) => x.from <= n ? x.page : page, source.pages![0].page);
   return { first: at(c.from), last: at(c.to) };
+}
+
+/** The non-blank lines a list of citations covers, as `source:line` keys. */
+export function linesOf(d: Pick<Disassembly, 'sources'>, cites: { source: string; from: number; to: number }[] = []): Set<string> {
+  const out = new Set<string>();
+  for (const c of cites) {
+    const text = d.sources.find(s => s.id === c.source)?.text.split('\n') ?? [];
+    for (let n = Math.max(1, c.from); n <= Math.min(c.to, text.length); n++) if (text[n - 1].trim()) out.add(`${c.source}:${n}`);
+  }
+  return out;
+}
+/** A part can be taken apart only when it cites enough lines of its own; fewer would split single lines. */
+export function divisible(d: Pick<Disassembly, 'sources'>, part: Pick<Part, 'cites'>): boolean {
+  return linesOf(d, part.cites).size >= DISASSEMBLY_LIMITS.minLinesToSplit;
+}
+/** Groups `source:line` keys into ranges per source; a range runs across blank lines, as forgotten ranges do. */
+export function lineRanges(d: Pick<Disassembly, 'sources'>, keys: Iterable<string>): { source: string; from: number; to: number }[] {
+  const bySource = new Map<string, number[]>();
+  for (const key of keys) { const at = key.lastIndexOf(':'); const list = bySource.get(key.slice(0, at)) ?? []; list.push(Number(key.slice(at + 1))); bySource.set(key.slice(0, at), list); }
+  return [...bySource].flatMap(([source, numbers]) => {
+    const text = d.sources.find(s => s.id === source)?.text.split('\n') ?? [];
+    const out: { source: string; from: number; to: number }[] = [];
+    for (const n of numbers.sort((a, b) => a - b)) {
+      const last = out.at(-1);
+      if (last && text.slice(last.to, n - 1).every(x => !x.trim())) last.to = n; else out.push({ source, from: n, to: n });
+    }
+    return out;
+  });
 }
 
 export type LineStatus = 'blank' | 'assigned' | 'excluded' | 'missing';
@@ -237,8 +280,24 @@ export function checkDisassembly(d: Disassembly): Finding[] {
       if (part.points) add(`${path}.points`, 'Only top-level parts have points');
     }
     part.points?.forEach((x, i) => { if (x.text.length > L.point) add(`${path}.points[${i}]`, `Point has ${x.text.length} characters; at most ${L.point}`); });
-    if (part.parts) checkLevel(part.parts, part.joints ?? [], `${path}.parts`, `${path}.joints`);
-    else if (part.joints?.length) add(`${path}.joints`, 'Joints need sub-parts to connect');
+    const own = linesOf(d, part.cites);
+    part.excluded?.forEach((x, i) => {
+      checkCite(x, `${path}.excluded[${i}]`);
+      if ([...linesOf(d, [x])].some(k => !own.has(k))) add(`${path}.excluded[${i}]`, `An exclusion of ${part.id} must stay inside the lines ${part.id} cites`);
+    });
+    if (part.parts) {
+      checkLevel(part.parts, part.joints ?? [], `${path}.parts`, `${path}.joints`);
+      if (own.size < L.minLinesToSplit) add(`${path}.parts`, `${part.id} cites ${own.size} non-blank lines; taking a part apart needs at least ${L.minLinesToSplit}`);
+      // Each level accounts for its parent's lines, as the whole accounts for the source's.
+      const covered = new Set([...part.parts.flatMap(x => [...linesOf(d, x.cites)]), ...(part.joints ?? []).flatMap(j => [...linesOf(d, j.cites)]), ...linesOf(d, part.excluded)]);
+      const title = (source: string) => d.sources.find(x => x.id === source)?.title ?? source;
+      lineRanges(d, [...own].filter(k => !covered.has(k))).forEach(x => add(path, `Lines ${x.from}–${x.to} of ${title(x.source)} are cited by ${part.id} but by none of its sub-parts, and not excluded`));
+      // A sub-part with all its parent's lines would let the descent go on forever.
+      part.parts.forEach((x, i) => { const lines = linesOf(d, x.cites); if (own.size && [...own].every(k => lines.has(k))) add(`${path}.parts[${i}].cites`, `${x.id} cites every line of ${part.id}; a sub-part takes only some of them`); });
+    } else {
+      if (part.joints?.length) add(`${path}.joints`, 'Joints need sub-parts to connect');
+      if (part.excluded?.length) add(`${path}.excluded`, 'Exclusions need sub-parts');
+    }
   }
 
   duplicates(d.runs.map((r, i) => ({ id: r.id, path: `runs[${i}]` })), 'run');
@@ -268,6 +327,12 @@ export function checkDisassembly(d: Disassembly): Finding[] {
       });
     }
     if (run.type === 'case') { oneCorrect(run.options, `${at}.options`); checkCites(run.cites, at); }
+  });
+
+  const parents = new Map(parts.map(x => [x.part.id, x.part]));
+  d.expansions?.forEach((x, i) => {
+    if (!parents.get(x.part)?.parts) add(`expansions[${i}]`, `${x.part} is not a part with sub-parts`);
+    if (d.kind !== 'generated') add(`expansions[${i}]`, 'Only generated disassemblies are taken apart after generation');
   });
 
   const re = d.reassemble;
@@ -315,4 +380,37 @@ export async function validateDisassembly(input: unknown): Promise<Disassembly> 
   findings.push(...checkDisassembly(d));
   if (findings.length) throw new DisassemblyError(findings);
   return d;
+}
+
+/** Sorted-key JSON, so two disassemblies compare by content, not by key order. */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
+/**
+ * Whether `next` is `previous` with one part taken apart: the same disassembly, except that one part without
+ * sub-parts gains sub-parts, their joints, its own exclusions, and an expansion entry. Nothing a learner may hold
+ * a reference to changes, so progress can move to the new revision.
+ */
+export function isExpansionOf(next: Disassembly, previous: Disassembly): string | undefined {
+  if (next.id !== previous.id || next.revision === previous.revision) return undefined;
+  const added = (next.expansions ?? []).slice((previous.expansions ?? []).length);
+  if (added.length !== 1 || canonical(next.expansions?.slice(0, previous.expansions?.length ?? 0) ?? []) !== canonical(previous.expansions ?? [])) return undefined;
+  const id = added[0].part;
+  const before = allParts(previous).find(x => x.part.id === id)?.part;
+  if (!before || before.parts) return undefined;
+  const strip = (d: Disassembly) => {
+    const copy = structuredClone(d) as Partial<Disassembly>;
+    delete copy.revision; delete copy.expansions;
+    const part = allParts(copy as Disassembly).find(x => x.part.id === id)?.part;
+    if (part) { delete part.parts; delete part.joints; delete part.excluded; }
+    return canonical(copy);
+  };
+  return strip(next) === strip(previous) ? id : undefined;
+}
+/** `v1` → `v2`; any other revision gains a counter. */
+export function nextRevision(revision: string): string {
+  const match = /^(.*?)(\d+)$/.exec(revision);
+  return match ? `${match[1]}${Number(match[2]) + 1}` : `${revision}-2`;
 }

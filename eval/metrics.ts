@@ -1,44 +1,54 @@
-import type { Lesson } from '../src/core/lesson';
+import { allParts, billOfMaterials, JOINT_FAMILY, type Disassembly } from '../src/core/disassembly';
+import { answerLengthRatio, optionSets } from '../src/core/disassembly-generation';
+import { detectLanguage } from '../src/core/generation';
+import { layoutDisassembly, layoutFindings } from '../src/core/layout';
+import type { GenerationStats, PhaseStats } from '../src/core/provider';
 
-/** Structure measured from an assembled lesson. None of these numbers says whether an explanation is true. */
-export interface LessonMetrics {
-  pages: number;
-  blocks: Record<string, number>;
-  activities: { choice: number; order: number };
-  evidence: number;
-  /** Share of source lines inside at least one citation: how much of the material the lesson actually uses. */
-  coverage: number;
-  /** For each choice, the correct option's length divided by the mean wrong option's length. Large values give the answer away. */
+/** Structure measured from a valid disassembly. None of these numbers says whether an explanation is true. */
+export interface DisassemblyMetrics {
+  /** Parts on each drawn level: the top level first, then each sub-assembly. */
+  partsPerLevel: number[];
+  depth: number;
+  families: string[];
+  forgottenLines: number;
+  layoutFindings: number;
+  /** The language the app reads in names and points; null when it cannot tell. */
+  writtenLanguage: 'it' | 'en' | null;
+  runs: Record<string, number>;
+  inferences: number;
+  /** For each option set, the correct option's length over the mean wrong option's length. Large values give the answer away. */
   answerLengthRatios: number[];
 }
 
-export function lessonMetrics(lesson: Lesson): LessonMetrics {
-  const blocks: Record<string, number> = {};
-  for (const block of lesson.pages.flatMap(p => p.blocks)) blocks[block.type] = (blocks[block.type] ?? 0) + 1;
-  const total = lesson.sources.reduce((sum, s) => sum + s.text.split('\n').length, 0);
-  const covered = lesson.sources.reduce((sum, s) => {
-    const lines = new Set<number>();
-    for (const e of lesson.evidence.filter(x => x.sourceId === s.id)) for (let l = e.startLine; l <= e.endLine; l++) lines.add(l);
-    return sum + lines.size;
-  }, 0);
-  const answerLengthRatios = lesson.activities.flatMap(a => {
-    if (a.type !== 'choice') return [];
-    const correct = a.options.find(o => o.id === a.correctId)!.label.length;
-    const wrong = a.options.filter(o => o.id !== a.correctId).map(o => o.label.length);
-    return [Math.round(correct / (wrong.reduce((x, y) => x + y, 0) / wrong.length) * 100) / 100];
-  });
+export function disassemblyMetrics(d: Disassembly): DisassemblyMetrics {
+  const parts = allParts(d);
+  const joints = [...d.joints, ...parts.flatMap(x => x.part.joints ?? [])];
+  const runs: Record<string, number> = {};
+  for (const run of d.runs) runs[run.type] = (runs[run.type] ?? 0) + 1;
+  const inferences = d.runs.reduce((sum, r) => sum + (r.inference ? 1 : 0) + (r.type === 'load' ? r.bricks.filter(b => b.inference).length : 0), 0);
   return {
-    pages: lesson.pages.length, blocks,
-    activities: { choice: lesson.activities.filter(a => a.type === 'choice').length, order: lesson.activities.filter(a => a.type === 'order').length },
-    evidence: lesson.evidence.length, coverage: Math.round(covered / total * 100) / 100, answerLengthRatios,
+    partsPerLevel: [d.parts.length, ...parts.filter(x => x.part.parts).map(x => x.part.parts!.length)],
+    depth: Math.max(...parts.map(x => x.depth)) + 1,
+    families: [...new Set(joints.map(j => JOINT_FAMILY[j.type]))].sort(),
+    forgottenLines: billOfMaterials(d).counts.missing,
+    layoutFindings: [...layoutDisassembly(d).values()].reduce((sum, level) => sum + layoutFindings(level).length, 0),
+    writtenLanguage: detectLanguage([...parts.map(x => x.part.name), ...d.parts.flatMap(p => p.points?.map(x => x.text) ?? [])].join(' ')) ?? null,
+    runs, inferences,
+    answerLengthRatios: optionSets(d.runs).flatMap(set => answerLengthRatio(set.options) ?? []),
   };
 }
 
-/** One attempt, as written to the JSON-lines report. */
+/** One attempt, as written to the JSON-lines report. Setups are named A, B, C so the review stays blind to models. */
 export interface AttemptRecord {
-  run: string; case: string; private: boolean; route: 'chatgpt' | 'local'; runtime?: string; model: string; attempt: number;
-  ok: boolean; failure?: string; issues?: string[]; repaired: boolean; seconds: number; outputChars: number;
-  metrics?: LessonMetrics; lessonFile?: string;
+  run: string; case: string; private: boolean; setup: string; attempt: number;
+  language: 'it' | 'en'; ok: boolean; failure?: string; issues?: string[]; seconds: number;
+  stats?: GenerationStats; metrics?: DisassemblyMetrics; file?: string;
+}
+
+/** One part taken apart on demand (D14), as written to `expansions.jsonl`. */
+export interface ExpansionRecord {
+  run: string; case: string; setup: string; part: string; ok: boolean; failure?: string; issues?: string[]; seconds: number;
+  stats?: PhaseStats; metrics?: DisassemblyMetrics; file?: string;
 }
 
 const median = (values: number[]) => {
@@ -47,21 +57,32 @@ const median = (values: number[]) => {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 };
+const total = (stats: GenerationStats | undefined, key: 'requests' | 'repairs' | 'sentChars' | 'receivedChars') => stats ? stats.structure[key] + stats.content[key] + stats.runs[key] : 0;
 
-export interface CaseSummary { case: string; attempts: number; valid: number; repaired: number; medianSeconds?: number; slowestSeconds?: number; medianCoverage?: number; maxAnswerLengthRatio?: number; failures: string[] }
+export interface CaseSummary {
+  case: string; setup: string; attempts: number; valid: number;
+  repairs: { structure: number; content: number; runs: number };
+  medianSeconds?: number; medianRequests?: number; medianSentChars?: number; medianReceivedChars?: number;
+  /** Must be 0 on every valid attempt: anything else is a defect in the checks, not in the model. */
+  maxForgottenLines?: number; maxLayoutFindings?: number;
+  languageMismatches: number; maxAnswerLengthRatio?: number; failures: string[];
+}
 export function summarize(records: AttemptRecord[]): CaseSummary[] {
-  const cases = [...new Set(records.map(r => r.case))];
-  return cases.map(id => {
-    const own = records.filter(r => r.case === id);
+  const keys = [...new Set(records.map(r => `${r.case}\u0000${r.setup}`))];
+  return keys.map(key => {
+    const [id, setup] = key.split('\u0000');
+    const own = records.filter(r => r.case === id && r.setup === setup);
     const valid = own.filter(r => r.ok);
     const ratios = valid.flatMap(r => r.metrics?.answerLengthRatios ?? []);
-    const coverage = median(valid.map(r => Math.round((r.metrics?.coverage ?? 0) * 100)));
+    const max = (values: number[]) => values.length ? Math.max(...values) : undefined;
     return {
-      case: id, attempts: own.length, valid: valid.length, repaired: own.filter(r => r.repaired).length,
-      medianSeconds: median(own.map(r => r.seconds)), slowestSeconds: own.length ? Math.max(...own.map(r => r.seconds)) : undefined,
-      medianCoverage: coverage === undefined ? undefined : coverage / 100,
-      maxAnswerLengthRatio: ratios.length ? Math.max(...ratios) : undefined,
-      failures: own.filter(r => !r.ok).map(r => r.failure ?? 'unknown'),
+      case: id, setup, attempts: own.length, valid: valid.length,
+      repairs: { structure: own.reduce((s, r) => s + (r.stats?.structure.repairs ?? 0), 0), content: own.reduce((s, r) => s + (r.stats?.content.repairs ?? 0), 0), runs: own.reduce((s, r) => s + (r.stats?.runs.repairs ?? 0), 0) },
+      medianSeconds: median(own.map(r => r.seconds)), medianRequests: median(own.map(r => total(r.stats, 'requests'))),
+      medianSentChars: median(own.map(r => total(r.stats, 'sentChars'))), medianReceivedChars: median(own.map(r => total(r.stats, 'receivedChars'))),
+      maxForgottenLines: max(valid.map(r => r.metrics!.forgottenLines)), maxLayoutFindings: max(valid.map(r => r.metrics!.layoutFindings)),
+      languageMismatches: valid.filter(r => r.metrics!.writtenLanguage && r.metrics!.writtenLanguage !== r.language).length,
+      maxAnswerLengthRatio: max(ratios), failures: own.filter(r => !r.ok).map(r => r.failure ?? 'unknown'),
     };
   });
 }

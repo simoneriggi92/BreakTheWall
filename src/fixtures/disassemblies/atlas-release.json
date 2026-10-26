@@ -165,7 +165,37 @@
           "icon": "shield-check"
         }
       ],
-      "joints": []
+      "joints": [],
+      "excluded": [
+        {
+          "source": "runbook",
+          "from": 28,
+          "to": 28,
+          "reason": "repetition",
+          "note": "Riga di tabella che riassume la sezione: la ripete."
+        },
+        {
+          "source": "runbook",
+          "from": 60,
+          "to": 62,
+          "reason": "context",
+          "note": "Titolo o frase introduttiva della sezione."
+        },
+        {
+          "source": "runbook",
+          "from": 72,
+          "to": 72,
+          "reason": "context",
+          "note": "Riguarda il pezzo nel suo insieme, non uno dei suoi sottopezzi."
+        },
+        {
+          "source": "runbook",
+          "from": 167,
+          "to": 167,
+          "reason": "repetition",
+          "note": "Riga di tabella che riassume la sezione: la ripete."
+        }
+      ]
     },
     {
       "id": "image",
@@ -279,6 +309,29 @@
           "to": "image-record",
           "type": "sends-to",
           "label": "digest"
+        }
+      ],
+      "excluded": [
+        {
+          "source": "runbook",
+          "from": 29,
+          "to": 29,
+          "reason": "repetition",
+          "note": "Riga di tabella che riassume la sezione: la ripete."
+        },
+        {
+          "source": "runbook",
+          "from": 74,
+          "to": 74,
+          "reason": "context",
+          "note": "Titolo o frase introduttiva della sezione."
+        },
+        {
+          "source": "runbook",
+          "from": 168,
+          "to": 168,
+          "reason": "repetition",
+          "note": "Riga di tabella che riassume la sezione: la ripete."
         }
       ]
     },
@@ -482,6 +535,15 @@
           "to": "rb-claim",
           "type": "limits",
           "label": "non basta per i dati"
+        }
+      ],
+      "excluded": [
+        {
+          "source": "runbook",
+          "from": 130,
+          "to": 130,
+          "reason": "context",
+          "note": "Titolo o frase introduttiva della sezione."
         }
       ]
     }

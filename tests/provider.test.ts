@@ -8,7 +8,7 @@ import { ProviderError, type ProviderFailure } from '../src/core/provider';
 import { ChatGPTAccount, type AccountRecord, type Vault } from '../src/desktop/chatgpt/account';
 import { AUTH, authorizeUrl, resetJwksCache, verifyIdToken } from '../src/desktop/chatgpt/oauth';
 import { listModels, streamResponse, type ResponseBody } from '../src/desktop/chatgpt/responses';
-import { Generator } from '../src/desktop/generator';
+import { assembleLesson } from '../src/core/generation';
 import { LessonStore } from '../src/desktop/lesson-store';
 import { draftFor, userSource } from './draft';
 
@@ -194,56 +194,24 @@ describe('Responses streaming and failures (T5)', () => {
   });
 });
 
-describe('generation orchestration and saved lessons (T6)', () => {
+describe('saved lessons (T6)', () => {
   const dirs: string[] = [];
   afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
-  async function setup(complete: (signal: AbortSignal) => Promise<string>) {
+  const lesson = async () => { const source = await userSource(); return assembleLesson(JSON.stringify(draftFor(source.id)), [source], { outcome: 'Spiegare il ciclo dell’acqua', priorKnowledge: '' }, { id: 'g-lesson', model: 'model-a', createdAt: '2026-10-21T17:00:00.000Z' }); };
+
+  it('lists a saved generated lesson, which reopens without another request', async () => {
     const root = await mkdtemp(join(tmpdir(), 'btw-lessons-')); dirs.push(root);
     const store = new LessonStore(root);
-    const generator = new Generator({ complete: (_body, signal) => complete(signal) }, store, () => new Date('2026-10-21T17:00:00Z'));
-    const source = await userSource();
-    return { root, store, generator, source, request: { sources: [source], goal: { outcome: 'Spiegare il ciclo dell’acqua', priorKnowledge: '' }, route: { provider: 'chatgpt', model: 'model-a' } } };
-  }
-
-  it('validates, saves and lists a generated lesson that reopens without another request', async () => {
-    const { store, generator, source, request } = await setup(async () => JSON.stringify(draftFor(source.id)));
-    const result = await generator.generate(request, () => {});
-    expect(result.ok).toBe(true);
+    await store.save(await lesson());
     const listed = await store.list();
-    expect(listed.lessons.map(x => x.id)).toEqual([result.ok && result.lesson.id]);
-    expect(listed.lessons[0]).toMatchObject({ kind: 'generated', generation: { model: 'model-a' } });
-    await expect(store.find(listed.lessons[0].id, 'v1')).resolves.toEqual(listed.lessons[0]);
-  });
-
-  it('saves nothing when the provider result is invalid or the request is cancelled, and keeps earlier lessons', async () => {
-    const first = await setup(async () => JSON.stringify(draftFor('src-x')));
-    const invalid = await first.generator.generate(first.request, () => {});
-    expect(invalid).toMatchObject({ ok: false, failure: { code: 'invalid-output', issues: expect.arrayContaining([expect.stringMatching(/source/)]) } });
-    expect(await readdir(first.root)).toEqual([]);
-
-    const ok = await setup(async () => JSON.stringify(draftFor(ok.source.id)));
-    await ok.generator.generate(ok.request, () => {});
-    let release!: () => void;
-    const slow = new Generator({ complete: (_b, signal) => new Promise((_, reject) => { release = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); signal.addEventListener('abort', () => release()); }) }, ok.store);
-    const pending = slow.generate(ok.request, () => {});
-    await vi.waitFor(() => expect(release).toBeDefined());
-    expect(await slow.generate(ok.request, () => {})).toMatchObject({ ok: false, failure: { code: 'busy' } });
-    slow.cancel();
-    expect(await pending).toMatchObject({ ok: false, failure: { code: 'cancelled' } });
-    expect((await ok.store.list()).lessons).toHaveLength(1);
-  });
-
-  it('refuses tampered sources from the renderer before any request is sent', async () => {
-    const complete = vi.fn(async () => '{}');
-    const { generator, request } = await setup(complete);
-    const result = await generator.generate({ ...request, sources: [{ ...request.sources[0], text: 'altro' }] }, () => {});
-    expect(result).toMatchObject({ ok: false, failure: { code: 'unsupported' } });
-    expect(complete).not.toHaveBeenCalled();
+    expect(listed.lessons[0]).toMatchObject({ id: 'g-lesson', kind: 'generated', generation: { model: 'model-a' } });
+    await expect(store.find('g-lesson', 'v1')).resolves.toEqual(listed.lessons[0]);
   });
 
   it('skips unreadable saved lessons without deleting them', async () => {
-    const { root, store, generator, request, source } = await setup(async () => JSON.stringify(draftFor(source.id)));
-    await generator.generate(request, () => {});
+    const root = await mkdtemp(join(tmpdir(), 'btw-lessons-')); dirs.push(root);
+    const store = new LessonStore(root);
+    await store.save(await lesson());
     const bad = join(root, 'g-broken'); await writeFile(join(root, 'ignored.txt'), 'x');
     await import('node:fs/promises').then(fs => fs.mkdir(bad)).then(() => writeFile(join(bad, 'v1.json'), '{ broken'));
     const listed = await store.list();

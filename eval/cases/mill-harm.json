@@ -1,0 +1,15 @@
+{
+  "id": "mill-harm",
+  "title": "Il principio del danno di Mill (argomento, testo inglese di pubblico dominio)",
+  "goal": {
+    "outcome": "Secondo Mill, quando la società può legittimamente costringere un individuo?",
+    "priorKnowledge": ""
+  },
+  "language": "it",
+  "sources": [
+    {
+      "path": "sources/mill-on-liberty.md",
+      "title": "On Liberty, cap. I (estratto)"
+    }
+  ]
+}

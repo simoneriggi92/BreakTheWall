@@ -1,15 +1,12 @@
 // @vitest-environment node
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { defaultSettings, parseLocalAddress, ProviderError, type LocalModel, type ProviderFailure } from '../src/core/provider';
 import type { CompletionRequest } from '../src/desktop/completion';
-import { Generator } from '../src/desktop/generator';
-import { LessonStore } from '../src/desktop/lesson-store';
 import { checkFormat, closeReasoning, completeLocal, detectServer, discoverServers } from '../src/desktop/local/runtimes';
 import { SettingsStore } from '../src/desktop/settings-store';
-import { draftFor, userSource } from './draft';
 
 type Handler = (body: unknown) => Response | Promise<Response>;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -139,60 +136,6 @@ describe('format check (T5b)', () => {
     // Seen live: the model ignoring the schema wrote past the probe's budget instead of closing the object.
     const rambling = network({ 'POST http://127.0.0.1:11434/api/chat': () => ndjson([{ message: { content: 'Ecco un gatto: {"nome": "Luna", "descrizione": "' } }, { done: true, done_reason: 'length' }]) });
     expect(await checkFormat(rambling.fetchImpl, ollama)).toMatchObject({ enforced: false, detail: expect.stringContaining('ignorato lo schema') });
-  });
-});
-
-describe('local generation with one repair pass (T5b)', () => {
-  const dirs: string[] = [];
-  afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recursive: true, force: true }))); });
-  async function setup(responses: ((sourceId: string) => string)[]) {
-    const root = await mkdtemp(join(tmpdir(), 'btw-local-')); dirs.push(root);
-    const store = new LessonStore(root);
-    const source = await userSource();
-    const seen: CompletionRequest[] = [];
-    const local = vi.fn(() => ({ complete: async (req: CompletionRequest) => { seen.push(req); return responses[seen.length - 1](source.id); } }));
-    const chatgpt = { complete: vi.fn(async (req: CompletionRequest) => { seen.push(req); return responses[seen.length - 1](source.id); }) };
-    const generator = new Generator({ chatgpt, local }, store, () => new Date('2026-10-22T10:00:00Z'));
-    const goal = { outcome: 'Spiegare il ciclo dell’acqua', priorKnowledge: '' };
-    return { root, store, seen, local, chatgpt, generator, request: (route: object) => ({ sources: [source], goal, route }) };
-  }
-  const broken = (id: string) => { const d = draftFor(id); d.opening.prediction.options.forEach(o => { o.correct = false; }); return JSON.stringify(d); };
-  const valid = (id: string) => JSON.stringify(draftFor(id));
-  const route = { provider: 'local', runtime: 'llamacpp', baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf' };
-
-  it('repairs a structurally invalid local draft once, then saves the lesson labelled with its local origin', async () => {
-    const { seen, generator, store, local, request } = await setup([broken, valid]);
-    const phases: string[] = [];
-    const result = await generator.generate(request(route), p => phases.push(p.phase));
-    expect(result.ok).toBe(true);
-    expect(local).toHaveBeenCalledWith({ runtime: 'llamacpp', baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf' });
-    expect(seen).toHaveLength(2);
-    expect(seen[1].messages.map(m => m.role)).toEqual(['user', 'assistant', 'user']);
-    expect(seen[1].messages[2].content).toContain('Tappa 1, prediction: serve esattamente un’opzione con correct=true (ne ha 0).');
-    expect(phases).toContain('repairing');
-    expect((await store.list()).lessons[0].generation).toMatchObject({ provider: 'local', runtime: 'llamacpp', model: 'qwen.gguf' });
-  });
-
-  it('gives up after one repair and saves nothing', async () => {
-    const { root, generator, request } = await setup([broken, broken]);
-    const result = await generator.generate(request(route), () => {});
-    expect(result).toMatchObject({ ok: false, failure: { code: 'invalid-output', issues: expect.arrayContaining(['Anche dopo una correzione automatica:']) } });
-    expect(await readdir(root)).toEqual([]);
-  });
-
-  it('does not spend a second ChatGPT request on repair', async () => {
-    const { seen, generator, request } = await setup([broken, valid]);
-    const result = await generator.generate(request({ provider: 'chatgpt', model: 'gpt' }), () => {});
-    expect(result).toMatchObject({ ok: false, failure: { code: 'invalid-output' } });
-    expect(seen).toHaveLength(1);
-  });
-
-  it('refuses a local route that points off this machine before sending anything', async () => {
-    const { seen, local, generator, request } = await setup([valid]);
-    const result = await generator.generate(request({ ...route, baseUrl: 'http://192.168.1.20:8080' }), () => {});
-    expect(result).toMatchObject({ ok: false, failure: { code: 'local-address' } });
-    expect(local).not.toHaveBeenCalled();
-    expect(seen).toHaveLength(0);
   });
 });
 

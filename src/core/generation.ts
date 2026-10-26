@@ -91,9 +91,13 @@ function strictSubset(node: unknown): unknown {
   }
   return out;
 }
+/** Any draft schema as structured outputs accept it. */
+export function strictJsonSchema(schema: z.ZodType): Record<string, unknown> {
+  return strictSubset(z.toJSONSchema(schema, { target: 'draft-7' })) as Record<string, unknown>;
+}
 /** The schema sent with a request. Source ids are a closed list, so a constrained decoder cannot cite a source that does not exist. */
 export function draftJsonSchema(sources: Pick<UserSource, 'id'>[]): Record<string, unknown> {
-  return strictSubset(z.toJSONSchema(draftZod(sources.map(x => x.id) as [string, ...string[]]), { target: 'draft-7' })) as Record<string, unknown>;
+  return strictJsonSchema(draftZod(sources.map(x => x.id) as [string, ...string[]]));
 }
 
 export const GENERATION_INSTRUCTIONS = `Sei il progettista didattico di Break the Wall, un'app che trasforma fonti in percorsi visivi e interattivi.

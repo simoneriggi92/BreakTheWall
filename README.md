@@ -17,7 +17,7 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
 ![Mill's harm principle taken apart in the blueprint theme: the claim in the middle, its grounds below, the consequence above, the objection and the limit at its sides](docs/images/disassembly-mill-blueprint.png)
 
 > [!NOTE]
-> Break the Wall is an alpha that runs from source on macOS. There is no installer or release yet. The prepared disassemblies work without any account. **Generating disassemblies from your own sources is the next phase:** today, Studio still generates the earlier kind of lesson, which the app keeps under "Earlier paths".
+> Break the Wall is an alpha that runs from source on macOS. There is no installer or release yet. The prepared disassemblies work without any account. **Generating disassemblies from your own sources is built and tested, but not yet witnessed live:** the comparison of ChatGPT models and the first real generations are the next step.
 
 ## Table of contents
 
@@ -28,7 +28,7 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
   - [Reassemble](#reassemble)
   - [Bill of materials](#bill-of-materials)
   - [Two themes, two languages](#two-themes-two-languages)
-  - [Earlier paths and generation](#earlier-paths-and-generation)
+  - [Generation](#generation)
   - [Progress and privacy](#progress-and-privacy)
 - [Local models](#local-models)
 - [Getting started](#getting-started)
@@ -61,7 +61,7 @@ It is not a course, a summarizer, a chatbot or a flashcard app. Review is there 
 ### The disassembly
 
 - **Exploded view:** the parts drawn as plates on a technical sheet, with balloons, a title block and an automatic layout. Mechanisms and stories run left to right; arguments stack, with the claim above its grounds and attacks or limits beside it.
-- **Sub-assemblies:** a part can open into its own 3–7 parts, up to three levels. Parts outside your question stay closed and hatched, but you can still open them.
+- **Sub-assemblies, as deep as the source goes:** a part can open into its own 3–7 parts, and so on, level after level. Every level accounts for its parent's lines. A part with at least 6 lines of its own can be taken apart on request ("Take this part apart", one small request); a smaller one says why it stops there. Parts outside your question stay closed and hatched, but you can still open them.
 - **Three kinds of joint:** mechanism (sends to, causes, depends on), argument (supports, attacks, limits) and story (leads to, because). Each kind has a color, a line style and an end mark, so color is never the only cue.
 - **Part card:** a role, 2–4 points marked → (then), = (stays the same) or ⚠ (caution), and an optional lens, metaphor with its limit, and critical note. It also lists the part's joints in words, its citations and your notes.
 - **Source pane:** numbered lines, the cited lines highlighted, page breaks for documents, and a file picker when there are many sources.
@@ -85,16 +85,21 @@ Every source line is in a part, in a joint, or excluded with a reason: context, 
 - **Paper** (light) and **blueprint** (dark), following the system or chosen in the header. Every text color reaches WCAG AA in both themes, checked by a test.
 - **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. When a disassembly exists in both languages, the player offers the other version, and progress stays separate for each version.
 
-### Earlier paths and generation
+### Generation
 
-Lessons created before disassemblies stay readable, with their progress, under "Earlier paths". Studio still generates this kind of lesson from pasted text or `.txt` / `.md` files, through two routes:
+Studio takes apart pasted text or `.txt` / `.md` files around your question, in three phases:
+1. **Structure:** the parts, their joints and the bill of materials. The app checks it line by line before going on.
+2. **Parts:** one request per top-level part, carrying only that part's lines.
+3. **Runs:** scenarios, load tests or cases, and the reassembly hints.
+
+Each phase can be repaired once with the app's findings; nothing is saved unless the whole disassembly passes. You choose the content language (by default, your question's), and you can give the structure and the parts different models, for example a cheaper one for the parts. There are two routes:
 
 | Route | Account | Where your source goes | Status |
 |---|---|---|---|
-| **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Sign-in witnessed; live inference pending |
-| **Local model** | none | a server on `127.0.0.1` on your Mac | Witnessed for code and non-code lessons |
+| **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Sign-in witnessed; lessons generated live by the evaluation runner; disassemblies not yet run live |
+| **Local model** | none | a server on `127.0.0.1` on your Mac | Witnessed for lessons; disassemblies not yet measured |
 
-Generating **disassemblies** from your sources is the next phase of the plan. It works in two passes: a bill of materials first, then one part at a time.
+Lessons created before disassemblies stay readable, with their progress, under "Earlier paths".
 
 ### Progress and privacy
 
@@ -113,7 +118,7 @@ Start a model server, open **Create a path → Generation → Local model**, and
 | Ollama | `127.0.0.1:11434` | `format` | depends on the model: ✅ Qwen3.6, ⚠️ ignored for LFM2.5 (the app warns) |
 | Other OpenAI-compatible server | any loopback port | `response_format` JSON Schema | depends on the server |
 
-Measured on an M4 Pro with 48 GB, using Qwen3.6-35B-A3B (Q4_K_M) through llama.cpp: a lesson takes about 1–2 minutes. Details are in the [local inference trial](docs/workflow/research/R-20261022-local-inference.md).
+Measured on an M4 Pro with 48 GB, using Qwen3.6-35B-A3B (Q4_K_M) through llama.cpp: a lesson took about 1–2 minutes. Disassemblies have not been timed yet. Details are in the [local inference trial](docs/workflow/research/R-20261022-local-inference.md).
 
 ```bash
 llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
@@ -156,13 +161,14 @@ Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your
 
 ## Project status
 
-Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v3). Evidence for each task is in its implementation record.
+Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v5). Evidence for each task is in its implementation record.
 
 | Phase | Tasks | Status |
 |---|---|---|
 | Contract | D1 format and host checks · D2 automatic layout · D3 learner state | ✅ automated tests |
 | Player | D4 themes and languages · D5 exploded view · D6 run · D7 reassembly and bill of materials · D8 library and store | ✅ automated tests; 🟡 D8 desktop flow being witnessed by the owner |
-| Generation | D9 two-phase generation and evaluation · D10 Studio and witnessed generation | ⏳ next |
+| Generation | D9 two-phase generation and model comparison · D10 Studio and witnessed generation | ✅ code and automated tests; ⏳ model comparison, claim review and witnessed generation |
+| Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code and automated tests; ⏳ measured with the model comparison |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 

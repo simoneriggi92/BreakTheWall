@@ -6,6 +6,12 @@ import { idSchema } from '../core/lesson';
 // A repository disassembly carries its files' text, so the bound is larger than for lessons.
 const MAX_BYTES = 4_000_000;
 
+/** The revision with more parts taken apart is the later one; `v10` sorts after `v9`. */
+function laterRevision(a: Disassembly, b: Disassembly): boolean {
+  const deeper = (a.expansions?.length ?? 0) - (b.expansions?.length ?? 0);
+  return deeper ? deeper > 0 : a.revision.localeCompare(b.revision, 'en', { numeric: true }) > 0;
+}
+
 /** Accepted generated disassemblies, one directory per disassembly, as the lesson store does for lessons. */
 export class DisassemblyStore {
   constructor(private root: string) {}
@@ -23,7 +29,10 @@ export class DisassemblyStore {
     await rename(file + '.pending', file);
     return disassembly;
   }
-  /** Unreadable or invalid files are left on disk untouched and counted, never shown. */
+  /**
+   * Unreadable or invalid files are left on disk untouched and counted, never shown. Taking a part apart keeps the
+   * earlier revision on disk; only the latest revision of each disassembly is listed.
+   */
   async list(): Promise<{ disassemblies: Disassembly[]; skipped: number }> {
     let dirs: string[];
     try { dirs = await readdir(this.root); }
@@ -36,7 +45,9 @@ export class DisassemblyStore {
           if (Buffer.byteLength(raw) > MAX_BYTES) throw new Error('oversized');
           const disassembly = await validateDisassembly(JSON.parse(raw));
           if (disassembly.kind !== 'generated' || disassembly.id !== dir || `${disassembly.revision}.json` !== name) throw new Error('misplaced');
-          disassemblies.push(disassembly);
+          const earlier = disassemblies.findIndex(x => x.id === disassembly.id);
+          if (earlier < 0) disassemblies.push(disassembly);
+          else if (laterRevision(disassembly, disassemblies[earlier])) disassemblies[earlier] = disassembly;
         } catch { skipped++; }
       }
     }

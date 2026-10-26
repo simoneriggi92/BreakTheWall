@@ -1,10 +1,11 @@
 {
   "id": "release-runbook",
-  "title": "Rilascio di un client web in staging (runbook operativo, inglese)",
+  "title": "Rilascio di Atlas Reader in staging (runbook operativo originale, inglese)",
   "goal": {
-    "outcome": "Capire come si rilascia una nuova versione del client web in staging e come si torna indietro se qualcosa va storto",
+    "outcome": "Come si rilascia una nuova versione del client web in staging, e come si torna indietro se qualcosa va storto?",
     "priorKnowledge": ""
   },
+  "language": "it",
   "sources": [
     {
       "path": "sources/release-runbook.md",

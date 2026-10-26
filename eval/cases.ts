@@ -1,20 +1,22 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { defaultContentLanguage, type ContentLanguage } from '../src/core/disassembly-generation';
 import { goalSchema, importSource, type LearningGoal, type UserSource } from '../src/core/source';
 
 /**
- * A case is a goal plus sources, stored as JSON next to its source files. Public cases live in the repository and
- * use only original or repository-owned text. Private cases live in the ignored .local/eval/cases and are never
- * written anywhere else.
+ * A case is a question plus sources, stored as JSON next to its source files. Public cases live in the repository and
+ * use only original, public-domain or repository-owned text. Private cases live in the ignored .local/eval/cases and
+ * are never written anywhere else. `language` is the content language; without it, the question's.
  */
 export const caseSchema = z.strictObject({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/),
   title: z.string().min(1).max(120),
   goal: goalSchema,
+  language: z.enum(['it', 'en']).optional(),
   sources: z.array(z.strictObject({ path: z.string().min(1), title: z.string().min(1).max(120), language: z.string().max(30).optional() })).min(1).max(4),
 });
-export interface EvalCase { id: string; title: string; goal: LearningGoal; sources: UserSource[]; private: boolean }
+export interface EvalCase { id: string; title: string; goal: LearningGoal; language: ContentLanguage; sources: UserSource[]; private: boolean }
 
 export const PUBLIC_CASES = 'eval/cases';
 export const PRIVATE_CASES = '.local/eval/cases';
@@ -28,7 +30,7 @@ async function loadFolder(root: string, folder: string, isPrivate: boolean): Pro
     const spec = caseSchema.parse(JSON.parse(await readFile(file, 'utf8')));
     // Sources are snapshots next to the case, so a case keeps measuring the same text as the code evolves.
     const sources = await Promise.all(spec.sources.map(async s => importSource({ kind: 'paste', title: s.title, text: await readFile(resolve(dirname(file), s.path), 'utf8'), language: s.language })));
-    return { id: spec.id, title: spec.title, goal: spec.goal, sources, private: isPrivate };
+    return { id: spec.id, title: spec.title, goal: spec.goal, language: spec.language ?? defaultContentLanguage(spec.goal.outcome, 'it'), sources, private: isPrivate };
   }));
 }
 

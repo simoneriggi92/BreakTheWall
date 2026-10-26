@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { ArrowRight, Link2 } from 'lucide-react';
-import { pagesOf, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { ArrowRight, Hammer, Link2 } from 'lucide-react';
+import { DISASSEMBLY_LIMITS, divisible, linesOf, pagesOf, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
+import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
 import type { Messages } from '../i18n/it';
-import { usePreferences } from '../preferences';
+import { failureText, usePreferences } from '../preferences';
 import { PartIcon } from './Sheet';
 
 /** "release-runbook.md · p. 12 · l. 40–52": the file only when there are several, the page only when the source has pages. */
@@ -28,9 +29,11 @@ interface Props {
   d: Disassembly; part?: Part; owner?: Part; joints: Joint[]; level: Part[]; number?: number;
   focus?: Cite; onFocus: (c: Cite) => void; onEnter: (id: string) => void;
   note: string; onNote: (value: string) => void;
+  /** Taking this part apart, when the disassembly allows it. */
+  takeApart?: ReactNode;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, joints, level, number, focus, onFocus, onEnter, note, onNote }: Props) {
+export function PartCard({ d, part, owner, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (part) heading.current?.focus({ preventScroll: true }); }, [part]);
@@ -65,6 +68,30 @@ export function PartCard({ d, part, owner, joints, level, number, focus, onFocus
     <Cites d={d} cites={part.cites} focus={focus} onFocus={onFocus}/>
     {part.parts && <button className="primary open-sub" onClick={() => onEnter(part.id)}>{part.relevant === false ? t.d.openClosed(part.parts.length) : t.d.openSub(part.parts.length)}<ArrowRight size={15}/></button>}
     {part.parts && part.relevant === false && <p className="micro plain">{t.d.closedNote}</p>}
+    {!part.parts && takeApart}
     <label className="part-note">{t.d.notes}<textarea rows={3} maxLength={4000} value={note} placeholder={t.d.notesPlaceholder} onChange={e => onNote(e.target.value)}/></label>
   </section>;
+}
+
+/**
+ * "Take this part apart": one request with only the part's lines. A part with too few lines says why it stops here,
+ * so the learner sees that the source, not the app, sets the depth.
+ */
+export function TakeApart({ d, part, route, progress, problem, onRun, onCancel }: {
+  d: Disassembly; part: Part; route?: GenerationRoute; progress?: GenerationProgress; problem?: ProviderFailure; onRun: () => void; onCancel: () => void;
+}) {
+  const { t } = usePreferences();
+  const x = t.d.expand;
+  if (!divisible(d, part)) return <p className="micro plain take-apart">{x.leaf(linesOf(d, part.cites).size, DISASSEMBLY_LIMITS.minLinesToSplit)}</p>;
+  if (progress) return <div className="generating take-apart">
+    <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{x.running}{progress.repairing ? ` · ${x.repairing}` : ''}</span><button className="subtle" onClick={onCancel}>{x.cancel}</button></div>
+    <p className="micro plain">{x.requests(progress.requests)}</p>
+  </div>;
+  const where = route && (route.provider === 'local' ? x.local(route.model) : `ChatGPT · ${route.model}`);
+  return <div className="take-apart">
+    <button className="subtle" disabled={!route} onClick={onRun}><Hammer size={15}/>{x.action}</button>
+    <p className="micro plain">{where ? x.cost(where) : x.noRoute}</p>
+    {problem && <div className={problem.code === 'cancelled' ? 'notice' : 'error-banner'} role="alert"><div><p>{failureText(t, problem)}</p>
+      {problem.issues && <details className="issue-details"><summary>{t.generate.technical}</summary><ul className="issue-list">{problem.issues.map((issue, i) => <li key={i}>{issue}</li>)}</ul></details>}</div></div>}
+  </div>;
 }
