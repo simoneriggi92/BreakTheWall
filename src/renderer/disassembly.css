@@ -184,3 +184,7 @@
   .disassembly { padding: 12px 16px 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .plate, .joint.flowing .joint-line, .state-mark.s-active circle, .running-dot { animation: none; } }
+
+/* Taking a part apart: the action sits under the card's citations. */
+.take-apart { margin-top: 12px; display: grid; gap: 6px; justify-items: start; }
+.take-apart .error-banner, .take-apart .notice { justify-self: stretch; }

@@ -310,7 +310,23 @@
           "icon": "users"
         }
       ],
-      "joints": []
+      "joints": [],
+      "excluded": [
+        {
+          "source": "mill",
+          "from": 95,
+          "to": 99,
+          "reason": "context",
+          "note": "It is about the part as a whole, not one of its sub-parts."
+        },
+        {
+          "source": "mill",
+          "from": 123,
+          "to": 131,
+          "reason": "context",
+          "note": "It is about the part as a whole, not one of its sub-parts."
+        }
+      ]
     },
     {
       "id": "objection",

@@ -61,10 +61,12 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
   const allDisassemblies = [...generatedDisassemblies, ...disassemblies];
   const lesson = selected?.kind === 'lesson' ? [...generated, ...lessons].find(x => x.id === selected.id) : undefined;
   const disassembly = selected?.kind === 'disassembly' ? allDisassemblies.find(x => x.id === selected.id) : undefined;
-  const created = (item: Lesson) => { setGenerated(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); open(item.id); };
+  const created = (item: Disassembly) => { setGeneratedDisassemblies(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); openDisassembly(item.id); };
+  // A part taken apart is a new revision of the same disassembly; the player reopens on it, with progress moved by the host.
+  const expanded = (next: Disassembly) => setGeneratedDisassemblies(list => list.map(x => x.id === next.id ? next : x));
   const runtimeLabel = runtime === 'desktop' ? t.common.desktopRuntime : runtime === 'browser' ? t.common.browserRuntime : '';
   return <><a href="#main" className="skip-link">{t.common.skip}</a>{disassembly
-    ? <DisassemblyPlayer key={disassembly.id} d={disassembly} bridge={bridge} goHome={() => setSelected(undefined)}
+    ? <DisassemblyPlayer key={`${disassembly.id}:${disassembly.revision}`} d={disassembly} bridge={bridge} goHome={() => setSelected(undefined)} onExpanded={expanded}
         versions={disassembly.family ? allDisassemblies.filter(x => x.family === disassembly.family && x.id !== disassembly.id) : []} openVersion={openDisassembly}/>
     : lesson
     ? <Player key={lesson.id} lesson={lesson} bridge={bridge} runtime={runtimeLabel} goHome={() => setSelected(undefined)}/>

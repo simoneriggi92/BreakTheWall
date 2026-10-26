@@ -18,7 +18,7 @@ export function rememberLesson(id: string) {
 interface Props {
   lessons: Lesson[]; generated: Lesson[]; disassemblies: Disassembly[]; bridge: DesktopBridge; error: string; skipped: number;
   draft: StudioDraft; setDraft: (update: (draft: StudioDraft) => StudioDraft) => void;
-  onOpen: (id: string) => void; onOpenDisassembly: (id: string) => void; onCreated: (lesson: Lesson) => void;
+  onOpen: (id: string) => void; onOpenDisassembly: (id: string) => void; onCreated: (disassembly: Disassembly) => void;
 }
 type Resume = { kind: 'lesson'; lesson: Lesson; state: LearnerState } | { kind: 'disassembly'; disassembly: Disassembly; state: DisassemblyState };
 const touched = (state: DisassemblyState) => state.path.length > 0 || !!state.selected || Object.keys(state.runs).length > 0 || Object.keys(state.notes).length > 0 || Object.keys(state.reassembly.placements).length > 0;

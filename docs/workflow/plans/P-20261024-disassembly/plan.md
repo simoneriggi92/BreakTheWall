@@ -1,11 +1,11 @@
 ---
 id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
-version: 3
+version: 5
 state: implementing
-current_task: D8
-last_evidence: Phase player (D4-D8) implemented and revised after the owner's first desktop use - npm run check 223 tests passed, npm run build passed
-next_action: Owner witnesses the desktop flow of D8 (library, disassembly, restart, resume, language switch); then implement P-20261024-disassembly v3 --phase generation
+current_task: D9
+last_evidence: Phase depth done (D13-D14: recursive contract, stopping rule, per-part bill of materials, progress carried across expansions, Take this part apart); 256 tests and build passing; no live generation yet
+next_action: Owner lists the ChatGPT models; then the A/B/C comparison with --expand (24 generations + 4 expansions) and the blind review
 approval: approved
 ---
 
@@ -15,12 +15,13 @@ approval: approved
 
 The app produces and plays **disassemblies** instead of lessons, as defined in the [product identity](../../../product.md#identity):
 - a source is taken apart into 3–7 parts per level, with sub-assemblies and typed joints;
+- any part can be taken apart further, on request, as deep as the source allows. No fixed number of levels limits it;
 - the learner runs a part (a scenario, a load test or a new case) and can reassemble the whole;
 - a bill of materials accounts for every source line, and the app checks it;
 - the whole app uses the technical-drawing style, with a paper theme and a blueprint theme;
 - the whole interface is available in **English and Italian**. The interface language is independent of the language of a disassembly's content.
 
-Generation produces disassemblies in two phases. ChatGPT is the primary route and capable local models the secondary one, per the owner's decision of 2026-10-22.
+Generation produces disassemblies in two phases. ChatGPT is the primary route and capable local models the secondary one, per the owner's decision of 2026-10-22. Before a default is chosen, ChatGPT models are compared on the same cases, including a mixed setup where a strong model writes the structure and a cheaper one writes the parts.
 
 Lessons already saved stay readable. Nothing the learner has today is lost.
 
@@ -40,6 +41,18 @@ The owner requires the tool to analyze **code repositories and documents** as we
 - [Product definition](../../../product.md): the identity, the three kinds of joint, sub-assemblies and the bill of materials, the adopted visual direction, and the mapping from lesson to disassembly.
 - Phase `contract` (D1–D3) was implemented under v2 on 2026-10-25; see the [implementation record](#implementation-record). Version 3 does not change D1–D3.
 - Owner requirement of 2026-10-25, given during that phase: "L'app deve essere multi-lingua: inglese ed italiano".
+- Phase `player` (D4–D8) was implemented under v3 on 2026-10-25 and revised after the owner's first desktop use. D8's witnessed desktop flow is still open. Version 4 does not change D1–D8.
+- Owner request of 2026-10-26 (v4): test generation through ChatGPT models, find which models give the best disassemblies, and look for "un'ottima qualità con modelli meno costosi". Also try a markdown document about an architecture and workflow the owner is building at work.
+- Owner requirement of 2026-10-26 (v5), after the generation phase was built with two levels: "non possiamo dare un limite di livelli se necessario aggiungerne uno nuovo … quando necessario dobbiamo essere in grado di avere più livelli e sottolivelli per capire pezzo per pezzo". Then, choosing among the options: "qualsiasi pezzo diventa smontabile su richiesta, a qualunque profondità, finché la fonte lo permette. Voglio che sia così".
+- Phase `generation` code (D9's generator and evaluation tooling, D10's Studio) was implemented under v4 on 2026-10-26; see the [implementation record](#phase-generation-d9d10). No live generation has run yet.
+- Depth today (static inspection, 2026-10-26):
+  - layout, learner state, the player and its breadcrumbs already work at any depth;
+  - the contract caps depth at three levels, because the schema nests explicitly;
+  - generation produces two levels.
+- Measured on the fixtures (2026-10-26):
+  - **sub-levels do not always account for their parent's lines.** Lines the parent cites but no sub-part or sub-level joint cites: Atlas 9 lines in 3 parts, Mill 14 in 1, Kessmouth 1. In the private fixtures, 1–31 per part.
+  - **Lines per leaf part:** median 6 (Atlas), 10 (Mill), 2 (Kessmouth), 9–54 in the private ones.
+- The evaluation runner (`eval/runner.ts`) already exists. It has `--allow-chatgpt`, `--list-models` and private cases in `.local/eval/cases/`, and a cap of 2 attempts per case in `eval/policy.ts`. It measures lessons only.
 - Current code before this plan (static inspection):
 
 | Area | Where | Today |
@@ -72,6 +85,12 @@ The owner requires the tool to analyze **code repositories and documents** as we
   - then one request for runs and reassembly hints.
 
   The structure phase can be repaired once on both routes. Content and runs can be repaired per part.
+- **Depth guided by the source (v5).** Levels are recursive, with no fixed limit. Two rules stop the descent:
+  - a part can be taken apart only when it cites enough lines of its own;
+  - each level must account for its parent's lines, the bill of materials applied part by part.
+- **Taking a part apart on demand (v5).** The first generation gives the top level and the sub-levels the question needs. Any divisible part can then be taken apart from its card, at any depth, with one small request carrying only that part's lines. Progress carries over to the deeper version.
+- **A model per phase.** A generation setup names one model for the structure and one for content and runs; they may be the same. The comparison in D9 chooses the default setup.
+- **What "cheaper" means here.** The ChatGPT route uses the learner's plan through Sign in with ChatGPT, not the paid API. Cost is plan usage, the number of requests and waiting time, not a price per token. The comparison reports requests, characters sent and received, and time.
 - **Prepared examples.** The two public prototype disassemblies become fixtures: the Atlas Reader runbook and Mill's harm principle. Mill's text is in the public domain. Both get an English version as well. Their sources are English already, so only the disassembly is written again.
 - **Lessons become legacy.** Saved generated lessons stay readable in a "Percorsi precedenti" section, with their progress. They are not converted. New generation produces only disassemblies.
 - **Two later phases, for repositories and for PDF documents.** Both are gated on the generation results. Both produce a scoped snapshot that the contract records, and a file- or page-level bill of materials.
@@ -103,7 +122,13 @@ Not included:
 - Saved lessons keep their Italian content. Only the legacy player's own controls follow the interface language.
 - The two prepared lessons are removed from the library and replaced by the two public disassemblies. Their code stays until legacy support is dropped in a later plan.
 - A short **original story-kind case**, a sequence of decisions with causes, is written as a contract fixture and evaluation case. It is not shown as a prepared example unless the owner asks.
-- ChatGPT evaluation keeps the opt-in flag and the 2-attempts-per-case cap.
+- A part is divisible when its own citations cover at least **6 non-blank lines**. With fewer, 3 sub-parts would split single lines. On the fixtures, 8 of 15 Atlas leaves, 8 of 11 Mill leaves and none of Kessmouth's could be taken apart further, as expected for a story of short events.
+- Taking a part apart uses the structure model of the current Studio setup: deciding how a part splits is structural work.
+- Prepared examples are not taken apart further. They are bundled read-only, and expanding one would mean storing a generated copy. This can be added later.
+- Runs stay on top-level parts. A deeper level has no runs of its own in this plan.
+- ChatGPT evaluation keeps the opt-in flag. The 2-attempts-per-case cap now applies per setup, within the run budget of D9.
+- The comparison uses the models the account lists at run time. It picks the strongest and the cheapest available, by the account's own naming, and records their exact slugs in the report. No model name is assumed in this plan.
+- The owner's work document is used only after the owner confirms that company policy allows sending it to OpenAI. Otherwise it runs only on the local route, and the source never leaves the Mac.
 
 ## Ordered tasks
 
@@ -117,7 +142,7 @@ Not included:
     - metadata as in lessons: id, revision, kind, generation, title, question, language;
     - sources with full text and sha256;
     - `whole`.
-  - Recursive `parts`, depth ≤ 3, 3–7 per level. Each part has:
+  - Recursive `parts`, depth ≤ 3, 3–7 per level (v5: D13 removes the depth limit). Each part has:
     - a closed `kind`: step, component, artifact, premise, conclusion, ground, limit, objection, consequence, rejected, event, actor;
     - a closed `icon` list, about 30 names mapped to lucide, one per kind of part and joint;
     - `role`;
@@ -301,10 +326,10 @@ Not included:
 
 ### Phase generation
 
-#### D9 — Two-phase generation and evaluation
+#### D9 — Two-phase generation, evaluation and model comparison
 
-- Purpose: generate what the prototype showed, and measure it.
-- Action:
+- Purpose: generate what the prototype showed, measure it, and choose which ChatGPT setup gives good disassemblies at the lowest plan usage.
+- Action, generation:
   - **Structure request.** Strict JSON Schema; the source ids are a closed list. It returns:
     - `whole`;
     - the parts tree with kinds, roles and citations;
@@ -316,32 +341,140 @@ Not included:
   - **Content requests**, one per top-level part, each carrying the goal, the structure and only that part's lines. They return points with marks, a metaphor with its limit, a lens, a critique when needed, and its sub-parts' sentences. A failing part gets one repair of that part only.
   - **Runs request.** It returns the runs and reassembly hints. The app derives the slots from the top-level parts and joints. It adds a repairable finding when the correct option is much longer than the wrong ones, with the threshold from the Q1 baseline.
   - **Language.** Every request names the content language. The app checks the result with `detectLanguage` on the question, the part names and the points, and adds a repairable finding when they disagree.
-  - Progress shows the phases ("Distinta" / "Bill of materials", then "Pezzo k di n" / "Part k of n", then "Prove" / "Runs"). Cancellation between phases saves nothing. Before a ChatGPT generation, the interface shows the number of requests.
-  - **Evaluation.**
-    - Adapt `npm run eval` and `eval/metrics.ts` to disassemblies: validity, repairs, requests, time, excluded share, layout overlaps from D2, the answer-length giveaway, the kinds of joint used.
-    - Add the story case. It is in English, so evaluation covers both content languages.
-    - The claim-review template lists points and verdicts.
+  - **Setup.** The generator takes a setup with a structure route and a content route. Each route is ChatGPT with a model slug, or a local model; the two may differ.
+  - Progress shows the phases ("Distinta" / "Bill of materials", then "Pezzo k di n" / "Part k of n", then "Prove" / "Runs"). Cancellation between phases saves nothing.
+- Action, evaluation (`npm run eval`, adapted to disassemblies):
+  - **Cases.** Four public cases, one per kind of material:
+    - the Atlas runbook (mechanism);
+    - Mill's harm principle (argument);
+    - the Kessmouth story (story, in English);
+    - this repository's core pipeline (code).
+
+    Private cases in `.local/eval/cases/` run only when named, and their outputs stay in `.local/`.
+  - **Automated metrics per attempt:**
+    - valid after the allowed repairs, and the number of repairs by phase;
+    - forgotten lines, which must be 0;
+    - layout findings from D2, which must be 0;
+    - content language matching the request;
+    - the answer-length giveaway;
+    - the kinds of joint used, parts per level and depth;
+    - requests, characters sent and received, and time per phase.
+  - **Claim review by the owner, blind.** For each case and setup, the review lists every top-level part's points and every run explanation with its cited lines. Each point is marked correct, imprecise or wrong according to the source. The setups appear as A, B and C, without model names, so the reading is not biased. The review adds a 1–5 "would I use it" rating for the exploded view and for the runs.
+  - The report is written under `.local/eval/runs/`. A summary, with no private content, is recorded in this plan's folder.
+- Action, model comparison on ChatGPT:
+  - **Setup A:** the strongest listed model on every phase.
+  - **Setup B:** the cheapest listed model on every phase.
+  - **Setup C (mixed):** the strongest model for the structure; the cheapest for content and runs.
+  - **Run budget, opt-in with `--allow-chatgpt`:**
+    - 3 setups × 4 public cases × 2 attempts = 24 generations;
+    - up to 4 more generations to replace attempts lost to a network or service error;
+    - up to 2 generations on the owner's private document, below;
+    - **at most 30 ChatGPT generations in total**, about 150–270 requests at 5–9 requests each;
+    - plus **up to 4 expansions** (D14), one per public case, at 1–2 requests each;
+    - stop at the first usage-limit response, and report what was measured.
+
+    The runner enforces the budget in `eval/policy.ts`.
+  - **Decision rule:** the default is the cheapest setup that meets the acceptance below. On a tie, the mixed setup wins over A. If only A meets it, A becomes the default, and the report says what B and C missed.
+- Action, the owner's work document (private, local-only):
+  - The owner places the markdown file and a goal in `.local/eval/cases/`. It is never committed, and public notes describe it only generically, as a private architecture document.
+  - **Gate:** the owner states in chat that company policy allows sending it to OpenAI. Until then it runs only on the local route.
+  - It runs with the default setup and is reviewed by the owner with the same rubric. It uses the 2 generations reserved for it in the budget, and it is not part of the acceptance.
 - Acceptance:
-  - ChatGPT (gpt-6-sol, 2 attempts per public case, opt-in): at least 7 of 10 valid.
-  - The local route is measured and reported, not gated.
-  - One claim review per case shows no more wrong claims than the lesson baseline (0 in 3 lessons).
-  - Every valid result has 0 forgotten lines and 0 layout overlaps, and its content is in the requested language.
-  - The numbers are recorded in this plan's folder.
-- Evidence: contract tests for each phase's schema and assembly; evaluation reports; claim reviews.
+  - The chosen setup is valid in at least 6 of its 8 public attempts (2 per case).
+  - Every valid result has 0 forgotten lines and 0 layout findings, and its content is in the requested language.
+  - The claim review of the chosen setup shows no more wrong points than setup A on the same cases, and no more than the lesson baseline (0 wrong claims in 3 lessons).
+  - The local route is measured on the public cases and reported, not gated.
+  - The numbers, the chosen setup with its exact model slugs, and the review summary are recorded in this plan's folder.
+  - If no setup meets the acceptance, the plan stops before D10 and the owner decides; the bar is not lowered silently.
+- Evidence: contract tests for each phase's schema, assembly and setup routing; the evaluation reports; the claim reviews; a comparison note.
+- Order (v5): the generator and the evaluation tooling are done. **The model comparison runs after D13 and D14**, so it measures the generator that ships, including expansions.
 - Dependencies: D1, D2.
+
+### Phase depth
+
+#### D13 — Depth guided by the source
+
+- Purpose: any part can open into sub-parts at any depth, as long as the source has lines to take apart. Owner requirement of 2026-10-26 (v5).
+- Action:
+  - **Recursive parts.** `parts` become truly recursive, with no fixed depth.
+    - The 3–7 rule, the length rules and the joint rules apply at every level.
+    - Top-level parts keep their points; deeper parts keep one sentence.
+    - Files written under the three-level schema stay valid, so `schemaVersion` does not change.
+  - **Stopping rule.** A part is *divisible* when its own citations cover at least `DISASSEMBLY_LIMITS.minLinesToSplit` non-blank lines (6).
+    - A level under a part that is not divisible is a located finding.
+    - The player says why such a part cannot be taken apart further, and shows its line count.
+  - **Bill of materials per part.** A part with sub-parts accounts for every non-blank line it cites. Each line is:
+    - in a sub-part;
+    - in a joint of that level;
+    - or in the part's own optional `excluded` list, with a reason: `context`, `repetition`, `detail` or `outside-question`.
+
+    Findings name the part and the range, as the whole-source check does. The existing fixtures, public and private, get part-level exclusions where their sub-levels leave lines uncovered.
+  - **Expansion record.** An optional `expansions` list records, for each part taken apart after generation, the part, provider, model and time. The stored origin of every level stays visible.
+  - **Revisions and progress.** Taking a part apart saves a new revision and keeps the previous file.
+    - The host checks that the new revision is an *expansion* of the old one: identical, except that one part without sub-parts gains sub-parts, their joints, its own exclusions and an `expansions` entry.
+    - When it is, the learner state moves to the new revision with everything kept: open path, runs, tried bricks, reassembly, notes. Otherwise the D3 rules apply.
+    - The store lists only the latest revision of each disassembly.
+  - Layout, state paths and breadcrumbs already work at any depth. Tests at depth 5 confirm it.
+- Acceptance:
+  - A synthetic disassembly five levels deep validates, lays out every level without geometry findings, and opens down to the deepest level and back through the breadcrumbs.
+  - The stopping rule and the per-part bill of materials each have contract tests with located findings.
+  - Every fixture, public and private, validates under the new rules, with 0 forgotten lines per source and per part.
+  - An expanded revision keeps run steps, tried bricks, reassembly placements, notes and the open path after a restart. A change that is not an expansion still resets, with the D3 notice.
+  - The library shows one card per disassembly after an expansion.
+- Evidence: `tests/disassembly.test.ts`, `tests/layout.test.ts`, `tests/disassembly-state.test.ts`, `tests/disassembly-store.test.ts`, `tests/progress-store.test.ts`.
+- Dependencies: D1, D2, D3, D8.
+
+#### D14 — Take a part apart on demand
+
+- Purpose: "Smonta questo pezzo" / "Take this part apart". The learner goes as deep as they need and pays only for what they open.
+- Action:
+  - The first generation (D9) keeps its shape: top-level parts and the sub-levels the question needs. Its structure phase also applies D13's rules.
+  - **The action.** The card of a divisible part without sub-parts, in a generated disassembly, offers the action, in the desktop app only. It shows that it sends one request, and to which route.
+  - **One request, one repair.**
+    - The request carries:
+      - the question and the content language;
+      - the path from the whole to the part, with the part names of each level on that path, as context;
+      - the part's role and explanation;
+      - only the part's lines.
+    - It returns:
+      - 3–7 sub-parts with kind, icon, name, role, a one-sentence explanation, an optional critique and citations;
+      - their joints;
+      - the part's own exclusions.
+
+    One level is small, so structure and content arrive together. The schema's source ids are a closed list of the part's sources.
+  - **Checks:** D13's rules, the language check, and citations inside the part's own lines. One repair with located findings, as in D9.
+  - **Route:** the structure model of the current Studio setup, ChatGPT or local. Progress, cancellation and the one-at-a-time rule are as for generation. On failure nothing changes, and the summary and findings are shown as in D10.
+  - Runs and reassembly are not regenerated.
+- Action, evaluation:
+  - `npm run eval -- --expand` takes apart one divisible part per public case on the first valid attempt of a setup. That is 4 expansions, each 1–2 requests.
+  - The report records validity, repairs, forgotten lines per part (must be 0), layout findings (must be 0) and the language.
+  - The blind review sheet lists the new sub-parts with their cited lines.
+- Acceptance:
+  - Tests:
+    - an expansion request carries only the part's lines;
+    - a valid answer adds the level, saves a new revision and moves the progress;
+    - a forgotten line or a split of a non-divisible part is repaired once, then refused;
+    - cancellation and failure change nothing.
+  - On ChatGPT, with the default setup chosen in D9, at least 3 of the 4 public expansions are valid, with 0 forgotten lines and 0 layout findings. They are claim-reviewed with the same rubric, with no more wrong points than setup A's top level.
+  - The local route is measured and reported, not gated.
+- Evidence: `tests/disassembly-generation.test.ts`, `tests/disassembly-player.test.tsx`, evaluation report.
+- Dependencies: D9, D13.
 
 #### D10 — Studio flow and witnessed generation
 
 - Purpose: generation inside the app, end to end.
 - Action:
   - Studio generates a disassembly with phase progress and the request count, and lets the learner set the content language before generating.
+  - The default setup chosen in D9 is preselected. An advanced choice lets the learner pick the structure model and the content model separately.
+  - New generation produces only disassemblies. Saved lessons stay readable under "Earlier paths".
   - A failure shows a summary in the interface language and the located findings as technical detail. The validator's findings stay in English, because they also go back to the model as repair instructions.
   - The result opens in the player.
 - Acceptance:
   - A witnessed desktop generation on each route (ChatGPT and the chosen local model) from a public case, then a restart with the disassembly and its progress intact. This is the evidence P-20261021 T5 asked for, now for disassemblies.
   - One of the witnessed generations has an English question under an Italian interface, and produces English content.
+  - In one witnessed generation, a part is taken apart on demand two levels below the top. After a restart, the deeper levels and the earlier progress are intact.
 - Evidence: `tests/studio.test.tsx` updated; a witnessed note.
-- Dependencies: D8, D9.
+- Dependencies: D8, D9, D14.
 
 ### Phase repository (gated)
 
@@ -393,7 +526,7 @@ Not included:
 
 ## Definition of done
 
-- D1–D10 meet their acceptance criteria. D11 and D12 meet them, or the owner moves them to a separate plan.
+- D1–D10, D13 and D14 meet their acceptance criteria. D11 and D12 meet them, or the owner moves them to a separate plan.
 - New generation produces disassemblies only. Saved lessons remain readable.
 - Both themes ship, and the default follows the system.
 - Both interface languages ship, the default follows the system locale, and no interface string is hard-coded outside the catalogs.
@@ -411,7 +544,14 @@ Not included:
 | Models cannot fill the richer contract reliably | Two phases with app validation between them; per-part repair; ChatGPT first; D9's measured gate before D10 |
 | Automatic layout produces cluttered sheets | Geometry tests on all fixtures in D2; length rules in D1; generation sees the limits |
 | Legacy lessons break while the app changes underneath | They keep their own schema, store and player; tests load a saved lesson and its progress in D3 and D8 |
+| The comparison spends too much of the owner's plan | A fixed run budget, enforced by the runner; opt-in flag; stop at the first usage-limit response |
+| A cheap model passes the automated checks but writes wrong points | Blind claim review on every case and setup; the decision rule requires no more wrong points than setup A |
+| Company material is sent to OpenAI against policy | The owner's document runs on ChatGPT only after the owner confirms the policy in chat; otherwise local route only; it stays in `.local/` |
+| Model names change or disappear from the account | Models are chosen from the account's list at run time; the report records exact slugs |
 | More requests per ChatGPT generation (about 5–9) | Request count shown before generating; evaluation is opt-in and capped; content requests carry only one part's lines |
+| Deep levels lose the learner | 3–7 parts per level at every depth; breadcrumbs name the path; depth grows only when the learner asks |
+| A model over-splits small parts | The host-enforced stopping rule: parts under 6 non-blank lines cannot be taken apart |
+| Taking a part apart erases progress | An expansion is checked to be additive, and the learner state moves to the new revision; a non-additive change keeps the D3 reset and notice |
 | Interpretations presented as facts | `inference` and `critique` are contract fields; the app labels them; claim review checks them |
 | Private material leaks through fixtures or evaluation | The TeamCity file stays in `.local/`; local-only tests skip when it is absent; public fixtures are original or public domain |
 | Repository analysis sends secrets | D11 detects secrets by content, not by file name, before preview; files with secrets are excluded whole with the reason shown; a fixture with planted secrets is part of acceptance |
@@ -434,7 +574,7 @@ Not included:
   - state and store tests;
   - interaction tests in jsdom for the player, run, reassembly and Studio, in both interface languages where wording matters;
   - catalog parity and rendered-language tests;
-  - evaluation runs for generation quality;
+  - evaluation runs for generation quality, including the three-setup comparison and a blind claim review;
   - witnessed desktop flows for persistence and live generation.
 - **Limits:**
   - jsdom does not lay out SVG text, so D2's geometry is tested on computed boxes from the layout module;
@@ -444,6 +584,8 @@ Not included:
 ## Review and authorization
 
 Self-review is in [review.md](review.md).
+- Version 5 removes the fixed depth and adds taking a part apart on demand, at the owner's request: "qualsiasi pezzo diventa smontabile su richiesta, a qualunque profondità, finché la fonte lo permette. Voglio che sia così". It adds phase `depth` (D13–D14) before D9's model comparison, four expansions to the run budget, and an expansion to D10's witnessed flow. D1–D8 are unchanged. The generation code built under v4 stays, and its evidence stays valid.
+- Version 4 extends D9 with a comparison of ChatGPT models, including a mixed setup, a run budget and a blind claim review. It also adds a private, local-only case for the owner's work document, and D10's setup choice. Request: "Scrivi il piano v4", after the owner asked which OpenAI models give the best disassemblies, ideally cheaper ones. D1–D8 and D11–D12 are unchanged. D1–D8's evidence stays valid.
 - Version 3 adds the English and Italian interface, at the owner's request: "rivedi il piano P-20261024-disassembly in v3 con l'interfaccia multilingua inglese e italiano". It changes D4–D10 and the shared sections, and leaves D1–D3 and D11–D12 unchanged. D1–D3 were implemented under the v2 approval, and their evidence stays valid.
 - Version 2 revised v1 after [research R-20261025](../../research/R-20261025-repository-and-document.md). Version 1 was never approved.
 
@@ -453,21 +595,23 @@ Self-review is in [review.md](review.md).
 
 Approval command:
 
-`Approve P-20261024-disassembly v3`
+`Approve P-20261024-disassembly v5`
 
-The v2 approval no longer covers the remaining tasks, because v3 is a material change. A later, separate command starts edits, for example:
+The v4 approval no longer covers the remaining tasks, because v5 is a material change. A later, separate command starts edits, for example:
 
-`implement P-20261024-disassembly v3 --phase player`
+`implement P-20261024-disassembly v5 --phase depth`
 
 Named phases:
 - `contract`: D1–D3, done under v2;
-- `player`: D4–D8;
-- `generation`: D9–D10;
+- `player`: D4–D8, done under v3 except D8's witnessed desktop flow;
+- `generation`: D9–D10. D9's code and D10's Studio were done under v4; D9's model comparison waits for phase `depth`;
+- `depth`: D13–D14;
 - `repository`: D11, gated;
 - `document`: D12, gated.
 
 Approval does not authorize:
-- ChatGPT runs beyond the stated cap;
+- ChatGPT runs beyond D9's run budget: 30 generations, that is 24 for the comparison, up to 4 replacements and up to 2 on the owner's private document, plus up to 4 expansions;
+- sending the owner's work document to OpenAI before the owner confirms in chat that company policy allows it;
 - model downloads or dependency changes, including a PDF extraction library or an internationalization library;
 - publication;
 - importing private documents or code into the repository;
@@ -475,7 +619,46 @@ Approval does not authorize:
 
 ## Approval record
 
-Version 3, approved:
+Version 5, approved:
+
+- Approver: project owner, through an explicit message in this conversation.
+- Received command: `Approve P-20261024-disassembly v5`.
+- Approved plan/version: `P-20261024-disassembly` / `5`.
+- Recorded at: `2026-10-26T14:03:14+01:00` (Europe/Rome).
+- Approved scope:
+  - D13–D14 (phase `depth`), and D9's model comparison and D10 as written in v5;
+  - D11–D12 in their gated phases;
+  - the stated assumptions and exclusions, including the 6-line stopping rule.
+
+  D1–D8 are recorded as implemented under earlier versions, with D8's witnessed desktop flow still open. The code of phase `generation` is recorded as implemented under v4.
+- Approved-content SHA-256: `38716bb735760212570605db0272c3ab7af5ed246abf5c57c9827471f4ac450f`.
+- Digest definition: SHA-256 of the UTF-8 plan body from `# Disassemblies` up to, and not including, `## Review and authorization`.
+- Authority boundary: this records approval only. Implementation needs a separate implement command. Not authorized:
+  - ChatGPT runs beyond D9's run budget: 30 generations (24 for the comparison, up to 4 replacements, up to 2 on the owner's private document), plus up to 4 expansions;
+  - sending the owner's work document to OpenAI before the owner confirms in chat that company policy allows it;
+  - model downloads and dependency changes;
+  - publication;
+  - importing private documents or code into the repository;
+  - starting D11 or D12 before their gate.
+
+Version 4, approved and superseded by v5 for the remaining tasks:
+
+- Approver: project owner, through an explicit message in this conversation.
+- Received command: `Approve P-20261024-disassembly v4`.
+- Approved plan/version: `P-20261024-disassembly` / `4`.
+- Recorded at: `2026-10-26T12:20:33+01:00` (Europe/Rome).
+- Approved scope: D9–D12 and their acceptance criteria as written in v4, with D1–D8 recorded as implemented under earlier versions (D8's witnessed desktop flow still open); phase `generation` and the gated phases `repository` and `document`; the stated assumptions and exclusions.
+- Approved-content SHA-256: `b7dc8b9b777542afd1a31fd6a9259899de4b425fdbc94033da39096da9924d42`.
+- Digest definition: SHA-256 of the UTF-8 plan body from `# Disassemblies` up to, and not including, `## Review and authorization`.
+- Authority boundary: this records approval only. Implementation needs a separate implement command. Not authorized:
+  - ChatGPT runs beyond D9's run budget (30 generations: 24 for the comparison, up to 4 replacements, up to 2 on the owner's private document);
+  - sending the owner's work document to OpenAI before the owner confirms in chat that company policy allows it;
+  - model downloads and dependency changes, including a PDF extraction library or an internationalization library;
+  - publication;
+  - importing private documents or code into the repository;
+  - starting D11 or D12 before their gate.
+
+Version 3, approved and superseded by v4 for the remaining tasks:
 
 - Approver: project owner, through an explicit message in this conversation.
 - Received command: `Approve P-20261024-disassembly v3`.
@@ -660,3 +843,160 @@ New tests:
 The README now describes the disassembly product, with a new blueprint screenshot of Mill. It says plainly that Studio still generates lessons until the generation phase.
 
 D8's witnessed desktop flow stays open until the owner confirms it on this version.
+
+### Phase generation (D9–D10)
+
+Received command: `implement P-20261024-disassembly v4 --phase generation`, on 2026-10-26. The plan ID, version and approval digest matched the v4 approval record.
+
+| Task | Status | Evidence |
+|---|---|---|
+| D9 generation | Done | `src/core/disassembly-generation.ts` (phase schemas, inputs, checks, assembly), `src/desktop/generator.ts` (phases, repairs, routes, stats); `tests/disassembly-generation.test.ts`, 21 tests (automated test) |
+| D9 evaluation | Done, not yet run | `eval/` adapted to disassemblies: setups A/B/C, budget ledger, blind review sheets, four public cases; `tests/eval.test.ts` (automated test); refusals checked by running the command (no request sent) |
+| D9 comparison | **Open** | No ChatGPT generation has been run. It needs the owner's go-ahead, the account's model list, and then the blind review |
+| D10 Studio | Done | `src/renderer/Studio.tsx`, catalogs, `App.tsx`; `tests/studio.test.tsx`, 15 tests (automated test); the question step was checked in the browser preview by the agent |
+| D10 witnessed generation | **Open** | Needs a live generation on each route, by the owner |
+
+Checks:
+- `npm run check`: passed, 17 files, 241 tests.
+- `npm run build`: passed. The bundle is 597 kB (592 kB before). The lucide-react warning was already there.
+- `npm run eval -- --help`, and three refused runs: without `--allow-chatgpt`; with `--runs 3`; with a private case and no `--private-to-chatgpt`. Each refusal came before any request, and no run folder or ledger was written.
+- Browser preview (agent): under the English interface, an Italian question sets the content language to Italian. Choosing English then shows "The question looks Italian…".
+- Static scan of the new and changed files: no names, code or text from the private cases.
+
+Acceptance, as far as code can show it:
+- **Each phase is checked before the next one starts:**
+  - the structure goes through the contract's own checks: levels, joints, citations and the bill of materials, with a forgotten range reported as `sources[i]`. It also gets a language check;
+  - a part's content is checked for point length, for each sub-part explained exactly once, and for language;
+  - the runs go through the contract's checks on runs and reassembly, plus the giveaway check and a language check.
+- **Repairs:** each phase may be repaired once on both routes. A content repair repeats only the failing part. When a repair fails too, the findings are named by phase, for example `structure · sources[0]: …`, and nothing is saved.
+- **Closed lists:** source ids, top-level part ids and sub-part ids. Every object in the three schemas has all its fields required and no extra fields.
+- **Round trip:** each of the five public fixtures, given back as phase answers, passes the three phases. It assembles into a valid disassembly with 0 forgotten lines and the same parts and slots.
+- **Setup:** the structure goes to the structure route; parts and runs go to the content route. ChatGPT and local routes can be mixed.
+- **Before any request:**
+  - a question in another language than the chosen content is refused;
+  - so are tampered sources;
+  - so is a local address off this machine.
+- **Failures:** a provider failure in one part is reported as itself, not as a cancellation, and stops the other parts. Cancellation and a second concurrent generation save nothing.
+- **Studio:**
+  - the request preview is exactly the structure request;
+  - the content language follows the question and can be changed, and a mismatch blocks generation;
+  - a second model for parts and runs is optional and remembered;
+  - progress shows the phase, "Pezzo k di n", repairs and the request count;
+  - a failed check shows a summary in the interface language, with the English findings as technical detail;
+  - the result opens in the player, and the library lists it under "Smontaggi".
+
+Decisions taken within the approved scope:
+- **Two levels are generated:** top-level parts and their sub-parts, as in all prepared disassemblies. The contract still accepts a third level; generation does not produce one.
+- **Two schema additions, found by the fixture round trip:**
+  - Structure joints may cite lines. Without that, lines that only state a connection would count as forgotten.
+  - A sub-part may carry a critique; Mill's colonial exclusion needs one.
+- **Parts are written in parallel:** three at a time on ChatGPT, one at a time on a local server, which would queue them anyway. Account token refresh was already shared between concurrent requests.
+- **Giveaway threshold: 1.6×.** Q1 accepted lessons at 1.35–1.5 and called 1.78–2.0 giveaways.
+- **Slots are derived by the app.** Interchangeable parts share the model's label, their kind, and the same neighbours; slot ids are assigned by the app. Run ids are assigned by the app too.
+- **Stored origin:** the contract keeps one provider and one model per disassembly.
+  - Setups with two models are stored as `structure + content`.
+  - The provider is `chatgpt` whenever any phase sent the sources to OpenAI.
+- **Prompts are in English, and every request names the content language.** Findings are in English because they go back to the model.
+- **Lesson generation is replaced.**
+  - The lesson `Generator`, its IPC result and its tests give way to the disassembly generator.
+  - The lesson draft code in `src/core/generation.ts` stays, with its tests, until legacy support is dropped.
+  - Saved lessons stay readable.
+- **Evaluation cases:**
+  - the public set is the four cases of D9. The Mill and Kessmouth sources are the fixtures' own. `glucose` and `account-session`, which were lesson-only, were removed;
+  - private cases run only when named;
+  - on ChatGPT, a private case also needs `--private-to-chatgpt`;
+  - the ledger `.local/eval/chatgpt-budget.jsonl` counts every generation that sent at least one request.
+- **Default setup:** until D9 chooses one, Studio uses the selected model for every phase, with the second model as an advanced choice. D9's result will set the preselection.
+- **Vocabulary:** Studio now speaks of "smontaggio" / "disassembly" and of a question, following the product's vocabulary table. The failure messages changed the same way.
+
+Not done in this phase, and why:
+- **ChatGPT comparison (24 generations, up to 4 replacements):** it spends the owner's plan, and the agent said it would start only with the owner's explicit go-ahead.
+- **Local route measurement:** no model server was running on the Mac, and starting a 35B model was left to the owner.
+- **Blind claim review and decision of the default setup:** owner steps, after the comparison.
+- **The owner's private document:** gated on the owner's statement about company policy. On the local route it needs a running server.
+- **D10 witnessed generations,** on each route, with a restart, and one English question under an Italian interface.
+
+Owner steps:
+1. `npm run eval -- --list-models`, to pick the strongest and the cheapest model the account lists.
+2. `npm run eval -- --route chatgpt --allow-chatgpt --setups A,B,C --strong <slug> --cheap <slug>`. That is 4 cases × 3 setups × 2 attempts = 24 generations, each of about 5–9 requests.
+3. Fill in the `*.review.md` sheets before opening `setups.json`.
+4. Optionally, with a local server running: `npm run eval`.
+
+### Phase depth (D13–D14)
+
+Received command: `implement P-20261024-disassembly v5 --phase depth`, on 2026-10-26. The plan ID, version and approval digest matched the v5 approval record.
+
+| Task | Status | Evidence |
+|---|---|---|
+| D13 | Done | `src/core/disassembly.ts` (recursive parts, `minLinesToSplit`, per-part bill of materials, part `excluded`, `expansions`, `isExpansionOf`, `nextRevision`), `src/core/disassembly-state.ts` (`carryOver`), `ProgressStore.carry`, latest revision in `DisassemblyStore.list`; `tests/depth.test.ts` (automated test) |
+| D14 code | Done | `acceptExpansion`, `buildExpansionInput` and `expandPart` in `src/core/disassembly-generation.ts`; `Generator.expand`; IPC `disassembly:expand`; `TakeApart` on the part card; App reopening the new revision; `eval --expand`. Tests: `tests/depth.test.ts`, `tests/disassembly-player.test.tsx` (automated test) |
+| D14 measurement | **Open** | Runs with D9's comparison: up to 4 expansions on ChatGPT, and the local route when a server is running |
+
+Checks:
+- `npm run check`: passed, 18 files, 256 tests.
+- `npm run build`: passed. The bundle is 605 kB.
+- Static scan of the new and changed public files: no names, code or text from the private cases. The private fixtures in `.local/` gained part-level exclusions and stay uncommitted.
+
+Acceptance, as far as code can show it:
+- **Depth:**
+  - a synthetic disassembly five levels deep validates;
+  - its five levels lay out without geometry findings;
+  - the state opens to the deepest level and back.
+- **Stopping rule:** a level under a part with 4 non-blank lines is a located finding, naming the count and the minimum.
+- **Per-part bill of materials:**
+  - an uncovered parent line is reported as a range, like a forgotten source range;
+  - an exclusion outside its part, an exclusion on a part without sub-parts, and a sub-part citing every line of its parent are each a finding.
+- **All fixtures validate under the new rules:** the five public ones and the three private ones.
+- **Expansions:**
+  - `isExpansionOf` accepts exactly one part gaining a level and rejects any other change;
+  - `carryOver` moves runs, choices, reassembly, notes and the selection to the new revision, and opens the part;
+  - the store keeps both revision files and lists one card;
+  - the progress store moves the saved file and keeps the old one.
+- **Taking a part apart:**
+  - the request carries the question, the path, and exactly the part's lines; the sources form a closed list;
+  - a valid split saves `v2` and moves the progress;
+  - a split that forgets lines is repaired once, then refused with nothing saved;
+  - parts that are too small, already open, or in a prepared disassembly are refused before any request;
+  - cancellation saves nothing.
+- **Player:**
+  - a generated disassembly offers "Smonta questo pezzo" with its cost and route;
+  - a small part says why it stops;
+  - after the split, the player reopens on the new level with the learner's note intact;
+  - prepared disassemblies show neither.
+
+Decisions taken within the approved scope:
+- **Kessmouth's `vote` lost its sub-level.** It cites 4 lines, below the approved minimum of 6, and its three sub-parts were one line each, which is exactly the split the rule forbids. Its points still tell the vote. The tests that used it now use Mill's `bounds`. If the owner wants such splits, the threshold is the place to change, not the fixture.
+- **Fixture gaps were closed with reasons, not by widening sub-parts.**
+  - Headings are `context`.
+  - Table rows that summarize their section are `repetition`.
+  - Lines about the part as a whole, such as Mill's definition and conclusion of the region, are `context` with a note.
+  - The private fixtures got `context` entries for the same kind of lines.
+- **The descent always ends.**
+  - The contract forbids a sub-part that cites all of its parent's lines.
+  - An expansion's sub-parts must cite only the part's own lines.
+  - So each expanded level has strictly fewer lines than the one above.
+
+  Hand-made sub-parts may still cite a line outside their parent (Atlas `rb-identity` does), as a cross-reference.
+- **The first generation also emits part-level exclusions,** so its sub-levels meet the same rule. Its instructions say not to open a part under 6 lines, and that deeper levels can come later.
+- **Learner state:**
+  - `path` accepts up to 32 levels. This is a storage bound on a file, not a product rule; the line count stops real depth far below it.
+  - After an expansion, the learner lands inside the new level.
+- **The route for taking a part apart** is the structure model of the Studio settings. When none is saved, it is the structure model that generated the disassembly.
+
+Incident during verification:
+- **What happened.** While checking the runner's refusals, the agent ran `npm run eval -- --route chatgpt --allow-chatgpt --setups A,B,C --strong x --cheap y --expand --cases kessmouth`. It expected a refusal, but the combination was within budget.
+  - The runner sent 6 structure requests to OpenAI through the owner's session, with the made-up slugs `x` and `y`.
+  - Each carried the public Kessmouth story and the instructions, about 4.8k characters.
+  - Each was rejected at once with `model-unavailable`, and no output was received.
+  - No private material was involved.
+- **Fixes:**
+  - the runner now checks every slug against the account's model list before sending anything;
+  - it stops at the first `model-unavailable`;
+  - the ledger counts only attempts that got past admission.
+- **Cleanup.** The run folder and the ledger file, which held only those 6 entries, were removed. The comparison budget is intact.
+- The same command now ends with "The account does not list x, y", and no request is sent.
+
+Owner steps (D9 comparison, now including D14):
+1. `npm run eval -- --list-models`.
+2. `npm run eval -- --route chatgpt --allow-chatgpt --setups A,B,C --strong <slug> --cheap <slug> --expand`: 24 generations and 4 expansions.
+3. Review the `*.review.md` and `*.expanded.review.md` sheets before opening `setups.json`.

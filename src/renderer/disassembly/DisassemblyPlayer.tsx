@@ -7,10 +7,11 @@ import {
   restoreDisassemblyState, scenarioView, selectPart, type DisassemblyState, type RestoredDisassemblyState,
 } from '../../core/disassembly-state';
 import { layoutDisassembly } from '../../core/layout';
+import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
 import { Brand } from '../icons';
 import { PreferencesMenu, restoreText, usePreferences } from '../preferences';
 import { BillOfMaterials } from './BillOfMaterials';
-import { PartCard } from './PartCard';
+import { PartCard, TakeApart } from './PartCard';
 import { Reassemble } from './Reassemble';
 import { RunPanel } from './RunPanel';
 import { Sheet } from './Sheet';
@@ -24,8 +25,10 @@ const MODES: Mode[] = ['explode', 'run', 'reassemble', 'bom'];
 const STEP_MS = 900;
 const stepDelay = () => typeof window.matchMedia === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? STEP_MS : 0;
 
-export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersion }: { d: Disassembly; bridge: DesktopBridge; goHome: () => void; versions?: Disassembly[]; openVersion?: (id: string) => void }) {
-  const { t, language } = usePreferences();
+export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersion, onExpanded }: { d: Disassembly; bridge: DesktopBridge; goHome: () => void; versions?: Disassembly[]; openVersion?: (id: string) => void; onExpanded?: (next: Disassembly) => void }) {
+  const { t, language, settings } = usePreferences();
+  const [expanding, setExpanding] = useState<{ part: string; progress: GenerationProgress }>();
+  const [expandProblem, setExpandProblem] = useState<{ part: string; failure: ProviderFailure }>();
   const [state, setState] = useState<DisassemblyState>(() => initialDisassemblyState(d));
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -64,6 +67,25 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   }, [state, loaded, bridge, retry]);
 
   const focusCite = (c: Cite) => { setFocus(c); setSourceId(c.source); };
+  // Taking a part apart: only generated disassemblies in the desktop app, through the structure model of the Studio setup.
+  const studio = bridge.studio;
+  const chatgptModel = settings?.chatgptModel ?? (d.generation?.provider === 'chatgpt' ? d.generation.model.split(' + ')[0] : undefined);
+  const expandRoute: GenerationRoute | undefined = settings?.provider === 'local'
+    ? settings.local && { provider: 'local', runtime: settings.local.runtime, baseUrl: settings.local.baseUrl, model: settings.local.model }
+    : chatgptModel ? { provider: 'chatgpt', model: chatgptModel } : undefined;
+  const takeApart = async (partId: string) => {
+    if (!studio?.expandPart || !expandRoute || expanding) return;
+    setExpandProblem(undefined);
+    setExpanding({ part: partId, progress: { phase: 'structure', repairing: false, received: 0, requests: 0 } });
+    const stop = studio.onGenerationProgress(progress => setExpanding(x => x && { ...x, progress }));
+    try {
+      // The progress the host moves to the new revision must include the last change.
+      await saveQueue.current.catch(() => {});
+      const result = await studio.expandPart({ disassemblyId: d.id, revision: d.revision, part: partId, route: expandRoute });
+      if (result.ok) onExpanded?.(result.disassembly);
+      else setExpandProblem({ part: partId, failure: result.failure });
+    } finally { stop(); setExpanding(undefined); }
+  };
   const level = openLevel(d, state.path) ?? d.parts;
   const owner = state.path.length ? findPart(d.parts, state.path.at(-1)!) : undefined;
   const joints = owner ? owner.joints ?? [] : d.joints;
@@ -129,7 +151,9 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
             </div>
             <aside className="d-side">
               {mode === 'explode' && <PartCard d={d} part={part} owner={owner} joints={joints} level={level} number={part && index(part.id)} focus={focus} onFocus={focusCite} onEnter={enter}
-                note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}/>}
+                note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}
+                takeApart={part && d.kind === 'generated' && studio?.expandPart && <TakeApart d={d} part={part} route={expandRoute} progress={expanding?.part === part.id ? expanding.progress : undefined}
+                  problem={expandProblem?.part === part.id ? expandProblem.failure : undefined} onRun={() => void takeApart(part.id)} onCancel={() => void studio.cancelGeneration()}/>}/>}
               {mode === 'run' && <RunPanel d={d} run={run} state={state} focus={focus} running={running?.runId === run.id} actions={{
                 choose: id => { if (!running) setRunId(id); }, focus: focusCite,
                 predict: (step, option) => setState(s => predict(d, s, run.id, step, option)),

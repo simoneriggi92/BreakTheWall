@@ -35,28 +35,40 @@ Versions were checked against npm metadata on 2026-10-21. The current [Vite guid
 
 ## Evaluating generation
 
-`npm run eval` runs the app's own generator on fixed cases and writes a report under `.local/eval/runs/<time>-<route>/`. The `.local` folder is ignored by git. Use it to compare a change to prompts, the draft schema, the pipeline or the model against a baseline.
+`npm run eval` runs the app's own two-phase generator on fixed cases and writes a report under `.local/eval/runs/<time>-<route>/`. The `.local` folder is ignored by git. Use it to compare a change to prompts, schemas, the pipeline or the models against a baseline.
 
 ```sh
-npm run eval                                   # all cases, 3 attempts, the local model chosen in the app
-npm run eval -- --cases glucose,release-runbook --runs 1
+npm run eval                                   # public cases, 2 attempts, the local model chosen in the app
+npm run eval -- --cases kessmouth,mill-harm --runs 1
 npm run eval -- --runtime llamacpp --base http://127.0.0.1:8080 --model qwen3.6
-npm run eval -- --route chatgpt --model <slug> --allow-chatgpt --runs 2
+npm run eval -- --list-models                  # the account's ChatGPT models; no generation
+npm run eval -- --route chatgpt --allow-chatgpt --setups A,B,C --strong <slug> --cheap <slug>
+npm run eval -- --route chatgpt --allow-chatgpt --structure-model <slug> --content-model <slug>
+npm run eval -- --route chatgpt --allow-chatgpt --setups C --strong <slug> --cheap <slug> --expand
 ```
 
+`--expand` then takes apart one part per case on the first valid attempt of the first setup named: the leaf with the most lines of its own, through that setup's structure model. Each expansion is one request, plus at most one repair. It writes `expansions.jsonl`, the expanded disassembly and its review sheet.
+
+A generation is three phases: the structure with the bill of materials, one request per top-level part, and one for the runs. Each phase can be repaired once. A ChatGPT **setup** names the models:
+- **A:** the strong model on every phase;
+- **B:** the cheap model on every phase;
+- **C:** the strong model for the structure, the cheap one for parts and runs.
+
 **Cases**
-- **Public:** `eval/cases/*.json`, each a goal plus snapshots of its sources. They are original text or files from this repository, so they never change as the code evolves.
-- **Private:** your own documents go in `.local/eval/cases/` in the same format. They are included unless you pass `--public-only`, and nothing from them leaves `.local/`.
+- **Public:** `eval/cases/*.json`, each a question, a content language and snapshots of its sources. They are original, public-domain or repository text: the Atlas runbook (mechanism), Mill's harm principle (argument), the Kessmouth story (story) and this repository's earlier core pipeline (code).
+- **Private:** your own documents go in `.local/eval/cases/` in the same format. A private case runs only when you name it in `--cases`, and nothing from it leaves `.local/`. On ChatGPT it also needs `--private-to-chatgpt`, which you pass only once you know that sending the document to OpenAI is allowed.
 
 **ChatGPT runs** spend your plan, so:
 - they need `--allow-chatgpt`;
-- they are capped at 2 attempts per case;
+- they are capped at 2 attempts per case and setup;
+- the plan's budget of 30 generations (28 on public cases, 2 on private ones) and 4 parts taken apart is counted across runs in `.local/eval/chatgpt-budget.jsonl`, and a run that would exceed it does not start;
 - they stop at the first usage-limit response.
 
 The runner also stops when a local server is unreachable or the model is missing.
 
 **Report contents**
-- `attempts.jsonl`: one line per attempt, with validity, repair, time, output size, page and representation mix, source coverage, and answer-length ratios. A correct answer much longer than the wrong ones gives itself away.
-- `summary.json`: totals per case.
-- The lesson of every valid attempt.
-- One `*.review.md` sheet per case: every statement next to its cited lines, with an empty verdict (✅ correct, ⚠️ imprecise, ❌ wrong). Claim errors are the one metric the runner cannot compute; fill in the sheet to record them.
+- `attempts.jsonl`: one line per attempt, with validity, time, and per phase the requests, repairs and characters sent and received. A valid attempt also records parts per level, depth, joint families, forgotten lines, layout findings, the written language, runs, inferences and answer-length ratios. A correct option much longer than the wrong ones gives itself away.
+- `summary.json`: totals per case and setup, by letter only.
+- `setups.json`: the models behind each letter. Open it only after the review.
+- The disassembly of every valid attempt.
+- One `*.review.md` sheet per case and setup, read blind: every point, sub-part, joint and run explanation next to its cited lines, with an empty verdict (✅ correct, ⚠️ imprecise, ❌ wrong) and a 1–5 rating for the exploded view and for the runs. Claim errors are the one metric the runner cannot compute; fill in the sheet to record them.

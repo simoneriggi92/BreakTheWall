@@ -1,0 +1,15 @@
+{
+  "id": "kessmouth",
+  "title": "How the Kessmouth market reached the quay (story, original, English)",
+  "goal": {
+    "outcome": "How did the Kessmouth market end up on the quay, and which decision made it happen?",
+    "priorKnowledge": ""
+  },
+  "language": "en",
+  "sources": [
+    {
+      "path": "sources/kessmouth.md",
+      "title": "The harbour bell of Kessmouth"
+    }
+  ]
+}

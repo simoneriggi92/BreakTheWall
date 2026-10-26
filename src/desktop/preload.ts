@@ -12,13 +12,18 @@ const studio = Object.freeze<StudioBridge>({
   generate: request => ipcRenderer.invoke('generation:start', request),
   cancelGeneration: () => ipcRenderer.invoke('generation:cancel'),
   onGenerationProgress: listener => {
-    const handler = (_event: unknown, progress: { received?: unknown; phase?: unknown }) => listener({ received: Number(progress?.received) || 0, phase: progress?.phase === 'repairing' ? 'repairing' : 'generating' });
+    const handler = (_event: unknown, p: { received?: unknown; phase?: unknown; repairing?: unknown; requests?: unknown; part?: unknown; parts?: unknown }) => listener({
+      phase: p?.phase === 'content' || p?.phase === 'runs' ? p.phase : 'structure', repairing: p?.repairing === true,
+      received: Number(p?.received) || 0, requests: Number(p?.requests) || 0,
+      ...(typeof p?.part === 'number' && typeof p?.parts === 'number' ? { part: p.part, parts: p.parts } : {}),
+    });
     ipcRenderer.on('generation:progress', handler);
     return () => { ipcRenderer.removeListener('generation:progress', handler); };
   },
   listLessons: () => ipcRenderer.invoke('lessons:list'),
   listDisassemblies: () => ipcRenderer.invoke('disassemblies:list'),
   findDisassembly: key => ipcRenderer.invoke('disassemblies:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),
+  expandPart: request => ipcRenderer.invoke('disassembly:expand', request),
   openUsageSettings: () => ipcRenderer.invoke('account:usage-settings'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: settings => ipcRenderer.invoke('settings:save', settings),

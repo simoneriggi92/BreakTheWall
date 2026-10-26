@@ -310,7 +310,23 @@
           "icon": "users"
         }
       ],
-      "joints": []
+      "joints": [],
+      "excluded": [
+        {
+          "source": "mill",
+          "from": 95,
+          "to": 99,
+          "reason": "context",
+          "note": "Riguarda il pezzo nel suo insieme, non uno dei suoi sottopezzi."
+        },
+        {
+          "source": "mill",
+          "from": 123,
+          "to": 131,
+          "reason": "context",
+          "note": "Riguarda il pezzo nel suo insieme, non uno dei suoi sottopezzi."
+        }
+      ]
     },
     {
       "id": "objection",

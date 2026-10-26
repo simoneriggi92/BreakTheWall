@@ -1,11 +1,14 @@
 import { z } from 'zod';
-import { allParts, type Disassembly, type Part } from './disassembly';
+import { allParts, isExpansionOf, type Disassembly, type Part } from './disassembly';
 
 const key = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
 export const disassemblyStateSchema = z.strictObject({
   schemaVersion: z.literal(1), disassemblyId: key, revision: key,
-  /** Open sub-assemblies, from the whole down; empty at the top level. */
-  path: z.array(key).max(2), selected: key.optional(),
+  /**
+   * Open sub-assemblies, from the whole down; empty at the top level. The bound only limits what a file can hold:
+   * every level cites fewer lines than the one above, so real depth stays far below it.
+   */
+  path: z.array(key).max(32), selected: key.optional(),
   /** Per run: the scenario step reached (-1 before the first), the option chosen per step, the bricks already removed. */
   runs: z.record(key, z.strictObject({
     step: z.number().int().min(-1).max(11),
@@ -69,6 +72,25 @@ export function restoreDisassemblyState(d: Disassembly, input: unknown): Restore
   if (parsed.data.disassemblyId !== d.id || parsed.data.revision !== d.revision) return reset('revision-changed');
   if (!referencesHold(d, parsed.data)) return reset('references-changed');
   return { state: parsed.data };
+}
+
+/**
+ * Progress moves to a revision that only took one part apart: every reference still holds. The learner lands inside
+ * the part just taken apart. Any other change returns undefined, and the D3 rules apply.
+ */
+export function carryOver(previous: Disassembly, next: Disassembly, state: DisassemblyState): DisassemblyState | undefined {
+  const part = isExpansionOf(next, previous);
+  if (!part || restoreDisassemblyState(previous, state).notice) return undefined;
+  const ancestors = (parts: Part[], trail: string[]): string[] | undefined => {
+    for (const p of parts) {
+      if (p.id === part) return [...trail, p.id];
+      const inner = p.parts && ancestors(p.parts, [...trail, p.id]);
+      if (inner) return inner;
+    }
+    return undefined;
+  };
+  const moved: DisassemblyState = { ...state, revision: next.revision, path: ancestors(next.parts, []) ?? state.path, selected: undefined };
+  return restoreDisassemblyState(next, moved).notice ? undefined : moved;
 }
 
 // ---------- Transitions: pure, so the player only draws what they return ----------

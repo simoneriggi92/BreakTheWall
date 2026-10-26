@@ -1,6 +1,57 @@
 # Plan review: disassembly v2
 
-Plan: [P-20261024-disassembly v3](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2 before v3 was written.
+Plan: [P-20261024-disassembly v5](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25; versions 4 and 5 on 2026-10-26. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2, phase `player` under v3, and the code of phase `generation` under v4.
+
+## Version 5: changes and findings resolved
+
+Version 5 follows the owner's requirement that any part can be taken apart on request, at any depth, as long as the source allows it. Generation under v4 produced two levels, and the contract allowed three.
+
+| Finding | Resolution in v5 |
+|---|---|
+| "No limit on levels" could mean one request producing an unbounded tree. That means a large answer, more forgotten lines, deep nested schemas, and plan usage spent on branches nobody opens. | The first generation keeps its shape. Further depth comes from one small request per part, carrying only that part's lines, when the learner asks for it. |
+| Without a numeric limit, something must stop the descent, or a model splits single lines. | The source stops it. A part must cite at least 6 non-blank lines to be divisible, and the host enforces this rule, not the model. The threshold was checked against the fixtures: story events stay whole, code and argument parts open. |
+| A deeper level can silently drop lines of its parent. Measured: the fixtures already do, by 1–31 lines per part. | A per-part bill of materials, with part-level exclusions and reasons. The fixtures are corrected in D13, and the check applies to generation and expansion alike. |
+| Taking a part apart changes the disassembly, so its revision changes. Under D3, a revision change restarts progress, so going deeper would erase the learner's runs and notes. | An expansion must be additive, and the host checks it. The learner state then moves to the new revision; any other change keeps the D3 reset. |
+| The store would list every revision as a separate card. | The store lists the latest revision of each disassembly. |
+| A mixed setup or a later expansion by another model hides who wrote which level. | An `expansions` list records the part, provider, model and time of each expansion. |
+| The D9 comparison would measure a generator that is about to change. | Phase `depth` comes before the comparison. The budget gains 4 expansions, one per public case, to measure D14. |
+| Prepared examples are bundled read-only; expanding them needs a stored copy. | Out of scope for this plan, stated as an assumption the owner can change. |
+| Runs act on the top level, so a deep level has nothing to run. | Stated as a limit. Runs at deeper levels can be a later plan if the owner wants them. |
+
+Checks (v5):
+- D1–D8 text is unchanged except one note in D1, which points to D13. Their evidence stays valid, and so does the v4 generation code.
+- The task IDs D13 and D14 are new, numbered after D12 so that recorded IDs keep their meaning. The order is stated: D13 → D14 → D9's comparison → D10.
+- Dependencies point backwards: D13 on D1–D3 and D8; D14 on D9 and D13; D10 now also on D14.
+- The digest covers the plan body up to "Review and authorization"; the implementation records sit after it.
+
+Residual risks added in v5:
+- The 6-line threshold is a judgement from four public and private fixtures, not a measured optimum. The owner can change it, and evaluation will show whether it blocks useful splits.
+- Deep levels have one sentence per part and no runs, so they explain less than the top level. If that proves too thin, points at deeper levels are a contract change for a later plan.
+- Expansion adds requests that the first generation's request count does not show. The action states its cost before sending.
+
+## Version 4: changes and findings resolved
+
+Version 4 follows the owner's request to compare ChatGPT models for generation, looking for good quality with cheaper models, and to try a work document.
+
+| Finding | Resolution in v4 |
+|---|---|
+| The owner asked to compare models "per la generazione di lezione", but lessons are the format being replaced. Results on lessons would not carry over to two-phase generation. | The comparison runs on disassemblies, inside D9, after the two-phase pipeline exists. |
+| "Cheaper" has no price per token on this route: Sign in with ChatGPT spends plan usage. | The plan defines cost as plan usage, requests, characters and time, and the report measures all four. |
+| One model per generation hides the cheapest good option. The structure is where costly errors happen; content requests are short and local to one part. | Setups name a model per phase. A mixed setup C (strong structure, cheap content) is compared with all-strong A and all-cheap B. |
+| The v3 cap (2 attempts per case) did not say how many models or setups. | An explicit budget: 30 generations in total, enforced by the runner, with a stop at the first usage-limit response. The approval boundary names it. |
+| Automated checks cannot tell a true point from a plausible false one, and knowing the model biases the reader. | A blind claim review, with setups labelled A/B/C. The decision rule requires the chosen setup to have no more wrong points than A. |
+| The owner's work document may fall under company policy. | It runs on ChatGPT only after the owner confirms the policy in chat; until then, local route only. It stays in `.local/` and is described only generically. |
+| Model names on the account change over time. | Models are chosen from the account's list at run time, and exact slugs are recorded. |
+| Four public cases are needed, one per kind of material, and none may be private. | Atlas runbook (mechanism), Mill (argument, public domain), Kessmouth (story, original), this repository's core pipeline (code). |
+
+Checks (v4):
+- D1–D8 text is unchanged; their evidence stays valid.
+- Task IDs are unchanged; D9 grows, and D10 gains the setup choice.
+- The digest covers the plan body up to "Review and authorization"; the implementation records sit after it.
+
+Residual risks added in v4:
+- 8 attempts per setup give an indication, not a proof. A difference of one or two valid results between setups is within noise, and the report must say so.
+- The blind review depends on the owner's time: 3 setups × 4 cases. If the owner cannot review all of them, the plan records which ones were reviewed, and the decision rule applies only to those.
 
 ## Version 3: changes and findings resolved
 

@@ -62,7 +62,7 @@ describe('rendered language', () => {
     render(<App bridge={bridge(locale)} prepared={prepared}/>);
     await waitFor(() => expect(document.documentElement.lang).toBe(expected));
     expect(pageLanguage()).toBe(expected);
-    await userEvent.click(screen.getByRole('button', { name: expected === 'en' ? /Create a path/ : /Crea un percorso/ }));
+    await userEvent.click(screen.getByRole('button', { name: expected === 'en' ? /Take apart a source/ : /Smonta una tua fonte/ }));
     expect(pageLanguage()).toBe(expected);
     await userEvent.click(screen.getByRole('button', { name: expected === 'en' ? /Back to your library/ : /Torna ai percorsi/ }));
     await userEvent.click(screen.getByRole('button', { name: /Sample/ }));

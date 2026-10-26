@@ -73,67 +73,6 @@
           "from": 7,
           "to": 10
         }
-      ],
-      "parts": [
-        {
-          "id": "for-wall",
-          "name": "Ada Pell, for the wall",
-          "kind": "actor",
-          "icon": "user-round",
-          "role": "The harbour master.",
-          "explain": "Without boats there would be nothing to sell, so the wall comes first.",
-          "cites": [
-            {
-              "source": "kessmouth",
-              "from": 8,
-              "to": 8
-            }
-          ]
-        },
-        {
-          "id": "for-hall",
-          "name": "The merchants, for the hall",
-          "kind": "actor",
-          "icon": "users",
-          "role": "The stallholders.",
-          "explain": "Their stalls stood in the rain, so they wanted the hall repaired.",
-          "cites": [
-            {
-              "source": "kessmouth",
-              "from": 9,
-              "to": 9
-            }
-          ]
-        },
-        {
-          "id": "promise",
-          "name": "The bell promise",
-          "kind": "event",
-          "icon": "flag",
-          "role": "The concession that wins the vote.",
-          "explain": "Ada Pell promises to ring the harbour bell before every storm, and wins by one voice.",
-          "cites": [
-            {
-              "source": "kessmouth",
-              "from": 10,
-              "to": 10
-            }
-          ]
-        }
-      ],
-      "joints": [
-        {
-          "from": "for-wall",
-          "to": "promise",
-          "type": "leads-to",
-          "label": "wins with"
-        },
-        {
-          "from": "for-hall",
-          "to": "promise",
-          "type": "because",
-          "label": "one voice short"
-        }
       ]
     },
     {

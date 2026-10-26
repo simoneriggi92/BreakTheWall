@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Disassembly } from './disassembly';
 import type { Lesson } from './lesson';
 import type { ImportErrorCode, ImportErrorParams, LearningGoal, UserSource } from './source';
 
@@ -17,7 +18,7 @@ export type RecoveryAction = 'sign-in' | 'enable-plan' | 'retry' | 'usage-settin
 export type FailureReason = 'local-not-a-server' | 'local-timeout' | 'local-stopped' | 'local-no-template' | 'local-unreadable'
   | 'sign-in-busy' | 'sign-in-denied' | 'sign-in-other-app' | 'sign-in-no-code' | 'sign-in-no-identity' | 'sign-in-other-account'
   | 'session-rejected' | 'models-format' | 'stream-unreadable' | 'sign-in-port' | 'sign-in-timeout' | 'sign-in-cancelled'
-  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified';
+  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified' | 'question-language' | 'part-not-divisible';
 /** `message` stays Italian for logs and tests; the interface words the failure from `reason` or `code`. */
 export interface ProviderFailure { code: FailureCode; reason?: FailureReason; message: string; action?: RecoveryAction; issues?: string[]; requestId?: string }
 
@@ -83,9 +84,14 @@ export const routeSchema = z.discriminatedUnion('provider', [
   localModelSchema.extend({ provider: z.literal('local') }),
 ]);
 export type GenerationRoute = z.infer<typeof routeSchema>;
+/** One route writes the structure, another the parts and runs; they may be the same. */
+export const setupSchema = z.strictObject({ structure: routeSchema, content: routeSchema });
+export type GenerationSetup = z.infer<typeof setupSchema>;
 export const settingsSchema = z.strictObject({
   version: z.literal(1), provider: z.enum(['chatgpt', 'local']),
   chatgptModel: z.string().max(100).optional(),
+  /** The model for parts and runs, when it differs from the structure model. */
+  chatgptContentModel: z.string().max(100).optional(),
   local: localModelSchema.extend({ check: z.strictObject({ enforced: z.boolean(), detail: z.string().max(300), checkedAt: z.string().max(40), reason: z.enum(['timeout', 'respected', 'ignored']).optional(), sample: z.string().max(100).optional() }).optional() }).optional(),
   /** Optional, so settings files written before themes and languages stay valid. `system` follows the operating system. */
   theme: z.enum(['system', 'paper', 'blueprint']).optional(),
@@ -93,7 +99,11 @@ export const settingsSchema = z.strictObject({
 });
 export type StudioSettings = z.infer<typeof settingsSchema>;
 export const defaultSettings: StudioSettings = { version: 1, provider: 'chatgpt' };
-export interface GenerationProgress { received: number; phase: 'generating' | 'repairing' }
+export type GenerationPhase = 'structure' | 'content' | 'runs';
+/** `part` counts finished parts during the content phase; `requests` counts every request sent so far. */
+export interface GenerationProgress { phase: GenerationPhase; repairing: boolean; received: number; requests: number; part?: number; parts?: number }
+export interface PhaseStats { requests: number; repairs: number; sentChars: number; receivedChars: number; ms: number }
+export type GenerationStats = Record<GenerationPhase, PhaseStats>;
 
 /** How a generated lesson names its origin in the library and the player. */
 export function generatedBy(lesson: Lesson): string {
@@ -102,8 +112,12 @@ export function generatedBy(lesson: Lesson): string {
   return g.provider === 'local' ? `Modello locale · ${g.model}` : `ChatGPT · ${g.model}`;
 }
 
-export interface GenerationRequest { sources: UserSource[]; goal: LearningGoal; route: GenerationRoute }
-export type GenerationResult = { ok: true; lesson: Lesson } | { ok: false; failure: ProviderFailure };
+export interface GenerationRequest { sources: UserSource[]; goal: LearningGoal; language: 'it' | 'en'; setup: GenerationSetup }
+export type GenerationResult = { ok: true; disassembly: Disassembly; stats: GenerationStats } | { ok: false; failure: ProviderFailure; stats?: GenerationStats };
+/** Take one part of a saved generated disassembly apart, through one route. */
+export interface ExpansionRequest { disassemblyId: string; revision: string; part: string; route: GenerationRoute }
+/** `disassembly` is the new revision; `moved` says whether the learner's progress followed it. */
+export type ExpansionResult = { ok: true; disassembly: Disassembly; moved: boolean; stats: PhaseStats } | { ok: false; failure: ProviderFailure; stats?: PhaseStats };
 export type PickError = { name: string; message: string; code?: ImportErrorCode | 'not-a-file' | 'unreadable' | 'truncated'; params?: ImportErrorParams };
 export interface PickedSources { sources: UserSource[]; errors: PickError[] }
 
@@ -122,6 +136,8 @@ export interface StudioBridge {
   /** Saved generated disassemblies; the renderer validates them again before showing them. */
   listDisassemblies?(): Promise<{ disassemblies: unknown[]; skipped: number }>;
   findDisassembly?(key: { id: string; revision: string }): Promise<unknown | null>;
+  /** Takes one part apart and saves the new revision; absent in the browser preview. */
+  expandPart?(request: ExpansionRequest): Promise<ExpansionResult>;
   openUsageSettings(): Promise<void>;
   getSettings(): Promise<StudioSettings>;
   saveSettings(settings: StudioSettings): Promise<StudioSettings>;

@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile, copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { progressKeySchema, type ProgressKey, type ProgressResult, type ProgressState } from '../core/bridge';
 import type { Disassembly } from '../core/disassembly';
-import { disassemblyStateSchema, restoreDisassemblyState } from '../core/disassembly-state';
+import { carryOver, disassemblyStateSchema, restoreDisassemblyState } from '../core/disassembly-state';
 import type { Lesson } from '../core/lesson';
 import { restoreState, stateSchema } from '../core/state';
 
@@ -61,6 +61,27 @@ export class ProgressStore {
     const restored = restoreState(target.lesson, parsed);
     if (restored.notice) return preserve({ notice: restored.notice, noticeCode: restored.noticeCode });
     return { state: restored.state };
+  }
+  /**
+   * After a part is taken apart, the learner state follows to the new revision. The old file stays, as on any revision
+   * change. Without saved progress, or when the change is not an expansion, nothing is written.
+   */
+  carry(previous: Disassembly, next: Disassembly): Promise<boolean> {
+    const task = this.queue.catch(() => {}).then(async () => {
+      const dir = join(this.root, DISASSEMBLIES, previous.id);
+      let saved: unknown;
+      try { saved = JSON.parse(await readFile(join(dir, previous.revision + '.json'), 'utf8')); }
+      catch { return false; }
+      const parsed = disassemblyStateSchema.safeParse(saved);
+      const moved = parsed.success ? carryOver(previous, next, parsed.data) : undefined;
+      if (!moved) return false;
+      const file = join(dir, next.revision + '.json');
+      await writeFile(file + '.pending', JSON.stringify(moved), { encoding: 'utf8', mode: 0o600 });
+      await rename(file + '.pending', file);
+      return true;
+    });
+    this.queue = task.then(() => {});
+    return task;
   }
   /** Resolution, checks and the write all run inside the queue, so saves land in call order. */
   save(input: ProgressState): Promise<void> {
