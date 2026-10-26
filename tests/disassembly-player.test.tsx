@@ -8,6 +8,8 @@ import { carryOver, trayOrder, type DisassemblyState } from '../src/core/disasse
 import { failure, type ExpansionRequest, type ExpansionResult, type GenerationProgress, type StudioSettings } from '../src/core/provider';
 import { App } from '../src/renderer/App';
 import { DisassemblyPlayer } from '../src/renderer/disassembly/DisassemblyPlayer';
+import { Sheet } from '../src/renderer/disassembly/Sheet';
+import { labelBeside, layoutDisassembly } from '../src/core/layout';
 import { PreferencesProvider } from '../src/renderer/preferences';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
 import { loadPreparedDisassemblies } from '../src/fixtures/disassemblies';
@@ -231,6 +233,20 @@ describe('content language and interface language', () => {
     expect(screen.getByRole('button', { name: 'Esploso' })).toBeInTheDocument();
     expect(screen.getByText(/How did the Kessmouth market/)).toHaveAttribute('lang', 'en');
     await act(async () => {});
+  });
+});
+
+describe('labels on a running line', () => {
+  it('moves the running joint’s label beside its line, and leaves the others where they are', async () => {
+    const d = await validateDisassembly(atlas());
+    const level = layoutDisassembly(d).get('root')!;
+    const index = level.joints.findIndex((_, i) => labelBeside(level, i));
+    const joint = d.joints[index];
+    render(<PreferencesProvider bridge={memoryBridge().bridge}><Sheet layout={level} parts={d.parts} joints={d.joints} title="t" subtitle="s" language="it" flow={[[joint.from, joint.to]]}/></PreferencesProvider>);
+    const labels = [...document.querySelectorAll<SVGGElement>('.joint-label')];
+    const [dx, dy] = labelBeside(level, index)!;
+    expect(labels[index].style.transform).toBe(`translate(${dx}px, ${dy}px)`);
+    expect(labels.filter((_, i) => i !== index).every(x => !x.style.transform)).toBe(true);
   });
 });
 

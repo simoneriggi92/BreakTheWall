@@ -188,3 +188,8 @@
 /* Taking a part apart: the action sits under the card's citations. */
 .take-apart { margin-top: 12px; display: grid; gap: 6px; justify-items: start; }
 .take-apart .error-banner, .take-apart .notice { justify-self: stretch; }
+
+/* A running line's label steps aside (see labelBeside); without a free side it lets the flow show through. */
+.joint-label { transition: transform .25s ease, opacity .25s ease; }
+.joint-label.see-through { opacity: .4; }
+@media (prefers-reduced-motion: reduce) { .joint-label { transition: none; } }

@@ -131,7 +131,7 @@ A run lets the learner put the whole under load. Write 1-3 runs, preferring the 
 - case: a situation the sources do not describe, with a question and 2-4 options.
 - Options: exactly one is correct, and each has a why. The correct one must not stand out by length or wording. Wrong options are plausible mistakes, and their why names the mistake.
 - inference: true when a run, step or brick states something the text does not say outright; the explanation then says so.
-- reassemble: a title and an instruction for rebuilding the blank drawing. slots: one label per top-level part, at most 40 characters, as it would be written on the drawing (a step number, or the kind of the part); interchangeable parts, such as independent grounds, share one label. hints: one per top-level part, a clue that helps place it without naming it.
+- reassemble: a title and an instruction for rebuilding the blank drawing. slots: one label per top-level part, at most 40 characters, written on the blank drawing where the part goes: a step number, or the kind of the part ("Premise", "Objection"). Never reuse words of the part's name: the label must not give the part away. Interchangeable parts, such as independent grounds, share one label. hints: one per top-level part, a clue that helps place it without naming it.
 - cites use the line numbers shown in the sources. Write everything in the content language of the request.`;
 
 const languageLine = (language: ContentLanguage) => `CONTENT LANGUAGE: ${LANGUAGE_NAMES[language]} (${language})`;
@@ -198,6 +198,16 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
 function languageFindings(path: string, value: string, language: ContentLanguage): Finding[] {
   const found = detectLanguage(value);
   return found && found !== language ? [{ path, message: `Written in ${LANGUAGE_NAMES[found]}, but the content language is ${LANGUAGE_NAMES[language]}: rewrite it in ${LANGUAGE_NAMES[language]}` }] : [];
+}
+const words = (value: string) => new Set(value.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []);
+/**
+ * A slot label gives its part away when it repeats the part's name: two shared words of four letters or more, or
+ * shared words making up at least half of the label. "Premise" for "Over themselves, individuals are sovereign" is fine.
+ */
+export function givesAway(label: string, name: string): boolean {
+  const own = words(label); const named = words(name);
+  const shared = [...own].filter(w => named.has(w)).length;
+  return shared >= 2 || (shared > 0 && shared * 2 >= own.size);
 }
 /** The correct option's length over the mean wrong option's length. */
 export function answerLengthRatio(options: { text: string; correct: boolean }[]): number | undefined {
@@ -300,6 +310,10 @@ export function acceptRuns(raw: string, input: Omit<Draft, 'runs'>): RunsDraft {
   const runs = parseJson(raw, runsZod(ids(input.sources), input.structure.parts.map(p => p.id) as Ids));
   const d = compose({ ...input, runs });
   const findings = checkDisassembly(d).filter(f => /^(runs|reassemble)/.test(f.path));
+  runs.reassemble.slots.forEach((slot, i) => {
+    const part = input.structure.parts.find(p => p.id === slot.part);
+    if (part && givesAway(slot.label, part.name)) findings.push({ path: `reassemble.slots[${i}].label`, message: `"${slot.label}" repeats the name of ${part.id} ("${part.name}"), which gives the reassembly away: use the step number or the kind of part` });
+  });
   for (const set of optionSets(d.runs)) {
     const ratio = answerLengthRatio(set.options);
     if (ratio !== undefined && ratio > ANSWER_LENGTH_LIMIT) findings.push({ path: set.path, message: `The correct option is ${ratio}× as long as the wrong ones, which gives it away: make the options similar in length` });

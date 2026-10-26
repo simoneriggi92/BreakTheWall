@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateDisassembly } from '../src/core/disassembly';
-import { layoutDisassembly, layoutFindings, layoutLevel, type LevelLayout } from '../src/core/layout';
+import { crosses as crossesRect, labelBeside, layoutDisassembly, layoutFindings, layoutLevel, type LevelLayout } from '../src/core/layout';
 import { atlas, fixture, mill, PRIVATE_FIXTURES, PUBLIC_FIXTURES, story } from './disassemblies';
 
 const plate = (level: LevelLayout, id: string) => level.plates.find(p => p.id === id)!.rect;
@@ -63,5 +63,25 @@ describe('automatic layout', () => {
       joints: [{ from: 'a', to: 'c', points: [[100, 25], [300, 25]], label: { x: 110, y: 60, w: 30, h: 18 }, returns: false }],
     };
     expect(layoutFindings(level)).toEqual(['Plates c and d overlap', 'Joint a → c crosses plate b']);
+  });
+});
+
+describe('labels beside a running line', () => {
+  it.each([...PUBLIC_FIXTURES, ...PRIVATE_FIXTURES])('moves labels of %s off their line only to free places', async path => {
+    const levels = layoutDisassembly(await validateDisassembly(fixture(path)));
+    let moved = 0; let total = 0;
+    for (const level of levels.values()) level.joints.forEach((joint, i) => {
+      total++;
+      const aside = labelBeside(level, i);
+      if (!aside) return;
+      moved++;
+      const r = { ...joint.label, x: joint.label.x + aside[0], y: joint.label.y + aside[1] };
+      const lines = level.joints.flatMap(j => j.points.slice(1).map((b, k) => [j.points[k], b] as const));
+      // The moved label must not cover any line, its own included, nor touch a plate or another label.
+      const shifted = { ...level, joints: level.joints.map((j, k) => k === i ? { ...j, label: r } : j) };
+      expect(layoutFindings(shifted), `${path} · ${joint.from} → ${joint.to}`).toEqual([]);
+      expect(lines.some(([a, b]) => crossesRect(a, b, r)), `${joint.from} → ${joint.to}`).toBe(false);
+    });
+    expect(moved / total).toBeGreaterThan(0.7);
   });
 });
