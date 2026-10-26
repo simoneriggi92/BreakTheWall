@@ -4,7 +4,7 @@ title: Disassemblies replace lessons - contract, player, two-phase generation, t
 version: 5
 state: implementing
 current_task: D9
-last_evidence: Phase depth done (D13-D14: recursive contract, stopping rule, per-part bill of materials, progress carried across expansions, Take this part apart); 256 tests and build passing; no live generation yet
+last_evidence: Phase depth done (256 tests, build passing); first live generation valid on the owner's private document (setup C, 11 requests, 207 s); slot labels found to give the answer away
 next_action: Owner lists the ChatGPT models; then the A/B/C comparison with --expand (24 generations + 4 expansions) and the blind review
 approval: approved
 ---
@@ -1000,3 +1000,33 @@ Owner steps (D9 comparison, now including D14):
 1. `npm run eval -- --list-models`.
 2. `npm run eval -- --route chatgpt --allow-chatgpt --setups A,B,C --strong <slug> --cheap <slug> --expand`: 24 generations and 4 expansions.
 3. Review the `*.review.md` and `*.expanded.review.md` sheets before opening `setups.json`.
+
+#### The owner's private work document (2026-10-26)
+
+- **Gate (D9).**
+  - Asked whether company policy allows sending the document to OpenAI, the owner answered in chat: "Sì, è consentito".
+  - The document is a private architecture and deployment proposal of about 330 lines. It stays in `.local/eval/cases/` and is not named in commits.
+  - Before sending, the agent checked it for keys, passwords and IP addresses, and found none.
+- **Run.** Requested by the owner before the A/B/C comparison, to judge generation on real work material.
+  - One generation with setup C: the strong model for the structure, the cheap one for parts and runs.
+  - It uses one of the 2 private generations in the budget.
+  - The owner's question asks how the described system is built, released and deployed.
+- **Result:** valid on the first attempt, the first live disassembly generation.
+  - 11 requests in 207 s: structure 105 s; 7 parts with 2 content repairs, 94 s; runs 62 s.
+  - About 101k characters sent and 33k received.
+  - 0 forgotten lines, 0 layout findings, content in Italian.
+  - The longest correct option is 1.54× the wrong ones, under the 1.6 limit.
+  - 7 top-level parts, no sub-levels, 3 runs (two scenarios, one case).
+  - The sections the question does not need were excluded as `outside-question`.
+  - The disassembly was copied into the app's library, so the owner can review it in the app and take parts apart there.
+- **Defect found: the reassembly gives the answer away.** The model used each part's name as its slot label, so the blank drawing shows the names. The instructions asked for a step number or a kind. No check catches this yet.
+- **Fixed after the run, at the owner's request (2026-10-26):**
+  - **Slot labels that give a part away are now a repairable finding in the runs phase.** A label gives a part away when it shares two words of four letters or more with the part's name, or when shared words make up at least half of the label.
+    - The instructions now ask for a step number or a kind, never the part's words.
+    - Every public fixture passes, except Kessmouth's "Rival" (for "The railway, a rival cause"). That label is now "Objection", the part's kind.
+    - The disassembly already generated from the private document keeps its labels; a new generation would follow the new rule.
+  - **Joint labels in run mode.** The owner noted that a label could hide the animation of a running arrow. While a joint's line runs, `labelBeside` moves its label off the line: perpendicular to the segment it sits on, to a side that touches no plate, label or line.
+    - The geometry test covers every fixture: 11 of 12 Atlas joints have a free side, as do all 26 of the private code case.
+    - Where neither side is free, the label turns see-through while its line runs.
+    - Other labels and the exploded view are unchanged. Checked in the browser preview on the Atlas scenario.
+- Commit `2e91e95` was pushed; [PR #7](https://github.com/simoneriggi92/BreakTheWall/pull/7) is open to `main`. [PR #6](https://github.com/simoneriggi92/BreakTheWall/pull/6), with the earlier phases, was already merged.

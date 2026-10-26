@@ -268,7 +268,7 @@ export function layoutDisassembly(d: Pick<Disassembly, 'parts' | 'joints'>): Map
 
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 /** Liang–Barsky clipping: does the segment enter the rectangle's interior? */
-function crosses([x1, y1]: Point, [x2, y2]: Point, r: Rect): boolean {
+export function crosses([x1, y1]: Point, [x2, y2]: Point, r: Rect): boolean {
   const e = 0.5; const left = r.x + e, right = r.x + r.w - e, topY = r.y + e, bottom = r.y + r.h - e;
   const dx = x2 - x1, dy = y2 - y1;
   let t0 = 0, t1 = 1;
@@ -300,4 +300,38 @@ export function layoutFindings(level: LevelLayout): string[] {
     if (r.x < 0 || r.y < 0 || r.x + r.w > level.width || r.y + r.h > level.height) { out.push('Drawing exceeds the sheet'); break; }
   }
   return out;
+}
+
+/**
+ * Where a joint's label can stand beside its line instead of on it, as an offset from its laid-out place. A run
+ * animates the line of the current step, and a label on top would hide it. The label moves perpendicular to the
+ * segment it sits on, to whichever side touches no plate, label or line; undefined when neither side is free.
+ */
+export function labelBeside(level: LevelLayout, index: number, gap = 4): Point | undefined {
+  const joint = level.joints[index]; const r = joint.label;
+  if (!r.w) return undefined;
+  const cx = r.x + r.w / 2; const cy = r.y + r.h / 2;
+  const segments = joint.points.slice(1).map((b, k): [Point, Point] => [joint.points[k], b]);
+  const distance = ([[x1, y1], [x2, y2]]: [Point, Point]) => {
+    const dx = x2 - x1; const dy = y2 - y1; const t = Math.max(0, Math.min(1, ((cx - x1) * dx + (cy - y1) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(cx - (x1 + t * dx), cy - (y1 + t * dy));
+  };
+  const [[x1, y1], [x2, y2]] = segments.reduce((best, s) => distance(s) < distance(best) ? s : best);
+  const length = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const nx = -(y2 - y1) / length; const ny = (x2 - x1) / length;
+  // Far enough that the box's projection on the normal clears the line.
+  const shift = r.w / 2 * Math.abs(nx) + r.h / 2 * Math.abs(ny) + gap;
+  const lines = level.joints.flatMap(j => j.points.slice(1).map((b, k): [Point, Point] => [j.points[k], b]));
+  // Above or right first, as text reads more easily over a line than under it.
+  const sides = ny > 0 || (ny === 0 && nx < 0) ? [-1, 1] : [1, -1];
+  for (const side of sides) {
+    const dx = nx * shift * side; const dy = ny * shift * side;
+    const moved = { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h };
+    const free = moved.x >= 0 && moved.y >= 0 && moved.x + moved.w <= level.width && moved.y + moved.h <= level.height
+      && !level.plates.some(p => overlap(moved, p.rect))
+      && !level.joints.some((j, k) => k !== index && overlap(moved, j.label))
+      && !lines.some(([a, b]) => crosses(a, b, moved));
+    if (free) return [Math.round(dx * 10) / 10, Math.round(dy * 10) / 10];
+  }
+  return undefined;
 }

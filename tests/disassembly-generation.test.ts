@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { billOfMaterials, DisassemblyError, type Disassembly, type Part } from '../src/core/disassembly';
 import {
-  acceptContent, acceptRuns, acceptStructure, answerLengthRatio, assembleDisassembly, buildContentInput, buildStructureInput, compose,
+  acceptContent, acceptRuns, acceptStructure, answerLengthRatio, givesAway, assembleDisassembly, buildContentInput, buildStructureInput, compose,
   contentJsonSchema, defaultContentLanguage, runsJsonSchema, structureJsonSchema, type GenerationMeta,
 } from '../src/core/disassembly-generation';
 import { failure, ProviderError, type GenerationProgress } from '../src/core/provider';
@@ -114,6 +114,22 @@ describe('two-phase generation contract (D9)', () => {
     expect(answerLengthRatio(run.options)).toBeGreaterThan(1.6);
     expect(findings(() => acceptRuns(JSON.stringify(giveaway), base))).toContainEqual({ path: `runs[${c}].options`, message: expect.stringMatching(/gives it away/) });
     expect(findings(() => acceptRuns(JSON.stringify(drafts.runs), base))).toEqual([]);
+  });
+
+  it('refuses slot labels that repeat the part’s name, since the blank drawing would show the answer', async () => {
+    expect(givesAway('Kettle and boiling water', 'Kettle and boiling water')).toBe(true);
+    expect(givesAway('Upload per region', 'Upload to one or many regions')).toBe(true);
+    expect(givesAway('Oven: one tray per batch', 'Oven and numbered trays')).toBe(false);
+    expect(givesAway('Premise', 'Over themselves, individuals are sovereign')).toBe(false);
+    for (const path of PUBLIC_FIXTURES) {
+      const d = fixture(path) as Disassembly;
+      for (const slot of d.reassemble.slots) for (const id of [slot.accepts].flat()) expect(givesAway(slot.label, d.parts.find(p => p.id === id)!.name), `${path} · ${slot.label}`).toBe(false);
+    }
+    const { sources, goal, language, drafts } = await setupFor(story());
+    const named = structuredClone(drafts.runs);
+    named.reassemble.slots[0].label = drafts.structure.parts.find(p => p.id === named.reassemble.slots[0].part)!.name;
+    expect(findings(() => acceptRuns(JSON.stringify(named), { sources, goal, language, meta, structure: drafts.structure, contents: drafts.contents })))
+      .toContainEqual({ path: 'reassemble.slots[0].label', message: expect.stringMatching(/gives the reassembly away/) });
   });
 
   it('derives interchangeable slots from shared labels and neighbours, never from the model’s ids', async () => {
