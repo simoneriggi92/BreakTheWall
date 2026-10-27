@@ -242,7 +242,7 @@ Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-2
 | Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
 | Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
 | macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built in CI on a tag and attached to [`v0.1.1-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha); install from a download witnessed by the owner |
-| Windows app | W1 Windows in CI · W2 platform-aware wording · W3–W5 icon, installer events, setup and release job · W6–W7 install steps and witnessed install | ✅ CI and start check on Windows; setup built in CI; ⏳ release and witnessed install |
+| Windows app | W1 Windows in CI · W2 platform-aware wording · W3–W5 icon, installer events, setup and release job · W6–W7 install steps and witnessed install | ✅ CI and start check on Windows; setup built in CI on a tag and attached to [`v0.2.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha); install witnessed by the owner in a Windows 11 VM |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 

@@ -2,10 +2,10 @@
 id: P-20261027-windows-alpha
 title: A Windows alpha - Windows in CI, platform-aware wording, an unsigned x64 Squirrel installer next to the DMG
 version: 1
-state: implementing
-current_task: W6
-last_evidence: W1-W5 verified on PR #27; W6 written - README Windows install, development, CHANGELOG, SECURITY, AGENTS
-next_action: Owner chooses the version for W7 and confirms the tag after merging PR #27
+state: completed
+current_task: none
+last_evidence: W1-W7 verified - v0.2.0-alpha built the Windows setup and DMG; the owner installed and used the setup in a Windows 11 VM
+next_action: None; Windows code signing, arm64 builds and updates would be a new plan
 approval: approved
 ---
 
@@ -224,3 +224,33 @@ The SmartScreen wording, the uninstall behaviour and the shortcuts are written f
 ### Version for W7
 
 The owner chose `0.2.0-alpha` ("Versione 0.2.0-alpha"): a new platform is a feature, not a fix. `package.json` and `package-lock.json` were set with `npm version 0.2.0-alpha --no-git-tag-version`, and the CHANGELOG's Unreleased entries moved to its section. The tag `v0.2.0-alpha` is pushed only after the owner confirms it, once this is on `main`.
+
+### W7: tag and draft release, 2026-10-27
+
+- PR #27 merged into `main` at `f073bde` (version 0.2.0-alpha). The owner confirmed the tag ("va bene il tag"); the agent pushed the annotated tag `v0.2.0-alpha` on `f073bde`.
+- Release workflow run 40541623081 (**passed**):
+  - "Windows x64 setup" (`windows-2025-vs2026`): "start check: the library is drawn"; `Break-the-Wall-0.2.0-alpha-x64-setup.exe`, 157.0 MB, SHA-256 `06d2875368d0c91ebe766b21aaef2d89877a48003e2bc01045838db3636903c6`;
+  - "Apple Silicon DMG" (`macos-15-arm64`): "signature: ad-hoc, verified", "start check: the library is drawn"; `Break-the-Wall-0.2.0-alpha-arm64.dmg`, 94.0 MB, SHA-256 `ca4e2f9b3978b0270265d6712903a3fce1411d947deeef2befdda56dddb48d94`;
+  - "Attach to the release": no release existed for the tag, so it created a draft pre-release with the four files and generated notes.
+- W5's tag path is verified. The draft is visible only to the owner; the assets are confirmed from the job logs.
+
+The owner installed the setup in the Windows 11 virtual machine (Windows on ARM, x64 emulation) and reported: "tutto funziona come previsto". The report covers the six points as listed, without detail per point; it is recorded as the owner's witnessed check, and the README's Windows steps stand as written.
+
+| # | Point | Kind | Result |
+|---|---|---|---|
+| 1 | SmartScreen, "More info" → "Run anyway" | Witnessed (owner) | **passed** (owner's report) |
+| 2 | Installs without administrator rights; Start menu and icon | Witnessed (owner) | **passed** (owner's report) |
+| 3 | Library, Atlas, Mill, a scenario, a Markdown file with Mermaid | Witnessed (owner) | **passed** (owner's report) |
+| 4 | ChatGPT sign-in survives a restart (DPAPI) | Witnessed (owner) | **passed** (owner's report) |
+| 5 | Local model server detected | Witnessed (owner) | **passed** (owner's report; whether a server was running was not stated) |
+| 6 | Uninstall removes the app and shortcuts | Witnessed (owner) | **passed** (owner's report) |
+
+### Verification of phase `release` and completion
+
+| Task | Verdict |
+|---|---|
+| W5 | **verified**: pull-request path on PR #27, tag path on `v0.2.0-alpha` (run 40541623081) |
+| W6 | **verified**: the owner found the Windows steps as written |
+| W7 | **verified** (owner's report) |
+
+All tasks W1–W7 are verified; the plan is completed. Residual risks stay as written: no code signing (SmartScreen), a native x64 PC and Windows 10 not witnessed, no updater, and antivirus heuristics on unsigned Squirrel setups. P-20261024-disassembly returns to `implementing`.
