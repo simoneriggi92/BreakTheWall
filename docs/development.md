@@ -15,7 +15,7 @@ npm run build
 npm start
 ```
 
-`check` runs strict TypeScript checks and the automated tests. `build` checks types, bundles the renderer into `dist/`, and bundles main/preload into `dist-electron/`. `start` launches that production build locally. This is not a signed installer or a distributable application package.
+`check` runs strict TypeScript checks and the automated tests. `build` checks types, bundles the renderer into `dist/`, and bundles main/preload into `dist-electron/`. `start` launches that production build locally. `npm run package` turns it into the downloadable app; see [Packaging](#packaging).
 
 `npm run dev:web` opens the same renderer for browser layout inspection. Browser preview and Electron are different runtime checks; browser persistence does not prove desktop persistence. Desktop test data can be isolated by setting `BTW_USER_DATA_DIR` to an absolute test directory before starting the app.
 
@@ -31,7 +31,21 @@ The domain module must remain independent of React and Electron. Lesson content 
 
 ## Brand assets
 
-The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/brand/`. The header draws the same mark inline, with its colours from the theme's `--brand-*` tokens; terracotta is used only for the piece pulled out of the mark. `npm run brand` renders `assets/icon.png` (1024 × 1024) from `app-icon.svg` with the installed Electron, and the desktop host sets it as the Dock icon on macOS and the window icon elsewhere. There is no packaged app bundle, so the icon applies to `npm start` and `npm run dev`.
+The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/brand/`. The header draws the same mark inline, with its colours from the theme's `--brand-*` tokens; terracotta is used only for the piece pulled out of the mark. `npm run brand` renders `assets/icon.png` (1024 × 1024) from `app-icon.svg` with the installed Electron, and the desktop host sets it as the Dock icon for `npm start` and `npm run dev` on macOS and as the window icon elsewhere. The packaged app carries it as its bundle icon instead (see [Packaging](#packaging)).
+
+## Packaging
+
+`npm run package` builds the app and turns it into `release/Break-the-Wall-<version>-arm64.dmg` with a `.sha256` file, on an Apple Silicon Mac (`scripts/package-mac.mjs`):
+
+1. `assets/icon.png` becomes the bundle's `.icns` (`sips`, `iconutil`).
+2. `@electron/packager` makes `Break the Wall.app` for `darwin`/`arm64`. Only `dist/`, `dist-electron/`, `assets/` and `package.json` go into `app.asar`: every runtime dependency is already bundled, so there is no `node_modules`.
+3. The bundle is signed ad-hoc and checked with `codesign --verify --deep --strict`. It is built in a temporary folder, because a synced folder such as iCloud Documents adds Finder attributes that break the signature.
+4. The start check opens the packaged app with empty user data and `BTW_SMOKE_TEST=1`: the main process exits 0 once the library is drawn, or 1 on a load failure, a renderer crash or 30 s without the library. The script stops if it fails.
+5. `hdiutil` writes the LZMA-compressed DMG with the app and an `Applications` link.
+
+The app uses the same data folder as `npm start` (`~/Library/Application Support/Break the Wall`), because the main process names the app before anything else. It needs macOS 13 or later (`LSMinimumSystemVersion`, from Electron).
+
+Ad-hoc signing lets the app run but not pass Gatekeeper: after a browser download, macOS blocks the first open until the user chooses Open Anyway. Signing with an Apple Developer ID and notarizing would replace the `codesign` step in `scripts/package-mac.mjs`; that needs an Apple Developer account and is not set up.
 
 ## Toolchain references
 

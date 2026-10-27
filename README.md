@@ -24,7 +24,7 @@
 ![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted, then its sub-assembly opened one level down; a scenario predicted and run on the drawing, where a smoke test fails and the rollback takes over; the theme switched from blueprint to paper; Mill's harm principle, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
-> **Alpha, running from source.** There is no installer yet. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
+> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
 
 ## Table of contents
 
@@ -77,7 +77,25 @@ The prepared examples show a release runbook and Mill's harm principle. The same
 
 ## Try the alpha
 
-**Requirements:** macOS, Node.js 22.23.2 and npm 10.9.8 (pinned in `package.json`).
+### Download the app
+
+**Requirements:** a Mac with Apple Silicon (M1 or later) and macOS 13 Ventura or later.
+
+1. Download `Break-the-Wall-<version>-arm64.dmg` from the [latest release](https://github.com/simoneriggi92/BreakTheWall/releases).
+2. Open it and drag **Break the Wall** to **Applications**.
+3. Open the app. The first time, macOS does not open it, because the alpha is signed ad-hoc and not notarized by Apple. Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm. You do this once for each version.
+
+To check the download, put the `.sha256` file from the release next to the DMG and run:
+
+```bash
+shasum -a 256 -c Break-the-Wall-<version>-arm64.dmg.sha256
+```
+
+The app starts clean: the two prepared examples, no account and nothing saved. What you create stays on your Mac in `~/Library/Application Support/Break the Wall`, and ChatGPT credentials stay in your Keychain. There are no automatic updates yet: to update, download the DMG of a newer release and replace the app; your data stays where it is.
+
+### Run from source
+
+For an Intel Mac, or to change the code. **Requirements:** macOS, Node.js 22.23.2 and npm 10.9.8 (pinned in `package.json`).
 
 ```bash
 git clone https://github.com/simoneriggi92/BreakTheWall.git
@@ -97,9 +115,10 @@ npm run check     # strict TypeScript + Vitest
 npm run dev:web   # renderer only, in a browser (no generation)
 npm run eval      # measure generation on fixed cases (see Local development)
 npm run brand     # render the app icon from docs/images/brand
+npm run package   # build the Apple Silicon DMG into release/
 ```
 
-Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your own. More details are in [Local development](docs/development.md), with links to the [product](docs/product.md), [architecture](docs/architecture.md), [active plan](docs/workflow/plans/P-20261024-disassembly/plan.md), [status](STATUS.md) and [changelog](CHANGELOG.md).
+Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your own. More details are in [Local development](docs/development.md), with links to the [product](docs/product.md), [architecture](docs/architecture.md), [plans](docs/workflow/plans/), [status](STATUS.md) and [changelog](CHANGELOG.md).
 
 ## Features
 
@@ -195,7 +214,7 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 
 ## Project status
 
-Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v6). Evidence for each task is in its implementation record.
+Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v7) and [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md) (v1). Evidence for each task is in its implementation record.
 
 | Phase | Tasks | Status |
 |---|---|---|
@@ -206,10 +225,11 @@ Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20
 | Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
 | Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
 | Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
+| macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built and started on Apple Silicon; ⏳ release workflow and witnessed install |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
-Not claimed: learning effectiveness, correctness of generated explanations, platforms other than macOS, or installer distribution.
+Not claimed: learning effectiveness, correctness of generated explanations, platforms other than macOS, Intel builds, or an app signed and notarized by Apple.
 
 ## Roadmap
 
@@ -222,7 +242,8 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 - [ ] Repositories as a source: snapshot identity, secrets found by content, file-level bill of materials
 - [ ] PDF documents as a source: checked extraction, page citations
 - [ ] Dependency map for repositories, and a reassembly that simulates the effect of a misplaced part
-- [ ] Packaged, signed macOS build
+- [x] Downloadable macOS app for Apple Silicon (ad-hoc signed)
+- [ ] Signed and notarized macOS app (Apple Developer ID), with updates
 
 ## Contributing
 
