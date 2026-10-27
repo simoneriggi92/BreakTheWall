@@ -14,7 +14,7 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
 ![Languages](https://img.shields.io/badge/interface-English%20%C2%B7%20Italiano-1f5f99?style=flat-square)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
 
-![Mill's harm principle taken apart in the blueprint theme: the claim in the middle, its grounds below, the consequence above, the objection and the limit at its sides](docs/images/disassembly-mill-blueprint.png)
+![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted; a run step predicted and then executed; Mill's harm principle in the blueprint theme, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
 > Break the Wall is an alpha that runs from source on macOS. There is no installer or release yet. The prepared disassemblies work without any account. Generating disassemblies from your own text and markdown sources works with ChatGPT or a local model; repositories and PDF documents as sources are next on the [roadmap](#roadmap). Feedback and contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -83,6 +83,8 @@ Optional. The drawing keeps its shape but loses its names; put the parts back by
 Every source line is in a part, in a joint, or excluded with a reason: context, outside the question, repetition, detail, contains secrets, generated. The view shows the scope (a repository snapshot or a document's pages), a strip per source, the items with their line ranges, and file-level exclusions. It also shows the app's own check, which names any forgotten range.
 
 ### Two themes, two languages
+
+![Mill's harm principle taken apart in the blueprint theme: the claim in the middle, its grounds below, the consequence above, the objection and the limit at its sides](docs/images/disassembly-mill-blueprint.png)
 
 - **Paper** (light) and **blueprint** (dark), following the system or chosen in the header. Every text color reaches WCAG AA in both themes, checked by a test.
 - **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. When a disassembly exists in both languages, the player offers the other version, and progress stays separate for each version.
