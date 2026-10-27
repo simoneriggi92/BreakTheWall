@@ -244,6 +244,7 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 - [ ] Dependency map for repositories, and a reassembly that simulates the effect of a misplaced part
 - [x] Downloadable macOS app for Apple Silicon (ad-hoc signed)
 - [ ] Signed and notarized macOS app (Apple Developer ID), with updates
+- [ ] Claude code integration
 
 ## Contributing
 
