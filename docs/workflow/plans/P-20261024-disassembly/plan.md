@@ -2,10 +2,10 @@
 id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
 version: 7
-state: blocked
+state: implementing
 current_task: D8
 last_evidence: identity and presentation verified, including the owner's Dock icon check; v0.1.0-alpha published as a pre-release
-next_action: Blocked while P-20261027-macos-dmg is implemented; then the owner witnesses D8 and D10, and D11–D12 stay gated
+next_action: Owner witnesses D8 (library and store) and D10 (generated disassembly in Studio); D11–D12 stay gated
 approval: approved
 ---
 
@@ -1627,3 +1627,4 @@ The plan is not complete: D8's and D10's witnessed flows remain, and D11–D12 s
 ## State changes
 
 - 2026-10-27: `implementing` → `blocked`, as P-20261027-macos-dmg's approved precondition requires (one implementing plan at a time). Waiting for the owner's witnessed checks (D8, D10); D11–D12 gated. It returns to `implementing` when P-20261027-macos-dmg is completed or when the owner resumes it.
+- 2026-10-27: `blocked` → `implementing`, as P-20261027-macos-dmg is completed.

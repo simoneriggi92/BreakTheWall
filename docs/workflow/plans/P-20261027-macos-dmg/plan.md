@@ -2,10 +2,10 @@
 id: P-20261027-macos-dmg
 title: A downloadable macOS build - ad-hoc signed DMG for Apple Silicon, built in CI on a tag
 version: 1
-state: implementing
-current_task: K6
-last_evidence: K4 verified on PR #24 - the Release workflow built the DMG on macos-15-arm64 in 2 m 37 s, start check passed, 92.8 MB artifact; release job skipped as designed
-next_action: Owner chooses the version and confirms the tag; the tag run attaches the DMG to a draft release; owner installs from a download (K6)
+state: completed
+current_task: none
+last_evidence: K1-K6 verified - v0.1.1-alpha published with the DMG; owner installed it from a download, passed Gatekeeper with Open Anyway, and signed in to ChatGPT again
+next_action: None; Developer ID signing, notarization and updates would be a new plan
 approval: approved
 ---
 
@@ -237,3 +237,35 @@ PR #23 (phase `package` and the docs) was merged before the workflow commit reac
 ### Version for K6
 
 The owner chose `0.1.1-alpha` for the first DMG ("porta la versione a 0.1.1-alpha con la sezione nel CHANGELOG"). `package.json` and `package-lock.json` were set with `npm version 0.1.1-alpha --no-git-tag-version`, and the CHANGELOG has its section. The tag `v0.1.1-alpha` is pushed only after the owner confirms it, once this is on `main`.
+
+### K6: tag and draft release, 2026-10-27
+
+- PR #24 merged into `main` at `285cc0a` (version 0.1.1-alpha). The owner confirmed the tag ("confermo il tag v0.1.1-alpha"); the agent pushed the annotated tag `v0.1.1-alpha` on `285cc0a`.
+- Release workflow run 40497618785 (**passed**): "Apple Silicon DMG" on `macos-15-arm64` checked the tag against `package.json`, signed and started the app ("signature: ad-hoc, verified", "start check: the library is drawn") and built `Break-the-Wall-0.1.1-alpha-arm64.dmg`, 94.0 MB, SHA-256 `8cc4e2a7845afd74122700b992021376ea57c056700a6f8e8b3fd43e05fc3a55`. "Attach to the release" found no release for the tag and created a draft pre-release with the DMG, the checksum and generated notes. The tag path of K4 is verified.
+- The draft is visible only to the owner: the agent's token lists no drafts, so the assets are confirmed from the job log, not from the release page.
+
+The owner published the pre-release at 2026-10-27T14:34:56Z. Checked without login: `v0.1.1-alpha` is a published pre-release with `Break-the-Wall-0.1.1-alpha-arm64.dmg` (93,974,298 bytes) and its `.sha256`; both download with HTTP 200 and `shasum -a 256 -c` passes on the public files.
+
+First observation from the owner's install: opening the downloaded app shows "Apple could not verify “Break the Wall” is free of malware that may harm your Mac or compromise your privacy." The rest of the seven points:
+
+| # | Point | Kind | Result |
+|---|---|---|---|
+| 1 | DMG opens, app copied to Applications | Witnessed (owner) | **passed**: `/Applications/Break the Wall.app` is version 0.1.1-alpha, signature ad-hoc, quarantine flag from the browser download |
+| 2 | First open blocked; Open Anyway works | Witnessed (owner) | **passed**: the first dialog's wording is recorded above and now quoted in the README; the quarantine flag carries the user-approved bit (`01c1`). The owner reported the Privacy & Security steps as the README gives them ("Tutto ok") |
+| 3 | Library, Atlas and Mill; a scenario runs; Markdown with Mermaid | Integration check (agent) | **passed**: the installed app on a copy of the owner's data (credentials left out) over the DevTools protocol: Atlas 6 plates, a scenario step runs and its state marks appear; Mill 7 plates; one of the owner's generated disassemblies opens its Markdown source as a document and draws its Mermaid diagram |
+| 4 | Icon and name in Dock, Finder, app switcher | Witnessed (owner) | **passed**: the owner sees the icon ("Sì, spunta"); the bundle's name and `.icns` were checked in K1 |
+| 5 | Progress from the source build is there | Integration check (agent) | **passed**: on the copy, the library shows the resume card, "Earlier paths" and 10 cards, from the folder the source build wrote. Persistence across a restart is the same store as the source build, covered by the existing tests |
+| 6 | ChatGPT credentials or Keychain prompt | Witnessed (owner) | **passed with the expected cost**: the credentials stored by the source build were not usable by the packaged app and the owner signed in again ("Ho rifatto il login"). The README now says so, and that an update may ask for it again |
+| 7 | Local model server detected | — | **not applicable**: no server was listening on 11434, 1234 or 8080 |
+
+The copy was deleted after the check; the screenshots, which showed private content, were deleted too.
+
+### Verification of phase `release` and completion
+
+| Task | Verdict |
+|---|---|
+| K4 | **verified**: pull-request path on PR #24, tag path on `v0.1.1-alpha` (run 40497618785) |
+| K5 | **verified**: README, development, SECURITY, CHANGELOG and AGENTS match what K6 observed; the README quotes the real Gatekeeper dialog and the need to sign in again |
+| K6 | **verified**: points 1–6 passed, 7 not applicable (no local server running) |
+
+All tasks K1–K6 are verified; the plan is completed. Residual risks stay as written: no notarization (users see the malware warning and need Open Anyway), the ChatGPT sign-in may need repeating after updates, and there is no updater. P-20261024-disassembly returns to `implementing`.

@@ -83,7 +83,7 @@ The prepared examples show a release runbook and Mill's harm principle. The same
 
 1. Download `Break-the-Wall-<version>-arm64.dmg` from the [latest release](https://github.com/simoneriggi92/BreakTheWall/releases).
 2. Open it and drag **Break the Wall** to **Applications**.
-3. Open the app. The first time, macOS does not open it, because the alpha is signed ad-hoc and not notarized by Apple. Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm. You do this once for each version.
+3. Open the app. The first time, macOS shows **“Break the Wall” Not Opened**: *Apple could not verify “Break the Wall” is free of malware that may harm your Mac or compromise your privacy.* The alpha is signed ad-hoc and not notarized by Apple, so this is expected. Choose **Done**. Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm with Touch ID or your password. Open the app again and choose **Open Anyway** in the dialog. You do this once for each download.
 
 To check the download, put the `.sha256` file from the release next to the DMG and run:
 
@@ -91,7 +91,7 @@ To check the download, put the `.sha256` file from the release next to the DMG a
 shasum -a 256 -c Break-the-Wall-<version>-arm64.dmg.sha256
 ```
 
-The app starts clean: the two prepared examples, no account and nothing saved. What you create stays on your Mac in `~/Library/Application Support/Break the Wall`, and ChatGPT credentials stay in your Keychain. There are no automatic updates yet: to update, download the DMG of a newer release and replace the app; your data stays where it is.
+The app starts clean: the two prepared examples, no account and nothing saved. What you create stays on your Mac in `~/Library/Application Support/Break the Wall`, and ChatGPT credentials stay in your Keychain. There are no automatic updates yet: to update, download the DMG of a newer release and replace the app; your data stays where it is. The ChatGPT sign-in does not carry over from a build run from source, and may not survive an update, because each version is signed ad-hoc: if Studio shows you signed out, sign in again.
 
 ### Run from source
 
@@ -225,7 +225,7 @@ Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-2
 | Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
 | Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
 | Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
-| macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built and started on Apple Silicon; ⏳ release workflow and witnessed install |
+| macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built in CI on a tag and attached to [`v0.1.1-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha); install from a download witnessed by the owner |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
