@@ -4,8 +4,14 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.1.1-alpha] - 2026-10-27
+
+The first alpha you can download: a Mac app for Apple Silicon, no Node.js needed.
+
 ### Added
 - A downloadable app for Apple Silicon Macs (macOS 13 or later): `npm run package` builds an ad-hoc signed DMG with a SHA-256 checksum, after starting the packaged app to check that the library is drawn. The README explains the install and the Open Anyway step, since the app is not notarized.
+- A Release workflow: a `v*` tag builds the DMG on an Apple Silicon runner and attaches it, with its checksum, to the tag's release.
+- The app starts clean: only the two prepared examples, no account and nothing saved. Your data stays in `~/Library/Application Support/Break the Wall`, shared with a build run from source.
 
 ## [0.1.0-alpha] - 2026-10-27
 
@@ -37,5 +43,6 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.1.0-alpha...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.1.1-alpha...HEAD
+[0.1.1-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha

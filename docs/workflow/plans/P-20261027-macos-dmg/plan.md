@@ -3,9 +3,9 @@ id: P-20261027-macos-dmg
 title: A downloadable macOS build - ad-hoc signed DMG for Apple Silicon, built in CI on a tag
 version: 1
 state: implementing
-current_task: K4
-last_evidence: phase release started - release workflow and release steps written; the workflow has not run yet
-next_action: Push the release workflow so it builds the DMG on PR #23 (K4); then merge, set the version, and the owner confirms the tag for K6
+current_task: K6
+last_evidence: K4 verified on PR #24 - the Release workflow built the DMG on macos-15-arm64 in 2 m 37 s, start check passed, 92.8 MB artifact; release job skipped as designed
+next_action: Owner chooses the version and confirms the tag; the tag run attaches the DMG to a draft release; owner installs from a download (K6)
 approval: approved
 ---
 
@@ -217,3 +217,23 @@ Started by the owner's command, typed as `vimplement P-20261027-macos-dmg v1 --p
 - `docs/development.md` (K5): "Making a release": version and CHANGELOG through a pull request, the tag on `main`, what the workflow does, the owner's check and publication.
 
 K4 is verified when the workflow's pull-request run passes. K5's Open Anyway wording waits for K6.
+
+PR #23 (phase `package` and the docs) was merged before the workflow commit reached it, so the workflow went into PR #24, opened for that commit alone.
+
+### Verification of K4 and K5
+
+| Check | Kind | Result |
+|---|---|---|
+| Release workflow, pull-request path | Integration check | **passed** on PR #24 (run 40496803466): image `macos-15-arm64`, `uname -m` arm64, `npm ci`, `npm run check`, `npm run package` ("signature: ad-hoc, verified", "start check: the library is drawn"), artifact `break-the-wall-dmg` of 92,806,207 bytes; "Attach to the release" skipped, as it must be without a tag. 2 m 37 s |
+| CI on the same commit | Automated test | **passed**: "Types, tests and build" |
+| Release workflow, tag path | Integration check | **not run**: needs a tag the owner confirms; checked in K6 |
+| Release steps in `docs/development.md` | Static inspection | written; followed for real in K6 |
+
+| Task | Verdict |
+|---|---|
+| K4 | **verified** for pull requests; the tag path is verified in K6 |
+| K5 | **implemented**; the Open Anyway wording is confirmed in K6 |
+
+### Version for K6
+
+The owner chose `0.1.1-alpha` for the first DMG ("porta la versione a 0.1.1-alpha con la sezione nel CHANGELOG"). `package.json` and `package-lock.json` were set with `npm version 0.1.1-alpha --no-git-tag-version`, and the CHANGELOG has its section. The tag `v0.1.1-alpha` is pushed only after the owner confirms it, once this is on `main`.
