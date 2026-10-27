@@ -4,6 +4,7 @@ import electron from 'electron';
 
 const jobs = [
   ['docs/images/brand/app-icon.svg', 'assets/icon.png', 1024, 1024],
+  ['docs/images/brand/app-icon.svg', 'assets/icon.ico', 1024, 1024],
   ['docs/images/brand/social-card.html', '.github/assets/social-preview.png', 1280, 640],
 ];
 const env = { ...process.env };

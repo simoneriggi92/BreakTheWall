@@ -4,6 +4,17 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0-alpha] - 2026-10-27
+
+The first alpha for Windows, next to the Mac app.
+
+### Added
+- A Windows app for x64 PCs (Windows 10 or 11): an unsigned Squirrel setup, installed per user without administrator rights, with Start menu and desktop shortcuts. The README explains SmartScreen's "Run anyway" step and checking the checksum in PowerShell.
+- Every pull request runs the checks and the start check on Windows too.
+
+### Changed
+- The interface names the right computer: "this PC" and Windows' credential protection on Windows, "this Mac" and the Keychain on macOS.
+
 ## [0.1.1-alpha] - 2026-10-27
 
 The first alpha you can download: a Mac app for Apple Silicon, no Node.js needed.
@@ -43,6 +54,7 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.1.1-alpha...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.2.0-alpha...HEAD
+[0.2.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha
 [0.1.1-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha

@@ -1,6 +1,6 @@
 # Local development
 
-The player targets macOS. Use Node 22.23.2 and npm 10.9.8 (the versions verified for this alpha). Dependencies are pinned in `package.json` and `package-lock.json`; use npm rather than mixing lockfiles.
+The app targets macOS and Windows x64; CI runs every check on both. Use Node 22.23.2 and npm 10.9.8 (the versions verified for this alpha). Dependencies are pinned in `package.json` and `package-lock.json`; use npm rather than mixing lockfiles.
 
 ```sh
 npm ci
@@ -31,7 +31,7 @@ The domain module must remain independent of React and Electron. Lesson content 
 
 ## Brand assets
 
-The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/brand/`. The header draws the same mark inline, with its colours from the theme's `--brand-*` tokens; terracotta is used only for the piece pulled out of the mark. `npm run brand` renders `assets/icon.png` (1024 × 1024) from `app-icon.svg` with the installed Electron, and the desktop host sets it as the Dock icon for `npm start` and `npm run dev` on macOS and as the window icon elsewhere. The packaged app carries it as its bundle icon instead (see [Packaging](#packaging)).
+The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/brand/`. The header draws the same mark inline, with its colours from the theme's `--brand-*` tokens; terracotta is used only for the piece pulled out of the mark. `npm run brand` renders `assets/icon.png` (1024 × 1024) and `assets/icon.ico` (16–256 px, for Windows) from `app-icon.svg` with the installed Electron, and the desktop host sets it as the Dock icon for `npm start` and `npm run dev` on macOS and as the window icon elsewhere. The packaged app carries it as its bundle icon instead (see [Packaging](#packaging)).
 
 ## Packaging
 
@@ -45,14 +45,16 @@ The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/br
 
 The app uses the same data folder as `npm start` (`~/Library/Application Support/Break the Wall`), because the main process names the app before anything else. It needs macOS 13 or later (`LSMinimumSystemVersion`, from Electron).
 
+On Windows, `npm run package:win` (`scripts/package-win.mjs`, on a Windows x64 machine) makes the same app folder for `win32`/`x64` with the executable `BreakTheWall.exe` (Squirrel needs a name without spaces) and `assets/icon.ico`, runs the same start check, and builds `release/Break-the-Wall-<version>-x64-setup.exe` with `electron-winstaller` (Squirrel), with its `.sha256`. Squirrel installs per user under `%LOCALAPPDATA%\BreakTheWall` and starts the app with `--squirrel-install`, `--squirrel-updated` or `--squirrel-uninstall`; `src/desktop/squirrel.ts` then creates or removes the Start menu and desktop shortcuts through `Update.exe` and quits. Data lives in `%APPDATA%\Break the Wall`. The setup is not code-signed, so SmartScreen asks the user to confirm; signing would be `electron-winstaller`'s `windowsSign` option. What both scripts share (the files that go in, the start check, the checksum) is in `scripts/package-common.mjs`.
+
 ### Making a release
 
 1. Set `version` in `package.json` to the new version (for example `0.1.1-alpha`), add its CHANGELOG section, and merge the change into `main` through a pull request.
 2. Tag that commit on `main` with the same version and a leading `v`, and push the tag: `git tag v0.1.1-alpha && git push origin v0.1.1-alpha`.
-3. The [Release workflow](../.github/workflows/release.yml) checks that the tag matches `package.json`, runs `npm run check` and `npm run package` on an Apple Silicon runner, and attaches the DMG and its `.sha256` to the tag's release. With no release yet, it creates a draft pre-release with generated notes.
-4. Download the DMG from the draft with a browser, install it as the README says, and check it. Then edit the notes and publish the release.
+3. The [Release workflow](../.github/workflows/release.yml) checks that the tag matches `package.json`, runs `npm run check` with `npm run package` on an Apple Silicon runner and `npm run package:win` on a Windows runner, and attaches the DMG, the setup and their `.sha256` files to the tag's release. With no release yet, it creates a draft pre-release with generated notes.
+4. Download the DMG and the setup from the draft with a browser, install them as the README says, and check them. Then edit the notes and publish the release.
 
-A pull request that changes packaging, or a manual run of the workflow, builds the same DMG as a workflow artifact and touches no release.
+A pull request that changes packaging, or a manual run of the workflow, builds the same DMG and setup as workflow artifacts and touches no release.
 
 Ad-hoc signing lets the app run but not pass Gatekeeper: after a browser download, macOS blocks the first open until the user chooses Open Anyway. Signing with an Apple Developer ID and notarizing would replace the `codesign` step in `scripts/package-mac.mjs`; that needs an Apple Developer account and is not set up.
 

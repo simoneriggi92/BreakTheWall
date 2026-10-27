@@ -53,7 +53,7 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
     checkLocalFormat: vi.fn(async model => ({ ok: true as const, check: { enforced: model.runtime !== 'ollama', detail: model.runtime === 'ollama' ? 'Il server ha ignorato lo schema di prova.' : 'Il server ha rispettato lo schema di prova.', checkedAt: '2026-10-22T10:00:00.000Z' } })),
   };
   const bridge: DesktopBridge = {
-    getRuntime: async () => ({ platform: 'test', mode: 'desktop' }),
+    getRuntime: async () => ({ platform: 'darwin', mode: 'desktop' }),
     loadProgress: async k => ({ state: saved.get(key(k)) ?? null }),
     saveProgress: async s => { saved.set(key(s), structuredClone(s) as LearnerState); },
     studio,

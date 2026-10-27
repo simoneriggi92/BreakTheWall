@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateDisassembly } from '../src/core/disassembly';
 import { loadCases, PUBLIC_CASES } from '../eval/cases';
@@ -28,7 +28,10 @@ describe('evaluation cases (Q1, D9)', () => {
     const folder = resolve(PUBLIC_CASES);
     for (const name of (await readdir(folder)).filter(x => x.endsWith('.json'))) {
       const spec = JSON.parse(await readFile(join(folder, name), 'utf8')) as { sources: { path: string }[] };
-      for (const s of spec.sources) expect(resolve(folder, s.path).startsWith(folder + '/'), `${name}: ${s.path}`).toBe(true);
+      for (const s of spec.sources) {
+        const inside = relative(folder, resolve(folder, s.path));
+        expect(inside !== '' && !inside.startsWith('..') && !isAbsolute(inside), `${name}: ${s.path}`).toBe(true);
+      }
     }
   });
 

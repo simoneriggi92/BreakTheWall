@@ -4,6 +4,7 @@ import type { DesktopBridge, ProgressResult } from '../core/bridge';
 import { resolveLanguage, type Language, type LanguageSetting } from '../core/language';
 import { defaultSettings, type ProviderFailure, type StudioSettings } from '../core/provider';
 import { en } from './i18n/en';
+import { forPlatform } from './i18n/devices';
 import { it, type Messages } from './i18n/it';
 
 export const CATALOGS: Record<Language, Messages> = { it, en };
@@ -43,11 +44,12 @@ export function PreferencesProvider({ bridge, children }: { bridge: DesktopBridg
   const [settings, setSettings] = useState<StudioSettings | undefined>(() => studio ? undefined : { ...defaultSettings, ...readLocal() });
   const [locale, setLocale] = useState(() => typeof navigator === 'undefined' ? undefined : navigator.language);
   const [dark, setDark] = useState(prefersDark);
+  const [platform, setPlatform] = useState<string>();
   const latest = useRef(settings);
   useEffect(() => {
     let active = true;
     void studio?.getSettings().then(value => { if (active) { latest.current = value; setSettings(value); } }).catch(() => {});
-    void bridge.getRuntime().then(info => { if (active && info.locale) setLocale(info.locale); }).catch(() => {});
+    void bridge.getRuntime().then(info => { if (!active) return; setPlatform(info.platform); if (info.locale) setLocale(info.locale); }).catch(() => {});
     return () => { active = false; };
   }, [bridge, studio]);
   useEffect(() => {
@@ -69,7 +71,8 @@ export function PreferencesProvider({ bridge, children }: { bridge: DesktopBridg
     document.documentElement.lang = language;
     document.documentElement.dataset.theme = theme;
   }, [language, theme]);
-  const value = useMemo(() => ({ language, theme, t: CATALOGS[language], n: numberFormat(language), settings, update }), [language, theme, settings, update]);
+  // Texts that name the computer follow the platform: "this Mac" on macOS, "this PC" on Windows.
+  const value = useMemo(() => ({ language, theme, t: forPlatform(CATALOGS[language], language, platform), n: numberFormat(language), settings, update }), [language, theme, platform, settings, update]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

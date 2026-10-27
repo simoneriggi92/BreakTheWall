@@ -29,3 +29,27 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+
+  windows:
+    name: 'Windows: types, tests and build'
+    # Keeps the app working on Windows (plan P-20261027-windows-alpha). The macOS job above keeps the name the
+    # main ruleset requires.
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm install --global npm@10.9.8
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - name: Start check
+        env:
+          BTW_SMOKE_TEST: '1'
+        run: BTW_USER_DATA_DIR="$RUNNER_TEMP/btw-start-check" npm start
