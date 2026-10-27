@@ -4,8 +4,10 @@
 
 Break the Wall turns a wall of text into a **disassembly**: an exploded view of 3–7 parts per level, joined by typed joints, each part tied to the exact lines of its source. You **run** the mechanism by predicting what happens before each step, or by removing a brick from an argument to see whether it falls. When you are ready, you **reassemble** it. One loop for any subject: only the kind of joint changes (mechanism, argument, story).
 
-**[Product](docs/product.md)** · **[Architecture](docs/architecture.md)** · **[Development](docs/development.md)** · **[Plan](docs/workflow/plans/P-20261024-disassembly/plan.md)** · **[Status](STATUS.md)** · **[Contributing](CONTRIBUTING.md)**
+**[Product](docs/product.md)** · **[Architecture](docs/architecture.md)** · **[Development](docs/development.md)** · **[Plan](docs/workflow/plans/P-20261024-disassembly/plan.md)** · **[Status](STATUS.md)** · **[Changelog](CHANGELOG.md)** · **[Contributing](CONTRIBUTING.md)**
 
+[![CI](https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/simoneriggi92/BreakTheWall?include_prereleases&style=flat-square)](https://github.com/simoneriggi92/BreakTheWall/releases)
 ![Status](https://img.shields.io/badge/status-alpha-orange?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square&logo=apple)
 ![Electron](https://img.shields.io/badge/Electron-45-47848F?style=flat-square&logo=electron&logoColor=white)
@@ -36,6 +38,7 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
 - [Project status](#project-status)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Community](#community)
 - [License](#license)
 
 ## Why Break the Wall?
@@ -202,6 +205,14 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 ## Contributing
 
 Contributions are welcome, from a bug report or a translation fix to a new prepared disassembly. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the checks every change passes and the research → plan → implement workflow used for larger changes.
+
+## Community
+
+- **Questions and ideas:** [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions).
+- **Bugs and proposals:** [issues](https://github.com/simoneriggi92/BreakTheWall/issues/new/choose), with a form for each. Issues labelled [good first issue](https://github.com/simoneriggi92/BreakTheWall/labels/good%20first%20issue) are a good place to start.
+- **Security:** report privately, as described in [SECURITY.md](SECURITY.md).
+- **Conduct:** everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Changes:** each version is described in the [changelog](CHANGELOG.md).
 
 ## License
 

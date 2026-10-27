@@ -2,6 +2,8 @@
 
 Thank you for your interest. Break the Wall is an alpha, and contributions of every size help: a bug report, a translation fix, a new prepared disassembly, a layout improvement, or a step on the [roadmap](README.md#roadmap).
 
+Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md). Questions and ideas are welcome in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions); security problems go to the private channel in [SECURITY.md](SECURITY.md).
+
 ## What the project is, and is not
 
 Break the Wall takes material apart into source-linked parts, lets the learner run the mechanism, and asks them to reassemble it: **disassemble → run → reassemble**. It is not a course, a chatbot, a summarizer or a flashcard app, and review is opt-in. There is one loop for every subject: only the kind of joint changes (mechanism, argument, story).

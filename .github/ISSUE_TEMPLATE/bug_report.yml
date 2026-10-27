@@ -1,0 +1,61 @@
+name: Bug report
+description: Something does not work as described.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting. Please never attach private documents, private code or credentials: the repository is public.
+        A security problem goes to the private form instead (Security → Report a vulnerability).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: "I opened the Mill example, ran the load test, removed the premise, and…"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. npm start
+        2. Open "Releasing Atlas Reader to staging"
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Desktop app (npm start or npm run dev)
+        - Browser preview (npm run dev:web)
+        - Evaluation runner (npm run eval)
+    validations:
+      required: true
+  - type: dropdown
+    id: route
+    attributes:
+      label: Generation route, if the bug is in generation
+      options:
+        - Not about generation
+        - ChatGPT
+        - Local model (llama.cpp)
+        - Local model (LM Studio)
+        - Local model (Ollama)
+        - Local model (other OpenAI-compatible server)
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: macOS, Node.js and npm, and the commit you run (git rev-parse --short HEAD).
+      placeholder: "macOS 26.1, Node 22.23.2, npm 10.9.8, commit abc1234"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or logs
+      description: A screenshot for visual problems; the terminal output for errors. Remove anything private first.
