@@ -5,7 +5,10 @@
   "license": "Apache-2.0",
   "description": "Take material apart into source-linked parts, run the mechanism, and reassemble it.",
   "author": "Simone Riggi",
-  "repository": { "type": "git", "url": "https://github.com/simoneriggi92/BreakTheWall.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/simoneriggi92/BreakTheWall.git"
+  },
   "type": "module",
   "main": "dist-electron/main.cjs",
   "engines": {
@@ -18,6 +21,7 @@
     "dev:web": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "npm run typecheck && vite build && node scripts/build-desktop.mjs",
     "start": "node scripts/start.mjs",
+    "package": "npm run build && node scripts/package-mac.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
@@ -33,6 +37,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@electron/packager": "20.3.0",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",

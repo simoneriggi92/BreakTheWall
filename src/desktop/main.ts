@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, net, protocol, safeStorage, sessio
 import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
-import { join, resolve, sep } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadPreparedDisassemblies } from '../fixtures/disassemblies';
 import { loadPreparedLessons } from '../fixtures/lessons';
@@ -12,6 +12,7 @@ import { resolveLanguage } from '../core/language';
 import { idSchema } from '../core/lesson';
 import { failure, localModelSchema, ProviderError, type GenerationProgress, type PickedSources } from '../core/provider';
 import { importSource, SOURCE_LIMITS, SourceImportError } from '../core/source';
+import { appFilePath, LIBRARY_DRAWN } from './app-files';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
 import { DraftStore } from './generation-draft';
@@ -28,8 +29,10 @@ if (process.env.BTW_USER_DATA_DIR) app.setPath('userData', resolve(process.env.B
 const devURL = process.env.BTW_RENDERER_URL;
 if (devURL && devURL !== 'http://127.0.0.1:5173') throw new Error('Unsupported development origin');
 const origin = devURL ?? 'btw://app';
-/** The app icon (rendered from docs/images/brand/app-icon.svg by `npm run brand`); there is no packaged bundle to carry it. */
+/** The app icon (rendered from docs/images/brand/app-icon.svg by `npm run brand`). A packaged bundle carries its own. */
 const icon = resolve(__dirname, '../assets/icon.png');
+/** The start check run by `npm run package` and the release workflow: open the window, wait for the library, exit 0 or 1. */
+const smokeTest = process.env.BTW_SMOKE_TEST === '1';
 
 function trustedSender(event: Electron.IpcMainInvokeEvent) {
   const url = event.senderFrame?.url;
@@ -147,12 +150,27 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
 function createWindow() {
   const window = new BrowserWindow({
     title: 'Break the Wall', width: 1480, height: 980, minWidth: 720, minHeight: 650,
-    backgroundColor: '#f3f5ef', ...(process.platform !== 'darwin' && existsSync(icon) ? { icon } : {}),
+    backgroundColor: '#f3f5ef', show: !smokeTest, ...(process.platform !== 'darwin' && existsSync(icon) ? { icon } : {}),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith(origin + '/')) event.preventDefault(); });
+  if (smokeTest) checkStart(window);
   void window.loadURL(origin + '/');
+}
+
+/** Exits 0 once the library is drawn, 1 if the page fails, its renderer dies, or nothing is drawn within 30 s. */
+function checkStart(window: BrowserWindow) {
+  const end = (code: number, reason: string) => { console.log(`start check: ${reason}`); app.exit(code); };
+  const timer = setTimeout(() => end(1, 'the library was not drawn within 30 s'), 30_000);
+  window.webContents.on('did-fail-load', (_event, code, description, url) => end(1, `${url} failed to load (${code} ${description})`));
+  window.webContents.on('render-process-gone', (_event, details) => end(1, `the renderer stopped (${details.reason})`));
+  window.webContents.on('did-finish-load', async () => {
+    for (let i = 0; i < 100; i++) {
+      if (await window.webContents.executeJavaScript(LIBRARY_DRAWN).catch(() => false)) { clearTimeout(timer); return end(0, 'the library is drawn'); }
+      await new Promise(r => setTimeout(r, 250));
+    }
+  });
 }
 
 /** The first preferred language of the operating system, which `system` settings follow. */
@@ -163,11 +181,11 @@ void app.whenReady().then(async () => {
   protocol.handle('btw', request => {
     const url = new URL(request.url);
     if (url.hostname !== 'app' || request.method !== 'GET') return new Response('Forbidden', { status: 403 });
-    const path = resolve(root, '.' + decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
-    if (!path.startsWith(root + sep)) return new Response('Forbidden', { status: 403 });
+    const path = appFilePath(root, url.pathname);
+    if (!path) return new Response('Forbidden', { status: 403 });
     return net.fetch(pathToFileURL(path).href);
   });
-  if (process.platform === 'darwin' && existsSync(icon)) app.dock?.setIcon(icon);
+  if (process.platform === 'darwin' && !app.isPackaged && existsSync(icon)) app.dock?.setIcon(icon);
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   ipcMain.handle('runtime:get', event => { trustedSender(event); return { platform: process.platform, mode: 'desktop', locale: systemLocale() }; });
