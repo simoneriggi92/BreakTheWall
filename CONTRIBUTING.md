@@ -16,7 +16,7 @@ Please judge a proposal against this before writing code. Subject-specific modes
 - **Suggest an improvement.** Open an issue first for anything larger than a small fix, so we can agree on the approach before you spend time on it.
 - **Improve the interface text.** Every string exists in Italian and English (`src/renderer/i18n/it.ts` and `en.ts`); both catalogs must change together.
 - **Write a prepared disassembly.** Prepared examples live in `src/fixtures/disassemblies/`. Their sources must be original or in the public domain, and the file must pass the host checks (`npm run check` validates every fixture).
-- **Pick up a roadmap item.** Repositories and PDF documents as sources are the next large steps; comment on the matching issue before starting.
+- **Pick up a roadmap item.** Repositories and PDF documents as sources are the next large steps, already planned in [the active plan](docs/workflow/plans/P-20261024-disassembly/plan.md) (tasks D11 and D12). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the plan.
 
 ## Set up
 
