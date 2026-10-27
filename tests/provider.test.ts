@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProviderError, type ProviderFailure } from '../src/core/provider';
+import { previewSchema, ProviderError, type ProviderFailure } from '../src/core/provider';
 import { ChatGPTAccount, type AccountRecord, type Vault } from '../src/desktop/chatgpt/account';
 import { AUTH, authorizeUrl, resetJwksCache, verifyIdToken } from '../src/desktop/chatgpt/oauth';
 import { listModels, streamResponse, type ResponseBody } from '../src/desktop/chatgpt/responses';
@@ -218,5 +218,29 @@ describe('saved lessons (T6)', () => {
     expect(listed.lessons).toHaveLength(1);
     expect(listed.skipped).toBe(1);
     expect(await readdir(bad)).toEqual(['v1.json']);
+  });
+});
+
+describe('the preview of a generation in progress (D22)', () => {
+  const part = (id: string, extra: object = {}) => ({ id, name: `Part ${id}`, kind: 'step', icon: 'settings', subParts: 0, status: 'waiting', ...extra });
+  const valid = { parts: [part('a', { status: 'done', lead: 'What a is for.', points: ['One step.', 'Another step.'] }), part('b', { status: 'writing' }), part('c', { status: 'failed', subParts: 3 })], joints: [{ from: 'a', to: 'b', type: 'sends-to', label: 'then' }] };
+  it('accepts a bounded preview and refuses malformed or oversized ones', () => {
+    expect(previewSchema.safeParse(valid).success).toBe(true);
+    const variants: unknown[] = [
+      { ...valid, parts: valid.parts.slice(0, 2) },
+      { ...valid, parts: [...valid.parts, ...['d', 'e', 'f', 'g', 'h'].map(id => part(id))] },
+      { ...valid, parts: [part('a', { status: 'finished' }), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('a', { kind: 'gear' }), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('A b'), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('a', { name: 'n'.repeat(201) }), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('a', { lead: 'l'.repeat(2001) }), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('a', { points: ['1', '2', '3', '4', '5'] }), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('a', { subParts: 8 }), ...valid.parts.slice(1)] },
+      { ...valid, parts: [part('a', { source: 'secret' }), ...valid.parts.slice(1)] },
+      { ...valid, joints: Array(21).fill(valid.joints[0]) },
+      { ...valid, joints: [{ ...valid.joints[0], type: 'pushes' }] },
+      'not a preview',
+    ];
+    for (const variant of variants) expect(previewSchema.safeParse(variant).success).toBe(false);
   });
 });

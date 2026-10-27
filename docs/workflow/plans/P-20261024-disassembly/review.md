@@ -1,8 +1,41 @@
-# Plan review: disassembly v2
+# Plan review: disassembly
 
-Plan: [P-20261024-disassembly v5](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25; versions 4 and 5 on 2026-10-26. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2, phase `player` under v3, and the code of phase `generation` under v4.
+Plan: [P-20261024-disassembly v6](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25; versions 4, 5 and 6 on 2026-10-26. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2, phase `player` under v3, and the code of phase `generation` under v4.
 
-## Version 5: changes and findings resolved
+## Version 6: changes and findings resolved
+
+Version 6 follows the owner's requests after the D9 decision: the three generation improvements the agent proposed, and five player and content changes.
+
+| Finding | Resolution in v6 |
+|---|---|
+| "Number by logical order" has no single meaning across kinds of material. In an argument, should the conclusion come first or last? | One rule for every kind, as the product identity asks: numbers follow the arrows. That is the flow for a mechanism, grounds before conclusions for an argument, and the dependency first for `depends-on`. It reuses the ranks the layout already computes, so numbers and drawing cannot disagree. Stated as an assumption the owner can change. |
+| Renumbering can contradict texts a model wrote with the old order, such as "step 3" in a run. | Generation inputs list parts in reading order with their numbers. Saved disassemblies may keep an old number in a text: a residual risk. |
+| Shortening the role tightens a limit, and D9 already failed on near-miss lengths. | D19, the shorten request, comes first, and D20's lead limit is a length finding it can fix. |
+| A rule against repetition in the contract would make saved disassemblies and fixtures invalid. | The rule is a generation and expansion check only. The contract does not change. |
+| "Restates the lead" is a judgement. | It is measured with word overlap, like `givesAway`, and calibrated on the repeat measured in D9's Mill output and on the hand-made fixtures, which must not be flagged. |
+| A markdown and diagram renderer is a dependency. Dependency changes were outside every earlier approval. | The v6 approval names exactly three: `markdown-it`, `mermaid`, `@types/markdown-it`. Mermaid loads only on first use, and the main bundle has a size limit. |
+| Rendering untrusted markdown inside the app could run code or fetch content. | Raw HTML off, Mermaid strict, links not followed, images not fetched, tests with hostile markup. The renderer already runs sandboxed with context isolation. |
+| A rendered view loses the line links that make citations work. | `markdown-it` maps each block to its source lines, so citations highlight blocks. |
+| "Sezione smontaggio" is ambiguous. | Read as the card of the open part; stated as an assumption for the owner to correct. |
+| Keeping a failed generation keeps text derived from possibly private sources on disk. | One draft at most, next to the saved disassemblies, deleted on success, on "Start over" and on a new generation. |
+| Letting parts finish after one fails spends requests on a generation that may never complete. | It saves them for the resume, which then sends only the failed part. Cancelling still stops everything at once. |
+| Suggestions asked automatically would spend plan usage the learner did not request. | The owner chose a button: nothing is sent until the learner presses it. Results are reused for the same selection, the cost is shown and the request can be cancelled. |
+| A suggestion request reads the whole source, so it costs about as much input as the structure request. | It is sent only on request, uses the content model, returns little text, and is not repeated for a selection that already has suggestions. Its time is measured in the witnessed use. |
+| Suggested questions could bias the learner toward what the model finds easy. | They fill an editable field and never replace it. Each one shows its kind and parts, so the learner sees what it will open before choosing. |
+| The live check needs ChatGPT runs. | It uses the 4 public generations left in D9's budget. The budget does not grow. |
+
+Checks (v6):
+- D1–D14 text is unchanged; their evidence stays valid. The phase `generation-usability` notes that D10's witnessed generations are best done after it.
+- Task IDs D15–D23 are new, numbered after D14. The order within each phase is stated.
+- Dependencies point backwards: D15 on D2, D5, D7; D16 on D5, D13; D17 on D5–D7; D18 on D5; D19 on D9, D14; D20 on D19; D21 on D9, D10; D22 on D2, D5, D21; D23 on D10, D19.
+- The digest covers the plan body up to "Review and authorization"; the implementation records sit after it.
+
+Residual risks added in v6:
+- The restate threshold comes from a few outputs. It may let some repeats through, or flag a point that only shares the part's key terms.
+- The fitted drawing on a very tall pane can make plates large and the joints long. The pane's minimum and maximum keep this in range, but visual quality is witnessed, not tested.
+- The rendered view and the line view can disagree on where a block starts, for example around front matter or lists. Tests cover the block maps of the fixtures; a local-only test, skipped when the file is absent, covers the work document.
+- A model change on resume mixes two models in one generation. The `generation` record names the setup at completion, not per part.
+
 
 Version 5 follows the owner's requirement that any part can be taken apart on request, at any depth, as long as the source allows it. Generation under v4 produced two levels, and the contract allowed three.
 

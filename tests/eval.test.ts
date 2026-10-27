@@ -56,18 +56,18 @@ describe('evaluation metrics and records (D9)', () => {
     expect(metrics.answerLengthRatios).toHaveLength(1);
   });
 
-  it('summarizes attempts per case and setup: validity, repairs by phase, requests, characters, checks and failures', () => {
+  it('summarizes attempts per case and setup: validity, repairs by phase, requests, characters, checks, failures, leads and shorten requests (D20)', () => {
     const phase = (requests: number, repairs = 0) => ({ requests, repairs, sentChars: 1000 * requests, receivedChars: 500 * requests, ms: 1000 });
-    const metrics: DisassemblyMetrics = { partsPerLevel: [5], depth: 1, families: ['mechanism'], forgottenLines: 0, layoutFindings: 0, writtenLanguage: 'en', runs: { scenario: 1 }, inferences: 0, answerLengthRatios: [1.2] };
+    const metrics: DisassemblyMetrics = { partsPerLevel: [5], depth: 1, families: ['mechanism'], forgottenLines: 0, layoutFindings: 0, writtenLanguage: 'en', runs: { scenario: 1 }, inferences: 0, answerLengthRatios: [1.2], maxLead: 80, restated: 0 };
     const base = { run: 'r', private: false, language: 'it' as const };
     const records: AttemptRecord[] = [
       { ...base, case: 'a', setup: 'A', attempt: 1, ok: true, seconds: 100, stats: { structure: phase(1), content: phase(5), runs: phase(1) }, metrics },
       { ...base, case: 'a', setup: 'A', attempt: 2, ok: false, failure: 'invalid-output', seconds: 300, stats: { structure: phase(2, 1), content: phase(0), runs: phase(0) } },
-      { ...base, case: 'a', setup: 'C', attempt: 1, ok: true, seconds: 80, stats: { structure: phase(1), content: phase(6, 1), runs: phase(1) }, metrics: { ...metrics, answerLengthRatios: [2.1] } },
+      { ...base, case: 'a', setup: 'C', attempt: 1, ok: true, seconds: 80, stats: { structure: phase(1), content: { ...phase(6, 1), shortens: 1 }, runs: phase(1) }, metrics: { ...metrics, answerLengthRatios: [2.1], maxLead: 120, restated: 2 } },
     ];
     expect(summarize(records)).toEqual([
-      { case: 'a', setup: 'A', attempts: 2, valid: 1, repairs: { structure: 1, content: 0, runs: 0 }, medianSeconds: 200, medianRequests: 5, medianSentChars: 4500, medianReceivedChars: 2250, maxForgottenLines: 0, maxLayoutFindings: 0, languageMismatches: 1, maxAnswerLengthRatio: 1.2, failures: ['invalid-output'] },
-      { case: 'a', setup: 'C', attempts: 1, valid: 1, repairs: { structure: 0, content: 1, runs: 0 }, medianSeconds: 80, medianRequests: 8, medianSentChars: 8000, medianReceivedChars: 4000, maxForgottenLines: 0, maxLayoutFindings: 0, languageMismatches: 1, maxAnswerLengthRatio: 2.1, failures: [] },
+      { case: 'a', setup: 'A', attempts: 2, valid: 1, repairs: { structure: 1, content: 0, runs: 0 }, medianSeconds: 200, medianRequests: 5, medianSentChars: 4500, medianReceivedChars: 2250, maxForgottenLines: 0, maxLayoutFindings: 0, languageMismatches: 1, maxAnswerLengthRatio: 1.2, failures: ['invalid-output'], maxLead: 80, restated: 0, savedByShorten: 0 },
+      { case: 'a', setup: 'C', attempts: 1, valid: 1, repairs: { structure: 0, content: 1, runs: 0 }, medianSeconds: 80, medianRequests: 8, medianSentChars: 8000, medianReceivedChars: 4000, maxForgottenLines: 0, maxLayoutFindings: 0, languageMismatches: 1, maxAnswerLengthRatio: 2.1, failures: [], maxLead: 120, restated: 2, savedByShorten: 1 },
     ]);
   });
 

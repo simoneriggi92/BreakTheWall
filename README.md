@@ -61,10 +61,12 @@ It is not a course, a summarizer, a chatbot or a flashcard app. Review is there 
 ### The disassembly
 
 - **Exploded view:** the parts drawn as plates on a technical sheet, with balloons, a title block and an automatic layout. Mechanisms and stories run left to right; arguments stack, with the claim above its grounds and attacks or limits beside it.
+- **Numbers in reading order:** a part's number follows the arrows: the flow of a mechanism, grounds before the claim they support, the events of a story. The bill of materials numbers parts the same way ("2.1.3").
+- **Room to read:** drag the bar under the drawing to make the plates bigger, and the bar between the card and the source to share the row. Sizes are remembered on this device. Inside a sub-assembly, the ↑ control, Escape or Alt+↑ goes back to the level above.
 - **Sub-assemblies, as deep as the source goes:** a part can open into its own 3–7 parts, and so on, level after level. Every level accounts for its parent's lines. A part with at least 6 lines of its own can be taken apart on request ("Take this part apart", one small request); a smaller one says why it stops there. Parts outside your question stay closed and hatched, but you can still open them.
 - **Three kinds of joint:** mechanism (sends to, causes, depends on), argument (supports, attacks, limits) and story (leads to, because). Each kind has a color, a line style and an end mark, so color is never the only cue.
-- **Part card:** a role, 2–4 points marked → (then), = (stays the same) or ⚠ (caution), and an optional lens, metaphor with its limit, and critical note. It also lists the part's joints in words, its citations and your notes.
-- **Source pane:** numbered lines, the cited lines highlighted, page breaks for documents, and a file picker when there are many sources.
+- **Part card:** a short lead (what the part is for), then 2–4 points that add the details, marked → (then), = (stays the same) or ⚠ (caution), and an optional lens, metaphor with its limit, and critical note. It also lists the part's joints in words, its citations and your notes.
+- **Source pane:** numbered lines, the cited lines highlighted, page breaks for documents, and a file picker when there are many sources. A markdown or text source can also be read as a document, beside the card or in a full-window reader with an outline: tables and Mermaid diagrams are drawn, and citations highlight their blocks. HTML inside a source is shown as text, links are not followed and images are not fetched.
 
 ### Run
 
@@ -92,7 +94,12 @@ Studio takes apart pasted text or `.txt` / `.md` files around your question, in 
 2. **Parts:** one request per top-level part, carrying only that part's lines.
 3. **Runs:** scenarios, load tests or cases, and the reassembly hints.
 
-Each phase can be repaired once with the app's findings; nothing is saved unless the whole disassembly passes. You choose the content language (by default, your question's), and you can give the structure and the parts different models, for example a cheaper one for the parts. There are two routes:
+Each phase can be repaired once with the app's findings. When the repair leaves only texts a few characters too long, one small request shortens just those. Nothing is saved as a disassembly unless the whole of it passes.
+
+- **Suggested break-downs:** on the question step, "Suggest break-downs" sends one request and proposes 3–5 questions, each with its kind (mechanism, argument, story) and the parts it would give. Choosing one fills the question field, which you can still edit. Nothing is sent until you press the button.
+- **The drawing while it is written:** once the structure is accepted, Studio draws the top level, and each plate shows whether its part is waiting, being written, done or failed. A part that is done opens its lead and points.
+- **Resume:** a failed or cancelled generation keeps what was accepted (structure, parts, runs) in one draft file in the app's data folder. Studio says what was kept and offers "Resume", which asks only for what is missing, or "Start over". The draft is deleted on success and when a new generation starts.
+ You choose the content language (by default, your question's), and you can give the structure and the parts different models, for example a cheaper one for the parts. There are two routes:
 
 | Route | Account | Where your source goes | Status |
 |---|---|---|---|
@@ -104,6 +111,7 @@ Lessons created before disassemblies stay readable, with their progress, under "
 ### Progress and privacy
 
 - **Storage:** disassemblies, lessons, progress and notes stay on your device, written atomically. Progress that no longer matches its disassembly is kept on disk and the session restarts, with a notice.
+- **Interrupted generations:** at most one draft, `generation-draft.json`, with the text generated so far. It never leaves the device and is deleted on success, on "Start over" and when a new generation starts.
 - **Credentials:** ChatGPT tokens are encrypted with the macOS Keychain (Electron `safeStorage`) and never reach the interface or the logs.
 - **Isolation:** the renderer has no Node, filesystem or network access. Every desktop operation goes through narrow, validated IPC calls.
 
@@ -153,7 +161,7 @@ Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your
 | Layer | Stack |
 |---|---|
 | Desktop host | Electron 45: sandboxed renderer, context isolation, custom `btw://` protocol |
-| Interface | React 19, TypeScript 7, Vite 8, SVG technical drawings, lucide icons, system fonts |
+| Interface | React 19, TypeScript 7, Vite 8, SVG technical drawings, lucide icons, system fonts; markdown-it for sources read as documents, Mermaid for their diagrams (loaded on first use) |
 | Disassembly model | zod 4 contract with located findings, bill-of-materials check, deterministic layered layout and pure run/reassembly transitions; independent of React and Electron |
 | AI routes | Sign in with ChatGPT (OAuth + PKCE, Responses API); Ollama, LM Studio and llama.cpp over loopback |
 | Storage | atomic JSON files in the app's data folder; credentials via Keychain-backed `safeStorage` |
@@ -161,14 +169,16 @@ Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your
 
 ## Project status
 
-Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v5). Evidence for each task is in its implementation record.
+Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v6). Evidence for each task is in its implementation record.
 
 | Phase | Tasks | Status |
 |---|---|---|
 | Contract | D1 format and host checks · D2 automatic layout · D3 learner state | ✅ automated tests |
 | Player | D4 themes and languages · D5 exploded view · D6 run · D7 reassembly and bill of materials · D8 library and store | ✅ automated tests; 🟡 D8 desktop flow being witnessed by the owner |
-| Generation | D9 two-phase generation and model comparison · D10 Studio and witnessed generation | ✅ code and automated tests; ⏳ model comparison, claim review and witnessed generation |
-| Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code and automated tests; ⏳ measured with the model comparison |
+| Generation | D9 two-phase generation and model comparison · D10 Studio and witnessed generation | ✅ code, automated tests and model comparison (setup A chosen); ⏳ witnessed generation |
+| Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code, automated tests and 2 measured expansions |
+| Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
+| Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 

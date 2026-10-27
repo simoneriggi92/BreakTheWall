@@ -13,6 +13,7 @@ import { failure, localModelSchema, ProviderError, type GenerationProgress, type
 import { importSource, SOURCE_LIMITS, SourceImportError } from '../core/source';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
+import { DraftStore } from './generation-draft';
 import { Generator } from './generator';
 import { checkFormat, detectServer, discoverServers, localCompleter } from './local/runtimes';
 import { SettingsStore } from './settings-store';
@@ -43,7 +44,8 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
   });
   const localFetch = globalThis.fetch.bind(globalThis);
   // Taking a part apart moves the learner's progress to the new revision, through the same store the player uses.
-  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, disassemblies, undefined, (previous, next) => progress.carry(previous, next));
+  // A failed or cancelled generation keeps what was accepted next to the saved disassemblies (D21).
+  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, disassemblies, undefined, (previous, next) => progress.carry(previous, next), new DraftStore(join(userData, 'generation-draft.json')));
   const settings = new SettingsStore(join(userData, 'settings.json'));
   // Host-side text (file dialog, sign-in page) follows the same setting as the interface.
   const language = async () => resolveLanguage((await settings.read()).language, systemLocale());
@@ -87,12 +89,12 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     try { return { ok: true, models: await account.models() }; }
     catch (error) { return asFailure(error); }
   });
-  /** Phase, repair, part and request changes are always sent; character counts are throttled. */
+  /** Phase, repair, part, request and part-status changes are always sent; character counts are throttled. */
   const progressTo = (event: Electron.IpcMainInvokeEvent) => {
     let last = 0; let step = '';
     return (progress: GenerationProgress) => {
       const now = Date.now();
-      const next = `${progress.phase}:${progress.repairing}:${progress.part}:${progress.requests}`;
+      const next = `${progress.phase}:${progress.repairing}:${progress.shortening}:${progress.part}:${progress.requests}:${progress.preview?.parts.map(p => p.status[0]).join('')}`;
       if (next !== step || now - last > 200) { last = now; step = next; event.sender.send('generation:progress', progress); }
     };
   };
@@ -122,6 +124,13 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     catch (error) { return asFailure(error); }
   });
   ipcMain.handle('generation:cancel', event => { trustedSender(event); generator.cancel(); });
+  ipcMain.handle('generation:draft', event => { trustedSender(event); return generator.draft(); });
+  ipcMain.handle('suggestions:start', async (event, input: unknown) => {
+    trustedSender(event);
+    try { return await generator.suggest(input); }
+    catch (error) { return asFailure(error); }
+  });
+  ipcMain.handle('suggestions:cancel', event => { trustedSender(event); generator.cancelSuggestions(); });
   ipcMain.handle('lessons:list', event => { trustedSender(event); return lessons.list(); });
   ipcMain.handle('disassemblies:list', event => { trustedSender(event); return disassemblies.list(); });
   ipcMain.handle('disassemblies:find', async (event, key: unknown) => {

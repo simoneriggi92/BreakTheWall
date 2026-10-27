@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { progressKeySchema, progressStateSchema, type DesktopBridge } from '../core/bridge';
-import type { StudioBridge } from '../core/provider';
+import { previewSchema, type StudioBridge } from '../core/provider';
 
 const studio = Object.freeze<StudioBridge>({
   pickSources: () => ipcRenderer.invoke('sources:pick'),
@@ -11,12 +11,20 @@ const studio = Object.freeze<StudioBridge>({
   listModels: () => ipcRenderer.invoke('account:models'),
   generate: request => ipcRenderer.invoke('generation:start', request),
   cancelGeneration: () => ipcRenderer.invoke('generation:cancel'),
+  generationDraft: () => ipcRenderer.invoke('generation:draft'),
+  suggest: request => ipcRenderer.invoke('suggestions:start', request),
+  cancelSuggestions: () => ipcRenderer.invoke('suggestions:cancel'),
   onGenerationProgress: listener => {
-    const handler = (_event: unknown, p: { received?: unknown; phase?: unknown; repairing?: unknown; requests?: unknown; part?: unknown; parts?: unknown }) => listener({
-      phase: p?.phase === 'content' || p?.phase === 'runs' ? p.phase : 'structure', repairing: p?.repairing === true,
-      received: Number(p?.received) || 0, requests: Number(p?.requests) || 0,
-      ...(typeof p?.part === 'number' && typeof p?.parts === 'number' ? { part: p.part, parts: p.parts } : {}),
-    });
+    // A preview that does not parse is dropped; the rest of the progress still arrives (D22).
+    const handler = (_event: unknown, p: { received?: unknown; phase?: unknown; repairing?: unknown; shortening?: unknown; requests?: unknown; part?: unknown; parts?: unknown; preview?: unknown }) => {
+      const preview = p?.preview === undefined ? undefined : previewSchema.safeParse(p.preview);
+      listener({
+        phase: p?.phase === 'content' || p?.phase === 'runs' ? p.phase : 'structure', repairing: p?.repairing === true, ...(p?.shortening === true ? { shortening: true } : {}),
+        received: Number(p?.received) || 0, requests: Number(p?.requests) || 0,
+        ...(typeof p?.part === 'number' && typeof p?.parts === 'number' ? { part: p.part, parts: p.parts } : {}),
+        ...(preview?.success ? { preview: preview.data } : {}),
+      });
+    };
     ipcRenderer.on('generation:progress', handler);
     return () => { ipcRenderer.removeListener('generation:progress', handler); };
   },

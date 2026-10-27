@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateDisassembly } from '../src/core/disassembly';
-import { crosses as crossesRect, labelBeside, layoutDisassembly, layoutFindings, layoutLevel, type LevelLayout } from '../src/core/layout';
+import { crosses as crossesRect, labelBeside, layoutDisassembly, layoutFindings, layoutLevel, readingPaths, type LevelLayout } from '../src/core/layout';
 import { atlas, fixture, mill, PRIVATE_FIXTURES, PUBLIC_FIXTURES, story } from './disassemblies';
 
 const plate = (level: LevelLayout, id: string) => level.plates.find(p => p.id === id)!.rect;
@@ -60,7 +60,7 @@ describe('automatic layout', () => {
     const level: LevelLayout = {
       orientation: 'flow', width: 600, height: 200,
       plates: [{ id: 'a', rect: r(0) }, { id: 'b', rect: r(150) }, { id: 'c', rect: r(300) }, { id: 'd', rect: r(340) }],
-      joints: [{ from: 'a', to: 'c', points: [[100, 25], [300, 25]], label: { x: 110, y: 60, w: 30, h: 18 }, returns: false }],
+      joints: [{ from: 'a', to: 'c', points: [[100, 25], [300, 25]], label: { x: 110, y: 60, w: 30, h: 18 }, returns: false }], order: ['a', 'b', 'c', 'd'],
     };
     expect(layoutFindings(level)).toEqual(['Plates c and d overlap', 'Joint a → c crosses plate b']);
   });
@@ -83,5 +83,38 @@ describe('labels beside a running line', () => {
       expect(lines.some(([a, b]) => crossesRect(a, b, r)), `${joint.from} → ${joint.to}`).toBe(false);
     });
     expect(moved / total).toBeGreaterThan(0.7);
+  });
+});
+
+describe('reading order (D15)', () => {
+  it('follows the flow of a mechanism, the dependency first, at every level', () => {
+    const layouts = layoutDisassembly(atlas());
+    expect(layouts.get('root')!.order).toEqual(['start', 'check', 'image', 'deploy', 'smoke', 'rollback']);
+    expect(layouts.get('image')!.order).toEqual(['image-build', 'image-push', 'image-record']);
+  });
+  it('puts grounds before the claim, a part that attacks or limits right after it, and loose parts last', () => {
+    expect(layoutDisassembly(mill()).get('root')!.order).toEqual(['utility', 'sovereignty', 'claim', 'objection', 'bounds', 'region', 'abstract-right']);
+  });
+  it('follows the events of a story', () => {
+    expect(layoutDisassembly(fixture(PUBLIC_FIXTURES[2])).get('root')!.order).toEqual(['storm', 'vote', 'wall', 'bell', 'railway', 'quay', 'hall']);
+  });
+  it('places a rollback cycle and a level without joints by the rule', () => {
+    const parts = ['a', 'b', 'c', 'd'].map(id => ({ id }));
+    const cycle = layoutLevel(parts, [{ from: 'a', to: 'b', type: 'sends-to', label: 'x' }, { from: 'b', to: 'c', type: 'sends-to', label: 'x' }, { from: 'c', to: 'a', type: 'sends-to', label: 'back' }]);
+    expect(cycle.order).toEqual(['a', 'b', 'c', 'd']);
+    expect(layoutLevel(parts, []).order).toEqual(['a', 'b', 'c', 'd']);
+  });
+  it.each([...PUBLIC_FIXTURES, ...PRIVATE_FIXTURES])('gives every level of %s a permutation of its parts', path => {
+    const d = fixture(path);
+    const levels = new Map<string, string[]>([['root', d.parts.map((p: any) => p.id)]]);
+    const walk = (parts: any[]) => parts.forEach(p => { if (p.parts) { levels.set(p.id, p.parts.map((x: any) => x.id)); walk(p.parts); } });
+    walk(d.parts);
+    for (const [key, level] of layoutDisassembly(d)) expect([...level.order].sort()).toEqual([...levels.get(key)!].sort());
+  });
+  it('numbers parts as paths in reading order', () => {
+    const paths = readingPaths(atlas());
+    expect(paths.get('start')).toBe('1');
+    expect(paths.get('image-push')).toBe('3.2');
+    expect(paths.get('rollback')).toBe('6');
   });
 });

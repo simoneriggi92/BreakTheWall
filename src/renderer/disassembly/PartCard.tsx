@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ArrowRight, Hammer, Link2 } from 'lucide-react';
+import { ArrowRight, ArrowUp, Hammer, Link2 } from 'lucide-react';
 import { DISASSEMBLY_LIMITS, divisible, linesOf, pagesOf, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
 import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
 import type { Messages } from '../i18n/it';
@@ -27,13 +27,15 @@ export function Points({ points }: { points: NonNullable<Part['points']> }) {
 
 interface Props {
   d: Disassembly; part?: Part; owner?: Part; joints: Joint[]; level: Part[]; number?: number;
+  /** The name of the level above, when a sub-assembly is open, and the way back to it. */
+  above?: string; onUp?: () => void;
   focus?: Cite; onFocus: (c: Cite) => void; onEnter: (id: string) => void;
   note: string; onNote: (value: string) => void;
   /** Taking this part apart, when the disassembly allows it. */
   takeApart?: ReactNode;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart }: Props) {
+export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (part) heading.current?.focus({ preventScroll: true }); }, [part]);
@@ -45,7 +47,8 @@ export function PartCard({ d, part, owner, joints, level, number, focus, onFocus
         <p className="role">{owner ? owner.role : d.whole.does}</p>
         {owner ? owner.points ? <Points points={owner.points}/> : <p>{owner.explain}</p> : <p>{d.whole.why}</p>}</div>
       <Cites d={d} cites={'cites' in whole ? whole.cites : []} focus={focus} onFocus={onFocus}/>
-      <p className="micro plain hint">{t.d.selectHint}</p>
+      <p className="micro plain hint">{t.d.selectHint}{above && ` ${t.d.upHint}`}</p>
+      {above && onUp && <button className="subtle level-up" onClick={onUp}><ArrowUp size={15}/>{t.d.up(above)}</button>}
     </section>;
   }
   const name = (id: string) => level.find(p => p.id === id)?.name ?? id;
@@ -54,7 +57,8 @@ export function PartCard({ d, part, owner, joints, level, number, focus, onFocus
     <span className="eyebrow">{t.d.partOf(number ?? 0, t.d.kinds[part.kind])}</span>
     <div lang={d.language}>
       <h2 ref={heading} tabIndex={-1}><PartIcon name={part.icon} size={20}/>{part.name}</h2>
-      <p className="role">{part.role}</p>
+      {/* The lead opens the card; the points and the explanation add what it does not say (D20). */}
+      <p className="role lead">{part.role}</p>
       {part.points ? <Points points={part.points}/> : <p>{part.explain}</p>}
       {part.lens && <div className="card-box"><span className="box-label">{t.d.lens}</span><dl className="lens-list">
         <dt>{t.d.lensWhat}</dt><dd>{part.lens.what}</dd><dt>{t.d.lensWhy}</dt><dd>{part.lens.why}</dd>
@@ -84,7 +88,7 @@ export function TakeApart({ d, part, route, progress, problem, onRun, onCancel }
   const x = t.d.expand;
   if (!divisible(d, part)) return <p className="micro plain take-apart">{x.leaf(linesOf(d, part.cites).size, DISASSEMBLY_LIMITS.minLinesToSplit)}</p>;
   if (progress) return <div className="generating take-apart">
-    <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{x.running}{progress.repairing ? ` · ${x.repairing}` : ''}</span><button className="subtle" onClick={onCancel}>{x.cancel}</button></div>
+    <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{x.running}{progress.shortening ? ` · ${x.shortening}` : progress.repairing ? ` · ${x.repairing}` : ''}</span><button className="subtle" onClick={onCancel}>{x.cancel}</button></div>
     <p className="micro plain">{x.requests(progress.requests)}</p>
   </div>;
   const where = route && (route.provider === 'local' ? x.local(route.model) : `ChatGPT · ${route.model}`);

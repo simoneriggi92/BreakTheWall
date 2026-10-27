@@ -13,7 +13,7 @@ import { labelBeside, layoutDisassembly } from '../src/core/layout';
 import { PreferencesProvider } from '../src/renderer/preferences';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
 import { loadPreparedDisassemblies } from '../src/fixtures/disassemblies';
-import { generatedFrom, splitAnswer } from './disassembly-drafts';
+import { deepDisassembly, generatedFrom, splitAnswer } from './disassembly-drafts';
 
 /** An in-memory bridge with the same contract as the preload; `locale` sets the interface language. */
 function memoryBridge(locale = 'it-IT') {
@@ -44,6 +44,10 @@ describe('exploded view, part card and source', () => {
     expect(card.getByRole('heading', { name: /deploy-staging/ })).toBeInTheDocument();
     expect(card.getByText(/Legge release.json/)).toBeInTheDocument();
     expect(card.getAllByText('resta uguale:', { exact: false }).length).toBeGreaterThan(0);
+    // D20: the lead opens the card in its own style, before the points.
+    const lead = card.getByText(d.parts[3].role);
+    expect(lead).toHaveClass('role', 'lead');
+    expect(lead.compareDocumentPosition(card.getAllByRole('list')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const [cite] = d.parts[3].cites;
     expect(focusedLines()).toEqual(Array.from({ length: cite.to - cite.from + 1 }, (_, i) => cite.from + i));
     await user().click(card.getByRole('button', { name: 'r. 100–115' }));
@@ -68,6 +72,136 @@ describe('exploded view, part card and source', () => {
     expect(card.textContent).not.toMatch(/undefined|null|\[object/);
     expect(card.querySelector('.card-box.inference')).toBeNull();
     expect(card.querySelector('.lens-list')).toBeNull();
+  });
+});
+
+describe('numbers in reading order (D15)', () => {
+  it('agrees across balloon, plate name, card and bill of materials, and says what the numbers mean', async () => {
+    await play(await validateDisassembly(mill()));
+    expect(screen.getByText('Numeri: ordine di lettura')).toBeInTheDocument();
+    const claim = plate(/^3\. Solo per impedire danni ad altri · /);
+    expect(claim.querySelector('.balloon text')!.textContent).toBe('3');
+    expect(plate(/^1\. L'utilità, nel senso più ampio · /)).toBeInTheDocument();
+    await user().click(claim);
+    expect(side().getByText(/^Pezzo 3 · /)).toBeInTheDocument();
+    await user().click(screen.getByRole('button', { name: 'Distinta base' }));
+    const rows = [...document.querySelectorAll('.bom-table:not(.excluded) tbody tr')].map(r => [r.children[0].textContent, r.children[1].textContent]);
+    expect(rows.slice(1, 4).map(r => r[0])).toEqual(['1', '2', '3']);
+    expect(rows[3][1]).toMatch(/^Solo per impedire danni ad altri/);
+  });
+  it('numbers the English version the same way under an English interface', async () => {
+    await play(await validateDisassembly(fixture(PUBLIC_FIXTURES[4])), memoryBridge('en-GB').bridge);
+    expect(screen.getByText('Numbers: reading order')).toBeInTheDocument();
+    const claim = screen.getAllByRole('button').find(b => b.getAttribute('data-id') === 'claim')!;
+    expect(claim.getAttribute('aria-label')).toMatch(/^3\. /);
+    await user().click(claim);
+    expect(side().getByText(/^Part 3 · /)).toBeInTheDocument();
+  });
+});
+
+describe('back to the level above (D16)', () => {
+  const enterCheck = async () => {
+    if (plate(/^2\. check/).getAttribute('aria-pressed') !== 'true') await user().click(plate(/^2\. check/));
+    await user().click(side().getByRole('button', { name: /Apri comunque il sottoassieme/ }));
+  };
+  it('shows the control only below the top level, names the level above, and goes back to the part just left', async () => {
+    await play(await validateDisassembly(atlas()));
+    expect(screen.queryByRole('button', { name: /^Livello superiore/ })).toBeNull();
+    await enterCheck();
+    await user().click(screen.getByRole('button', { name: 'Livello superiore: Catena di rilascio' }));
+    const check = plate(/^2\. check/);
+    expect(check).toHaveAttribute('aria-pressed', 'true');
+    expect(check).toHaveFocus();
+    expect(screen.queryByRole('button', { name: /^Livello superiore/ })).toBeNull();
+  });
+  it('goes up with Escape, with Alt+↑ and from the sub-assembly card, but not while typing a note', async () => {
+    await play(await validateDisassembly(atlas()));
+    await enterCheck();
+    await user().keyboard('{Escape}');
+    expect(plate(/^2\. check/)).toHaveFocus();
+    await enterCheck();
+    await user().keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(plate(/^2\. check/)).toHaveAttribute('aria-pressed', 'true');
+    await enterCheck();
+    await user().click(side().getByRole('button', { name: 'Torna a Catena di rilascio' }));
+    expect(plate(/^2\. check/)).toHaveFocus();
+    await enterCheck();
+    await user().click(plate(/^1\. Lockfile esatto/));
+    await user().type(side().getByLabelText(/I tuoi appunti/), 'x{Escape}');
+    expect(screen.getByRole('button', { name: 'Livello superiore: Catena di rilascio' })).toBeInTheDocument();
+  });
+  it('climbs back from the fifth level one level at a time, in English too', async () => {
+    const d = await validateDisassembly(await deepDisassembly(5));
+    await play(d, memoryBridge('en-GB').bridge);
+    const names = ['p1', 'p1-1', 'p1-1-1', 'p1-1-1-1'];
+    for (const id of names) {
+      await user().click(document.querySelector<HTMLElement>(`.sheet .plate[data-id="${id}"]`)!);
+      await user().click(side().getByRole('button', { name: /Open the sub-assembly/ }));
+    }
+    for (const id of [...names].reverse()) {
+      await user().keyboard('{Escape}');
+      expect(document.querySelector(`.sheet .plate[data-id="${id}"]`)).toHaveFocus();
+    }
+    expect(screen.queryByRole('button', { name: /^Level above/ })).toBeNull();
+  });
+});
+
+describe('resizable drawing, card and source (D17)', () => {
+  const separators = () => screen.queryAllByRole('separator').map(x => x.getAttribute('aria-label'));
+  const setWidth = (width: number) => act(() => { Object.defineProperty(window, 'innerWidth', { value: width, configurable: true }); window.dispatchEvent(new Event('resize')); });
+  it('offers both splitters in the exploded view and in runs, one in the bill of materials, and remembers the sizes', async () => {
+    localStorage.clear();
+    const d = await validateDisassembly(atlas());
+    const view = await play(d);
+    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza della fonte']);
+    const drawing = document.querySelector<HTMLElement>('.d-drawing')!;
+    expect(drawing.style.height).toBe('50vh');
+    screen.getByRole('separator', { name: 'Altezza del disegno' }).focus();
+    await user().keyboard('{ArrowDown}{ArrowDown}');
+    expect(drawing.style.height).toBe('60vh');
+    screen.getByRole('separator', { name: 'Larghezza della fonte' }).focus();
+    await user().keyboard('{ArrowLeft}');
+    expect(document.querySelector<HTMLElement>('.d-side')!.style.getPropertyValue('--source-w')).toBe(String(0.34 + 0.05));
+    await user().click(screen.getByRole('button', { name: 'Fai girare' }));
+    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza della fonte']);
+    await user().click(screen.getByRole('button', { name: 'Distinta base' }));
+    expect(separators()).toEqual(['Larghezza della fonte']);
+    await user().click(screen.getByRole('button', { name: 'Rimonta' }));
+    expect(separators()).toEqual([]);
+    view.unmount();
+    await play(d);
+    expect(document.querySelector<HTMLElement>('.d-drawing')!.style.height).toBe('60vh');
+    localStorage.clear();
+  });
+  it('shows the whole sheet until the learner sets a height, then follows it, and fits again on reset', async () => {
+    localStorage.clear();
+    await play(await validateDisassembly(atlas()));
+    const sheet = () => document.querySelector<SVGSVGElement>('.d-drawing .sheet')!;
+    expect(sheet()).toHaveClass('fit-contain');
+    expect(sheet().style.minWidth).toBe('');
+    const bar = screen.getByRole('separator', { name: 'Altezza del disegno' });
+    bar.focus();
+    await user().keyboard('{ArrowDown}');
+    expect(sheet()).toHaveClass('fit-height');
+    await user().keyboard('{Enter}');
+    expect(sheet()).toHaveClass('fit-contain');
+    localStorage.clear();
+  });
+  it('widens the source to the whole row and back, hiding the card meanwhile', async () => {
+    await play(await validateDisassembly(atlas()));
+    await user().click(screen.getByRole('button', { name: 'Allarga la fonte a tutta la riga' }));
+    expect(document.querySelector('.part-card')).toBeNull();
+    expect(screen.queryByRole('separator', { name: 'Larghezza della fonte' })).toBeNull();
+    await user().click(screen.getByRole('button', { name: 'Riporta la fonte accanto alla scheda' }));
+    expect(document.querySelector('.part-card')).not.toBeNull();
+  });
+  it('stacks the panes without splitters on a narrow window', async () => {
+    setWidth(800);
+    try {
+      await play(await validateDisassembly(atlas()));
+      expect(separators()).toEqual([]);
+      expect(document.querySelector<HTMLElement>('.d-drawing')!.style.height).toBe('');
+    } finally { setWidth(1024); }
   });
 });
 
@@ -285,9 +419,9 @@ describe('taking a part apart on demand (D14)', () => {
     render(<App bridge={bridge} prepared={[]} disassemblies={[]}/>);
     await user().click(await screen.findByRole('button', { name: (name: string) => name.includes(d.title) }));
     await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
-    await user().click(plate(new RegExp(`^${d.parts.indexOf(small) + 1}\\. `)));
+    await user().click(plate(new RegExp(`^\\d+\\. ${small.name} · `)));
     expect(side().getByText(new RegExp(`Questo pezzo non si smonta oltre: cita ${linesOf(d, small.cites).size} righe, ne servono almeno 6`))).toBeInTheDocument();
-    await user().click(plate(new RegExp(`^${d.parts.indexOf(leaf) + 1}\\. `)));
+    await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
     await user().type(side().getByLabelText(/I tuoi appunti/), 'resta');
     expect(side().getByText('Una richiesta a ChatGPT · strong, con le sole righe di questo pezzo.')).toBeInTheDocument();
     await user().click(side().getByRole('button', { name: 'Smonta questo pezzo' }));
@@ -296,7 +430,7 @@ describe('taking a part apart on demand (D14)', () => {
     expect(await within(crumbs).findByText(leaf.name)).toHaveAttribute('aria-current', 'location');
     expect(plate(/^1\. .* 1 · /)).toBeInTheDocument();
     await user().click(within(crumbs).getByRole('button', { name: d.whole.name }));
-    await user().click(plate(new RegExp(`^${d.parts.indexOf(leaf) + 1}\\. `)));
+    await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
     expect(side().getByLabelText(/I tuoi appunti/)).toHaveValue('resta');
     expect(side().getByRole('button', { name: /Apri il sottoassieme · 3 pezzi/ })).toBeInTheDocument();
   });
@@ -306,7 +440,7 @@ describe('taking a part apart on demand (D14)', () => {
     const leaf = d.parts.find(p => !p.parts && divisible(d, p))!;
     const { bridge } = await desktopWith(d);
     await play(d, bridge);
-    await user().click(plate(new RegExp(`^${d.parts.indexOf(leaf) + 1}\\. `)));
+    await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
     expect(side().queryByRole('button', { name: 'Smonta questo pezzo' })).not.toBeInTheDocument();
     expect(side().queryByText(/non si smonta oltre/)).not.toBeInTheDocument();
   });
