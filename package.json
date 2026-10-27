@@ -2,7 +2,10 @@
   "name": "break-the-wall",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
+  "description": "Take material apart into source-linked parts, run the mechanism, and reassemble it.",
+  "author": "Simone Riggi",
+  "repository": { "type": "git", "url": "https://github.com/simoneriggi92/BreakTheWall.git" },
   "type": "module",
   "main": "dist-electron/main.cjs",
   "engines": {
