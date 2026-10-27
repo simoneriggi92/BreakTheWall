@@ -45,6 +45,15 @@ The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/br
 
 The app uses the same data folder as `npm start` (`~/Library/Application Support/Break the Wall`), because the main process names the app before anything else. It needs macOS 13 or later (`LSMinimumSystemVersion`, from Electron).
 
+### Making a release
+
+1. Set `version` in `package.json` to the new version (for example `0.1.1-alpha`), add its CHANGELOG section, and merge the change into `main` through a pull request.
+2. Tag that commit on `main` with the same version and a leading `v`, and push the tag: `git tag v0.1.1-alpha && git push origin v0.1.1-alpha`.
+3. The [Release workflow](../.github/workflows/release.yml) checks that the tag matches `package.json`, runs `npm run check` and `npm run package` on an Apple Silicon runner, and attaches the DMG and its `.sha256` to the tag's release. With no release yet, it creates a draft pre-release with generated notes.
+4. Download the DMG from the draft with a browser, install it as the README says, and check it. Then edit the notes and publish the release.
+
+A pull request that changes packaging, or a manual run of the workflow, builds the same DMG as a workflow artifact and touches no release.
+
 Ad-hoc signing lets the app run but not pass Gatekeeper: after a browser download, macOS blocks the first open until the user chooses Open Anyway. Signing with an Apple Developer ID and notarizing would replace the `codesign` step in `scripts/package-mac.mjs`; that needs an Apple Developer account and is not set up.
 
 ## Toolchain references

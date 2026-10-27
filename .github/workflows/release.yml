@@ -1,0 +1,77 @@
+name: Release
+
+# A v* tag builds the Apple Silicon DMG and attaches it to the tag's release, as a draft pre-release when there is
+# none yet; the owner publishes it. A pull request that touches packaging, or a manual run, only builds the DMG as a
+# workflow artifact.
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/package-mac.mjs
+      - src/desktop/main.ts
+      - src/desktop/app-files.ts
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Apple Silicon DMG
+    # Named explicitly: the DMG is arm64 and its start check opens it, so the runner must be Apple Silicon.
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      # engine-strict is on: use the npm version pinned in package.json.
+      - run: npm install --global npm@10.9.8
+      - name: The runner is Apple Silicon
+        run: test "$(uname -m)" = arm64
+      - name: The tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "${GITHUB_REF_NAME}" = "v$(node -p "require('./package.json').version")"
+      - run: npm ci
+      - run: npm run check
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: break-the-wall-dmg
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Attach to the release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: break-the-wall-dmg
+          path: release
+      - name: Upload the DMG and its checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" release/* --draft --prerelease --verify-tag --title "Break the Wall $TAG" --generate-notes
+          fi
