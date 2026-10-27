@@ -4,7 +4,7 @@ Break the Wall handles two things that must not leak: the learner's sources, and
 
 ## Supported versions
 
-Break the Wall is an alpha. Only the latest commit on `main` and the app attached to the latest release receive security fixes. The macOS app is signed ad-hoc and not notarized by Apple: download it only from this repository's releases, and check it against the `.sha256` file published with it.
+Break the Wall is an alpha. Only the latest commit on `main` and the app attached to the latest release receive security fixes. The macOS app is signed ad-hoc and not notarized by Apple, and the Windows setup is not code-signed: download them only from this repository's releases, and check each against the `.sha256` file published with it.
 
 ## Reporting a vulnerability
 

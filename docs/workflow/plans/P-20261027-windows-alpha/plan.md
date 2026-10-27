@@ -3,9 +3,9 @@ id: P-20261027-windows-alpha
 title: A Windows alpha - Windows in CI, platform-aware wording, an unsigned x64 Squirrel installer next to the DMG
 version: 1
 state: implementing
-current_task: W3
-last_evidence: W1, W2 verified; W3-W5 implemented - .ico, Squirrel events, package:win, release job; 348 tests and the Mac package pass locally; Windows packaging not run yet
-next_action: Push phase package to PR #27 so the Release workflow builds the Windows setup (W4, W5 acceptance)
+current_task: W6
+last_evidence: W1-W5 verified on PR #27; W6 written - README Windows install, development, CHANGELOG, SECURITY, AGENTS
+next_action: Owner chooses the version for W7 and confirms the tag after merging PR #27
 approval: approved
 ---
 
@@ -200,4 +200,27 @@ Started by the owner's command `implement P-20261027-windows-alpha v1 --phase pa
 | `.ico` entries | Static inspection | **passed**: 7 PNG entries, 16–256 px, each the full icon |
 | `npm run package` on macOS after the shared module | Targeted build | **passed**: signature verified, "start check: the library is drawn", 92.8 MB DMG |
 | Workflow syntax | Static inspection | **passed**: jobs `package`, `windows`, `release` (needs both) |
-| `npm run package:win` and the Windows release job | Integration check | **not run yet**: needs the Windows runner, on the pull request |
+| `npm run package:win` and the Windows release job | Integration check | **passed** on PR #27 at `e7a1cfe` (job 122305803097, `windows-2025-vs2026`): 336 tests; "Packaging app for platform win32 x64"; "start check: the library is drawn"; `Break-the-Wall-0.1.1-alpha-x64-setup.exe`, 157.0 MB, SHA-256 `b049c67e…19f2164` |
+| The DMG job and both CI jobs on the same commit | Automated test, integration check | **passed**; "Attach to the release" skipped, as it must be without a tag |
+
+Observed: `npm ci` on Windows warns that `rimraf@2`, `glob@7` and `inflight`, pulled in by `electron-winstaller`, are deprecated (development only, not in the app); GitHub warns that `actions/checkout@v4`, `setup-node@v4` and `upload-artifact@v4` target Node 20 (Dependabot's open pull requests move them to v7). The setup is larger than the DMG (157 MB against 93 MB): Squirrel packs the whole app in its NuGet package with plain zip compression.
+
+| Task | Verdict |
+|---|---|
+| W3 | **verified** (the Start menu shortcuts are seen in W7) |
+| W4 | **verified** |
+| W5 | **verified** for pull requests; the tag path is verified in W7 |
+
+### Phase `release`: W6, 2026-10-27
+
+Started by the owner's command `implement P-20261027-windows-alpha v1 --phase release`.
+
+- README: the tagline and platform badge name Windows; the alpha note offers the download for Windows x64 PCs; "Try the alpha" has "Download for Mac" and "Download for Windows" (requirements: x64, Windows 10 or 11; the setup; SmartScreen's "Windows protected your PC" → "More info" → "Run anyway"; a PowerShell check of the `.sha256` that prints `True`; the clean start; data in `%APPDATA%\Break the Wall` and credentials encrypted by Windows; updating with a newer setup; uninstalling from Settings → Apps, which keeps the data folder); "Run from source" for macOS or Windows; credentials and storage name Windows' data protection; the status table, the plans link, "Not claimed" and the roadmap.
+- `docs/development.md`: both systems in CI; the `.ico`; Windows packaging, Squirrel's install folder and events, the data folder, and where code signing would go; the release steps with both builds.
+- CHANGELOG (Unreleased), SECURITY (the Windows setup is not code-signed) and the AGENTS.md technical-direction line.
+
+The SmartScreen wording, the uninstall behaviour and the shortcuts are written from how Windows and Squirrel are documented to behave; W7 confirms or corrects them.
+
+### Version for W7
+
+The owner chose `0.2.0-alpha` ("Versione 0.2.0-alpha"): a new platform is a feature, not a fix. `package.json` and `package-lock.json` were set with `npm version 0.2.0-alpha --no-git-tag-version`, and the CHANGELOG's Unreleased entries moved to its section. The tag `v0.2.0-alpha` is pushed only after the owner confirms it, once this is on `main`.

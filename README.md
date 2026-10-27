@@ -9,12 +9,12 @@
 
 <p align="center">AI gives you a wall of text. Break the Wall turns it into source-linked parts you can explore, test and put back together.</p>
 
-<p align="center"><strong>Open-source alpha · macOS · English &amp; Italian · Apache-2.0</strong></p>
+<p align="center"><strong>Open-source alpha · macOS · Windows · English &amp; Italian · Apache-2.0</strong></p>
 
 <p align="center">
   <a href="https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="CI"></a>
   <a href="https://github.com/simoneriggi92/BreakTheWall/releases"><img src="https://img.shields.io/github/v/release/simoneriggi92/BreakTheWall?include_prereleases&amp;style=flat-square&amp;color=D96B4B" alt="Release"></a>
-  <img src="https://img.shields.io/badge/platform-macOS-102B46?style=flat-square&amp;logo=apple" alt="Platform: macOS">
+  <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows-102B46?style=flat-square" alt="Platform: macOS and Windows">
   <img src="https://img.shields.io/badge/interface-English%20%C2%B7%20Italiano-102B46?style=flat-square" alt="Interface: English and Italian">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-102B46?style=flat-square" alt="License: Apache-2.0"></a>
 </p>
@@ -24,7 +24,7 @@
 ![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted, then its sub-assembly opened one level down; a scenario predicted and run on the drawing, where a smoke test fails and the rollback takes over; the theme switched from blueprint to paper; Mill's harm principle, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
-> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
+> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
 
 ## Table of contents
 
@@ -77,7 +77,7 @@ The prepared examples show a release runbook and Mill's harm principle. The same
 
 ## Try the alpha
 
-### Download the app
+### Download for Mac
 
 **Requirements:** a Mac with Apple Silicon (M1 or later) and macOS 13 Ventura or later.
 
@@ -93,9 +93,25 @@ shasum -a 256 -c Break-the-Wall-<version>-arm64.dmg.sha256
 
 The app starts clean: the two prepared examples, no account and nothing saved. What you create stays on your Mac in `~/Library/Application Support/Break the Wall`, and ChatGPT credentials stay in your Keychain. There are no automatic updates yet: to update, download the DMG of a newer release and replace the app; your data stays where it is. The ChatGPT sign-in does not carry over from a build run from source, and may not survive an update, because each version is signed ad-hoc: if Studio shows you signed out, sign in again.
 
+### Download for Windows
+
+**Requirements:** a 64-bit (x64) PC with Windows 10 or 11.
+
+1. Download `Break-the-Wall-<version>-x64-setup.exe` from the [latest release](https://github.com/simoneriggi92/BreakTheWall/releases).
+2. Run it. The alpha is not code-signed, so Windows SmartScreen shows **Windows protected your PC**. Choose **More info**, then **Run anyway**. You do this once for each download.
+3. The setup installs Break the Wall for your user only, without administrator rights, adds it to the Start menu and the desktop, and opens it.
+
+To check the download, put the `.sha256` file from the release next to the setup and run in PowerShell (it prints `True` when they match):
+
+```powershell
+(Get-FileHash .\Break-the-Wall-<version>-x64-setup.exe).Hash -eq (Get-Content .\Break-the-Wall-<version>-x64-setup.exe.sha256).Split(' ')[0]
+```
+
+The app starts clean, as on the Mac. What you create stays in `%APPDATA%\Break the Wall`, and ChatGPT credentials are encrypted by Windows for your user. To update, run the setup of a newer release; your data stays. To uninstall, open **Settings → Apps → Installed apps**, find **Break the Wall** and choose **Uninstall**: the app and its shortcuts go, your data folder stays until you delete it.
+
 ### Run from source
 
-For an Intel Mac, or to change the code. **Requirements:** macOS, Node.js 22.23.2 and npm 10.9.8 (pinned in `package.json`).
+For an Intel Mac, or to change the code. **Requirements:** macOS or Windows, Node.js 22.23.2 and npm 10.9.8 (pinned in `package.json`).
 
 ```bash
 git clone https://github.com/simoneriggi92/BreakTheWall.git
@@ -178,7 +194,7 @@ Lessons created before disassemblies stay readable, with their progress, under "
 
 - **Storage:** disassemblies, lessons, progress and notes stay on your device, written atomically. Progress that no longer matches its disassembly is kept on disk and the session restarts, with a notice.
 - **Interrupted generations:** at most one draft, `generation-draft.json`, with the text generated so far. It never leaves the device and is deleted on success, on "Start over" and when a new generation starts.
-- **Credentials:** ChatGPT tokens are encrypted with the macOS Keychain (Electron `safeStorage`) and never reach the interface or the logs.
+- **Credentials:** ChatGPT tokens are encrypted with Electron `safeStorage` (the Keychain on macOS, the system's data protection on Windows) and never reach the interface or the logs.
 - **Isolation:** the renderer has no Node, filesystem or network access. Every desktop operation goes through narrow, validated IPC calls.
 
 ## Local models
@@ -209,12 +225,12 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 | Interface | React 19, TypeScript 7, Vite 8, SVG technical drawings, lucide icons, system fonts; markdown-it for sources read as documents, Mermaid for their diagrams (loaded on first use) |
 | Disassembly model | zod 4 contract with located findings, bill-of-materials check, deterministic layered layout and pure run/reassembly transitions; independent of React and Electron |
 | AI routes | Sign in with ChatGPT (OAuth + PKCE, Responses API); Ollama, LM Studio and llama.cpp over loopback |
-| Storage | atomic JSON files in the app's data folder; credentials via Keychain-backed `safeStorage` |
+| Storage | atomic JSON files in the app's data folder; credentials via `safeStorage` (Keychain on macOS, DPAPI on Windows) |
 | Tests | Vitest, Testing Library (jsdom): contract, layout geometry, contrast, catalogs, player interactions |
 
 ## Project status
 
-Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v7) and [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md) (v1). Evidence for each task is in its implementation record.
+Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v7), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md) (v1) and [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) (v1). Evidence for each task is in its implementation record.
 
 | Phase | Tasks | Status |
 |---|---|---|
@@ -226,10 +242,11 @@ Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-2
 | Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
 | Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
 | macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built in CI on a tag and attached to [`v0.1.1-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha); install from a download witnessed by the owner |
+| Windows app | W1 Windows in CI · W2 platform-aware wording · W3–W5 icon, installer events, setup and release job · W6–W7 install steps and witnessed install | ✅ CI and start check on Windows; setup built in CI; ⏳ release and witnessed install |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
-Not claimed: learning effectiveness, correctness of generated explanations, platforms other than macOS, Intel builds, or an app signed and notarized by Apple.
+Not claimed: learning effectiveness, correctness of generated explanations, platforms other than macOS and Windows x64, Intel Mac or Windows on ARM builds, or apps signed by Apple or Microsoft.
 
 ## Roadmap
 
@@ -244,6 +261,8 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 - [ ] Dependency map for repositories, and a reassembly that simulates the effect of a misplaced part
 - [x] Downloadable macOS app for Apple Silicon (ad-hoc signed)
 - [ ] Signed and notarized macOS app (Apple Developer ID), with updates
+- [x] Downloadable Windows app for x64 (unsigned installer)
+- [ ] Code-signed Windows installer
 - [ ] Claude code integration
 
 ## Contributing
