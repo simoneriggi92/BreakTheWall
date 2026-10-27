@@ -4,7 +4,7 @@
 
 Break the Wall turns a wall of text into a **disassembly**: an exploded view of 3–7 parts per level, joined by typed joints, each part tied to the exact lines of its source. You **run** the mechanism by predicting what happens before each step, or by removing a brick from an argument to see whether it falls. When you are ready, you **reassemble** it. One loop for any subject: only the kind of joint changes (mechanism, argument, story).
 
-**[Product](docs/product.md)** · **[Architecture](docs/architecture.md)** · **[Development](docs/development.md)** · **[Plan](docs/workflow/plans/P-20261024-disassembly/plan.md)** · **[Status](STATUS.md)**
+**[Product](docs/product.md)** · **[Architecture](docs/architecture.md)** · **[Development](docs/development.md)** · **[Plan](docs/workflow/plans/P-20261024-disassembly/plan.md)** · **[Status](STATUS.md)** · **[Contributing](CONTRIBUTING.md)**
 
 ![Status](https://img.shields.io/badge/status-alpha-orange?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square&logo=apple)
@@ -12,12 +12,12 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Languages](https://img.shields.io/badge/interface-English%20%C2%B7%20Italiano-1f5f99?style=flat-square)
-![License](https://img.shields.io/badge/license-not%20selected-lightgrey?style=flat-square)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
 
-![Mill's harm principle taken apart in the blueprint theme: the claim in the middle, its grounds below, the consequence above, the objection and the limit at its sides](docs/images/disassembly-mill-blueprint.png)
+![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted; a run step predicted and then executed; Mill's harm principle in the blueprint theme, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
-> Break the Wall is an alpha that runs from source on macOS. There is no installer or release yet. The prepared disassemblies work without any account. **Generating disassemblies from your own sources is built and tested, but not yet witnessed live:** the comparison of ChatGPT models and the first real generations are the next step.
+> Break the Wall is an alpha that runs from source on macOS. There is no installer or release yet. The prepared disassemblies work without any account. Generating disassemblies from your own text and markdown sources works with ChatGPT or a local model; repositories and PDF documents as sources are next on the [roadmap](#roadmap). Feedback and contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Table of contents
 
@@ -84,6 +84,8 @@ Every source line is in a part, in a joint, or excluded with a reason: context, 
 
 ### Two themes, two languages
 
+![Mill's harm principle taken apart in the blueprint theme: the claim in the middle, its grounds below, the consequence above, the objection and the limit at its sides](docs/images/disassembly-mill-blueprint.png)
+
 - **Paper** (light) and **blueprint** (dark), following the system or chosen in the header. Every text color reaches WCAG AA in both themes, checked by a test.
 - **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. When a disassembly exists in both languages, the player offers the other version, and progress stays separate for each version.
 
@@ -103,7 +105,7 @@ Each phase can be repaired once with the app's findings. When the repair leaves 
 
 | Route | Account | Where your source goes | Status |
 |---|---|---|---|
-| **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Sign-in witnessed; lessons generated live by the evaluation runner; disassemblies not yet run live |
+| **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Experimental. Disassemblies generated live: in the last check, 4 of 4 public cases valid |
 | **Local model** | none | a server on `127.0.0.1` on your Mac | Witnessed for lessons; disassemblies not yet measured |
 
 Lessons created before disassemblies stay readable, with their progress, under "Earlier paths".
@@ -117,7 +119,7 @@ Lessons created before disassemblies stay readable, with their progress, under "
 
 ## Local models
 
-Start a model server, open **Create a path → Generation → Local model**, and the app finds it. It probes the default ports and identifies each runtime by its own endpoints. Before first use, it sends a tiny probe to check whether the server really enforces the output format.
+Start a model server, open **Take apart a source → Generation → Local model**, and the app finds it. It probes the default ports and identifies each runtime by its own endpoints. Before first use, it sends a tiny probe to check whether the server really enforces the output format.
 
 | Runtime | Default address | How the format is enforced | Observed on Ollama 0.30.8 / llama.cpp b9509 |
 |---|---|---|---|
@@ -190,7 +192,8 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 - [x] Automatic layout for mechanisms, arguments and stories
 - [x] Player: exploded view, run, reassemble, bill of materials
 - [x] Paper and blueprint themes; English and Italian interface
-- [ ] Two-phase generation of disassemblies (ChatGPT first, local models measured)
+- [x] Two-phase generation of disassemblies, with suggested questions, a live drawing and resume
+- [ ] Local models measured on disassemblies
 - [ ] Repositories as a source: snapshot identity, secrets found by content, file-level bill of materials
 - [ ] PDF documents as a source: checked extraction, page citations
 - [ ] Dependency map for repositories, and a reassembly that simulates the effect of a misplaced part
@@ -198,8 +201,8 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 
 ## Contributing
 
-The project uses a research → plan → approve → implement → verify workflow. Read [AGENTS.md](AGENTS.md) for repository constraints and the active plan before proposing changes. Fixtures must be original or suitably licensed: the repository is public.
+Contributions are welcome, from a bug report or a translation fix to a new prepared disassembly. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the checks every change passes and the research → plan → implement workflow used for larger changes.
 
 ## License
 
-No license has been selected yet. The intended distribution is open source, but until a license is added, publishing the source does not grant reuse rights.
+Break the Wall is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.

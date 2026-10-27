@@ -11,10 +11,10 @@ This repository uses the `project-workflow` skills for research → plan → rev
 - Technical direction: TypeScript/React and Electron are established in T1. Exact versions are pinned in `package.json`; domain code must remain independent of React/Electron. No application packaging or signing is established.
 - External dependencies: no credentials or AI services are configured by this foundation. Provider documentation review is not proof of account access or a successful inference. Source: [foundation evidence](docs/workflow/research/R-20261021-foundation.md).
 - Generated file: `STATUS.md` is derived from plan front matter by the project-workflow status generator. Edit the plan, then regenerate status.
+- License: Apache-2.0, chosen by the owner on 2026-10-27 ([LICENSE](LICENSE), [NOTICE](NOTICE)). Contributions are accepted under its section 5; there is no separate CLA.
 - Publication boundary: the remote repository is public. Use original or suitably licensed fixtures. Earlier private code excerpts and local source snapshots are outside this repository's content scope. Source: [README](README.md) and foundation evidence.
 
 ## Open questions
 
-- Which open-source license should the owner adopt?
 - Can the selected provider/account complete the required structured generation through the documented authentication route? This needs a witnessed integration check.
 - Which retrieval route will support the later AI-assisted source-discovery mode? Do not show this mode as working before it is implemented and checked.
