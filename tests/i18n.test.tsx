@@ -6,8 +6,10 @@ import { detectLanguage } from '../src/core/generation';
 import { resolveLanguage } from '../src/core/language';
 import { settingsSchema, type StudioSettings } from '../src/core/provider';
 import { App } from '../src/renderer/App';
+import { DEVICE_TEXTS, DEVICES, forPlatform } from '../src/renderer/i18n/devices';
 import { en } from '../src/renderer/i18n/en';
 import { it as italian } from '../src/renderer/i18n/it';
+import { PreferencesProvider, usePreferences } from '../src/renderer/preferences';
 import { sample } from './sample';
 
 /** Every leaf of a catalog, with its path; functions are called with neutral arguments. */
@@ -54,6 +56,37 @@ describe('interface catalogs', () => {
     expect(settingsSchema.parse({ version: 1, provider: 'local', theme: 'blueprint', language: 'en' }).theme).toBe('blueprint');
     expect(settingsSchema.safeParse({ version: 1, provider: 'chatgpt', theme: 'neon' }).success).toBe(false);
   });
+});
+
+describe('device wording (W2)', () => {
+  const catalogs = { en, it: italian } as const;
+  const mac = /\bMac\b|portachiavi di questo Mac|keychain/;
+  it.each(['en', 'it'] as const)('writes the device texts once: with the Mac\'s words they equal the %s catalog', language => {
+    const texts = DEVICE_TEXTS[language](DEVICES[language].mac);
+    const catalog = catalogs[language];
+    for (const [section, entries] of Object.entries(texts)) {
+      const own = catalog[section as keyof typeof catalog] as Record<string, unknown>;
+      expect(leaves(entries)).toEqual(leaves(Object.fromEntries(Object.keys(entries).map(k => [k, own[k]]))));
+    }
+  });
+  it.each(['en', 'it'] as const)('keeps the catalog on macOS and in the browser, and names no Mac on Windows or other systems (%s)', language => {
+    const catalog = catalogs[language];
+    expect(forPlatform(catalog, language, 'darwin')).toBe(catalog);
+    expect(forPlatform(catalog, language, 'web')).toBe(catalog);
+    expect(forPlatform(catalog, language, undefined)).toBe(catalog);
+    for (const [platform, device] of [['win32', language === 'en' ? 'this PC' : 'questo PC'], ['linux', language === 'en' ? 'this computer' : 'questo computer']] as const) {
+      const all = leaves(forPlatform(catalog, language, platform));
+      expect(all.filter(([, text]) => mac.test(text)).map(([path]) => path)).toEqual([]);
+      expect(all.filter(([, text]) => text.includes(device)).length).toBeGreaterThanOrEqual(6);
+      expect(leaves(forPlatform(catalog, language, platform)).map(x => x[0])).toEqual(leaves(catalog).map(x => x[0]));
+    }
+  });
+  it.each([['win32', 'en-US', 'Models on this PC', 'protected by Windows on this PC'], ['win32', 'it-IT', 'Modelli su questo PC', 'protette da Windows su questo PC'], ['darwin', 'en-US', 'Models on this Mac', 'in this Mac’s keychain']])(
+    'the interface follows the platform the desktop reports (%s, %s)', async (platform, locale, models, kept) => {
+      function Probe() { const { t } = usePreferences(); return <p>{t.local.models} · {t.generate.useAccount}</p>; }
+      render(<PreferencesProvider bridge={{ ...bridge(locale), getRuntime: async () => ({ platform, mode: 'desktop', locale }) }}><Probe/></PreferencesProvider>);
+      expect(await screen.findByText(new RegExp(models))).toHaveTextContent(kept);
+    });
 });
 
 describe('rendered language', () => {

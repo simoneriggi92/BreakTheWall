@@ -254,7 +254,7 @@ export const it = {
     refused: 'Il modello ha rifiutato di generare questo smontaggio. Nessuno smontaggio è stato salvato.',
     'invalid-output': 'La risposta non ha superato i controlli dello smontaggio. Nessuno smontaggio è stato salvato.',
     network: 'Connessione non riuscita. Controlla la rete e riprova.',
-    storage: 'Il portachiavi del sistema non è disponibile: le credenziali non possono essere salvate in modo protetto.',
+    storage: 'Il portachiavi di sistema non è disponibile: le credenziali non possono essere salvate in modo protetto.',
     busy: 'C’è già una generazione in corso.',
     'desktop-only': 'Accesso e generazione sono disponibili nell’app desktop.',
     'local-address': 'Per proteggere le tue fonti, il modello locale deve rispondere su questo Mac: usa un indirizzo come localhost:1234 o 127.0.0.1:11434.',

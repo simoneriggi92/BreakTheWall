@@ -3,9 +3,9 @@ id: P-20261027-windows-alpha
 title: A Windows alpha - Windows in CI, platform-aware wording, an unsigned x64 Squirrel installer next to the DMG
 version: 1
 state: implementing
-current_task: W1
-last_evidence: phase ci implemented - tests path-neutral (338 pass on macOS), Windows CI job added; the Windows job has not run yet
-next_action: Push phase ci so both CI jobs run on its pull request (W1 acceptance)
+current_task: W2
+last_evidence: W1 verified on PR #27; W2 implemented - device wording follows the platform, 345 tests pass on macOS
+next_action: Push phase wording to PR #27 so both CI jobs run it (W2 acceptance)
 approval: approved
 ---
 
@@ -159,4 +159,24 @@ Started by the owner's command `implement P-20261027-windows-alpha v1 --phase ci
 | `npm run check` on macOS | Automated test | **passed**: 22 files, 338 tests |
 | The two changed test files | Automated test | **passed** on macOS: 10 tests |
 | Workflow syntax | Static inspection | **passed**: jobs `check` and `windows` |
-| Windows job | Automated test, integration check | **not run yet**: runs on the pull request |
+| Windows job | Automated test, integration check | **passed** on PR #27 (job 122295504466, `windows-2025-vs2026`): 22 files, 326 tests; build; "start check: the library is drawn" |
+| macOS job on the same commit | Automated test | **passed**: "Types, tests and build" |
+
+| Task | Verdict |
+|---|---|
+| W1 | **verified** |
+
+### Phase `wording` (W2), 2026-10-27
+
+Started by the owner's command `implement P-20261027-windows-alpha v1 --phase wording`.
+
+- `src/renderer/i18n/devices.ts`: the 9 texts per language that name the computer or its credential store (`suggest.local`, `generate.noKeychain`, `generate.useAccount`, `generate.sentLocal`, `local.staysHere`, `local.models`, `local.otherAddress`, `failures.storage`, `failures['local-address']`) are written once per language as functions of the device's words: Mac ("this Mac", "the system keychain", "in this Mac's keychain"), Windows ("this PC", "Windows credential protection", "protected by Windows on this PC") and other systems ("this computer", "the system keyring"). `forPlatform` returns the catalog unchanged on `darwin`, in the browser preview (`web`) and when the platform is not known yet, and swaps in the device's texts otherwise. The catalogs keep their Mac wording as written.
+- `src/renderer/preferences.tsx`: the provider keeps the `platform` that `getRuntime()` already returned and passes the catalog through `forPlatform`.
+- `src/renderer/i18n/it.ts`: `failures.storage` now says "Il portachiavi di sistema", like `generate.noKeychain`, so both are written from the same words.
+- `tests/studio.test.tsx`: its desktop bridge reports `darwin`, the system those tests describe (they expect "questo Mac"); before, it reported a placeholder `test`.
+- `tests/i18n.test.tsx`: the device texts with the Mac's words equal both catalogs (no drift); `darwin`, `web` and an unknown platform keep the catalog; `win32` and `linux` leave no "Mac" or keychain anywhere in either catalog and keep the same keys; the provider renders "Models on this PC" / "protected by Windows on this PC" for `win32` in English, the Italian equivalents, and the Mac wording for `darwin`.
+
+| Check | Kind | Result |
+|---|---|---|
+| `npm run check` on macOS | Automated test | **passed**: 22 files, 345 tests (7 new) |
+| Both CI jobs | Automated test | **not run yet**: run on PR #27 when pushed |
