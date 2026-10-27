@@ -21,7 +21,7 @@
 
 <p align="center"><a href="#try-the-alpha"><strong>Try the alpha</strong></a> · <a href="#how-it-works">How it works</a> · <a href="#roadmap">Roadmap</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 
-![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted; a run step predicted and then executed; Mill's harm principle in the blueprint theme, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
+![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted, then its sub-assembly opened one level down; a scenario predicted and run on the drawing, where a smoke test fails and the rollback takes over; the theme switched from blueprint to paper; Mill's harm principle, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
 > **Alpha, running from source.** There is no installer yet. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
