@@ -1,11 +1,11 @@
 ---
 id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
-version: 5
+version: 6
 state: implementing
-current_task: D9
-last_evidence: Phase depth done (256 tests, build passing); first live generation valid on the owner's private document (setup C, 11 requests, 207 s); slot labels found to give the answer away
-next_action: Owner lists the ChatGPT models; then the A/B/C comparison with --expand (24 generations + 4 expansions) and the blind review
+current_task: D22
+last_evidence: generation-usability: D19–D21 verified, D20 live 4/4 valid; D22–D23 tests pass, witnessed checks pending; D17–D18 witnessed checks pending
+next_action: Owner witnesses D17–D18 and D22–D23 in the desktop app (one live generation and suggestions on a public case and the work document); then D8 and D10
 approval: approved
 ---
 
@@ -26,6 +26,10 @@ Generation produces disassemblies in two phases. ChatGPT is the primary route an
 Lessons already saved stay readable. Nothing the learner has today is lost.
 
 The owner requires the tool to analyze **code repositories and documents** as well as short text sources. Both arrive as gated phases after two-phase generation, because neither fits in one request.
+
+Version 6 makes the app easier to read and to use, after the owner's first generated disassemblies:
+- in the player: numbers that follow the line of reasoning, a way back to the level above, panes the learner can resize, and a rendered view of markdown sources with their diagrams;
+- in generation: suggested questions after the source is added, a short lead with the details in the points, fewer failures over a few characters, a failed generation that can resume, and the drawing shown while the parts are written.
 
 ## Evidence and current state
 
@@ -66,6 +70,26 @@ The owner requires the tool to analyze **code repositories and documents** as we
 | Prepared content | `src/fixtures/lessons.ts` | Two prepared lessons |
 | Evaluation | `eval/`, `npm run eval` | Measures lessons. Baselines: ChatGPT gpt-6-sol 8/8 valid, local 5/15 |
 | Tests | `tests/*.test.ts(x)` | 101 tests: contracts, generation, providers, studio and player interactions |
+- Owner requests of 2026-10-26 (v6), after the D9 comparison. On the three generation improvements proposed by the agent: "Si". Then, in the owner's words:
+  - "Ogni pezzo e la relativa descrizione sembra ripetuta: tra bullet point e la descrizione sopra. Quindi la descrizione la terrei breve (magari come incipit), ed a completare i bullet point per i dettagli";
+  - "Serve lasciare la possibilità all'utente di ingrandire la griglia con i blocchi … degli split panel, che abbassando verso il basso, ingrandisce la dimensione dei blocchi e della griglia. Stessa cosa per sezione smontaggio. Sezione fonte la ridurrei di dimensione, con possibilità di ingrandire";
+  - "La fonte deve avere bottone per visualizzare file .md, come in un editor dedicato, che è in grado di visualizzare rendering .md e flowchart, mermaid, etc";
+  - "I numeri dei pezzi sono fuorvianti … Mi serve numerarli per ordine logico del workflow e della linea di ragionamento";
+  - "manca tipo una freccia per tornare al livello precedente dai blocchi smontati";
+  - then, in a later message: "quando si aggiunge la fonte per la scomposizione … l'AI suggerisca tramite UI all'utente la domanda che si vuole porre per la generazione. Tipo dei suggested break-downs".
+- What the code does today, for those requests (static inspection and the D9 outputs, 2026-10-26):
+
+| Request | Where | Today |
+|---|---|---|
+| Lead and points repeat | `STRUCTURE_INSTRUCTIONS`, `CONTENT_INSTRUCTIONS` in `src/core/disassembly-generation.ts`; `PartCard.tsx` | The structure phase writes `role` as "one sentence on what it does", with no length limit beyond the contract's 2000 characters. The content phase writes the points without seeing a rule against restating it. In setup A's Mill output, roles run 149–238 characters, and the first two points of the first part restate its role clause by clause. The card shows the role, then the points |
+| Numbers | `Sheet.tsx` balloons, `PartCard.tsx` eyebrow, `BillOfMaterials.tsx` | The number is the part's position in the stored array. The layout ranks parts along the joints (`layoutLevel` in `src/core/layout.ts`), so the drawing's order and the numbers can disagree. Reassembly already hides the numbers |
+| Back to the level above | `DisassemblyPlayer.tsx` | Only the breadcrumbs, above the mode tabs, lead back. The sheet and the card have no control for it, and no key does it |
+| Pane sizes | `disassembly.css` | The sheet takes the full width, capped at 1.15× its layout width. The card and the source sit below it in a fixed 1.15 : 1 grid. The source list is capped at 60% of the window height. Nothing can be resized |
+| Rendered markdown | `SourcePane.tsx` | Numbered plain lines only. No markdown or diagram rendering exists, and no dependency for it is installed. The renderer runs with `contextIsolation`, `sandbox` and `webSecurity` on |
+| Failures over a few characters | `withRepair` in `src/desktop/generator.ts`; comparison report | Half of the failed D9 attempts were lengths 1–20 characters over a limit after the one repair. The schema sent to the model has no `maxLength`; zod applies it afterwards |
+| A failed generation is lost | `Generator.generate` | Nothing is kept until the final validation. The first failing part aborts the other parts, and a retry starts again from the structure |
+| Choosing the question | `Studio.tsx`, step 2 of 3 | A blank field with one fixed example as placeholder. The question decides which parts open and which stay closed, but the app gives no help in writing it |
+| Waiting | `Studio.tsx` | A progress bar with the phase and the request count, for about 4 minutes with setup A. The structure is known after the first phase but not shown |
 
 ## Scope and choices
 
@@ -94,6 +118,8 @@ The owner requires the tool to analyze **code repositories and documents** as we
 - **Prepared examples.** The two public prototype disassemblies become fixtures: the Atlas Reader runbook and Mill's harm principle. Mill's text is in the public domain. Both get an English version as well. Their sources are English already, so only the disassembly is written again.
 - **Lessons become legacy.** Saved generated lessons stay readable in a "Percorsi precedenti" section, with their progress. They are not converted. New generation produces only disassemblies.
 - **Two later phases, for repositories and for PDF documents.** Both are gated on the generation results. Both produce a scoped snapshot that the contract records, and a file- or page-level bill of materials.
+- **Usability of the player (v6).** Numbers follow the line of reasoning, a control leads back to the level above, the drawing, the card and the source can be resized, and markdown sources can be read rendered, with their diagrams.
+- **Usability of generation (v6).** Suggested break-downs when the source is added, a short lead with the details in the points, a cheap second repair for lengths only, a failed generation kept and resumed, and the drawing shown as soon as the structure is accepted. None of these changes the stored format.
 
 Not included:
 - interface languages other than English and Italian, right-to-left scripts, and translation of sources or of a disassembly from one language to the other;
@@ -126,6 +152,13 @@ Not included:
 - Taking a part apart uses the structure model of the current Studio setup: deciding how a part splits is structural work.
 - Prepared examples are not taken apart further. They are bundled read-only, and expanding one would mean storing a generated copy. This can be added later.
 - Runs stay on top-level parts. A deeper level has no runs of its own in this plan.
+- **Reading order (v6).** The numbers follow the arrows: a part comes before the parts its joints lead to. For a mechanism, that is the order of the flow; for an argument, grounds come before what they support, up to the conclusion; `depends-on` puts the dependency first, as the layout already does. Parts that only attack or limit another are numbered right after it; parts without joints come last. Ties keep the drawing's order across a rank.
+- **"Sezione smontaggio" (v6)** is read as the card of the open part, beside the source. The owner can correct this before approval.
+- **Pane sizes (v6)** are a per-device convenience, saved in the renderer's local storage and not in the settings file. A reset returns to the defaults.
+- **Rendered view (v6)** is offered for every prose source, not for code. Plain text renders as paragraphs, so it does no harm; markdown gets headings, lists, tables and diagrams. Raw HTML inside the source is shown as text, never run.
+- **Saved disassemblies keep their wording (v6).** The short lead applies to new generations and expansions. Saved ones are not rewritten, and the card does not hide points that repeat the role.
+- **Suggestions only on request (v6).** The owner chose a button: "Preferisco che i suggerimenti arrivino solo premendo un bottone". Entering the question step sends nothing.
+- **One kept generation (v6).** Only the latest failed or cancelled generation is kept for resuming. A new generation discards it. A change of sources, question or language means it is not offered; a change of model does not, since what was kept is already validated.
 - ChatGPT evaluation keeps the opt-in flag. The 2-attempts-per-case cap now applies per setup, within the run budget of D9.
 - The comparison uses the models the account lists at run time. It picks the strongest and the cheapest available, by the account's own naming, and records their exact slugs in the report. No model name is assumed in this plan.
 - The owner's work document is used only after the owner confirms that company policy allows sending it to OpenAI. Otherwise it runs only on the local route, and the source never leaves the Mac.
@@ -476,6 +509,220 @@ Not included:
 - Evidence: `tests/studio.test.tsx` updated; a witnessed note.
 - Dependencies: D8, D9, D14.
 
+### Phase player-usability
+
+Order: D15 → D16 → D17 → D18. Each task is usable on its own; D18 waits for its dependencies to be added.
+
+#### D15 — Numbers in reading order
+
+- Purpose: a part's number says where it sits in the line of reasoning, not where it was stored. Owner request: "Mi serve numerarli per ordine logico del workflow e della linea di ragionamento".
+- Action:
+  - **Reading order in the core.** `layoutLevel` also returns `order`, the part ids of the level in reading order, by the rule in the assumptions:
+    - by rank along the joints, as the layout already computes them, cycles broken the same way;
+    - within a rank, in the drawing's order across it;
+    - a side part right after its host;
+    - parts without joints last.
+
+    It is pure and deterministic, like the rest of the layout.
+  - **Every number uses it:** the sheet's balloons and plate labels for screen readers, the card's "Part 3 of 7", and the bill of materials, whose numbers become paths in reading order ("2.1.3"). Plates are drawn and focused in that order, so the Tab key follows the numbers.
+  - **The sheet says what the numbers mean.** The title block reads "numbers: reading order" in the interface language.
+  - **Generation speaks the same order.** The content and runs inputs list the parts in reading order, with their numbers, so a run step or a slot hint that names a number matches the drawing.
+  - Reassembly keeps hiding the numbers.
+- Acceptance:
+  - Core tests: on Atlas, the order follows the flow; on Mill, grounds come before the principle and the principle before its consequences, and a part that only attacks or limits follows its host; on Kessmouth, the order of events; a rollback cycle and a part without joints are placed by the rule. Every level of every fixture gets a permutation of its parts.
+  - Player tests: a balloon's number, the plate's accessible name, the card's eyebrow and the bill of materials agree for the same part, in both languages.
+  - A generation test: the content and runs inputs list parts in reading order.
+- Evidence: `tests/layout.test.ts`, `tests/disassembly-player.test.tsx`, `tests/disassembly-generation.test.ts`.
+- Dependencies: D2, D5, D7.
+
+#### D16 — Back to the level above
+
+- Purpose: leave a sub-assembly from where the eyes are, not only from the breadcrumbs. Owner request: "manca tipo una freccia per tornare al livello precedente dai blocchi smontati".
+- Action:
+  - Below the top level, the drawing pane shows a back control at its top left, with an arrow and the name of the level above ("↑ Pipeline di rilascio"). The card of an open sub-assembly shows the same action.
+  - Escape and Alt+↑ also go up one level, except while the learner types in a field.
+  - Going up selects the part that was just left and moves focus to its plate, so the learner keeps their place.
+  - At the top level the control is not shown. Runs and reassembly already work on the top level, so it appears in the exploded view only.
+- Acceptance: player tests, in both languages:
+  - the control appears only below the top level and names the level above;
+  - the control, Escape and Alt+↑ each go up exactly one level, select the part left and focus its plate;
+  - Escape in the notes field does not leave the level;
+  - a test at depth 5 goes back to the top one level at a time.
+- Evidence: `tests/disassembly-player.test.tsx`, `tests/depth.test.ts`.
+- Dependencies: D5, D13.
+
+#### D17 — Resizable drawing, card and source
+
+- Purpose: the learner chooses how much room the drawing takes, and makes the plates bigger when they need to read them. Owner request: "degli split panel, che abbassando verso il basso, ingrandisce la dimensione dei blocchi e della griglia … Sezione fonte la ridurrei di dimensione, con possibilità di ingrandire".
+- Action:
+  - **Two splitters**, in the exploded view and in runs:
+    - a horizontal one between the drawing and the row below it. Dragging it down makes the drawing pane taller;
+    - a vertical one between the card (or the run panel) and the source.
+  - **The drawing grows with its pane.** The sheet fits the pane in both directions, with no 1.15× cap, so a taller pane draws bigger plates and text. When the fit would draw text smaller than today, the drawing scrolls sideways, as it does now.
+  - **A narrower source by default.** The source starts at about a third of the row, against about half today. A button in its header widens it to the whole row and back.
+  - **The bill of materials** gets the same vertical splitter between its table and the source.
+  - **Keyboard and screen readers.** Each splitter is a `separator` with its orientation and current value. Arrow keys move it by 5%, Home and End go to the limits, Enter or a double click resets it. Minimum sizes keep every pane usable: 200 px for the drawing, 280 px for the card, 240 px for the source.
+  - **Remembered per device.** Sizes are saved in the renderer's local storage and restored. When storage is unavailable or holds bad values, the defaults apply.
+  - Under 900 px of width the panes stack as today, without splitters.
+  - A small `SplitPane` component in `src/renderer`, with pointer capture for dragging. No dependency.
+- Acceptance:
+  - Component tests: keyboard moves stay within the limits, sizes are saved and restored, reset works, and failing or invalid storage gives the defaults.
+  - Player tests: the source's widen button, and the splitters present in the exploded view, runs and the bill of materials but not under 900 px.
+  - Witnessed by the owner in the desktop app, on Atlas and on the generated disassembly of the work document, in both themes: dragging the drawing pane down makes the plates readable.
+- Evidence: `tests/split-pane.test.tsx` (new), `tests/disassembly-player.test.tsx`, a witnessed note.
+- Dependencies: D5, D6, D7.
+
+#### D18 — Rendered view of a markdown source
+
+- Purpose: read a markdown source as a document, with its tables and diagrams, and still see which lines a part cites. Owner request: "La fonte deve avere bottone per visualizzare file .md, come in un editor dedicato … rendering .md e flowchart, mermaid".
+- Action:
+  - **Two views of a prose source.** The source header gets a switch, "Lines | Document". Code sources keep the lines only. The choice is remembered per source while the disassembly is open.
+  - **A full-window reader.** An "Open" button shows the document in a dialog over the player, with an outline of its headings on the side. Escape closes it and returns focus to the button.
+  - **Rendering.**
+    - Markdown is rendered with `markdown-it`, with raw HTML off, so HTML inside a source shows as text and never runs.
+    - Tables and strikethrough are rendered; code blocks show as code.
+    - Fences tagged `mermaid` are drawn by `mermaid`, loaded on first use as a separate chunk, with `securityLevel: 'strict'` and a theme for paper and one for blueprint. A diagram that does not parse shows its code with a short note.
+    - Links are not followed inside the app; their address shows on hover. Images are not fetched; their alt text shows. Nothing leaves the Mac.
+  - **Citations still work.** `markdown-it` gives each block the source lines it came from. The rendered blocks carry those ranges, so the focused citation highlights its blocks and scrolls to the first, and the open part's cited blocks are shaded as in the line view.
+  - **Dependencies.** `markdown-it`, `mermaid` and the dev dependency `@types/markdown-it`. Exact versions pinned, each the latest stable release at least two weeks old, recorded in `package-lock.json`. The build records the size of the main bundle and of the diagram chunk.
+- Acceptance:
+  - Tests:
+    - headings, lists, tables and code render;
+    - a `<script>` or an `<img onerror>` in a source renders as text;
+    - the blocks' line ranges match the source, and a citation highlights the right blocks;
+    - a mermaid fence calls the diagram renderer, which is mocked in jsdom, and a failing one shows its code;
+    - the dialog closes on Escape and returns focus;
+    - code sources have no switch.
+  - `npm run build` passes. The main bundle grows by no more than 150 kB; the diagram library loads only when a diagram is shown.
+  - Witnessed by the owner: the work document opens rendered, with its four diagrams and its tables, and a citation highlights its block.
+- Evidence: `tests/source-document.test.tsx` (new), `tests/disassembly-player.test.tsx`, the build output, a witnessed note.
+- Dependencies: D5. The dependencies are added only under the v6 approval, which names them.
+
+### Phase generation-usability
+
+Order: D19 → D20 → D21 → D22 → D23. D10's witnessed generations are best done after this phase, because it changes Studio.
+
+#### D19 — A second repair, for lengths only
+
+- Purpose: stop failing a 4-minute generation over a few characters. In D9, half of the failed attempts were 1–20 characters over a limit after the one repair.
+- Action:
+  - After the one repair, when **every** remaining finding of a phase is a length finding, the host sends one small "shorten" request:
+    - it carries only the over-long texts, each with its path, its length and its limit, and the content language;
+    - the answer's schema is a closed list of those paths, each with a replacement text.
+  - The host puts the replacements in place and checks the whole phase again. Any finding left, of any kind, fails the phase as today.
+  - It applies to the structure, content and runs phases and to taking a part apart, on both routes. It counts as a repair in the statistics. Progress says "shortening texts".
+  - A mix of length and other findings gets no shorten request: the other findings mean the draft is wrong, not long.
+- Acceptance: scripted tests:
+  - a part 3 characters over its limit after the repair is shortened with one more request and accepted;
+  - an answer that leaves out a path, adds one, or is still over the limit is refused;
+  - a mix of findings sends no shorten request;
+  - cancelling during the shorten request changes nothing.
+- Evidence: `tests/disassembly-generation.test.ts`, `tests/provider.test.ts`.
+- Dependencies: D9, D14.
+
+#### D20 — A short lead, the details in the points
+
+- Purpose: the card says each thing once. The lead says what the part is for; the points add how and why. Owner request: "la descrizione la terrei breve (magari come incipit), ed a completare i bullet point per i dettagli".
+- Action:
+  - **Instructions.**
+    - Every `role` becomes a lead of at most 100 characters: what the part is for in the whole.
+    - The points of a top-level part, and the explanation of a sub-part, add details the lead does not give: steps, conditions, limits, consequences. They must not say the lead again.
+    - The same applies to taking a part apart.
+  - **Host checks, on new generations and expansions only:**
+    - a lead over 100 characters is a length finding, so D19 can shorten it;
+    - a point, or a sub-part's explanation, that restates the lead is a located finding. "Restates" is measured as word overlap, in the same language-independent way as `givesAway`, with a threshold calibrated on the D9 outputs.
+
+    The contract does not change, so saved disassemblies and the fixtures stay valid.
+  - **The card** shows the lead as an opening line in a stronger style, then the points.
+- Acceptance:
+  - Tests: the restate check flags the repeated points of the D9 Mill output of setup A, and none of the hand-made fixtures' points; a long lead is shortened by D19.
+  - **Live check, within the remaining budget:** setup A, one attempt on each of the four public cases, which are the 4 public generations left in D9's budget. Required:
+    - at least 3 of 4 valid;
+    - every lead at most 100 characters;
+    - no point flagged as restating its lead.
+
+    The report also records how many attempts D19's shorten request saved.
+- Evidence: `tests/disassembly-generation.test.ts`, `tests/disassembly-player.test.tsx`, evaluation report.
+- Dependencies: D19.
+
+#### D21 — Keep a failed generation and resume it
+
+- Purpose: a failure late in a generation no longer costs the whole generation.
+- Action:
+  - **The host keeps a draft** after each accepted step: the structure, each accepted part, and the runs.
+    - One file, `generation-draft.json`, in the app's data folder, written atomically.
+    - It holds the request (source ids and their sha256, question, language, setup), what was accepted, and the statistics so far.
+    - It is deleted on success, on "Start over", and when a new generation starts.
+  - **Parts no longer stop each other.** When one part fails, the parts already running finish and are kept. Cancelling still stops everything at once, and keeps what was accepted.
+  - **Studio offers to resume.** After a failure or a cancellation, and after a restart, Studio says what was kept, for example "structure and 5 of 7 parts kept". It then offers:
+    - "Resume": only the missing parts, then the runs;
+    - "Start over".
+
+    Resume is offered only when the selected sources, their content, the question and the language are the same as in the draft. A different model may finish it. The kept structure is already validated.
+  - A draft file that cannot be read is set aside with a notice, and generation starts fresh.
+- Acceptance: scripted tests:
+  - one part fails twice: the other parts are kept, and resuming sends one content request and the runs request;
+  - the runs phase fails: resuming sends only the runs request;
+  - a changed source, question or language offers only a fresh start;
+  - a cancellation keeps what was accepted; a success deletes the draft; an unreadable draft is set aside;
+  - Studio shows both actions and what was kept, in both languages, and again after a restart.
+- Evidence: `tests/provider.test.ts`, `tests/studio.test.tsx`, a new `tests/generation-draft.test.ts`.
+- Dependencies: D9, D10.
+
+#### D22 — The drawing while it is written
+
+- Purpose: the wait becomes reading. With setup A a generation takes about 4 minutes, and the structure is known after the first.
+- Action:
+  - Once the structure is accepted, progress carries a **preview** of the top level:
+    - parts (id, name, kind, icon, number of sub-parts) and joints;
+    - each part's status: waiting, writing, done or failed;
+    - for each part that is done, its lead and points.
+
+    The preview has a bounded schema in `src/core/provider.ts`. The preload drops a preview that does not parse, and keeps the rest of the progress.
+  - **Studio draws the top level** with the same layout and sheet as the player. Plates show their status with the existing state marks. A finished part can be opened to read its lead and points. The phase line stays above the drawing. During the runs phase every plate is done, and the line says the runs are being prepared.
+  - A resumed generation (D21) starts its preview from the kept draft.
+  - Reduced motion: statuses change without animation.
+- Acceptance:
+  - Studio tests with a scripted bridge: the drawing appears after the structure; statuses change part by part; a finished part opens its lead and points; a failed part shows ✕; a resumed generation starts with its kept parts done.
+  - The preview schema refuses malformed and oversized previews.
+  - Witnessed by the owner during one live generation, which can be one of D10's.
+- Evidence: `tests/studio.test.tsx`, `tests/provider.test.ts`, a witnessed note.
+- Dependencies: D2, D5, D21.
+
+#### D23 — Suggested break-downs
+
+- Purpose: the learner does not start from a blank question. After reading the source, the app proposes a few ways to take it apart, and the learner picks one or writes their own. Owner request of 2026-10-26: "quando si aggiunge la fonte per la scomposizione … l'AI suggerisca tramite UI all'utente la domanda che si vuole porre per la generazione. Tipo dei suggested break-downs".
+- Action:
+  - **When: only on request.** The question step shows a "Suggest break-downs" button, in the desktop app only. The button says that it sends one request and to which route. Nothing is sent until the learner presses it, and the request can be cancelled. The question field stays usable while it runs.
+    - Suggestions are kept per selection, keyed by the sources' sha256. Going back and forth between steps shows them again without a new request.
+    - "Other suggestions" asks again, sending the earlier questions so the new ones differ.
+  - **One request, one repair.** The request carries the sources as the structure request does, the content language currently chosen, and the learner's prior knowledge when given. It returns 3–5 suggested break-downs, each with:
+    - a question, at most 160 characters, that passes the question format check;
+    - the kind of joint it would follow: mechanism, argument or story;
+    - the 3–7 top-level parts it would give, by name only;
+    - the line ranges it rests on, inside the sources.
+  - **Checks.**
+    - Questions must be distinct, in the content language, and must not repeat each other's parts wholesale.
+    - The cited ranges must exist in the sources.
+    - D19's shorten request applies to lengths.
+  - **The cards.** Each suggestion is a card with its question, its kind and the part names as a short preview. Choosing one fills the question field, where the learner can still edit it; the content language follows it.
+  - **Route.** The content model of the current setup: suggesting is short work and needs no structure model. The busy and cancel rules are those of generation. Starting a generation cancels a suggestion request still running.
+  - **Failure.** A failed or cancelled request leaves the question step as it is today, with a short notice. Nothing blocks the learner from writing their own question.
+  - Suggestions are not stored with the disassembly. Only the question the learner sends is stored, as today.
+- Acceptance:
+  - Scripted tests:
+    - no request is sent until the button is pressed;
+    - a valid answer gives 3–5 cards;
+    - duplicate questions, a question in the other language or a range outside the sources is repaired once, then refused with a notice;
+    - choosing a card fills the field, and the text stays editable;
+    - suggestions are reused for the same selection and asked again after a source changes;
+    - cancelling, and starting a generation, stop the request;
+    - the browser preview shows no suggestions.
+  - Studio tests in both interface languages.
+  - Witnessed by the owner in the desktop app, on a public case and on the work document: the suggestions arrive, and at least one of them leads to a valid generation. These are the owner's own uses, not evaluation runs, so they do not draw on D9's budget.
+- Evidence: `tests/disassembly-generation.test.ts`, `tests/provider.test.ts`, `tests/studio.test.tsx`, a witnessed note.
+- Dependencies: D10, D19.
+
 ### Phase repository (gated)
 
 #### D11 — Local repository as a source
@@ -526,7 +773,7 @@ Not included:
 
 ## Definition of done
 
-- D1–D10, D13 and D14 meet their acceptance criteria. D11 and D12 meet them, or the owner moves them to a separate plan.
+- D1–D10 and D13–D23 meet their acceptance criteria. D11 and D12 meet them, or the owner moves them to a separate plan.
 - New generation produces disassemblies only. Saved lessons remain readable.
 - Both themes ship, and the default follows the system.
 - Both interface languages ship, the default follows the system locale, and no interface string is hard-coded outside the catalogs.
@@ -562,6 +809,15 @@ Not included:
 | The two catalogs drift: a change in one language is not made in the other | Same keys enforced by the type checker; the review of each task checks both catalogs |
 | A coarse language check accepts mixed-language generated content | It only flags clear disagreement; claim review in D9 reads the content; the learner can see the language label |
 | Reassembly does not prove understanding (Q3 open) | It ships as optional; the owner's use after D8 is recorded; the plan does not claim learning effects |
+| Reading-order numbers disagree with what a model wrote ("step 3") | Generation inputs list parts in reading order with their numbers (D15); saved disassemblies may still say an old number in a run text, an accepted residual risk |
+| A rendered source runs code or fetches content | Raw HTML off in `markdown-it`; Mermaid in strict mode; links not followed and images not fetched; tests with hostile markup (D18) |
+| The diagram library makes the app slow to open | Loaded on first use as a separate chunk; the main bundle may grow by at most 150 kB (D18) |
+| A shorten request changes meaning, not only length | It carries only the over-long texts; the whole phase is checked again; claim review in the live check reads the result (D19–D20) |
+| The restate check rejects good points | Calibrated on the D9 outputs and the hand-made fixtures; it is a finding the repair can fix, not an outright refusal (D20) |
+| Suggestions spend plan usage | Sent only when the learner presses the button, with the cost shown; reused for the same selection; cancellable (D23) |
+| A suggestion steers the learner toward what the model finds easy | Suggestions fill an editable field and never replace it; the learner's own question works as today (D23) |
+| A kept draft is resumed against changed sources | Resume requires the same sha256 for every source, the same question and language (D21) |
+| Generated text derived from a private source stays on disk after a failure | One draft at most, in the app's data folder next to saved disassemblies, deleted on success, on "Start over" and when a new generation starts (D21) |
 
 ## Verification strategy
 
@@ -575,7 +831,8 @@ Not included:
   - interaction tests in jsdom for the player, run, reassembly and Studio, in both interface languages where wording matters;
   - catalog parity and rendered-language tests;
   - evaluation runs for generation quality, including the three-setup comparison and a blind claim review;
-  - witnessed desktop flows for persistence and live generation.
+  - witnessed desktop flows for persistence and live generation;
+  - for v6: splitter and dialog keyboard tests, hostile-markup rendering tests, scripted generation tests for the shorten request and the kept draft, and witnessed use of the resized panes, the rendered work document and the drawing during a live generation.
 - **Limits:**
   - jsdom does not lay out SVG text, so D2's geometry is tested on computed boxes from the layout module;
   - visual quality is witnessed;
@@ -584,6 +841,7 @@ Not included:
 ## Review and authorization
 
 Self-review is in [review.md](review.md).
+- Version 6 adds two phases at the owner's request, after the D9 decision for setup A: `player-usability` (D15–D18) and `generation-usability` (D19–D23). The owner accepted the three generation improvements proposed by the agent ("Si") and asked for five more: lead and points without repetition, resizable panes, a rendered markdown view with diagrams, numbers in reading order, and a way back to the level above. In a later message the owner added suggested break-downs (D23). D1–D14 are unchanged, and their evidence stays valid. D18 needs three dependencies, named in the approval boundary.
 - Version 5 removes the fixed depth and adds taking a part apart on demand, at the owner's request: "qualsiasi pezzo diventa smontabile su richiesta, a qualunque profondità, finché la fonte lo permette. Voglio che sia così". It adds phase `depth` (D13–D14) before D9's model comparison, four expansions to the run budget, and an expansion to D10's witnessed flow. D1–D8 are unchanged. The generation code built under v4 stays, and its evidence stays valid.
 - Version 4 extends D9 with a comparison of ChatGPT models, including a mixed setup, a run budget and a blind claim review. It also adds a private, local-only case for the owner's work document, and D10's setup choice. Request: "Scrivi il piano v4", after the owner asked which OpenAI models give the best disassemblies, ideally cheaper ones. D1–D8 and D11–D12 are unchanged. D1–D8's evidence stays valid.
 - Version 3 adds the English and Italian interface, at the owner's request: "rivedi il piano P-20261024-disassembly in v3 con l'interfaccia multilingua inglese e italiano". It changes D4–D10 and the shared sections, and leaves D1–D3 and D11–D12 unchanged. D1–D3 were implemented under the v2 approval, and their evidence stays valid.
@@ -595,31 +853,55 @@ Self-review is in [review.md](review.md).
 
 Approval command:
 
-`Approve P-20261024-disassembly v5`
+`Approve P-20261024-disassembly v6`
 
-The v4 approval no longer covers the remaining tasks, because v5 is a material change. A later, separate command starts edits, for example:
+The v5 approval no longer covers the remaining tasks, because v6 is a material change. A later, separate command starts edits, for example:
 
-`implement P-20261024-disassembly v5 --phase depth`
+`implement P-20261024-disassembly v6 --phase player-usability`
 
 Named phases:
 - `contract`: D1–D3, done under v2;
 - `player`: D4–D8, done under v3 except D8's witnessed desktop flow;
 - `generation`: D9–D10. D9's code and D10's Studio were done under v4; D9's model comparison waits for phase `depth`;
-- `depth`: D13–D14;
+- `depth`: D13–D14, done under v5, with D9's comparison and decision;
+- `player-usability`: D15–D18;
+- `generation-usability`: D19–D23;
 - `repository`: D11, gated;
 - `document`: D12, gated.
 
 Approval does not authorize:
-- ChatGPT runs beyond D9's run budget: 30 generations, that is 24 for the comparison, up to 4 replacements and up to 2 on the owner's private document, plus up to 4 expansions;
+- ChatGPT runs beyond D9's run budget: 30 generations, that is 24 for the comparison, up to 4 replacements and up to 2 on the owner's private document, plus up to 4 expansions. D20's live check uses the 4 public generations still left in it;
 - sending the owner's work document to OpenAI before the owner confirms in chat that company policy allows it;
-- model downloads or dependency changes, including a PDF extraction library or an internationalization library;
+- model downloads or dependency changes, including a PDF extraction library or an internationalization library. The only exception: D18's `markdown-it`, `mermaid` and the dev dependency `@types/markdown-it`, at exact versions;
 - publication;
 - importing private documents or code into the repository;
 - starting D11 or D12 before their gate.
 
 ## Approval record
 
-Version 5, approved:
+Version 6, approved:
+
+- Approver: project owner, through an explicit message in this conversation.
+- Received command: `Approve P-20261024-disassembly v6`.
+- Approved plan/version: `P-20261024-disassembly` / `6`.
+- Recorded at: `2026-10-26T17:33:18+01:00` (Europe/Rome).
+- Approved scope:
+  - D15–D18 (phase `player-usability`) and D19–D23 (phase `generation-usability`), with D23's suggestions sent only when the learner presses the button;
+  - the remaining tasks of earlier versions as written: D8's and D10's witnessed flows, and D11–D12 in their gated phases;
+  - the stated assumptions and exclusions, including reading-order numbers that follow the arrows, and the card of the open part as the "sezione smontaggio".
+
+  D1–D7, D9, D13 and D14 are recorded as implemented under earlier versions; D9's comparison chose setup A.
+- Approved-content SHA-256: `9a78080b014da17fdf2caf9320ec6451023124a07710f21fa70cd1e0c1fb79ec`.
+- Digest definition: SHA-256 of the UTF-8 plan body from `# Disassemblies` up to, and not including, `## Review and authorization`.
+- Authority boundary: this records approval only. Implementation needs a separate implement command. Not authorized:
+  - ChatGPT runs beyond D9's run budget (30 generations, plus up to 4 expansions). D20's live check uses the 4 public generations left in it;
+  - sending the owner's work document to OpenAI before the owner confirms in chat that company policy allows it (confirmed on 2026-10-26 for this plan's runs);
+  - model downloads and dependency changes, except D18's `markdown-it`, `mermaid` and the dev dependency `@types/markdown-it`, at exact versions;
+  - publication;
+  - importing private documents or code into the repository;
+  - starting D11 or D12 before their gate.
+
+Version 5, approved and superseded by v6 for the remaining tasks:
 
 - Approver: project owner, through an explicit message in this conversation.
 - Received command: `Approve P-20261024-disassembly v5`.
@@ -1029,4 +1311,125 @@ Owner steps (D9 comparison, now including D14):
     - The geometry test covers every fixture: 11 of 12 Atlas joints have a free side, as do all 26 of the private code case.
     - Where neither side is free, the label turns see-through while its line runs.
     - Other labels and the exploded view are unchanged. Checked in the browser preview on the Atlas scenario.
+
+#### D9 model comparison (2026-10-26)
+
+Run on the owner's request ("I test con i vari modelli? Se si, inizia"), with the budget approved in v5. The numbers are in [comparison.md](comparison.md).
+- **Validity:** A (`gpt-6.1-sol` on every phase) 6/8, B (`gpt-5.6-luna`) 4/8, C (`gpt-6.1-sol` structure + `gpt-5.6-luna` parts and runs) 5/8.
+  - Every valid attempt has 0 forgotten lines, 0 layout findings and the requested language.
+  - One of A's failures was a service error.
+- **Why the others failed:**
+  - points or a joint label a few characters over the limit after one repair;
+  - giveaway options;
+  - malformed load tests (B).
+- **Expansions:** 2 of 2 valid, on core pipeline and Mill. Kessmouth has no divisible part. The runbook had no valid C attempt to take apart.
+- **Budget used:** 24 of 28 public generations, 1 of 2 private, 2 of 4 expansions.
+- **Default setup: A** (`gpt-6.1-sol` on every phase). The owner delegated the claim review to the agent; the review was not blind and found 0 wrong claims in A. See [comparison.md](comparison.md#claim-review-and-decision-2026-10-26).
 - Commit `2e91e95` was pushed; [PR #7](https://github.com/simoneriggi92/BreakTheWall/pull/7) is open to `main`. [PR #6](https://github.com/simoneriggi92/BreakTheWall/pull/6), with the earlier phases, was already merged.
+
+### Phase player-usability (D15–D18)
+
+Received command: `implement P-20261024-disassembly v6 --phase player-usability`, on 2026-10-26. The plan ID, version and approval digest (`9a78080b…`) matched the approval record; no other plan was implementing.
+
+| Task | What was built | Evidence |
+|---|---|---|
+| D15 | `layoutLevel` returns `order`, the reading order (rank along the joints, across each rank as drawn, side parts right after their host in drawn order, loose parts last); `readingNumbers` and `readingPaths` in `src/core/layout.ts`. Balloons, plate names, Tab order, the card's eyebrow and the bill of materials ("2.1.3", listed in that order) use it. The title block band says "numbers: reading order". Content and runs inputs list parts in reading order with their numbers | `tests/layout.test.ts` (Atlas flow, Mill grounds → claim → objection, limit → consequence, Kessmouth events, a rollback cycle, a level without joints, permutation on every level of every public and private fixture, paths); `tests/disassembly-player.test.tsx` (balloon, plate name, card and bill of materials agree, in both languages); `tests/disassembly-generation.test.ts` |
+| D16 | Below the top level, "↑ <level above>" at the top left of the drawing pane and "Back to <level above>" in the sub-assembly card; Escape and Alt+↑ go up one level except while typing or inside a dialog; the part just left is selected and its plate focused | `tests/disassembly-player.test.tsx` (control only below the top level, three ways up, notes field, five levels down and back in English) |
+| D17 | `src/renderer/disassembly/SplitPane.tsx`: two `separator` splitters (drawing height, source width), keyboard, pointer drag, reset by Enter or double click, sizes in local storage with fallback to defaults. The source starts at a third of the row and can widen to the whole row. The bill of materials has the source splitter | `tests/split-pane.test.tsx`; `tests/disassembly-player.test.tsx` (splitters per mode, sizes restored after a remount, widen and back, none on a narrow window) |
+| D18 | `src/renderer/markdown.ts` (`markdown-it`, raw HTML off, line ranges on every block, links inert, images as alt text, mermaid fences as placeholders); `SourceDocument` and `SourceReader` (dialog with outline); `src/renderer/diagrams.ts` (Mermaid loaded on first use, strict); `src/renderer/svg-mount.ts` | `tests/source-document.test.tsx` (rendering, hostile markup as text, line maps, innermost-block highlight, drawn and failing diagrams, view switch, reader with outline and Escape keeping the level, no switch for code, styles moved out of the markup) |
+
+Checks: `npm run check` passed, 20 files and 298 tests. `npm run build` passed. `npm audit`: 0 vulnerabilities.
+
+**Bundle.** The main bundle went from 605,283 to 721,178 bytes (+116 kB; the limit was 150 kB). Mermaid and its diagram types are separate chunks, about 5 MB in all, loaded only when a diagram is shown. The built `index.html` keeps the strict policy (no `'unsafe-inline'`).
+
+Browser preview (dev server, 1280×800), checked by the agent:
+- Atlas fits the drawing pane at first; dragging the bar down makes the plates bigger and the sheet scrolls sideways; a double click fits it again.
+- The document view of the Atlas runbook renders its headings, lists and table; selecting `deploy-staging` highlights its table row and paragraph and scrolls to them. The reader shows the outline and closes on Escape.
+- Mill numbers grounds 1–2, the claim 3, the objection 4 and the limit 5 beside it, the consequence 6, the loose part 7. Escape inside "Bounds" returns to the top level with "Bounds" selected.
+- Mermaid renders a flowchart and a sequence diagram and rejects a broken one. Under the production style policy, reproduced in an iframe, an SVG inserted as markup lost its styles (black fill), while the mounted one kept them.
+
+Deviations from the plan text, decided during implementation:
+- **Versions.** The plan asked for the latest releases at least two weeks old: `markdown-it` 15.0.2 and `mermaid` 12.1.0. Both had published advisories fixed in the next release: a high-severity quadratic-time parse in `markdown-it` (fixed in 15.0.3, 10 days old) and a low-severity issue through `katex` in `mermaid` (fixed in 12.2.0, 13 days old). The fixed releases were pinned instead. `@types/markdown-it` was not added, because `markdown-it` 15 ships its own types. The lockfile only adds packages; no existing one changed.
+- **Drawing size.** "Fits the pane in both directions" kept wide sheets small whatever the pane height, which is what the owner asked to fix. The drawing now follows the pane's height and scrolls sideways when wider; until the learner sets a height, the pane is as tall as the whole sheet needs at its width.
+  - Owner feedback in the desktop app, the same day: "il disegno non entra più nello schermo, con 6 pezzi … rimettendo la barra al default, i 6 blocchi non rientrano … In quel caso riduci la dimensione dei blocchi". The 70% minimum width still forced a scroll on a window narrower than the sheet. Fix: until the learner sets a height (or after a reset by double click or Enter) the sheet is contained in the pane with no minimum width, so plates shrink and the whole sheet shows; once a height is set, the drawing follows it as above. Checked in the browser preview at 1000×700: Atlas's 6 parts fit. `npm run check`: 299 tests passed.
+- **Breakpoint.** Panes stack at 960 px and under, the stylesheet's existing breakpoint, not 900 px.
+- **Side parts** are numbered in drawn order after their host, so Mill's objection (left) comes before its limit (right).
+- **Diagram styles** go through the CSS object model because the production policy blocks inline styles; the policy was not loosened.
+
+Not done here: D17's and D18's witnessed checks in the desktop app (the owner, on Atlas and on the generated disassembly of the work document, whose four diagrams are the real case for D18).
+
+#### Verification of phase player-usability (2026-10-26)
+
+No CI is configured; checks come from `package.json`.
+
+| Check | Command | Result |
+|---|---|---|
+| Phase tests | `npx vitest run tests/layout.test.ts tests/split-pane.test.tsx tests/source-document.test.tsx tests/disassembly-player.test.tsx tests/disassembly-generation.test.ts tests/i18n.test.tsx` | passed: 6 files, 105 tests |
+| Types and all tests | `npm run check` | passed: 20 files, 298 tests |
+| Production build | `npm run build` | passed; main bundle 721,178 bytes; strict policy kept in `dist/index.html` |
+| Dependency advisories | `npm audit` | passed: 0 vulnerabilities |
+| Browser preview | `npm run dev:web`, driven by the agent | passed for the points listed in the implementation record |
+| Desktop app, witnessed by the owner | — | not run: needs the owner |
+
+| Task | Acceptance | Verdict |
+|---|---|---|
+| D15 | Core order on Atlas, Mill, Kessmouth, a cycle and loose parts; a permutation on every level of every fixture; balloon, plate name, card and bill of materials agree in both languages; generation inputs in reading order | **verified** |
+| D16 | Control only below the top level, naming the level above; the control, Escape and Alt+↑ go up one level, select and focus the part left; Escape in the notes field stays; five levels back one at a time | **verified** |
+| D17 | Component and player tests pass. The witnessed check in the desktop app, on Atlas and on the work document in both themes, is still open. The narrow-window breakpoint is 960 px, not 900 px, as recorded | **verification pending** (owner) |
+| D18 | Rendering, hostile markup, line ranges, citations, mocked diagrams, failing diagram, dialog and code tests pass; build passes; the main bundle grew by 116 kB of the allowed 150 kB; Mermaid is a separate chunk. Diagram styles under the production policy were checked in a browser reproduction, not in the desktop app. The witnessed check on the work document's four diagrams is still open | **verification pending** (owner) |
+
+Confidence: automated and browser-preview evidence for all four tasks; desktop-app evidence for none yet. The plan is not complete: D17 and D18 wait for the owner's witnessed check, and phase `generation-usability`, D8 and D10 remain.
+
+### Phase generation-usability (D19–D23)
+
+Received command: `implement P-20261024-disassembly v6 --phase generation-usability`, on 2026-10-27. The plan ID, version and approval digest (`9a78080b…`, recomputed) matched the approval record; no other plan was implementing.
+
+| Task | What was built | Evidence |
+|---|---|---|
+| D19 | `longTexts`, `SHORTEN_INSTRUCTIONS`, `shortenJsonSchema`, `applyShortened` in `src/core/disassembly-generation.ts`. After the one repair, when every finding left is a length finding that leads to a text in the answer, `withRepair` in `src/desktop/generator.ts` sends one shorten request with only those texts (path, length, limit, content language) and checks the whole phase again. It applies to structure, parts, runs, expansions and suggestions; it counts as a repair, and also in `shortens`; progress carries `shortening` and Studio and "Take this part apart" say "shortening texts that are too long" | `tests/disassembly-generation.test.ts` (a point 3 characters over shortened and accepted; a missing, duplicated, added or still-too-long text refused; a mix of findings sends no shorten request; cancelling during the shorten request saves nothing) |
+| D20 | Instructions ask for a lead of at most 100 characters and points or explanations that add to it. Host checks on new generations and expansions only: `LEAD_LIMIT` (a length finding, so D19 can shorten it) and `restates` (a located finding). The card shows the lead as an opening line in a stronger style (`.role.lead`). The evaluation report records the longest lead, restated texts and attempts saved by a shorten request | `tests/disassembly-generation.test.ts` (Mill setup A points flagged; no point or explanation of the five public fixtures flagged; a long lead shortened through D19; restated point and split explanation located); `tests/fixtures/d9-mill-setup-a.json`; `tests/disassembly-player.test.tsx`; `tests/eval.test.ts`; live check below |
+| D21 | `src/desktop/generation-draft.ts`: `DraftStore` keeps one `generation-draft.json` in the app's data folder, written atomically after each accepted step (request key with source ids and sha256, question, language, setup, id and creation time, structure, parts, runs, statistics). The generator deletes it on success and when a new generation starts; parts no longer stop each other; cancelling stops everything and keeps what was accepted. `resume: true` asks only for what is missing. Studio reads the draft on opening and after a failure, says what was kept, and offers "Resume" and "Start over" when `resumable` holds; otherwise it says that generating discards the other draft | `tests/generation-draft.test.ts` (one part failing twice, then one content and one runs request; a failed runs phase, then only the runs request; changed source, question or language; cancellation; success; an unreadable draft set aside); `tests/studio.test.tsx` (both actions and what was kept, in both languages, again after a restart; another question offers no resume; set-aside notice) |
+| D22 | `previewSchema` in `src/core/provider.ts` (3–7 parts with id, name, kind, icon, number of sub-parts, status, and for done parts lead and up to 4 points; up to 20 joints; every text bounded). The generator sends it with each progress once the structure is accepted; the preload drops a preview that does not parse and keeps the rest; the host sends every status change. `src/renderer/disassembly/GenerationPreview.tsx` draws the top level with the player's layout and sheet, state marks for writing, done and failed, and opens a done part's lead and points. During runs the line says the runs are being prepared | `tests/provider.test.ts` (malformed and oversized previews refused); `tests/generation-draft.test.ts` (no preview during the structure; statuses one part at a time; leads and points of done parts; a failed part; every plate done during runs; a resumed generation starts with its kept parts done); `tests/studio.test.tsx` |
+| D23 | `SUGGEST_INSTRUCTIONS`, `buildSuggestionInput`, `acceptSuggestions` (question check, at most 160 characters, distinct from each other and from those already shown, content language, different parts, ranges inside the sources); `Generator.suggest` on the setup's content route, one repair and D19's shorten, cancellable, refused while a generation runs, and cancelled when one starts. Studio's question step shows "Suggest break-downs" with the route it goes to, only in the desktop app; cards with question, kind and part names fill the editable field and set the content language; suggestions are kept per selection (sources' ids and sha256) in the session draft and never stored with a disassembly; "Other suggestions" sends the questions already shown | `tests/disassembly-generation.test.ts`; `tests/generation-draft.test.ts` (one request only when asked; repaired once then refused; cancel; a generation cancels it; busy); `tests/studio.test.tsx` (no request before the button; cards; the field stays editable; reuse across steps; asked again after the selection changes; cancellation and failure notices; no route; English; none in the browser preview) |
+
+Deviations from the plan text, decided during implementation:
+- **Lengths from the schema.** Texts over a schema limit (for example a 160-character question) are worded like the app's own length findings, so D19 can shorten them too. A finding on a point names the point; its `text` is what is shortened.
+- **Restate threshold.** A text restates its lead when it shares at least 6 words with it (words of four letters or more, compared by their first five letters), making up at least 60% of its own words. On the D9 outputs, setup A's Mill points share up to 11 words with their leads; no point or explanation of the hand-made fixtures shares more than 5. One Atlas point, "Nothing changes outside the build server.", nearly repeats its lead with 5 shared words and is left by this threshold.
+- **Resume re-checks the draft.** Kept steps are accepted again against the current sources before use, so a draft cannot carry anything the checks would refuse; a step that no longer passes is asked for again.
+- **Start over** starts a new generation at once, which deletes the draft; there is no separate "discard" call.
+- **Retry.** While a matching draft can be resumed, the failure banner shows no "Retry" button: "Resume" and "Start over" replace it.
+- **Unreadable draft** is renamed to `generation-draft.unreadable.json` (one file at most) and reported once.
+- **Account state at Studio level.** Suggestions need the setup's content route before the generation step, so the account status, and the model list when signed in with plan usage, are read when Studio opens instead of at the generation step. No source is sent by these calls.
+- **Preview of sub-assemblies.** The preview carries only the number of sub-parts, so a sub-assembly's plate shows its count; it opens nothing until the disassembly is saved.
+
+**D20 live check** (2026-10-27, run `2026-10-27T07-40-10-019Z`, setup A on every phase, one attempt on each of the four public cases: the last 4 public generations of D9's budget, now 28 of 28 used):
+
+| Case | Valid | Requests | Repairs (structure/parts/runs) | Shorten requests | Longest lead | Restated texts | Forgotten lines |
+|---|---|---|---|---|---|---|---|
+| core-pipeline | yes | 9 | 0/0/1 | 0 | 98 | 0 | 0 |
+| kessmouth | yes | 8 | 0/0/0 | 0 | 99 | 0 | 0 |
+| mill-harm | yes | 10 | 1/0/0 | 0 | 99 | 0 | 0 |
+| release-runbook | yes | 12 | 0/2/1 | 0 | 99 | 0 | 0 |
+
+4 of 4 valid (required: 3), every lead at most 100 characters, no point or explanation flagged as restating its lead. D19's shorten request was not needed in this run, so it saved no attempt here; its evidence is the scripted tests. Median 375 s per generation. The report stays in `.local/eval/runs/`.
+
+#### Verification of phase generation-usability (2026-10-27)
+
+| Check | Command | Result |
+|---|---|---|
+| Phase tests | `npx vitest run tests/disassembly-generation.test.ts tests/generation-draft.test.ts tests/provider.test.ts tests/studio.test.tsx tests/disassembly-player.test.tsx tests/eval.test.ts` | passed |
+| Types and all tests | `npm run check` | passed: 21 files, 331 tests |
+| Production build | `npm run build` | passed; main bundle 730.7 kB (+10 kB) |
+| D20 live check | `npm run eval -- --route chatgpt --allow-chatgpt --setups A --strong gpt-6.1-sol --runs 1` | passed: 4 of 4 valid, longest lead 99, 0 restated |
+| Browser preview with a scripted bridge | dev server, driven by the agent | passed: suggestion cards fill the field; the drawing shows done, writing and failed plates and opens a done part's lead and points |
+| Desktop app, witnessed by the owner | — | not run: needs the owner |
+
+| Task | Acceptance | Verdict |
+|---|---|---|
+| D19 | Scripted tests for shortening, refusals, mixed findings and cancellation pass | **verified** |
+| D20 | Restate check on Mill setup A and the fixtures; long lead shortened; live check 4 of 4 valid, leads ≤ 100, 0 restated | **verified** |
+| D21 | Host and Studio tests pass, in both languages and after a restart | **verified** |
+| D22 | Schema, host and Studio tests pass. The witnessed live generation is still open | **verification pending** (owner) |
+| D23 | Core, host and Studio tests pass. The owner's witnessed use, on a public case and on the work document, is still open | **verification pending** (owner) |
+
+Confidence: automated evidence for all five tasks and live evidence for D20. The plan is not complete: D17, D18, D22 and D23 wait for the owner's witnessed checks, and so do D8 and D10.

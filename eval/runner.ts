@@ -171,8 +171,11 @@ async function main(argv: string[]): Promise<number> {
   }
   const summary = summarize(records);
   await writeFile(join(dir, 'summary.json'), JSON.stringify({ run, route: values.route, setups: setups.map(s => s.name), cases: cases.map(c => ({ id: c.id, private: c.private })), summary }, null, 1));
-  console.table(summary.map(s => ({ case: s.case, setup: s.setup, valid: `${s.valid}/${s.attempts}`, repairs: `${s.repairs.structure}/${s.repairs.content}/${s.repairs.runs}`, 'median s': s.medianSeconds, requests: s.medianRequests, 'sent k': s.medianSentChars && Math.round(s.medianSentChars / 1000), 'received k': s.medianReceivedChars && Math.round(s.medianReceivedChars / 1000), forgotten: s.maxForgottenLines, layout: s.maxLayoutFindings, 'language ≠': s.languageMismatches, 'answer length ×': s.maxAnswerLengthRatio })));
-  if (chatgpt) console.log(`ChatGPT budget: ${(await readLedger(root)).length} of 30 generations used.`);
+  console.table(summary.map(s => ({ case: s.case, setup: s.setup, valid: `${s.valid}/${s.attempts}`, repairs: `${s.repairs.structure}/${s.repairs.content}/${s.repairs.runs}`, 'median s': s.medianSeconds, requests: s.medianRequests, 'sent k': s.medianSentChars && Math.round(s.medianSentChars / 1000), 'received k': s.medianReceivedChars && Math.round(s.medianReceivedChars / 1000), forgotten: s.maxForgottenLines, layout: s.maxLayoutFindings, 'language ≠': s.languageMismatches, 'answer length ×': s.maxAnswerLengthRatio, 'max lead': s.maxLead, restated: s.restated, 'saved by shorten': s.savedByShorten })));
+  if (chatgpt) {
+    const all = await readLedger(root); const generations = all.filter(x => x.kind !== 'expansion');
+    console.log(`ChatGPT budget: ${generations.filter(x => !x.private).length} of 28 public and ${generations.filter(x => x.private).length} of 2 private generations, ${all.length - generations.length} of 4 expansions used.`);
+  }
   console.log(`Report: ${dir}`);
   return 0;
 }

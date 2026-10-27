@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ArrowUp, ChevronRight, X } from 'lucide-react';
 import type { DesktopBridge, ProgressResult } from '../../core/bridge';
 import type { Cite, Disassembly, Part } from '../../core/disassembly';
 import {
   answerCase, checkReassembly, clearReassembly, execute, initialDisassemblyState, openLevel, openPath, place, predict, removeBrick, restartRun,
   restoreDisassemblyState, scenarioView, selectPart, type DisassemblyState, type RestoredDisassemblyState,
 } from '../../core/disassembly-state';
-import { layoutDisassembly } from '../../core/layout';
+import { layoutDisassembly, readingNumbers } from '../../core/layout';
 import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
 import { Brand } from '../icons';
 import { PreferencesMenu, restoreText, usePreferences } from '../preferences';
@@ -15,7 +15,8 @@ import { PartCard, TakeApart } from './PartCard';
 import { Reassemble } from './Reassemble';
 import { RunPanel } from './RunPanel';
 import { Sheet } from './Sheet';
-import { SourcePane } from './SourcePane';
+import { SourcePane, type SourceView } from './SourcePane';
+import { PANES, Splitter, usePaneSizes } from './SplitPane';
 
 type Mode = 'explode' | 'run' | 'reassemble' | 'bom';
 const MODES: Mode[] = ['explode', 'run', 'reassemble', 'bom'];
@@ -39,12 +40,32 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   const [runId, setRunId] = useState(d.runs[0].id);
   const [focus, setFocus] = useState<Cite>();
   const [sourceId, setSourceId] = useState(d.sources[0].id);
+  // Lines or document, per source, while the disassembly is open (D18).
+  const [views, setViews] = useState<Record<string, SourceView>>({});
+  const viewProps = { view: views[sourceId] ?? 'lines', onView: (v: SourceView) => setViews(x => ({ ...x, [sourceId]: v })) };
   const [feedback, setFeedback] = useState<{ wrong?: { part: string; hint: string }; complete: boolean }>();
   // A step runs in two beats: first its parts show as running, then its effects and explanation land.
   const [running, setRunning] = useState<{ runId: string; step: number }>();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const layouts = useMemo(() => layoutDisassembly(d), [d]);
+  // Resizable panes (D17): the drawing's height, the source's width, and a source widened to the whole row.
+  const panes = usePaneSizes();
+  const [sourceWide, setSourceWide] = useState(false);
+  const work = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLElement>(null);
+  const wideRow = useRef<HTMLDivElement>(null);
+  // Until the learner sets a height, the drawing pane is as tall as the whole sheet needs at the pane's width.
+  const [workWidth, setWorkWidth] = useState(0);
+  useEffect(() => {
+    const el = work.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setWorkWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loaded, mode]);
+  const drawingAt = (_x: number, y: number) => { const top = work.current?.getBoundingClientRect().top; return top === undefined ? undefined : (y - top) / window.innerHeight; };
+  const sourceAt = (target: { current: HTMLElement | null }) => (x: number) => { const r = target.current?.getBoundingClientRect(); return r?.width ? (r.right - x) / r.width : undefined; };
   const saveQueue = useRef(Promise.resolve());
   const saveVersion = useRef(0);
 
@@ -93,6 +114,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   const part = state.selected ? level.find(p => p.id === state.selected) : undefined;
   const run = d.runs.find(r => r.id === runId) ?? d.runs[0];
   const crumbs = state.path.map((id, i) => ({ id, name: findPart(d.parts, id)?.name ?? id, depth: i + 1 }));
+  const above = crumbs.length > 1 ? crumbs.at(-2)!.name : d.whole.name;
   const select = (id: string) => {
     const next = state.selected === id ? undefined : id;
     setState(s => selectPart(d, s, next));
@@ -101,6 +123,30 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   };
   const enter = (id: string) => { setState(s => openPath(d, s, [...s.path, id])); setFocus(undefined); };
   const leave = (depth: number) => { setState(s => openPath(d, s, s.path.slice(0, depth))); setFocus(undefined); };
+  // Up one level: the part just left stays selected and its plate takes the focus, so the learner keeps their place.
+  const [refocus, setRefocus] = useState<string>();
+  const up = () => {
+    const left = state.path.at(-1);
+    if (!left) return;
+    setState(s => selectPart(d, openPath(d, s, s.path.slice(0, -1)), left)); setFocus(undefined); setRefocus(left);
+  };
+  useEffect(() => {
+    if (!refocus) return;
+    document.querySelector<SVGGElement>(`.sheet .plate[data-id="${CSS.escape(refocus)}"]`)?.focus({ preventScroll: true });
+    setRefocus(undefined);
+  }, [refocus]);
+  const upRef = useRef(up); upRef.current = up;
+  useEffect(() => {
+    if (mode !== 'explode' || !state.path.length) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target?.closest('input, textarea, select, [contenteditable="true"], dialog');
+      if (e.defaultPrevented || typing || !(e.key === 'Escape' || (e.altKey && e.key === 'ArrowUp'))) return;
+      e.preventDefault(); upRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, state.path.length]);
   // Runs act on the whole: the drawing returns to the top level while a run is open.
   const setModeAndLevel = (next: Mode) => { setMode(next); setFeedback(undefined); if (next === 'run' || next === 'reassemble') setState(s => openPath(d, s, [])); };
   const runDecor = mode === 'run' && run.type === 'scenario' ? (() => {
@@ -113,8 +159,16 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       const removed = state.runs[run.id]?.tried.at(-1); const brick = run.bricks.find(b => b.part === removed);
       return { bricks: run.bricks.map(b => b.part), removed, target: brick ? { id: run.target, verdict: brick.verdict } : undefined };
     })() : {};
+  const sized = panes.wide && (mode === 'explode' || mode === 'run');
+  const sheetW = Math.max(layout.width, 560); const sheetH = layout.height + 64;
+  const fitted = workWidth ? Math.min(PANES.drawing.max, Math.max(PANES.drawing.min, ((workWidth - 26) * sheetH / sheetW + 22 + (state.path.length ? 34 : 0)) / window.innerHeight)) : PANES.drawing.initial;
+  const drawingShare = panes.sizes.drawing ?? fitted;
+  const sourceWidth = { '--source-w': String(panes.sizes.source) } as CSSProperties;
+  const sourceSplitter = (target: { current: HTMLElement | null }) => <Splitter pane="source" orientation="vertical" grows="ArrowLeft" value={panes.sizes.source} label={t.d.panes.source}
+    onChange={v => panes.set('source', v)} onReset={() => panes.reset('source')} fromPointer={sourceAt(target)}/>;
+  const splitSide = panes.wide && mode !== 'reassemble' && !sourceWide;
   const save = { opening: t.player.opening, saving: t.player.saving, saved: t.player.saved, failed: t.player.saveFailed }[saveStatus];
-  const index = (id: string) => level.findIndex(p => p.id === id) + 1;
+  const index = (id: string) => readingNumbers(layout).get(id);
   // Content never changes language by itself; when a version in the interface language exists, the player offers it.
   const other = d.language !== language ? versions.find(v => v.language === language) : undefined;
 
@@ -136,9 +190,12 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
         {other && openVersion && <div className="notice version-notice" role="status"><span>{t.d.otherVersion(t.languageNames[other.language])}</span><button onClick={() => openVersion(other.id)}>{t.d.openVersion}</button></div>}
         {notice && <div className="notice" role="status">{restoreText(t, notice, 'disassembly')}<button aria-label={t.common.closeNotice} onClick={() => setNotice(undefined)}><X size={15}/></button></div>}
         {saveStatus === 'failed' && <div className="error-banner" role="alert">{t.player.unsaved} <button onClick={() => setRetry(x => x + 1)}>{t.player.retrySave}</button></div>}
-        {mode === 'bom' ? <div className="d-wide"><BillOfMaterials d={d} onFocus={focusCite}/><SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus} cited={[]}/></div>
-          : <div className="d-work">
-            <div className="d-drawing">
+        {mode === 'bom' ? <div className={`d-wide${panes.wide ? ' split' : ''}`} ref={wideRow} style={sourceWidth}><BillOfMaterials d={d} onFocus={focusCite}/>
+            {panes.wide && sourceSplitter(wideRow)}
+            <SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus} cited={[]} {...viewProps}/></div>
+          : <div className={`d-work${sized ? ' sized' : ''}`} ref={work}>
+            <div className={`d-drawing${sized ? ' sized' : ''}`} style={sized ? { height: `${Math.floor(drawingShare * 1000) / 10}vh` } : undefined}>
+              {mode === 'explode' && state.path.length > 0 && <button className="subtle level-up" onClick={up} aria-label={t.d.upLabel(above)} lang={d.language}><ArrowUp size={15}/>{above}</button>}
               {mode === 'reassemble'
                 ? <Reassemble d={d} layout={layouts.get('root')!} state={state} feedback={feedback}
                     place={(slot, p) => { setFeedback(undefined); setState(s => place(d, s, slot, p)); }}
@@ -147,14 +204,16 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
                 : <Sheet layout={layout} parts={level} joints={joints} title={owner?.name ?? d.whole.name} language={d.language}
                     subtitle={t.d.sheetSub(t.d.modes[mode], state.path.length + 1, level.length)} selected={state.selected}
                     onSelect={id => mode === 'run' && run.type === 'load' && run.bricks.some(b => b.part === id) ? setState(s => removeBrick(d, s, run.id, id)) : select(id)}
-                    onEnter={id => mode === 'explode' && enter(id)} {...runDecor}/>}
+                    onEnter={id => mode === 'explode' && enter(id)} fit={sized ? panes.sizes.drawing === null ? 'contain' : 'height' : undefined} {...runDecor}/>}
             </div>
-            <aside className="d-side">
-              {mode === 'explode' && <PartCard d={d} part={part} owner={owner} joints={joints} level={level} number={part && index(part.id)} focus={focus} onFocus={focusCite} onEnter={enter}
+            {sized && <Splitter pane="drawing" orientation="horizontal" grows="ArrowDown" value={drawingShare} label={t.d.panes.drawing}
+              onChange={v => panes.set('drawing', v)} onReset={() => panes.reset('drawing')} fromPointer={drawingAt}/>}
+            <aside className={`d-side${splitSide ? ' split' : ''}`} ref={row} style={sourceWidth}>
+              {mode === 'explode' && !sourceWide && <PartCard d={d} part={part} owner={owner} above={state.path.length ? above : undefined} onUp={up} joints={joints} level={level} number={part && index(part.id)} focus={focus} onFocus={focusCite} onEnter={enter}
                 note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}
                 takeApart={part && d.kind === 'generated' && studio?.expandPart && <TakeApart d={d} part={part} route={expandRoute} progress={expanding?.part === part.id ? expanding.progress : undefined}
                   problem={expandProblem?.part === part.id ? expandProblem.failure : undefined} onRun={() => void takeApart(part.id)} onCancel={() => void studio.cancelGeneration()}/>}/>}
-              {mode === 'run' && <RunPanel d={d} run={run} state={state} focus={focus} running={running?.runId === run.id} actions={{
+              {mode === 'run' && !sourceWide && <RunPanel d={d} run={run} state={state} focus={focus} running={running?.runId === run.id} actions={{
                 choose: id => { if (!running) setRunId(id); }, focus: focusCite,
                 predict: (step, option) => setState(s => predict(d, s, run.id, step, option)),
                 execute: () => {
@@ -169,7 +228,9 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
                 remove: p => setState(s => removeBrick(d, s, run.id, p)),
                 answer: option => setState(s => answerCase(d, s, run.id, option)),
               }}/>}
-              {mode !== 'reassemble' && <SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus} cited={mode === 'explode' && part ? part.cites : []}/>}
+              {splitSide && sourceSplitter(row)}
+              {mode !== 'reassemble' && <SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus} cited={mode === 'explode' && part ? part.cites : []}
+                wide={sourceWide} onWide={() => setSourceWide(x => !x)} {...viewProps}/>}
             </aside>
           </div>}
       </main>}

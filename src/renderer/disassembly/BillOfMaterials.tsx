@@ -1,5 +1,6 @@
 import { Check, TriangleAlert } from 'lucide-react';
 import { allParts, billOfMaterials, type Cite, type Disassembly, type LineStatus } from '../../core/disassembly';
+import { readingPaths } from '../../core/layout';
 import { usePreferences } from '../preferences';
 import { citeLabel } from './PartCard';
 
@@ -15,7 +16,10 @@ export function BillOfMaterials({ d, onFocus }: { d: Disassembly; onFocus: (c: C
   const { t, n } = usePreferences();
   const bom = billOfMaterials(d);
   const forgotten = bom.sources.flatMap(s => s.forgotten.map(f => ({ ...f, title: s.title })));
-  const numbered = allParts(d).map(({ part, path }) => ({ part, number: path.match(/\d+/g)!.map(x => Number(x) + 1).join('.') }));
+  // Item numbers are paths in reading order ("2.1.3"), listed in that order, as the drawing numbers them.
+  const paths = readingPaths(d);
+  const key = (path: string) => path.split('.').map(x => x.padStart(3, '0')).join('.');
+  const numbered = allParts(d).map(({ part }) => ({ part, number: paths.get(part.id)! })).sort((a, b) => key(a.number).localeCompare(key(b.number)));
   const joints = [...d.joints, ...allParts(d).flatMap(x => x.part.joints ?? [])].filter(j => j.cites?.length);
   const ranges = (cites: Cite[]) => <span className="cites-inline">{cites.map((c, i) => <button key={i} className="cite" onClick={() => onFocus(c)}>{citeLabel(t, d, c)}</button>)}</span>;
   return <div className="bom">

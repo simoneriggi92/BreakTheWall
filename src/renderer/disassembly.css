@@ -13,6 +13,8 @@
 .question { font-size: 15px; color: var(--muted); max-width: 70ch; }
 .disassembly .save-status { margin-left: auto; }
 .d-work { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.level-up { display: inline-flex; align-items: center; gap: 6px; width: fit-content; justify-self: start; }
+.d-drawing > .level-up { margin: 0 0 6px; align-self: flex-start; }
 .d-drawing { min-width: 0; border: 1px solid var(--line); border-radius: 4px; padding: 10px;
   background-color: var(--bg);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px),
@@ -20,6 +22,25 @@
   background-size: 12px 12px, 12px 12px, 60px 60px, 60px 60px; }
 .d-side { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
 .d-side > :only-child { grid-column: 1 / -1; }
+.d-side.split, .d-wide.split { grid-template-columns: minmax(280px, 1fr) 12px minmax(240px, calc(var(--source-w) * 100%)); gap: 4px; }
+/* Resizable panes (D17). */
+.d-work.sized { gap: 4px; }
+.d-drawing.sized { display: flex; flex-direction: column; min-height: 0; }
+.d-drawing.sized .sheet-scroll { flex: 1; min-height: 0; }
+/* Until the learner sets a height the whole sheet shows, plates shrinking on a wide sheet; after that the drawing
+   follows the pane's height, so dragging down makes plates bigger and a sheet wider than the pane scrolls sideways. */
+.d-drawing.sized .sheet.fit-contain { width: 100%; height: 100%; }
+.d-drawing.sized .sheet.fit-height { height: 100%; width: auto; }
+.splitter { display: flex; align-items: center; justify-content: center; touch-action: none; border-radius: 3px; }
+.splitter-horizontal { height: 12px; cursor: row-resize; }
+.splitter-vertical { width: 12px; align-self: stretch; cursor: col-resize; }
+.splitter > span { background: var(--line); border-radius: 2px; }
+.splitter-horizontal > span { width: 56px; height: 4px; }
+.splitter-vertical > span { width: 4px; height: 56px; position: sticky; top: 50vh; }
+.splitter:hover > span, .splitter:focus-visible > span { background: var(--ink); }
+.source-tools { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.source-tools .icon-button { width: 28px; height: 28px; }
+.source-views { display: inline-flex; gap: 4px; }
 .d-side .source-pane { position: sticky; top: 84px; }
 .d-wide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 18px; align-items: start; }
 .d-wide .source-pane { position: sticky; top: 84px; }
@@ -193,3 +214,40 @@
 .joint-label { transition: transform .25s ease, opacity .25s ease; }
 .joint-label.see-through { opacity: .4; }
 @media (prefers-reduced-motion: reduce) { .joint-label { transition: none; } }
+
+/* A prose source read as a document (D18): blocks keep their source lines, so citations highlight them. */
+.source-document { overflow: auto; max-height: 60vh; padding: 8px 16px 14px; font-size: 14px; line-height: 1.6; color: var(--code-ink); }
+.source-document > :first-child { margin-top: 4px; }
+.source-document h1, .source-document h2, .source-document h3, .source-document h4 { line-height: 1.25; margin: 1.1em 0 .4em; }
+.source-document h1 { font-size: 21px; } .source-document h2 { font-size: 18px; } .source-document h3 { font-size: 16px; } .source-document h4 { font-size: 14.5px; }
+.source-document ul, .source-document ol { padding-left: 1.6em; }
+.source-document [data-from].cited { background: var(--excluded); }
+.source-document [data-from].focus { background: var(--code-hl); box-shadow: -4px 0 0 var(--code-hl), -7px 0 0 var(--code-mark); }
+.source-document table { border-collapse: collapse; margin: 8px 0; font-size: 13px; display: block; overflow-x: auto; }
+.source-document th, .source-document td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+.source-document pre { overflow-x: auto; font-family: var(--f-mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; }
+.source-document code { font-family: var(--f-mono); font-size: .92em; }
+.source-document blockquote { margin: 8px 0; color: var(--muted); }
+.md-link { text-decoration: underline dotted; cursor: help; }
+.md-image { font-style: italic; color: var(--muted); }
+.md-diagram { margin: 10px 0; }
+.md-diagram.drawn .md-diagram-source { display: none; }
+.md-diagram-svg { overflow-x: auto; }
+.md-diagram-svg svg { max-width: 100%; height: auto; }
+.source-reader { width: min(1200px, 94vw); height: 90vh; max-height: 90vh; padding: 0; border: 1px solid var(--ink); border-radius: 4px; background: var(--code-bg); color: var(--ink); }
+.source-reader::backdrop { background: var(--backdrop); }
+.source-reader .dialog-head { margin: 0; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.reader-body { display: grid; grid-template-columns: minmax(160px, 240px) minmax(0, 1fr); height: calc(100% - 52px); }
+.reader-body > :only-child { grid-column: 1 / -1; }
+.reader-outline { overflow: auto; padding: 10px 8px; border-right: 1px solid var(--line); font-size: 13px; background: var(--bg); }
+.reader-outline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.reader-outline .text-button { text-align: left; font-size: 13px; padding: 2px 4px; }
+.source-document.reader-document { max-height: none; height: 100%; padding: 12px 28px 28px; font-size: 15px; }
+@media (max-width: 960px) { .reader-body { grid-template-columns: minmax(0, 1fr); } .reader-outline { display: none; } }
+
+/* D20: the lead opens the card in a stronger style; the points follow. */
+.part-card .role.lead { color: var(--ink); font-weight: 600; font-size: 15.5px; line-height: 1.45; }
+/* D22: the top level while it is written. */
+.generation-preview { display: grid; gap: 10px; margin-top: 6px; }
+.generation-preview .sheet { width: 100%; height: auto; max-height: 62vh; }
+.generation-preview .preview-card h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; }

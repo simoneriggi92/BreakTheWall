@@ -27,7 +27,7 @@ Network access for AI belongs to the main process only: the system browser handl
 
 The local-model route talks only to loopback addresses, from the main process. To try it, start a model server before opening the generation step. For example, run `llama-server -m model.gguf -c 32768` (port 8080), or start LM Studio's server (port 1234) or Ollama (port 11434). The app then finds the server by itself. The format check tells you whether that server enforces the lesson schema; Ollama 0.30.8 did not for the models in the local inference trial.
 
-The domain module must remain independent of React and Electron. Lesson content is data rendered with application-owned components; source text is never HTML or executable UI.
+The domain module must remain independent of React and Electron. Lesson content is data rendered with application-owned components; source text is never HTML or executable UI. A source read as a document is rendered by `markdown-it` with raw HTML off, so markup in it shows as text; links are not followed and images are not fetched. Mermaid diagrams load on first use and run in strict mode. The production policy allows styles only from the app's files, so a diagram's `<style>` and `style` attributes are applied through the CSS object model (`src/renderer/svg-mount.ts`) rather than by loosening the policy.
 
 ## Toolchain references
 

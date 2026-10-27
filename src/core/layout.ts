@@ -19,6 +19,8 @@ export type LevelLayout = {
   plates: { id: string; rect: Rect }[];
   /** One entry per joint of the level, in the same order; points run from `from` to `to`. */
   joints: { from: string; to: string; points: Point[]; label: Rect; returns: boolean }[];
+  /** The level's part ids in reading order: the numbers the learner sees follow it. */
+  order: string[];
   width: number; height: number;
 };
 
@@ -145,6 +147,15 @@ function finish(
   const gaps = Array.from({ length: Math.max(0, layers.length - 1) }, () => LAYOUT.rankGap as number);
   for (const e of routed) { const r = rank.get(e.up)!; gaps[r] = Math.max(gaps[r], lu(e.joint) + 2 * pad); }
   const sideOf = new Map(sideRoutes.map(s => [s.id, s]));
+  // Reading order follows the arrows: rank by rank, across each rank as drawn, the side parts right after their host
+  // (in the order they are drawn), parts without joints last.
+  const order: string[] = [];
+  for (const layer of layers) for (const item of layer) {
+    if (!item.node || sideOf.has(item.node)) continue;
+    const sides = layer.filter(x => x.node && sideOf.get(x.node)?.host === item.node).map(x => x.node!);
+    order.push(item.node, ...sides);
+  }
+  order.push(...loose);
 
   // Across the ranks: stack each layer, then centre it on the axis.
   for (const layer of layers) {
@@ -219,14 +230,14 @@ function finish(
       lines.push({ joint: e.joint, points: e.reversed ? [...points].reverse() : points, label: box });
     }
     if (grow.size && attempt < 40) { grow.forEach(r => { gaps[r] += LAYOUT.grow; }); continue; }
-    return toScreen(orientation, layers, lines, loose, joints, uStart, extentU);
+    return { ...toScreen(orientation, layers, lines, loose, joints, uStart, extentU), order };
   }
 }
 
 function toScreen(
   orientation: Orientation, layers: Item[][], lines: { joint: number; points: Point[]; label?: [number, number, number, number] }[],
   loose: string[], joints: Pick<Joint, 'from' | 'to' | 'label'>[], uStart: number[], extentU: number,
-): LevelLayout {
+): Omit<LevelLayout, 'order'> {
   const flow = orientation === 'flow'; const P = LAYOUT.plate;
   const pt = ([u, v]: Point): Point => flow ? [u, v] : [v, -u];
   const rect = (u0: number, v0: number, du: number, dv: number): Rect => flow ? { x: u0, y: v0, w: du, h: dv } : { x: v0, y: -(u0 + du), w: dv, h: du };
@@ -256,6 +267,25 @@ function toScreen(
     width: Math.ceil(Math.max(...finalBoxes.map(b => b.x + b.w)) + LAYOUT.margin),
     height: Math.ceil(Math.max(...finalBoxes.map(b => b.y + b.h)) + LAYOUT.margin),
   };
+}
+
+/** Each part's number on its level, from 1, in reading order. */
+export function readingNumbers(level: Pick<LevelLayout, 'order'>): Map<string, number> {
+  return new Map(level.order.map((id, i) => [id, i + 1]));
+}
+/** Each part's place in the whole, as "2.1.3": its reading number on every level from the top. */
+export function readingPaths(d: Pick<Disassembly, 'parts' | 'joints'>, layouts = layoutDisassembly(d)): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (parts: Part[], owner: string, prefix: string) => {
+    const numbers = readingNumbers(layouts.get(owner)!);
+    for (const p of parts) {
+      const path = `${prefix}${numbers.get(p.id)}`;
+      out.set(p.id, path);
+      if (p.parts) walk(p.parts, p.id, `${path}.`);
+    }
+  };
+  walk(d.parts, 'root', '');
+  return out;
 }
 
 /** Every level of a disassembly: the whole (`root`) and each sub-assembly, keyed by its part id. */

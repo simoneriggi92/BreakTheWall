@@ -1,5 +1,5 @@
 import { allParts, billOfMaterials, JOINT_FAMILY, type Disassembly } from '../src/core/disassembly';
-import { answerLengthRatio, optionSets } from '../src/core/disassembly-generation';
+import { answerLengthRatio, optionSets, restates } from '../src/core/disassembly-generation';
 import { detectLanguage } from '../src/core/generation';
 import { layoutDisassembly, layoutFindings } from '../src/core/layout';
 import type { GenerationStats, PhaseStats } from '../src/core/provider';
@@ -18,6 +18,8 @@ export interface DisassemblyMetrics {
   inferences: number;
   /** For each option set, the correct option's length over the mean wrong option's length. Large values give the answer away. */
   answerLengthRatios: number[];
+  /** D20: the longest lead at any level, and the points and explanations that say their lead again. */
+  maxLead: number; restated: number;
 }
 
 export function disassemblyMetrics(d: Disassembly): DisassemblyMetrics {
@@ -35,6 +37,8 @@ export function disassemblyMetrics(d: Disassembly): DisassemblyMetrics {
     writtenLanguage: detectLanguage([...parts.map(x => x.part.name), ...d.parts.flatMap(p => p.points?.map(x => x.text) ?? [])].join(' ')) ?? null,
     runs, inferences,
     answerLengthRatios: optionSets(d.runs).flatMap(set => answerLengthRatio(set.options) ?? []),
+    maxLead: Math.max(...parts.map(x => x.part.role.length)),
+    restated: parts.reduce((sum, { part }) => sum + (part.points ?? []).filter(x => restates(x.text, part.role)).length + (part.explain && restates(part.explain, part.role) ? 1 : 0), 0),
   };
 }
 
@@ -66,6 +70,8 @@ export interface CaseSummary {
   /** Must be 0 on every valid attempt: anything else is a defect in the checks, not in the model. */
   maxForgottenLines?: number; maxLayoutFindings?: number;
   languageMismatches: number; maxAnswerLengthRatio?: number; failures: string[];
+  /** D20: the longest lead and the restated texts over valid attempts; valid attempts that needed a shorten request (D19). */
+  maxLead?: number; restated: number; savedByShorten: number;
 }
 export function summarize(records: AttemptRecord[]): CaseSummary[] {
   const keys = [...new Set(records.map(r => `${r.case}\u0000${r.setup}`))];
@@ -83,6 +89,8 @@ export function summarize(records: AttemptRecord[]): CaseSummary[] {
       maxForgottenLines: max(valid.map(r => r.metrics!.forgottenLines)), maxLayoutFindings: max(valid.map(r => r.metrics!.layoutFindings)),
       languageMismatches: valid.filter(r => r.metrics!.writtenLanguage && r.metrics!.writtenLanguage !== r.language).length,
       maxAnswerLengthRatio: max(ratios), failures: own.filter(r => !r.ok).map(r => r.failure ?? 'unknown'),
+      maxLead: max(valid.map(r => r.metrics!.maxLead ?? 0)), restated: valid.reduce((sum, r) => sum + (r.metrics!.restated ?? 0), 0),
+      savedByShorten: valid.filter(r => r.stats && (r.stats.structure.shortens ?? 0) + (r.stats.content.shortens ?? 0) + (r.stats.runs.shortens ?? 0) > 0).length,
     };
   });
 }

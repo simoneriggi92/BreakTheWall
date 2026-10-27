@@ -3,14 +3,20 @@ import { ArrowLeft, ArrowRight, Check, ClipboardPaste, Cpu, FileText, KeyRound, 
 import type { Disassembly } from '../core/disassembly';
 import { buildStructureInput, defaultContentLanguage, type ContentLanguage } from '../core/disassembly-generation';
 import { detectLanguage } from '../core/generation';
-import { RUNTIME_NAMES, type AccountStatus, type FormatCheck, type GenerationProgress, type GenerationRoute, type GenerationSetup, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioSettings } from '../core/provider';
+import { resumable, RUNTIME_NAMES, type AccountStatus, type DraftState, type FormatCheck, type GenerationProgress, type GenerationRoute, type GenerationSetup, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioSettings, type Suggestion } from '../core/provider';
 import { checkSelection, CODE_LANGUAGES, goalSchema, importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
+import { GenerationPreview } from './disassembly/GenerationPreview';
 import { Icon } from './icons';
 import type { Messages } from './i18n/it';
 import { failureText, usePreferences } from './preferences';
 
-/** `language` is set only when the learner chose one; until then it follows the question. */
-export interface StudioDraft { sources: UserSource[]; outcome: string; prior: string; language?: ContentLanguage }
+/**
+ * `language` is set only when the learner chose one; until then it follows the question. Suggested break-downs are
+ * kept for the selection they were asked for, keyed by its sources' hashes, and never stored with a disassembly.
+ */
+export interface StudioDraft { sources: UserSource[]; outcome: string; prior: string; language?: ContentLanguage; suggestions?: KeptSuggestions }
+interface KeptSuggestions { key: string; language: ContentLanguage; items: Suggestion[]; shown: string[] }
+const selectionKey = (sources: Pick<UserSource, 'id' | 'sha256'>[]) => sources.map(s => `${s.id}:${s.sha256}`).sort().join(',');
 export const emptyDraft: StudioDraft = { sources: [], outcome: '', prior: '' };
 const runtimeName = (t: Messages, runtime: LocalRuntime) => runtime === 'openai' ? t.local.openaiServer : RUNTIME_NAMES[runtime];
 /** Import errors are worded from their code, so they follow the interface language. */
@@ -35,6 +41,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { s
   const [busy, setBusy] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }); window.scrollTo({ top: 0 }); }, [step]);
+  const routes = useRoutes(studio);
 
   const add = (incoming: UserSource[], extra: string[] = []) => {
     const problems = [...extra];
@@ -90,6 +97,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { s
       <div className="studio-step" hidden={step !== 1}>
         <span className="step-label"><Icon name="target" size={18}/>{t.studio.goalLabel}</span>
         <p className="step-hint">{t.studio.goalHint(draft.sources.length)}</p>
+        {studio?.suggest && <Suggestions studio={studio} draft={draft} setDraft={setDraft} language={language} route={routes.setup?.content}/>}
         <label>{t.studio.outcome}<textarea rows={4} maxLength={400} value={draft.outcome} placeholder={t.studio.outcomePlaceholder} onChange={e => setDraft(d => ({ ...d, outcome: e.target.value }))}/></label>
         <label><span>{t.studio.prior} <span className="optional">{t.common.optional}</span></span><input maxLength={200} value={draft.prior} placeholder={t.studio.priorPlaceholder} onChange={e => setDraft(d => ({ ...d, prior: e.target.value }))}/></label>
         {draft.outcome && !goal.success && <p className="field-error">{goalText(t, goal.error.issues[0])}</p>}
@@ -98,7 +106,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { s
         {languageClash && <p className="field-error">{t.studio.questionLanguage(t.languageNames[asked])}</p>}
         <div className="creation-controls"><button className="subtle" onClick={() => setStep(0)}><ArrowLeft size={16}/>{t.studio.material}</button><button className="primary" disabled={!goal.success} onClick={() => setStep(2)}>{t.studio.toGeneration}<ArrowRight size={16}/></button></div>
       </div>
-      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{t.studio.sourcesCount(draft.sources.length)}</span><p>{draft.outcome}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>{t.studio.editGoal}</button></div><Generate studio={studio} sources={draft.sources} goal={goal.success ? goal.data : undefined} language={language} languageClash={languageClash} onCreated={onCreated} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
+      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{t.studio.sourcesCount(draft.sources.length)}</span><p>{draft.outcome}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>{t.studio.editGoal}</button></div><Generate studio={studio} routes={routes} sources={draft.sources} goal={goal.success ? goal.data : undefined} language={language} languageClash={languageClash} onCreated={onCreated} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
     </div>
   </section>;
 }
@@ -120,31 +128,88 @@ function phasePercent(progress: GenerationProgress): number {
   return Math.min(97, 85 + Math.round(progress.received / 800));
 }
 
-function Generate({ studio, sources, goal, language, languageClash, onCreated, onBusyChange }: { studio?: StudioBridge; sources: UserSource[]; goal?: { outcome: string; priorKnowledge: string }; language: ContentLanguage; languageClash: boolean; onCreated: (disassembly: Disassembly) => void; onBusyChange: (value: boolean) => void }) {
-  const { t, n: fmt, settings, update: updateSettings } = usePreferences();
+/**
+ * The account, the models and the setup they allow. Studio needs them before the generation step: suggested
+ * break-downs go to the setup's content route.
+ */
+function useRoutes(studio?: StudioBridge) {
+  const { settings } = usePreferences();
   const [status, setStatus] = useState<AccountStatus>();
   const [models, setModels] = useState<ModelOption[]>([]);
-  const [problem, setProblem] = useState<ProviderFailure>();
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<GenerationProgress>({ phase: 'structure', repairing: false, received: 0, requests: 0 });
+  const [modelsProblem, setModelsProblem] = useState<ProviderFailure>();
   const provider = settings?.provider ?? 'chatgpt';
   const planReady = status?.state === 'signed-in' && status.planUsage;
-  const chatgptModel = models.some(m => m.slug === settings?.chatgptModel) ? settings!.chatgptModel! : models[0]?.slug ?? '';
-  // Parts and runs use the structure model unless the learner picked another one that the account still lists.
-  const contentModel = models.some(m => m.slug === settings?.chatgptContentModel) ? settings!.chatgptContentModel! : '';
-
   useEffect(() => { if (studio) void studio.accountStatus().then(setStatus); }, [studio]);
   useEffect(() => {
     if (!studio || !planReady || provider !== 'chatgpt') return;
     let active = true;
     void studio.listModels().then(result => {
       if (!active) return;
-      if (!result.ok) { setProblem(result.failure); return; }
+      if (!result.ok) { setModelsProblem(result.failure); return; }
       setModels(result.models);
     });
     return () => { active = false; };
   }, [studio, planReady, provider]);
+  const chatgptModel = models.some(m => m.slug === settings?.chatgptModel) ? settings!.chatgptModel! : models[0]?.slug ?? '';
+  // Parts and runs use the structure model unless the learner picked another one that the account still lists.
+  const contentModel = models.some(m => m.slug === settings?.chatgptContentModel) ? settings!.chatgptContentModel! : '';
+  const local = settings?.local;
+  const localRoute: GenerationRoute | undefined = local && { provider: 'local', runtime: local.runtime, baseUrl: local.baseUrl, model: local.model };
+  const setup: GenerationSetup | undefined = provider === 'local'
+    ? localRoute && { structure: localRoute, content: localRoute }
+    : planReady && chatgptModel ? { structure: { provider: 'chatgpt', model: chatgptModel }, content: { provider: 'chatgpt', model: contentModel || chatgptModel } } : undefined;
+  return { status, setStatus, models, modelsProblem, provider, planReady, chatgptModel, contentModel, local, setup };
+}
+type Routes = ReturnType<typeof useRoutes>;
+
+/**
+ * Suggested break-downs (D23), only when the learner presses the button: one request to the content route, with the
+ * cost said beside it. A card fills the question field, which stays editable; the content language follows it.
+ */
+function Suggestions({ studio, draft, setDraft, language, route }: { studio: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; language: ContentLanguage; route?: GenerationRoute }) {
+  const { t } = usePreferences();
+  const s = t.suggest;
+  const [running, setRunning] = useState(false);
+  const [problem, setProblem] = useState<ProviderFailure>();
+  const key = selectionKey(draft.sources);
+  const kept = draft.suggestions?.key === key ? draft.suggestions : undefined;
+  const ask = async () => {
+    if (!route || !studio.suggest) return;
+    setRunning(true); setProblem(undefined);
+    const shown = kept?.shown ?? [];
+    try {
+      const result = await studio.suggest({ sources: draft.sources, language, priorKnowledge: draft.prior.slice(0, 200), route, avoid: shown });
+      if (result.ok) setDraft(d => ({ ...d, suggestions: { key, language, items: result.suggestions, shown: [...shown, ...result.suggestions.map(x => x.question)].slice(-20) } }));
+      else setProblem(result.failure);
+    } finally { setRunning(false); }
+  };
+  const where = route && (route.provider === 'local' ? s.local(route.model) : `ChatGPT · ${route.model}`);
+  return <div className="suggestions">
+    {running
+      ? <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{s.running}</span><button className="subtle" onClick={() => void studio.cancelSuggestions?.()}>{s.cancel}</button></div>
+      : <div className="studio-actions"><button className="subtle" disabled={!route} onClick={() => void ask()}><Sparkles size={15}/>{kept ? s.more : s.action}</button></div>}
+    <p className="micro plain">{where ? s.cost(where) : s.noRoute}</p>
+    {problem && <p className="notice" role="alert">{problem.code === 'cancelled' ? s.cancelled : s.failed(failureText(t, problem))}</p>}
+    {kept && <ul className="suggestion-cards" aria-label={s.label}>{kept.items.map((x, i) => <li key={i}><article className="suggestion-card" lang={kept.language}>
+      <span className="eyebrow">{s.kinds[x.kind]}</span><p className="suggestion-question">{x.question}</p>
+      <p className="micro plain"><span className="sr-only">{s.parts}: </span>{x.parts.join(' · ')}</p>
+      <button className="text-button" aria-pressed={draft.outcome === x.question} onClick={() => setDraft(d => ({ ...d, outcome: x.question, language: kept.language }))}>{s.use}</button>
+    </article></li>)}</ul>}
+  </div>;
+}
+
+function Generate({ studio, routes, sources, goal, language, languageClash, onCreated, onBusyChange }: { studio?: StudioBridge; routes: Routes; sources: UserSource[]; goal?: { outcome: string; priorKnowledge: string }; language: ContentLanguage; languageClash: boolean; onCreated: (disassembly: Disassembly) => void; onBusyChange: (value: boolean) => void }) {
+  const { t, n: fmt, settings, update: updateSettings } = usePreferences();
+  const { status, setStatus, models, provider, planReady, chatgptModel, contentModel, local, setup } = routes;
+  const [problem, setProblem] = useState<ProviderFailure>();
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<GenerationProgress>({ phase: 'structure', repairing: false, received: 0, requests: 0 });
+  // A failed or cancelled generation keeps what was accepted; Studio offers to finish it (D21).
+  const [kept, setKept] = useState<DraftState>();
+  const readDraft = async () => { if (studio?.generationDraft) setKept(await studio.generationDraft()); };
+  useEffect(() => { void readDraft(); }, [studio]);
   useEffect(() => studio?.onGenerationProgress(setProgress), [studio]);
+  const shown = problem ?? routes.modelsProblem;
 
   const sent = useMemo(() => goal && sources.length ? buildStructureInput(sources, goal, language) : '', [sources, goal, language]);
   if (!studio) return <div className="studio-step"><span className="step-label"><span className="step-number">3</span><Icon name="lightbulb" size={18}/>{t.generate.title}</span><p className="step-hint">{t.generate.desktopOnly}</p></div>;
@@ -156,28 +221,27 @@ function Generate({ studio, sources, goal, language, languageClash, onCreated, o
     if (!result.ok) setProblem(result.failure);
     setStatus(await studio.accountStatus());
   };
-  const local = settings?.local;
-  const localRoute: GenerationRoute | undefined = local && { provider: 'local', runtime: local.runtime, baseUrl: local.baseUrl, model: local.model };
-  const setup: GenerationSetup | undefined = provider === 'local'
-    ? localRoute && { structure: localRoute, content: localRoute }
-    : planReady && chatgptModel ? { structure: { provider: 'chatgpt', model: chatgptModel }, content: { provider: 'chatgpt', model: contentModel || chatgptModel } } : undefined;
-  const generate = async () => {
+  const generate = async (resume = false) => {
     if (!goal || !setup || languageClash) return;
     setProblem(undefined); setRunning(true); setProgress({ phase: 'structure', repairing: false, received: 0, requests: 0 }); onBusyChange(true);
     try {
-      const result = await studio.generate({ sources, goal, language, setup });
-      if (result.ok) onCreated(result.disassembly);
-      else { setProblem(result.failure); if (result.failure.action === 'sign-in') setStatus(await studio.accountStatus()); }
+      const result = await studio.generate({ sources, goal, language, setup, ...(resume ? { resume: true } : {}) });
+      if (result.ok) { setKept({ draft: null }); onCreated(result.disassembly); }
+      else { setProblem(result.failure); await readDraft(); if (result.failure.action === 'sign-in') setStatus(await studio.accountStatus()); }
     } finally { setRunning(false); onBusyChange(false); }
   };
   const m = t.generate.missing;
   const missing = [!sources.length && m.source, !goal && m.goal, languageClash && m.language,
     provider === 'chatgpt' ? (!planReady ? m.chatgpt : !chatgptModel && m.model) : !local && m.local].filter(Boolean);
+  const draft = kept?.draft;
+  const canResume = !!draft && !!goal && resumable(draft, { sources, question: goal.outcome, language });
   const action = (f: ProviderFailure) => f.action === 'sign-in' ? <button onClick={() => void signIn()}>{t.generate.signInAgain}</button>
     : f.action === 'enable-plan' ? <button onClick={() => void signIn(true)}>{t.generate.enablePlan}</button>
     : f.action === 'usage-settings' ? <button onClick={() => void studio.openUsageSettings()}>{t.generate.usageSettings}</button>
-    : (f.action === 'retry' || f.action === 'local-setup') && f.code !== 'cancelled' ? <button disabled={!!missing.length} onClick={() => void generate()}>{t.generate.retry}</button> : null;
-  const phase = progress.phase === 'content' ? t.generate.phases.content(Math.min((progress.part ?? 0) + 1, progress.parts ?? 1), progress.parts ?? 1) : t.generate.phases[progress.phase];
+    : (f.action === 'retry' || f.action === 'local-setup') && f.code !== 'cancelled' && !canResume ? <button disabled={!!missing.length} onClick={() => void generate()}>{t.generate.retry}</button> : null;
+  const phase = progress.phase === 'runs' && progress.preview ? t.generate.runsPreparing
+    : progress.phase === 'content' ? t.generate.phases.content(Math.min((progress.part ?? 0) + 1, progress.parts ?? 1), progress.parts ?? 1) : t.generate.phases[progress.phase];
+  const pass = progress.shortening ? t.generate.shortening : progress.repairing ? t.generate.repairing : '';
 
   return <div className="studio-step">
     <span className="step-label"><span className="step-number">3</span><Icon name="lightbulb" size={18}/>{t.generate.title}</span>
@@ -205,13 +269,22 @@ function Generate({ studio, sources, goal, language, languageClash, onCreated, o
         : t.generate.sentChatgpt}</p><pre tabIndex={0}>{sent}</pre></> : <p className="micro plain">{t.generate.sentEmpty}</p>}
     </details>
     {running ? <div className="generating">
-        <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{phase}{progress.repairing ? ` · ${t.generate.repairing}` : ''}</span><button className="subtle" onClick={() => void studio.cancelGeneration()}>{t.generate.cancel}</button></div>
+        <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{phase}{pass ? ` · ${pass}` : ''}</span><button className="subtle" onClick={() => void studio.cancelGeneration()}>{t.generate.cancel}</button></div>
         <progress max={100} value={phasePercent(progress)} aria-label={t.generate.progress}/>
         <p className="micro plain">{t.generate.progressText(progress.requests, progress.received ? fmt(progress.received) : '')}</p>
+        {progress.preview && <GenerationPreview preview={progress.preview} language={language}/>}
       </div>
-      : <button className="primary generate-button" disabled={!!missing.length} onClick={() => void generate()}><Sparkles size={17}/>{t.generate.generate}</button>}
+      : canResume ? <div className="kept-draft" role="group" aria-label={t.generate.kept(draft.parts, draft.kept, draft.runs)}>
+          <p>{t.generate.kept(draft.parts, draft.kept, draft.runs)}</p>
+          <div className="studio-actions"><button className="primary" disabled={!!missing.length} onClick={() => void generate(true)}><RefreshCw size={16}/>{t.generate.resume}</button>
+            <button className="subtle" disabled={!!missing.length} onClick={() => void generate()}>{t.generate.startOver}</button></div>
+          <p className="micro plain">{t.generate.resumeHint}</p>
+        </div>
+      : <>{draft && <p className="micro plain">{t.generate.draftElsewhere(draft.title ?? '')}</p>}
+        <button className="primary generate-button" disabled={!!missing.length} onClick={() => void generate()}><Sparkles size={17}/>{t.generate.generate}</button></>}
+    {!running && kept?.setAside && <p className="notice" role="status">{t.generate.draftSetAside}</p>}
     {!running && missing.length > 0 && <p className="micro plain">{t.generate.stillNeeded(missing.join(', '))}</p>}
-    {problem && <div className={problem.code === 'cancelled' ? 'notice' : 'error-banner'} role="alert"><div><p>{failureText(t, problem)}</p>{problem.issues && <details className="issue-details"><summary>{t.generate.technical}</summary><ul className="issue-list">{problem.issues.map((x, i) => <li key={i}>{x}</li>)}</ul></details>}{problem.requestId && <p className="micro plain">{t.generate.request(problem.requestId)}</p>}</div>{action(problem)}</div>}
+    {shown && <div className={shown.code === 'cancelled' ? 'notice' : 'error-banner'} role="alert"><div><p>{failureText(t, shown)}</p>{shown.issues && <details className="issue-details"><summary>{t.generate.technical}</summary><ul className="issue-list">{shown.issues.map((x, i) => <li key={i}>{x}</li>)}</ul></details>}{shown.requestId && <p className="micro plain">{t.generate.request(shown.requestId)}</p>}</div>{action(shown)}</div>}
   </div>;
 }
 

@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { billOfMaterials, DisassemblyError, type Disassembly, type Part } from '../src/core/disassembly';
+import { readFileSync } from 'node:fs';
 import {
-  acceptContent, acceptRuns, acceptStructure, answerLengthRatio, givesAway, assembleDisassembly, buildContentInput, buildStructureInput, compose,
-  contentJsonSchema, defaultContentLanguage, runsJsonSchema, structureJsonSchema, type GenerationMeta,
+  acceptContent, acceptExpansion, acceptRuns, acceptStructure, acceptSuggestions, answerLengthRatio, applyShortened, givesAway, assembleDisassembly, buildContentInput, buildRunsInput,
+  buildStructureInput, buildSuggestionInput, compose, contentJsonSchema, defaultContentLanguage, LEAD_LIMIT, longTexts, restates, runsJsonSchema, structureJsonSchema,
+  type GenerationMeta,
 } from '../src/core/disassembly-generation';
 import { failure, ProviderError, type GenerationProgress } from '../src/core/provider';
 import type { UserSource } from '../src/core/source';
@@ -14,7 +16,8 @@ import type { CompletionRequest } from '../src/desktop/completion';
 import { DisassemblyStore } from '../src/desktop/disassembly-store';
 import { Generator } from '../src/desktop/generator';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
-import { draftsFrom, pastedSource, scriptedAnswer } from './disassembly-drafts';
+import { CONTENT_INSTRUCTIONS, EXPANSION_INSTRUCTIONS, STRUCTURE_INSTRUCTIONS } from '../src/core/disassembly-generation';
+import { deepDisassembly, draftsFrom, generatedFrom, pastedSource, scriptedAnswer, splitAnswer } from './disassembly-drafts';
 
 const meta: GenerationMeta = { id: 'g-test', createdAt: '2026-10-26T10:00:00.000Z', provider: 'chatgpt', model: 'model-a' };
 const goalOf = (d: Disassembly) => ({ outcome: d.question, priorKnowledge: '' });
@@ -74,6 +77,15 @@ describe('two-phase generation contract (D9)', () => {
     const cited = drafts.structure.parts[index].cites.flatMap(c => Array.from({ length: c.to - c.from + 1 }, (_, k) => c.from + k));
     expect(lines).toEqual(cited);
     expect(own).toContain('PART TO WRITE: railway');
+  });
+
+  it('lists parts in reading order, with the numbers the drawing shows, in content and runs requests (D15)', async () => {
+    const { sources, goal, language, drafts } = await setupFor(mill());
+    const listed = (input: string) => input.split('\n').filter(l => /^\d+\. /.test(l)).map(l => l.split(' ')[1]);
+    const order = ['utility', 'sovereignty', 'claim', 'objection', 'bounds', 'region', 'abstract-right'];
+    expect(listed(buildContentInput(sources, goal, language, drafts.structure, 0))).toEqual(order);
+    expect(listed(buildRunsInput(sources, goal, language, drafts.structure, drafts.contents))).toEqual(order);
+    expect(buildRunsInput(sources, goal, language, drafts.structure, drafts.contents)).toMatch(/^ {4}5\.1\. bounds-maturity /m);
   });
 
   it('finds forgotten lines, joints across levels, the wrong language and bad JSON in the structure, located by path', async () => {
@@ -159,9 +171,8 @@ describe('generation orchestration across phases and routes (D9)', () => {
     const respond = (route: string) => async (request: CompletionRequest, signal: AbortSignal) => {
       seen.push({ route, request });
       if (signal.aborted) throw new ProviderError(failure('cancelled'));
-      const fallback = scriptedAnswer(context.drafts, request.schemaName, request.messages[0].content);
       const own = answer ? await answer(request, seen.length) : undefined;
-      return own ?? fallback;
+      return own ?? scriptedAnswer(context.drafts, request.schemaName, request.messages[0].content);
     };
     const chatgpt = { complete: vi.fn(respond('chatgpt')) };
     const local = vi.fn((target: { model: string }) => ({ complete: respond(`local:${target.model}`) }));
@@ -226,7 +237,7 @@ describe('generation orchestration across phases and routes (D9)', () => {
     expect(seen).toHaveLength(0);
   });
 
-  it('reports a provider failure from one part as itself, not as a cancellation, and stops the other parts', async () => {
+  it('reports a provider failure from one part as itself, not as a cancellation, and sends no runs request (D21: the other parts finish)', async () => {
     const { generator, request, seen, root } = await setup(atlas(), request => {
       if (request.schemaName === 'break_the_wall_part' && request.messages[0].content.includes('PART TO WRITE: check')) throw new ProviderError(failure('usage-limit'));
       return undefined as unknown as string;
@@ -272,5 +283,136 @@ describe('generation orchestration across phases and routes (D9)', () => {
     const result = await generator.generate({ ...request({ structure: gpt('m'), content: gpt('m') }), sources: [tampered] }, () => {});
     expect(result).toMatchObject({ ok: false, failure: { code: 'unsupported' } });
     expect(seen).toHaveLength(0);
+  });
+
+  // ---------- D19: a second repair, for lengths only ----------
+  const bellWith = (drafts: ReturnType<typeof draftsFrom>, points: { text: string; mark: null }[]) => JSON.stringify({ ...drafts.contents[3], points });
+  const isBell = (request: CompletionRequest) => request.schemaName === 'break_the_wall_part' && request.messages[0].content.includes('PART TO WRITE: bell');
+
+  it('shortens a point still 3 characters over its limit after the repair with one more request, and accepts it (D19)', async () => {
+    const { generator, request, seen, drafts } = await setup(story(), request => {
+      if (request.schemaName === 'break_the_wall_shorten') return JSON.stringify({ texts: [{ path: 'points[0].text', text: 'The bell rings once the water passes the quay.' }] });
+      return isBell(request) ? bellWith(drafts, [{ text: 'x'.repeat(133), mark: null }, { text: drafts.contents[3].points[1].text, mark: null }]) : undefined as unknown as string;
+    });
+    const progress: GenerationProgress[] = [];
+    const result = await generator.generate(request({ structure: gpt('strong'), content: gpt('cheap') }), p => progress.push(p));
+    expect(result).toMatchObject({ ok: true, stats: { content: { requests: drafts.structure.parts.length + 2, repairs: 2 } } });
+    if (!result.ok) return;
+    const shorten = seen.filter(x => x.request.schemaName === 'break_the_wall_shorten');
+    expect(shorten).toHaveLength(1);
+    expect(shorten[0].request).toMatchObject({ model: 'cheap', messages: [{ role: 'user' }] });
+    expect(shorten[0].request.messages[0].content).toContain('- points[0].text (133 characters; at most 130): "xxx');
+    expect(shorten[0].request.messages[0].content).toContain('CONTENT LANGUAGE: English (en)');
+    expect(result.disassembly.parts.find(p => p.id === 'bell')!.points![0].text).toBe('The bell rings once the water passes the quay.');
+    expect(progress.some(p => p.shortening && p.repairing && p.phase === 'content')).toBe(true);
+  });
+
+  it('refuses a shortened answer that leaves out a path, adds one, or is still over the limit (D19)', () => {
+    const raw = JSON.stringify({ name: 'n'.repeat(50), points: [{ text: 'x'.repeat(133), mark: null }] });
+    const texts = longTexts(raw, [{ path: 'points[0]', message: 'Point has 133 characters; at most 130' }, { path: 'name', message: 'Part name has 50 characters; at most 48' }])!;
+    expect(texts.map(x => [x.path, x.length, x.limit])).toEqual([['points[0].text', 133, 130], ['name', 50, 48]]);
+    const answer = (list: { path: string; text: string }[]) => JSON.stringify({ texts: list });
+    expect(JSON.parse(applyShortened(raw, texts, answer([{ path: 'points[0].text', text: 'Short.' }, { path: 'name', text: 'Name' }])))).toEqual({ name: 'Name', points: [{ text: 'Short.', mark: null }] });
+    expect(findings(() => applyShortened(raw, texts, answer([{ path: 'name', text: 'Name' }])))).not.toEqual([]);
+    expect(findings(() => applyShortened(raw, texts, answer([{ path: 'name', text: 'Name' }, { path: 'name', text: 'Nom' }])))).toEqual([{ path: 'points[0].text', message: 'Not shortened' }, { path: 'name', message: 'Shortened more than once' }]);
+    expect(findings(() => applyShortened(raw, texts, answer([{ path: 'points[0].text', text: 'Short.' }, { path: 'name', text: 'Name' }, { path: 'title', text: 'T' }])))).not.toEqual([]);
+    expect(findings(() => applyShortened(raw, texts, answer([{ path: 'points[0].text', text: 'y'.repeat(131) }, { path: 'name', text: 'Name' }])))).toEqual([{ path: 'points[0].text', message: 'Text has 131 characters; at most 130' }]);
+    // A finding that is not about a length, or a path that leads to no text, means the draft is wrong, not long.
+    expect(longTexts(raw, [{ path: 'name', message: 'Part name has 50 characters; at most 48' }, { path: 'points', message: 'A top-level part needs 2–4 points; it has 1' }])).toBeUndefined();
+    expect(longTexts(raw, [{ path: 'missing', message: 'Text has 50 characters; at most 48' }])).toBeUndefined();
+  });
+
+  it('fails the phase when the shortened answer is still too long, and sends no shorten request for a mix of findings (D19)', async () => {
+    const still = await setup(story(), request => request.schemaName === 'break_the_wall_shorten'
+      ? JSON.stringify({ texts: [{ path: 'points[0].text', text: 'y'.repeat(131) }] })
+      : isBell(request) ? bellWith(still.drafts, [{ text: 'x'.repeat(133), mark: null }, { text: 'The bell rings.', mark: null }]) : undefined as unknown as string);
+    expect(await still.generator.generate(still.request({ structure: gpt('m'), content: gpt('m') }), () => {})).toMatchObject({ ok: false, failure: { code: 'invalid-output', issues: ['part bell · points[0].text: Text has 131 characters; at most 130'] } });
+    const mixed = await setup(story(), request => isBell(request) ? bellWith(mixed.drafts, [{ text: 'x'.repeat(2001), mark: null }, ...Array(4).fill({ text: 'The bell rings.', mark: null })]) : undefined as unknown as string);
+    const result = await mixed.generator.generate(mixed.request({ structure: gpt('m'), content: gpt('m') }), () => {});
+    expect(result).toMatchObject({ ok: false, failure: { code: 'invalid-output' } });
+    expect(mixed.seen.some(x => x.request.schemaName === 'break_the_wall_shorten')).toBe(false);
+  });
+
+  it('cancels during the shorten request without saving anything (D19)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let shortening = false;
+    const { generator, request, root, drafts } = await setup(story(), async request => {
+      if (request.schemaName === 'break_the_wall_shorten') { shortening = true; await gate; return JSON.stringify({ texts: [{ path: 'points[0].text', text: 'Short.' }] }); }
+      return isBell(request) ? bellWith(drafts, [{ text: 'x'.repeat(133), mark: null }, { text: 'The bell rings.', mark: null }]) : undefined as unknown as string;
+    });
+    const pending = generator.generate(request({ structure: gpt('m'), content: gpt('m') }), () => {});
+    await vi.waitFor(() => expect(shortening).toBe(true));
+    generator.cancel(); release();
+    expect(await pending).toMatchObject({ ok: false, failure: { code: 'cancelled' } });
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  // ---------- D20: a short lead, the details in the points ----------
+  it('treats a lead over 100 characters as a length, which the shorten request fixes (D20)', async () => {
+    const context = await setupFor(story());
+    const long = structuredClone(context.drafts.structure); long.parts[1].role = `${long.parts[1].role} ${'and so on '.repeat(5)}`.slice(0, 105);
+    expect(findings(() => acceptStructure(JSON.stringify(long), { sources: context.sources, goal: context.goal, language: 'en', meta }))).toEqual([{ path: 'parts[1].role', message: `Lead has 105 characters; at most ${LEAD_LIMIT}` }]);
+    const { generator, request, seen } = await setup(story(), request => request.schemaName === 'break_the_wall_shorten'
+      ? JSON.stringify({ texts: [{ path: 'parts[1].role', text: 'The town votes on the wall.' }] })
+      : request.schemaName === 'break_the_wall_structure' ? JSON.stringify(long) : undefined as unknown as string);
+    const result = await generator.generate(request({ structure: gpt('m'), content: gpt('m') }), () => {});
+    expect(result).toMatchObject({ ok: true, stats: { structure: { requests: 3, repairs: 2 } } });
+    if (result.ok) expect(result.disassembly.parts[1].role).toBe('The town votes on the wall.');
+    expect(seen.map(x => x.request.schemaName).slice(0, 3)).toEqual(['break_the_wall_structure', 'break_the_wall_structure', 'break_the_wall_shorten']);
+  });
+
+  it('asks for leads of at most 100 characters and for points and explanations that add to them (D20)', () => {
+    expect(STRUCTURE_INSTRUCTIONS).toContain("role: the part's lead, at most 100 characters");
+    expect(CONTENT_INSTRUCTIONS).toContain('Never say the lead again');
+    expect(EXPANSION_INSTRUCTIONS).toContain('role: its lead, at most 100 characters');
+  });
+});
+
+describe('the restate check (D20)', () => {
+  const millA = JSON.parse(readFileSync('tests/fixtures/d9-mill-setup-a.json', 'utf8')) as { parts: { role: string; points: string[] }[] };
+  it('flags the points of the D9 Mill output of setup A that say their lead again', () => {
+    const flagged = millA.parts.flatMap(p => p.points.filter(x => restates(x, p.role)));
+    expect(flagged).toContain('La società può costringere un individuo contro la sua volontà solo per prevenire un danno agli altri.');
+    expect(flagged).toContain('Mill fonda il limite alla coercizione sull\'utilità, non su un diritto astratto indipendente da essa.');
+    expect(flagged.length).toBeGreaterThanOrEqual(6);
+    // A point that adds a step or a limit is not a restatement, even when it shares a word or two.
+    expect(restates('Chi necessita ancora di tutela deve essere protetto anche dalle proprie azioni.', millA.parts[2].role)).toBe(false);
+  });
+
+  it.each(PUBLIC_FIXTURES)('flags no point or explanation of the hand-made %s', path => {
+    const d: Disassembly = fixture(path);
+    const walk = (parts: Part[]): string[] => parts.flatMap(p => [...(p.points ?? []).filter(x => restates(x.text, p.role)).map(x => x.text), ...(p.explain && restates(p.explain, p.role) ? [p.explain] : []), ...walk(p.parts ?? [])]);
+    expect(walk(d.parts)).toEqual([]);
+  });
+
+  it('locates a restated point in a content answer and a restated explanation in a split', async () => {
+    const { sources, goal, drafts } = await setupFor(story());
+    const lead = 'The council votes to raise a stone wall against the winter storms.';
+    const structure = acceptStructure(JSON.stringify({ ...drafts.structure, parts: drafts.structure.parts.map((p, i) => i === 1 ? { ...p, role: lead } : p) }), { sources, goal, language: 'en', meta });
+    const content = { ...drafts.contents[1], points: [{ text: 'The council votes for a stone wall against the storms of winter.', mark: null }, drafts.contents[1].points[1]] };
+    expect(findings(() => acceptContent(JSON.stringify(content), structure, 1, 'en'))).toEqual([{ path: 'points[0]', message: expect.stringMatching(/^Says the lead again \("The council votes/) }]);
+    const d = generatedFrom(await deepDisassembly(2));
+    const split = splitAnswer(d, 'p2');
+    split.parts[0] = { ...split.parts[0], role: lead, explain: 'The council votes to raise the stone wall against storms in winter.' };
+    expect(findings(() => acceptExpansion(JSON.stringify(split), d, 'p2', { provider: 'chatgpt', model: 'm', createdAt: meta.createdAt }))).toContainEqual({ path: 'parts[0].explain', message: expect.stringMatching(/^Says the lead again/) });
+  });
+});
+
+describe('suggested break-downs (D23)', () => {
+  const suggestion = (question: string, parts = ['Storm', 'Vote', 'Wall'], cites = [{ source: '', from: 1, to: 4 }]) => ({ question, kind: 'story', parts, cites });
+  it('accepts 3–5 distinct questions in the content language with ranges inside the sources', async () => {
+    const { sources } = await setupFor(story());
+    const cites = [{ source: sources[0].id, from: 1, to: 4 }];
+    const ok = { suggestions: [suggestion('Why did the town vote to build the wall?', undefined, cites), suggestion('How did the storm reach the quay and the hall?', ['Storm', 'Quay', 'Hall'], cites), suggestion('What did the railway change for the quay?', ['Railway', 'Quay', 'Bell'], cites)] };
+    expect(acceptSuggestions(JSON.stringify(ok), sources, 'en')).toHaveLength(3);
+    expect(findings(() => acceptSuggestions(JSON.stringify({ suggestions: ok.suggestions.slice(0, 2) }), sources, 'en'))).not.toEqual([]);
+    const bad = { suggestions: [ok.suggestions[0], { ...ok.suggestions[0], parts: ['Bell', 'Hall', 'Quay'] }, { ...ok.suggestions[1], question: 'Perché la città ha votato per costruire il muro?' }, { ...ok.suggestions[2], cites: [{ source: sources[0].id, from: 20, to: 40 }] }] };
+    expect(findings(() => acceptSuggestions(JSON.stringify(bad), sources, 'en')).map(f => f.path)).toEqual(['suggestions[1].question', 'suggestions[2].question', 'suggestions[3].cites[0]']);
+    expect(findings(() => acceptSuggestions(JSON.stringify({ suggestions: [...ok.suggestions, { ...ok.suggestions[0], question: 'Who rang the bell, and why then?' }] }), sources, 'en'))).toEqual([{ path: 'suggestions[3].parts', message: expect.stringMatching(/same parts/) }]);
+    expect(findings(() => acceptSuggestions(JSON.stringify(ok), sources, 'en', ['Why did the town vote to build the wall?']))).toEqual([{ path: 'suggestions[0].question', message: expect.stringMatching(/Repeats another question/) }]);
+    const long = { suggestions: [{ ...ok.suggestions[0], question: 'w'.repeat(161) }, ...ok.suggestions.slice(1)] };
+    expect(findings(() => acceptSuggestions(JSON.stringify(long), sources, 'en'))).toEqual([{ path: 'suggestions[0].question', message: 'Text has 161 characters; at most 160' }]);
+    expect(buildSuggestionInput(sources, 'en', '', ['An earlier question?'])).toMatch(/CONTENT LANGUAGE: English \(en\)\nPRIOR KNOWLEDGE: not given\nALREADY SHOWN \(propose different ones\):\n- An earlier question\?/);
   });
 });

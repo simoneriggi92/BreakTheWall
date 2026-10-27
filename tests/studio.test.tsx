@@ -1,10 +1,10 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge, ProgressKey } from '../src/core/bridge';
 import { validateDisassembly, type Disassembly } from '../src/core/disassembly';
 import { buildStructureInput } from '../src/core/disassembly-generation';
-import { defaultSettings, failure, type AccountStatus, type GenerationProgress, type GenerationRequest, type GenerationStats, type LocalServer, type StudioBridge, type StudioSettings } from '../src/core/provider';
+import { defaultSettings, failure, type AccountStatus, type DraftState, type GenerationPreview, type GenerationProgress, type GenerationRequest, type GenerationStats, type LocalServer, type StudioBridge, type StudioSettings, type SuggestionRequest, type SuggestionResult } from '../src/core/provider';
 import type { LearnerState } from '../src/core/state';
 import { loadPreparedLessons } from '../src/fixtures/lessons';
 import { App } from '../src/renderer/App';
@@ -24,7 +24,7 @@ async function generated(request: GenerationRequest): Promise<Disassembly> {
 }
 
 /** The desktop contract with a scripted account and provider; no tokens ever appear on this side. */
-function desktop(options: { generate?: (request: GenerationRequest) => ReturnType<StudioBridge['generate']>; plan?: boolean; servers?: LocalServer[]; settings?: StudioSettings } = {}) {
+function desktop(options: { generate?: (request: GenerationRequest) => ReturnType<StudioBridge['generate']>; plan?: boolean; servers?: LocalServer[]; settings?: StudioSettings; draft?: () => DraftState; suggest?: (request: SuggestionRequest) => Promise<SuggestionResult> } = {}) {
   const saved = new Map<string, LearnerState>();
   const key = (k: ProgressKey) => `${'lessonId' in k ? k.lessonId : k.disassemblyId}:${k.revision}`;
   let status: AccountStatus = { state: 'signed-out', storage: true };
@@ -39,6 +39,9 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
     listModels: async () => ({ ok: true as const, models: [{ slug: 'model-a', name: 'Model A' }, { slug: 'model-b', name: 'Model B' }] }),
     generate: vi.fn(options.generate ?? (async (request: GenerationRequest) => ({ ok: true as const, disassembly: await generated(request), stats }))),
     cancelGeneration: async () => {},
+    generationDraft: vi.fn(async () => options.draft?.() ?? { draft: null }),
+    suggest: vi.fn(options.suggest ?? (async (request: SuggestionRequest) => ({ ok: true as const, suggestions: suggestionsFor(request) }))),
+    cancelSuggestions: vi.fn(async () => {}),
     onGenerationProgress: listener => { listeners.push(listener); return () => {}; },
     listLessons: async () => ({ lessons: [], skipped: 0 }),
     listDisassemblies: async () => ({ disassemblies: [], skipped: 0 }),
@@ -57,20 +60,35 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
   };
   return { bridge, studio, emit: (progress: GenerationProgress) => listeners.forEach(l => l(progress)) };
 }
-const studioRegion = () => within(screen.getByRole('region', { name: /Rompi il muro su una tua fonte/ }));
+/** Unmounts the app between two runs in one test, as a restart would. */
+const cleanupAndReset = () => { cleanup(); localStorage.clear(); sessionStorage.clear(); };
+const studioRegion = () => within(screen.getByRole('region', { name: /Rompi il muro su una tua fonte|Break the wall on a source of your own/ }));
+/** Three suggestions in the request's language, each named after the request so a second ask is told apart. */
+function suggestionsFor(request: SuggestionRequest) {
+  const n = request.avoid.length;
+  const it = request.language === 'it';
+  const cites = [{ source: request.sources[0].id, from: 1, to: 2 }];
+  return [0, 1, 2].map(k => ({ question: it ? `Domanda suggerita ${n + k + 1}: come evapora l’acqua?` : `Suggested question ${n + k + 1}: how does water evaporate?`, kind: (['mechanism', 'argument', 'story'] as const)[k], parts: [`Parte ${k}A`, `Parte ${k}B`, `Parte ${k}C`], cites }));
+}
+const LABELS = {
+  it: { create: 'Smonta una tua fonte', paste: /Incolla testo/, name: 'Nome della fonte', text: 'Testo', add: 'Aggiungi fonte', toGoal: 'Continua con la domanda', outcome: /cosa vuoi capire/i },
+  en: { create: 'Take apart a source', paste: /Paste text/, name: 'Source name', text: 'Text', add: 'Add source', toGoal: 'Continue to the question', outcome: /What do you want to understand/i },
+};
+const local = { version: 1 as const, provider: 'local' as const, local: { runtime: 'llamacpp' as const, baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf', check: { enforced: true, detail: 'ok', checkedAt: '2026-10-22T10:00:00.000Z' } } };
 
-async function prepare(bridge: DesktopBridge, question = goal) {
+async function prepare(bridge: DesktopBridge, question = goal, language: 'it' | 'en' = 'it') {
+  const l = LABELS[language];
   const user = userEvent.setup();
   render(<App bridge={bridge} prepared={prepared} disassemblies={[]}/>);
-  await user.click(screen.getByRole('button', { name: 'Smonta una tua fonte' }));
+  await user.click(await screen.findByRole('button', { name: l.create }));
   const studio = studioRegion();
-  await user.click(studio.getByRole('button', { name: /Incolla testo/ }));
-  await user.type(studio.getByLabelText('Nome della fonte'), 'Appunti sul ciclo');
-  await user.click(studio.getByLabelText('Testo'));
+  await user.click(studio.getByRole('button', { name: l.paste }));
+  await user.type(studio.getByLabelText(l.name), 'Appunti sul ciclo');
+  await user.click(studio.getByLabelText(l.text));
   await user.paste(SOURCE_TEXT + '\r\n\r\n');
-  await user.click(studio.getByRole('button', { name: 'Aggiungi fonte' }));
-  await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
-  await user.type(studio.getByLabelText(/cosa vuoi capire/i), question);
+  await user.click(studio.getByRole('button', { name: l.add }));
+  await user.click(studio.getByRole('button', { name: l.toGoal }));
+  if (question) await user.type(studio.getByLabelText(l.outcome), question);
   return { user, studio };
 }
 
@@ -162,6 +180,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     await user.click(studio.getByRole('button', { name: 'Materiale' }));
     expect(studioRegion().getByRole('button', { name: /Scegli file/ })).toBeDisabled();
     await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    expect(studio.queryByRole('button', { name: /Suggerisci scomposizioni/ })).not.toBeInTheDocument();
     await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     expect(studioRegion().getByText(/Accesso e generazione sono disponibili nell’app desktop/)).toBeInTheDocument();
   });
@@ -311,5 +330,173 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(alert).toHaveTextContent('La risposta non ha superato i controlli dello smontaggio. Nessuno smontaggio è stato salvato.');
     expect(within(alert).getByText('Dettagli tecnici (in inglese, come li riceve il modello)')).toBeInTheDocument();
     expect(within(alert).getByText(issues[0])).toBeInTheDocument();
+  });
+
+  // ---------- D23: suggested break-downs ----------
+  it('suggests break-downs only when asked, fills the field with the chosen one, and keeps them for the same selection (D23)', async () => {
+    const { bridge, studio: fake } = desktop({ settings: local });
+    const { user, studio } = await prepare(bridge, '');
+    expect(studio.getByText('Invia una richiesta con le fonti a qwen.gguf su questo Mac. Nulla parte finché non premi.')).toBeInTheDocument();
+    expect(fake.suggest).not.toHaveBeenCalled();
+    await user.click(studio.getByRole('button', { name: /Suggerisci scomposizioni/ }));
+    expect(fake.suggest).toHaveBeenCalledWith(expect.objectContaining({ language: 'it', priorKnowledge: '', avoid: [], route: { provider: 'local', runtime: 'llamacpp', baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf' } }));
+    const cards = within(await studio.findByRole('list', { name: 'Scomposizioni suggerite' })).getAllByRole('listitem');
+    expect(cards).toHaveLength(3);
+    expect(cards[1]).toHaveTextContent('argomento');
+    expect(cards[1]).toHaveTextContent('Parte 1A · Parte 1B · Parte 1C');
+    await user.click(within(cards[1]).getByRole('button', { name: 'Usa questa domanda' }));
+    const field = studio.getByLabelText(/cosa vuoi capire/i);
+    expect(field).toHaveValue('Domanda suggerita 2: come evapora l’acqua?');
+    await user.type(field, ' E poi?');
+    expect(field).toHaveValue('Domanda suggerita 2: come evapora l’acqua? E poi?');
+    // Back and forth between steps: the same suggestions, no new request.
+    await user.click(studio.getByRole('button', { name: 'Materiale' }));
+    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    expect(within(studio.getByRole('list', { name: 'Scomposizioni suggerite' })).getAllByRole('listitem')).toHaveLength(3);
+    expect(fake.suggest).toHaveBeenCalledTimes(1);
+    await user.click(studio.getByRole('button', { name: /Altri suggerimenti/ }));
+    expect(fake.suggest).toHaveBeenLastCalledWith(expect.objectContaining({ avoid: suggestionsFor({ avoid: [], language: 'it', sources: [{ id: 'x' }] } as unknown as SuggestionRequest).map(x => x.question) }));
+    expect(await studio.findByText('Domanda suggerita 4: come evapora l’acqua?')).toBeInTheDocument();
+    // Another selection: the suggestions were for the earlier one, so the button asks again.
+    await user.click(studio.getByRole('button', { name: 'Materiale' }));
+    await user.click(studio.getByRole('button', { name: 'Rimuovi Appunti sul ciclo' }));
+    await user.click(studio.getByRole('button', { name: /Incolla testo/ }));
+    await user.type(studio.getByLabelText('Nome della fonte'), 'Altra fonte');
+    await user.click(studio.getByLabelText('Testo'));
+    await user.paste('Un’altra fonte sul ciclo dell’acqua, con due righe.\nLa seconda riga.');
+    await user.click(studio.getByRole('button', { name: 'Aggiungi fonte' }));
+    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    expect(studio.queryByRole('list', { name: 'Scomposizioni suggerite' })).not.toBeInTheDocument();
+    expect(studio.getByRole('button', { name: /Suggerisci scomposizioni/ })).toBeEnabled();
+  });
+
+  it('needs a route before suggesting, and leaves the question step as it is after a cancellation or a failure (D23)', async () => {
+    let finish!: (result: SuggestionResult) => void;
+    const { bridge, studio: fake } = desktop({ suggest: () => new Promise(resolve => { finish = resolve; }) });
+    const { studio } = await prepare(bridge, '');
+    expect(studio.getByRole('button', { name: /Suggerisci scomposizioni/ })).toBeDisabled();
+    expect(studio.getByText(/Per i suggerimenti serve un modello/)).toBeInTheDocument();
+    cleanupAndReset();
+    const second = desktop({ settings: local, suggest: () => new Promise(resolve => { finish = resolve; }) });
+    const again = await prepare(second.bridge, '');
+    await again.user.click(again.studio.getByRole('button', { name: /Suggerisci scomposizioni/ }));
+    expect(again.studio.getByRole('status')).toHaveTextContent('Cerco modi di smontare le fonti…');
+    // The question field stays usable while the request runs.
+    await again.user.type(again.studio.getByLabelText(/cosa vuoi capire/i), 'La mia domanda sul ciclo?');
+    await again.user.click(again.studio.getByRole('button', { name: 'Annulla' }));
+    expect(second.studio.cancelSuggestions).toHaveBeenCalled();
+    act(() => finish({ ok: false, failure: failure('cancelled') }));
+    expect(await again.studio.findByText('Suggerimenti annullati. Puoi scrivere tu la domanda.')).toBeInTheDocument();
+    await again.user.click(again.studio.getByRole('button', { name: /Suggerisci scomposizioni/ }));
+    act(() => finish({ ok: false, failure: failure('invalid-output') }));
+    expect(await again.studio.findByText(/^Nessun suggerimento: .* Puoi scrivere tu la domanda\.$/)).toBeInTheDocument();
+    expect(again.studio.getByLabelText(/cosa vuoi capire/i)).toHaveValue('La mia domanda sul ciclo?');
+    expect(fake.suggest).not.toHaveBeenCalled();
+  });
+
+  it('words suggestions in English when the interface is English (D23)', async () => {
+    const { bridge } = desktop({ settings: { ...local, language: 'en' } });
+    const { user, studio } = await prepare(bridge, '', 'en');
+    expect(studio.getByText('Sends one request with the sources to qwen.gguf on this Mac. Nothing is sent until you press it.')).toBeInTheDocument();
+    await user.click(studio.getByRole('button', { name: /Suggest break-downs/ }));
+    const cards = within(await studio.findByRole('list', { name: 'Suggested break-downs' })).getAllByRole('listitem');
+    expect(cards[2]).toHaveTextContent('story');
+    await user.click(within(cards[0]).getByRole('button', { name: 'Use this question' }));
+    expect(studio.getByLabelText(/What do you want to understand/i)).toHaveValue('Suggested question 1: how does water evaporate?');
+    expect(studio.getByRole('button', { name: /Other suggestions/ })).toBeInTheDocument();
+  });
+
+  // ---------- D21: resume a kept generation ----------
+  /** A host that fails the first generation and then keeps a draft for that very request. */
+  function keeping(kept = 5, settings: StudioSettings = local) {
+    let draft: DraftState = { draft: null };
+    const host = desktop({
+      settings, draft: () => draft,
+      generate: async request => {
+        if (request.resume) return { ok: true as const, disassembly: await generated(request), stats };
+        draft = { draft: { sources: request.sources.map(s => ({ id: s.id, sha256: s.sha256 })), question: request.goal.outcome, language: request.language, title: 'Il ciclo dell’acqua', parts: 7, kept, runs: false } };
+        return { ok: false as const, failure: failure('invalid-output', { issues: ['part sea · points[0]: Point has 131 characters; at most 130'] }), stats };
+      },
+    });
+    return { ...host, kept: () => draft };
+  }
+
+  it('says what a failed generation kept and offers to resume it or start over, again after a restart (D21)', async () => {
+    const host = keeping();
+    const { user, studio } = await prepare(host.bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    await user.click(await studio.findByRole('button', { name: /Genera lo smontaggio/ }));
+    expect(await studio.findByText('Generazione interrotta. Tenuti: la struttura, 5 di 7 pezzi.')).toBeInTheDocument();
+    expect(studio.queryByRole('button', { name: /Genera lo smontaggio/ })).not.toBeInTheDocument();
+    expect(studio.queryByRole('button', { name: 'Riprova' })).not.toBeInTheDocument();
+    expect(studio.getByRole('button', { name: 'Ricomincia da capo' })).toBeEnabled();
+
+    // After a restart the same draft is offered for the same selection.
+    cleanupAndReset();
+    const restarted = desktop({ settings: local, draft: host.kept, generate: host.studio.generate });
+    const again = await prepare(restarted.bridge);
+    await again.user.click(again.studio.getByRole('button', { name: 'Continua alla generazione' }));
+    await again.user.click(await again.studio.findByRole('button', { name: /^Riprendi$/ }));
+    expect(host.studio.generate).toHaveBeenLastCalledWith(expect.objectContaining({ resume: true }));
+    expect(await screen.findByText('Smontaggio generato')).toBeInTheDocument();
+  });
+
+  it('starts over without resuming, and offers no resume for another question; in English too (D21)', async () => {
+    const host = keeping(6, { ...local, language: 'en' });
+    const { user, studio } = await prepare(host.bridge, 'How does the water get from the sea to the clouds?', 'en');
+    await user.click(studio.getByRole('button', { name: 'Continue to generation' }));
+    await user.click(await studio.findByRole('button', { name: /Generate the disassembly/ }));
+    expect(await studio.findByText('Generation interrupted. Kept: the structure, 6 of 7 parts.')).toBeInTheDocument();
+    expect(studio.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
+    await user.click(studio.getByRole('button', { name: 'Start over' }));
+    expect(host.studio.generate).toHaveBeenLastCalledWith(expect.not.objectContaining({ resume: true }));
+    await user.click(studio.getByRole('button', { name: /Edit the question/ }));
+    await user.type(studio.getByLabelText(/What do you want to understand/i), ' And back?');
+    await user.click(studio.getByRole('button', { name: 'Continue to generation' }));
+    expect(studio.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+    expect(studio.getByText(/An interrupted generation \(“Il ciclo dell’acqua”\) is about other sources, another question or another language/)).toBeInTheDocument();
+    expect(studio.getByRole('button', { name: /Generate the disassembly/ })).toBeEnabled();
+  });
+
+  it('says when an unreadable draft was set aside (D21)', async () => {
+    const { bridge } = desktop({ settings: local, draft: () => ({ draft: null, setAside: true }) });
+    const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    expect(await studio.findByText('Una generazione interrotta non era leggibile ed è stata messa da parte: si riparte da capo.')).toBeInTheDocument();
+  });
+
+  // ---------- D22: the drawing while it is written ----------
+  it('draws the top level once the structure is accepted, with each part’s status, and opens a finished part (D22)', async () => {
+    let finish!: () => void;
+    const { bridge, emit } = desktop({ settings: local, generate: () => new Promise(resolve => { finish = () => resolve({ ok: false, failure: failure('cancelled') }); }) });
+    const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    await user.click(await studio.findByRole('button', { name: /Genera lo smontaggio/ }));
+    act(() => emit({ phase: 'structure', repairing: false, received: 900, requests: 1 }));
+    expect(studio.queryByRole('group', { name: /Esploso: Lo smontaggio mentre viene scritto/ })).not.toBeInTheDocument();
+    const part = (id: string, name: string, status: GenerationPreview['parts'][number]['status'], extra: object = {}) => ({ id, name, kind: 'step' as const, icon: 'settings' as const, subParts: 0, status, ...extra });
+    const preview = (statuses: GenerationPreview['parts'][number]['status'][]): GenerationPreview => ({
+      parts: [part('sea', 'Il mare si scalda', statuses[0], statuses[0] === 'done' ? { lead: 'Il sole scalda il mare.', points: ['L’acqua evapora in superficie.', 'Il vapore sale con l’aria calda.'] } : {}),
+        part('cloud', 'Il vapore diventa nube', statuses[1]), part('rain', 'La pioggia torna', statuses[2])],
+      joints: [{ from: 'sea', to: 'cloud', type: 'sends-to', label: 'sale' }, { from: 'cloud', to: 'rain', type: 'causes', label: 'cade' }],
+    });
+    act(() => emit({ phase: 'content', repairing: false, received: 0, requests: 2, part: 0, parts: 3, preview: preview(['writing', 'writing', 'waiting']) }));
+    const sheet = studio.getByRole('group', { name: 'Esploso: Lo smontaggio mentre viene scritto' });
+    expect(within(sheet).getByRole('button', { name: /^1\. Il mare si scalda · Passo · in corso$/i })).toBeInTheDocument();
+    expect(within(sheet).getByText('0 di 3 pezzi scritti')).toBeInTheDocument();
+    act(() => emit({ phase: 'content', repairing: true, shortening: true, received: 0, requests: 4, part: 1, parts: 3, preview: preview(['done', 'failed', 'writing']) }));
+    expect(studio.getAllByRole('status')[0]).toHaveTextContent('Pezzo 2 di 3 · accorcio i testi troppo lunghi');
+    expect(within(sheet).getByRole('button', { name: /Il vapore diventa nube · Passo · fallito/i })).toBeInTheDocument();
+    expect(sheet.querySelector('[data-id="cloud"] .state-mark')).toHaveTextContent('✕');
+    await user.click(within(sheet).getByRole('button', { name: /Il mare si scalda/ }));
+    expect(studio.getByText('Il sole scalda il mare.')).toHaveClass('lead');
+    expect(studio.getByText('Il vapore sale con l’aria calda.')).toBeInTheDocument();
+    await user.click(within(sheet).getByRole('button', { name: /La pioggia torna/ }));
+    expect(studio.getByText('«La pioggia torna» non è ancora scritto.')).toBeInTheDocument();
+    act(() => emit({ phase: 'runs', repairing: false, received: 0, requests: 6, preview: preview(['done', 'done', 'done']) }));
+    expect(studio.getAllByRole('status')[0]).toHaveTextContent('Tutti i pezzi sono scritti: preparo le prove');
+    expect(within(sheet).getByText('3 di 3 pezzi scritti')).toBeInTheDocument();
+    act(() => finish());
+    expect(await studio.findByText(/Generazione annullata/)).toBeInTheDocument();
   });
 });
