@@ -8,6 +8,11 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 The first public alpha. It runs from source on macOS; there is no installer yet.
 
+### Identity
+- A new identity: the name stays Break the Wall, with the tagline "Take the text apart." / "Smonta il testo." and a mark of four lines of text, one piece pulled out in terracotta and still linked to its place.
+- The mark and tagline in the header of both themes, the home's new opening, and the app icon in the Dock. Paper and blueprint keep their colours; terracotta appears only in the logo.
+- Brand assets in `docs/images/brand/`; `npm run brand` renders the app icon and the social card from them.
+
 ### Disassemblies
 - A disassembly format with typed joints for three kinds of material (mechanism, argument, story), sub-assemblies as deep as the source allows, and a bill of materials that accounts for every line of the source. The host checks every file before showing it.
 - An automatic layout: mechanisms and stories flow left to right; arguments stack the claim above its grounds, with attacks and limits beside it. Part numbers follow the reading order.

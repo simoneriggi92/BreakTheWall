@@ -5,7 +5,7 @@ export const it = {
   common: {
     skip: 'Vai al contenuto', opening: 'APERTURA…', desktopRuntime: 'DESKTOP · LOCALE', browserRuntime: 'ANTEPRIMA BROWSER',
     close: 'Chiudi', closeNotice: 'Chiudi avviso', optional: 'facoltativo', lines: 'righe', characters: 'caratteri',
-    brandTagline: 'UN CONCETTO ALLA VOLTA',
+    brandTagline: 'Smonta il testo.',
   },
   preferences: {
     label: 'Preferenze', theme: 'Tema', language: 'Lingua',
@@ -35,7 +35,7 @@ export const it = {
     previous: 'Tappa precedente', next: 'Prossima tappa', openActivity: 'Apri l’attività per continuare.', solveActivity: 'Risolvi l’attività per continuare.',
   },
   library: {
-    eyebrow: 'IL TUO SPAZIO DI STUDIO', resumeTitle: 'Riparti dai tuoi collegamenti.', emptyTitle: 'Cosa vuoi capire oggi?', subtitle: 'Una fonte, un obiettivo, un concetto alla volta.',
+    eyebrow: 'PARTI DA UNA FONTE', resumeTitle: 'Riparti dai tuoi collegamenti.', emptyTitle: 'Smonta il testo.', subtitle: 'Trasforma un muro di testo in parti da esaminare, mettere alla prova e ricomporre.',
     continueDraft: 'Continua la bozza', create: 'Smonta una tua fonte', resumeEyebrow: 'RIPRENDI DA DOVE ERI', resume: 'Riprendi',
     resumeStep: (n: number, total: number, title: string) => `Tappa ${n} di ${total} · ${title}`,
     yourPaths: 'I tuoi percorsi', fromSources: 'DALLE TUE FONTI', skipped: (n: number) => `${n} percorsi non hanno superato il controllo. I file restano sul disco.`,

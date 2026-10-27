@@ -1,6 +1,25 @@
 # Plan review: disassembly
 
-Plan: [P-20261024-disassembly v6](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25; versions 4, 5 and 6 on 2026-10-26. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2, phase `player` under v3, and the code of phase `generation` under v4.
+Plan: [P-20261024-disassembly v7](plan.md). Version 1 reviewed on 2026-10-24; versions 2 and 3 on 2026-10-25; versions 4, 5 and 6 on 2026-10-26; version 7 on 2026-10-27. Review type: author self-review and static checks. There was no independent reviewer. Phase `contract` was implemented under v2, phase `player` under v3, and the code of phase `generation` under v4.
+
+## Version 7: changes and findings resolved
+
+Version 7 follows the owner's choice of an identity for the public alpha, and the request to present the repository with it.
+
+| Finding | Resolution in v7 |
+|---|---|
+| Only one plan may be active, and this one still has D8 and D10 open. A separate identity plan could not start. | The identity becomes two phases of this plan, as v6 did for usability. |
+| The chosen identity lives in a review outside the repository, partly generated with AI. | D24 rebuilds the mark as hand-written SVG in `docs/images/brand/`, from the review's geometric version; the AI board is not copied. |
+| Terracotta on paper is not a safe text colour, and the player already uses colours for joint families and states. | Terracotta is a decorative brand accent only (`--brand-piece`): the piece in the mark. Text and status keep their tokens and the contrast test. |
+| The owner asked to keep blueprint blue. | Both themes keep their palettes; only the mark's accent is added (D25). |
+| An app icon usually needs packaging. | No packaging is in scope; the host sets the Dock and window icon at run time (D27). |
+| A README written before the images exist would point at missing files. | D28 and D29 land together in phase `presentation`, after the identity is in the app. |
+| A release and GitHub settings are external changes. | They are listed in the approval boundary and confirmed by the owner right before each one (D30, D31). |
+| The tagline in the header and the home's title are the same words. | Kept, as in the reviewed proposal: the header names the product, the home states what to do. The owner can change it. |
+
+Residual risks added in v7:
+- The mark's small sizes are judged by eye from rendered samples.
+- The social card is uploaded by hand; the repository cannot check that it was.
 
 ## Version 6: changes and findings resolved
 

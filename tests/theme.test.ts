@@ -33,4 +33,12 @@ describe('paper and blueprint themes', () => {
     const paper = tokens(':root, :root[data-theme="paper"]'); const blueprint = tokens(':root[data-theme="blueprint"]');
     expect(Object.keys(blueprint).sort()).toEqual(Object.keys(paper).sort());
   });
+  it.each([[':root, :root[data-theme="paper"]'], [':root[data-theme="blueprint"]']])('%s draws the mark at 3:1 or more against the backgrounds (D25)', selector => {
+    // Graphics, not text: WCAG's non-text contrast, for the bars that carry the mark's shape. The terracotta piece keeps the
+    // owner's #D96B4B (3.0:1 on paper): logos are exempt, and it is never text or the only cue. The link is decorative.
+    const t = tokens(selector);
+    const failing = ['brand-bars'].flatMap(fg => ['bg', 'surface'].filter(bg => contrast(t[fg], t[bg]) < 3).map(bg => `${fg}/${bg}`));
+    expect(failing).toEqual([]);
+  });
 });
+

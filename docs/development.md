@@ -29,6 +29,10 @@ The local-model route talks only to loopback addresses, from the main process. T
 
 The domain module must remain independent of React and Electron. Lesson content is data rendered with application-owned components; source text is never HTML or executable UI. A source read as a document is rendered by `markdown-it` with raw HTML off, so markup in it shows as text; links are not followed and images are not fetched. Mermaid diagrams load on first use and run in strict mode. The production policy allows styles only from the app's files, so a diagram's `<style>` and `style` attributes are applied through the CSS object model (`src/renderer/svg-mount.ts`) rather than by loosening the policy.
 
+## Brand assets
+
+The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/brand/`. The header draws the same mark inline, with its colours from the theme's `--brand-*` tokens; terracotta is used only for the piece pulled out of the mark. `npm run brand` renders `assets/icon.png` (1024 × 1024) from `app-icon.svg` with the installed Electron, and the desktop host sets it as the Dock icon on macOS and the window icon elsewhere. There is no packaged app bundle, so the icon applies to `npm start` and `npm run dev`.
+
 ## Toolchain references
 
 Versions were checked against npm metadata on 2026-10-21. The current [Vite guide](https://vite.dev/guide/) documents its Node requirements. The host follows the relevant boundaries in Electron's [security guide](https://www.electronjs.org/docs/latest/tutorial/security) and [sandbox model](https://www.electronjs.org/docs/latest/tutorial/sandbox). Runtime data validation follows [Zod's parsing model](https://zod.dev/basics). These references explain choices; they are not evidence of a successful app launch.

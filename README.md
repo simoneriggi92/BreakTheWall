@@ -1,29 +1,36 @@
-# Break the Wall
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/brand/wordmark-blueprint.svg">
+    <img src="docs/images/brand/wordmark.svg" alt="Break the Wall" width="460">
+  </picture>
+</p>
 
-**Take apart whatever you want to understand (a source, a repository, a topic) and see how its parts work together. You have understood it when you can put it back together.**
+<h1 align="center">Take the text apart.</h1>
 
-Break the Wall turns a wall of text into a **disassembly**: an exploded view of 3–7 parts per level, joined by typed joints, each part tied to the exact lines of its source. You **run** the mechanism by predicting what happens before each step, or by removing a brick from an argument to see whether it falls. When you are ready, you **reassemble** it. One loop for any subject: only the kind of joint changes (mechanism, argument, story).
+<p align="center">AI gives you a wall of text. Break the Wall turns it into source-linked parts you can explore, test and put back together.</p>
 
-**[Product](docs/product.md)** · **[Architecture](docs/architecture.md)** · **[Development](docs/development.md)** · **[Plan](docs/workflow/plans/P-20261024-disassembly/plan.md)** · **[Status](STATUS.md)** · **[Changelog](CHANGELOG.md)** · **[Contributing](CONTRIBUTING.md)**
+<p align="center"><strong>Open-source alpha · macOS · English &amp; Italian · Apache-2.0</strong></p>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/simoneriggi92/BreakTheWall?include_prereleases&style=flat-square)](https://github.com/simoneriggi92/BreakTheWall/releases)
-![Status](https://img.shields.io/badge/status-alpha-orange?style=flat-square)
-![Platform](https://img.shields.io/badge/platform-macOS-lightgrey?style=flat-square&logo=apple)
-![Electron](https://img.shields.io/badge/Electron-45-47848F?style=flat-square&logo=electron&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Languages](https://img.shields.io/badge/interface-English%20%C2%B7%20Italiano-1f5f99?style=flat-square)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
+<p align="center">
+  <a href="https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="CI"></a>
+  <a href="https://github.com/simoneriggi92/BreakTheWall/releases"><img src="https://img.shields.io/github/v/release/simoneriggi92/BreakTheWall?include_prereleases&amp;style=flat-square&amp;color=D96B4B" alt="Release"></a>
+  <img src="https://img.shields.io/badge/platform-macOS-102B46?style=flat-square&amp;logo=apple" alt="Platform: macOS">
+  <img src="https://img.shields.io/badge/interface-English%20%C2%B7%20Italiano-102B46?style=flat-square" alt="Interface: English and Italian">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-102B46?style=flat-square" alt="License: Apache-2.0"></a>
+</p>
+
+<p align="center"><a href="#try-the-alpha"><strong>Try the alpha</strong></a> · <a href="#how-it-works">How it works</a> · <a href="#roadmap">Roadmap</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 
 ![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted; a run step predicted and then executed; Mill's harm principle in the blueprint theme, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
-> Break the Wall is an alpha that runs from source on macOS. There is no installer or release yet. The prepared disassemblies work without any account. Generating disassemblies from your own text and markdown sources works with ChatGPT or a local model; repositories and PDF documents as sources are next on the [roadmap](#roadmap). Feedback and contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Alpha, running from source.** There is no installer yet. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
 
 ## Table of contents
 
 - [Why Break the Wall?](#why-break-the-wall)
+- [How it works](#how-it-works)
+- [Try the alpha](#try-the-alpha)
 - [Features](#features)
   - [The disassembly](#the-disassembly)
   - [Run](#run)
@@ -33,7 +40,6 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
   - [Generation](#generation)
   - [Progress and privacy](#progress-and-privacy)
 - [Local models](#local-models)
-- [Getting started](#getting-started)
 - [Tech stack](#tech-stack)
 - [Project status](#project-status)
 - [Roadmap](#roadmap)
@@ -43,9 +49,9 @@ Break the Wall turns a wall of text into a **disassembly**: an exploded view of 
 
 ## Why Break the Wall?
 
-AI answers often arrive as a wall of text: correct-sounding, hard to retain and hard to check. Reverse engineering takes software apart, with evidence for every finding, so you can understand and rebuild it. Break the Wall applies the same principle to knowledge: **disassemble → run → reassemble**, with every part tied to its source.
+A useful AI explanation can still be a wall of text: correct-sounding, hard to retain and hard to check. Break the Wall makes its structure explorable: open one part, see what it connects to, and return to the source lines behind it. The question is not only "can I read this?" but "can I explain how its parts work together?"
 
-It is not a course, a summarizer, a chatbot or a flashcard app. Review is there only if you want it. See the [product definition](docs/product.md).
+The idea comes from reverse engineering, which takes software apart with evidence for every finding so it can be understood and rebuilt. It is not a course, a summarizer, a chatbot or a flashcard app; review is there only if you want it. See the [product definition](docs/product.md).
 
 | | A chat answer | Break the Wall |
 |---|:---:|:---:|
@@ -57,7 +63,43 @@ It is not a course, a summarizer, a chatbot or a flashcard app. Review is there 
 | Progress, runs and notes that resume after restart | ❌ | ✅ |
 
 > [!IMPORTANT]
-> Citations are verified; explanations are not. The app checks that every cited line exists in your source, and that every line is either in a part or excluded with a reason. A wrong explanation can still sit next to a correct citation, so read the highlighted lines.
+> Source links are checked; explanations can still be wrong. The app checks that every cited line exists in your source, and that every line is either in a part or excluded with a reason. A wrong explanation can still sit next to a correct citation, so read the highlighted lines.
+
+## How it works
+
+| Step | What you do |
+|---|---|
+| **Disassemble** | Explore 3–7 parts per level, with named connections and links to source lines. Open a part to go deeper. |
+| **Run** | Predict a process step before it runs, remove a premise from an argument, or apply the whole to a new case. |
+| **Reassemble** | If you want, rebuild the structure on a drawing whose names are hidden. |
+
+The prepared examples show a release runbook and Mill's harm principle. The same loop works for any subject: only the kind of connection changes (mechanism, argument, story).
+
+## Try the alpha
+
+**Requirements:** macOS, Node.js 22.23.2 and npm 10.9.8 (pinned in `package.json`).
+
+```bash
+git clone https://github.com/simoneriggi92/BreakTheWall.git
+cd BreakTheWall
+npm ci
+npm run build
+npm start
+```
+
+The first `npm start` downloads Electron's binary for your Mac. Open either prepared example to try the loop without an account. To take apart your own material, choose **Take apart a source** and paste text or pick a `.txt` / `.md` file; generation needs a ChatGPT sign-in or a [local model](#local-models).
+
+**Development**
+
+```bash
+npm run dev       # Vite + Electron with reload
+npm run check     # strict TypeScript + Vitest
+npm run dev:web   # renderer only, in a browser (no generation)
+npm run eval      # measure generation on fixed cases (see Local development)
+npm run brand     # render the app icon from docs/images/brand
+```
+
+Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your own. More details are in [Local development](docs/development.md), with links to the [product](docs/product.md), [architecture](docs/architecture.md), [active plan](docs/workflow/plans/P-20261024-disassembly/plan.md), [status](STATUS.md) and [changelog](CHANGELOG.md).
 
 ## Features
 
@@ -140,27 +182,6 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 > [!TIP]
 > Use a model with at least ~30B parameters and a 32k context. Plan for 32 GB of memory or more. Only addresses on this machine are accepted, so your source never leaves the computer on this route.
 
-## Getting started
-
-**Requirements:** macOS, Node.js 22.23.2 and npm 10.9.8 (versions pinned in `package.json`).
-
-```bash
-npm ci
-npm run build
-npm start
-```
-
-**Development**
-
-```bash
-npm run dev       # Vite + Electron with reload
-npm run check     # strict TypeScript + Vitest
-npm run dev:web   # renderer only, in a browser (no generation)
-npm run eval      # measure generation on fixed cases (see Local development)
-```
-
-Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your own. More details are in [Local development](docs/development.md).
-
 ## Tech stack
 
 | Layer | Stack |
@@ -184,6 +205,7 @@ Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20
 | Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code, automated tests and 2 measured expansions |
 | Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
 | Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
+| Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; 🟡 release `v0.1.0-alpha` |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 

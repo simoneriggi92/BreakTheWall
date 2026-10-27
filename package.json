@@ -21,7 +21,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
-    "eval": "node scripts/eval.mjs"
+    "eval": "node scripts/eval.mjs",
+    "brand": "node scripts/brand.mjs"
   },
   "dependencies": {
     "lucide-react": "1.61.0",

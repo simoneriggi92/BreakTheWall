@@ -7,7 +7,15 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const Component = icons[name] ?? ArrowDownUp;
   return <Component size={size} strokeWidth={1.7} aria-hidden="true" />;
 }
+/**
+ * The mark (docs/images/brand/mark.svg): four lines of text, the second one's end pulled out and still linked to its
+ * place. Its colours come from the theme's brand tokens, so paper and blueprint both work; the piece is decorative.
+ */
 export function Brand() {
   const { t } = usePreferences();
-  return <span className="brand"><svg width="32" height="29" viewBox="0 0 34 31" fill="currentColor" aria-hidden="true"><g transform="rotate(-6 16 15)"><rect x="1" y="2" width="13" height="9" rx="1.5"/><rect x="17" y="2" width="13" height="9" rx="1.5"/><rect x="1" y="14" width="13" height="9" rx="1.5"/><rect x="21" y="18" width="13" height="9" rx="1.5" opacity=".5" transform="rotate(20 21 18)"/></g></svg><span>Break the Wall<small>{t.common.brandTagline}</small></span></span>;
+  return <span className="brand"><svg className="brand-mark" width="38" height="32" viewBox="0 0 104 88" aria-hidden="true">
+    <path className="brand-link" d="M40 33H60V29H78" fill="none" strokeWidth="5"/>
+    <g className="brand-bars"><rect x="4" y="6" width="54" height="12" rx="1"/><rect x="4" y="27" width="36" height="12" rx="1"/><rect x="4" y="48" width="54" height="12" rx="1"/><rect x="4" y="69" width="54" height="12" rx="1"/></g>
+    <rect className="brand-piece" x="78" y="20" width="24" height="18"/>
+  </svg><span>Break the Wall<small>{t.common.brandTagline}</small></span></span>;
 }

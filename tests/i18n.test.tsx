@@ -72,12 +72,25 @@ describe('rendered language', () => {
   it('switches language and theme from the header and saves them with the other settings', async () => {
     const host = bridge('it-IT', { provider: 'local' });
     render(<App bridge={host} prepared={[await sample()]}/>);
-    await screen.findByText('Cosa vuoi capire oggi?');
+    await screen.findByRole('heading', { level: 1, name: 'Smonta il testo.' });
     await userEvent.click(screen.getByLabelText('Preferenze'));
     await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Lingua' }), 'en');
-    expect(await screen.findByText('What do you want to understand today?')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Take the text apart.' })).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Theme' }), 'blueprint');
     expect(document.documentElement.dataset.theme).toBe('blueprint');
     expect(host.saved.at(-1)).toEqual({ version: 1, provider: 'local', language: 'en', theme: 'blueprint' });
+  });
+  it.each([['en-US', 'START WITH A SOURCE', 'Take the text apart.', 'Turn a wall of text into parts you can inspect, test and put back together.'],
+    ['it-IT', 'PARTI DA UNA FONTE', 'Smonta il testo.', 'Trasforma un muro di testo in parti da esaminare, mettere alla prova e ricomporre.']])('shows the identity in the header and the home opening (%s, D25–D26)', async (locale, eyebrow, tagline, line) => {
+    render(<App bridge={bridge(locale)} prepared={[await sample()]}/>);
+    const heading = await screen.findByRole('heading', { level: 1, name: tagline });
+    const brand = document.querySelector('.topbar .brand')!;
+    expect(brand).toHaveTextContent(`Break the Wall${tagline}`);
+    // The mark is drawn from the theme's brand tokens; the piece pulled out of the text is the only terracotta.
+    expect(brand.querySelector('svg.brand-mark')).toHaveAttribute('aria-hidden', 'true');
+    expect(brand.querySelectorAll('.brand-bars rect')).toHaveLength(4);
+    expect(brand.querySelector('.brand-piece')).not.toBeNull();
+    expect(heading.parentElement).toHaveTextContent(eyebrow);
+    expect(screen.getByText(line)).toBeInTheDocument();
   });
 });
