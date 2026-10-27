@@ -3,9 +3,9 @@ id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
 version: 7
 state: implementing
-current_task: D30
+current_task: D31
 last_evidence: identity implemented (D24–D27); README, demo, screenshot and social card done (D28–D29), fresh clone builds and starts; 335 tests pass
-next_action: Owner confirms the push and PR, D30's GitHub settings, then D31's release after the merge; owner uploads the social card and checks the Dock icon
+next_action: Owner merges PR #20, confirms D31's tag and pre-release, uploads the social card and checks the Dock icon
 approval: approved
 ---
 
@@ -1592,7 +1592,7 @@ Received command: `implement P-20261024-disassembly v7 --phase presentation`, on
 |---|---|---|
 | D28 | The README opens with the wordmark (the blueprint version in dark mode, through `<picture>`), "Take the text apart.", the problem in one line, the alpha facts, badges in the brand's colours, links to *Try the alpha*, *How it works*, *Roadmap* and *Contribute*, and the demo. New sections *How it works* and *Try the alpha* (clone, `npm ci`, build, start; the first start downloads Electron); *Getting started* is folded into *Try the alpha*; the detailed sections stay. The status table gains the identity and presentation phases | A fresh clone of the public `main` (1c6d74a): `npm ci` (0 vulnerabilities), `npm run build`, and `npm start`, which downloaded Electron and opened the app |
 | D29 | The demo GIF re-recorded with the same storyboard (10 frames, 25 s, 799 kB, 960 × 720), the blueprint screenshot of Mill retaken at 1440 × 980, and the social card as `docs/images/brand/social-card.html`, rendered by `npm run brand` to `.github/assets/social-preview.png` (1280 × 640) | Frames checked on a contact sheet: the new mark in every header; no old mark in any image |
-| D30 | Prepared, waiting for the owner's confirmation: description, topics, and the edit to issue #12 | — |
+| D30 | Applied on the owner's confirmation ("Poi applica D30"): description "Break down AI walls of text into source-linked parts. Explore connections, test what holds them together, and reassemble. Open-source macOS alpha."; 20 topics (artificial-intelligence, ai, llm, chatgpt, local-llm, ollama, llama-cpp, lm-studio, knowledge-visualization, interactive-learning, active-learning, source-grounded, reverse-engineering, learning, desktop-app, macos, electron, react, typescript, mermaid), none claiming PDF, repositories or another platform; issue #12 points at `docs/images/brand/mark.svg`. Website left empty | API responses: description and 20 topics returned; issue #12 updated |
 | D31 | `CHANGELOG.md` records the identity under `0.1.0-alpha`. The tag and pre-release wait for the merge into `main` and the owner's confirmation | — |
 
 Checks: `npm run check` passed, 21 files and 335 tests.
