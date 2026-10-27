@@ -3,9 +3,9 @@ id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
 version: 6
 state: implementing
-current_task: D22
-last_evidence: generation-usability: D19–D21 verified, D20 live 4/4 valid; D22–D23 tests pass, witnessed checks pending; D17–D18 witnessed checks pending
-next_action: Owner witnesses D17–D18 and D22–D23 in the desktop app (one live generation and suggestions on a public case and the work document); then D8 and D10
+current_task: D8
+last_evidence: player-usability and generation-usability verified; D20 live 4/4 valid; owner reported the desktop checks of D17–D18 and D22–D23 as ok
+next_action: Owner witnesses D8 (library and store) and D10 (generated disassembly in Studio); D11–D12 stay gated
 approval: approved
 ---
 
@@ -1433,3 +1433,16 @@ Deviations from the plan text, decided during implementation:
 | D23 | Core, host and Studio tests pass. The owner's witnessed use, on a public case and on the work document, is still open | **verification pending** (owner) |
 
 Confidence: automated evidence for all five tasks and live evidence for D20. The plan is not complete: D17, D18, D22 and D23 wait for the owner's witnessed checks, and so do D8 and D10.
+
+#### Owner's desktop check (2026-10-27)
+
+After the build with both v6 phases was started in the desktop app, the agent listed what to try: the resizable panes and the rendered markdown source (D17, D18), the drawing while a disassembly is generated, the suggested break-downs on a public case and on the work document, and resuming a cancelled generation (D21–D23). The owner answered: "tutto ok". The report does not detail each point; it is recorded as the owner's witnessed check of these tasks.
+
+| Task | Verdict |
+|---|---|
+| D17 | **verified** (owner's report) |
+| D18 | **verified** (owner's report) |
+| D22 | **verified** (owner's report) |
+| D23 | **verified** (owner's report) |
+
+The plan is not complete: D8's and D10's witnessed flows remain, and D11–D12 stay behind their gate.

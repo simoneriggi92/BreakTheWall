@@ -177,8 +177,8 @@ Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20
 | Player | D4 themes and languages · D5 exploded view · D6 run · D7 reassembly and bill of materials · D8 library and store | ✅ automated tests; 🟡 D8 desktop flow being witnessed by the owner |
 | Generation | D9 two-phase generation and model comparison · D10 Studio and witnessed generation | ✅ code, automated tests and model comparison (setup A chosen); ⏳ witnessed generation |
 | Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code, automated tests and 2 measured expansions |
-| Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code and automated tests; 🟡 D17 and D18 to be witnessed by the owner |
-| Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests and D20 live check (4 of 4 valid); 🟡 D22 and D23 to be witnessed by the owner |
+| Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
+| Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
