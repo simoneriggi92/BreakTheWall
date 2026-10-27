@@ -205,7 +205,7 @@ Work follows the approved [plan P-20261024-disassembly](docs/workflow/plans/P-20
 | Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code, automated tests and 2 measured expansions |
 | Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
 | Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
-| Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; 🟡 release `v0.1.0-alpha` |
+| Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha); 🟡 Dock icon to be witnessed |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
