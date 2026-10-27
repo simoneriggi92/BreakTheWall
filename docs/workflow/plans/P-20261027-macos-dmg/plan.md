@@ -4,8 +4,8 @@ title: A downloadable macOS build - ad-hoc signed DMG for Apple Silicon, built i
 version: 1
 state: implementing
 current_task: K4
-last_evidence: phase package verified - npm run package on the owner's Mac gives a 92.8 MB ad-hoc signed DMG whose app starts and draws the library; npm run check 338 tests
-next_action: Owner reviews the package phase; then "implement P-20261027-macos-dmg v1 --phase release"
+last_evidence: phase package verified; the DMG holds no personal data and a new user starts with only Atlas and Mill, signed out; K5 docs written at the owner's request
+next_action: Owner reviews the docs; then "implement P-20261027-macos-dmg v1 --phase release" for K4 and K6
 approval: approved
 ---
 
@@ -185,3 +185,25 @@ Observed, for K5 and K6:
 | K1 | **verified** (Finder appearance confirmed in K6) |
 | K2 | **verified** |
 | K3 | **verified** |
+
+### Clean first start (owner's request, 2026-10-27)
+
+The owner asked to verify that a download carries none of their data: no earlier lessons or generations, no OpenAI account, only the Atlas and Mill examples.
+
+| Check | Kind | Result |
+|---|---|---|
+| What the DMG holds | Static inspection | **passed**: the image root holds only `Break the Wall.app` and the `Applications` link; `Contents/Resources` holds `app.asar`, `electron.icns` and Electron's language folders |
+| What `app.asar` holds | Static inspection | **passed**: `/assets/icon.png`, `/dist` (index and 98 assets), `/dist-electron` (main, preload), `/package.json`; no source maps, no user data, no `.local/` |
+| Personal or private strings in `app.asar` | Static inspection | **passed**: 0 matches for `/Users/`, the owner's work and personal e-mail domains, the private repository, runbook, book and course names, `.local/` paths, OpenAI key or JWT shapes, and token or account-id values. The only matches for the owner's name are `author` and `repository` in `package.json`, which are public |
+| What a new user sees | Integration check | **passed**: the packaged app from the mounted DMG, with empty user data, read over the DevTools protocol: one section, "Disassemblies", with the two cards "Releasing Atlas Reader to staging" and "The harm principle (Mill, 1859)"; no "Earlier paths", no resume card; `accountStatus` is `signed-out`; `localStorage` empty; the data folder holds only Chromium's caches, no `credentials/`, `disassemblies/`, `lessons/`, `workspaces/` or `settings.json` |
+
+Why it holds: everything the learner creates lives in their own `~/Library/Application Support/Break the Wall` and credentials in their own Keychain; neither is read by `npm run package`. The prepared lessons of the first plan are bundled only so that old progress stays readable; the desktop app passes none to the library. A DMG built by CI from a clean checkout has even less to leave out than one built in the owner's folder.
+
+### K5 ahead of K4 (owner's request, 2026-10-27)
+
+The owner asked to update the README now that there will be an installer ("aggiorna anche Readme repo, perché adesso ci sarà l'installer"). Written within K5's scope:
+- README: the alpha note; "Try the alpha" split into "Download the app" (requirements, the three steps with Open Anyway, the checksum, a clean start, data location, no updates) and "Run from source" (for an Intel Mac or to change the code); `npm run package` among the commands; the status table and roadmap; the plans link.
+- `docs/development.md`: a Packaging section, and the two sentences that said there is no package.
+- SECURITY.md, CHANGELOG (Unreleased) and the AGENTS.md technical-direction line.
+
+Still open in K5: how a release is made (with K4), and the Open Anyway wording, to be confirmed against what K6 shows on macOS 27.

@@ -4,6 +4,9 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- A downloadable app for Apple Silicon Macs (macOS 13 or later): `npm run package` builds an ad-hoc signed DMG with a SHA-256 checksum, after starting the packaged app to check that the library is drawn. The README explains the install and the Open Anyway step, since the app is not notarized.
+
 ## [0.1.0-alpha] - 2026-10-27
 
 The first public alpha. It runs from source on macOS; there is no installer yet.
