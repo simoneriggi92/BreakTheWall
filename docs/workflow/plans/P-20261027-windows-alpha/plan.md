@@ -3,9 +3,9 @@ id: P-20261027-windows-alpha
 title: A Windows alpha - Windows in CI, platform-aware wording, an unsigned x64 Squirrel installer next to the DMG
 version: 1
 state: implementing
-current_task: W2
-last_evidence: W1 verified on PR #27; W2 implemented - device wording follows the platform, 345 tests pass on macOS
-next_action: Push phase wording to PR #27 so both CI jobs run it (W2 acceptance)
+current_task: W3
+last_evidence: W1, W2 verified; W3-W5 implemented - .ico, Squirrel events, package:win, release job; 348 tests and the Mac package pass locally; Windows packaging not run yet
+next_action: Push phase package to PR #27 so the Release workflow builds the Windows setup (W4, W5 acceptance)
 approval: approved
 ---
 
@@ -179,4 +179,25 @@ Started by the owner's command `implement P-20261027-windows-alpha v1 --phase wo
 | Check | Kind | Result |
 |---|---|---|
 | `npm run check` on macOS | Automated test | **passed**: 22 files, 345 tests (7 new) |
-| Both CI jobs | Automated test | **not run yet**: run on PR #27 when pushed |
+| Both CI jobs | Automated test | **passed** on PR #27 at `e2c9d93`: "Types, tests and build" (macOS) and "Windows: types, tests and build" |
+
+| Task | Verdict |
+|---|---|
+| W2 | **verified** |
+
+### Phase `package` (W3–W5), 2026-10-27
+
+Started by the owner's command `implement P-20261027-windows-alpha v1 --phase package`. The owner confirmed `electron-winstaller` 5.4.4 right before it was installed ("Sì, installa 5.4.4"); `npm install --save-dev --save-exact` added it with 0 vulnerabilities.
+
+- **W3, icon**: `npm run brand` also writes `assets/icon.ico`, rendered from `app-icon.svg` at 1024 px and resized to 16, 24, 32, 48, 64, 128 and 256 px PNG entries (`scripts/brand-render.cjs` writes the ICO header itself; no dependency). `assets/icon.png` and the social card re-render unchanged. A first attempt rendered at 256 px and captured only a corner of the 1024 px SVG; caught by looking at the entries.
+- **W3, Squirrel**: `src/desktop/squirrel.ts` maps `--squirrel-install` / `--squirrel-updated` to creating the shortcuts, `--squirrel-uninstall` to removing them, `--squirrel-obsolete` to quitting, and every other start (including `--squirrel-firstrun`) to a normal start, on Windows only; `runSquirrel` runs `Update.exe --createShortcut=<exe>` or `--removeShortcut=<exe>` one folder above the versioned app folder. `main.ts` runs it first and exits before anything else. `tests/squirrel.test.ts` covers every flag, other systems, and the `Update.exe` call.
+- **W4**: `scripts/package-common.mjs` now holds what both package scripts share (the `ignore` rule, the start check, the checksum file); `scripts/package-mac.mjs` uses it, unchanged in behaviour. `scripts/package-win.mjs` and `npm run package:win`: `@electron/packager` for `win32`/`x64` with the executable `BreakTheWall.exe` (Squirrel needs a name without spaces; the product name stays Break the Wall), the `.ico` and version metadata; the start check on the packaged `.exe`; `electron-winstaller` writes `release/Break-the-Wall-<version>-x64-setup.exe` (no MSI, no delta) and its `.sha256`.
+- **W5**: the Release workflow gains "Windows x64 setup" on `windows-latest` (tag check, `npm ci`, `npm run check`, `npm run package:win`, artifact `break-the-wall-windows-setup`); pull requests touching `scripts/package-*.mjs`, `squirrel.ts` or `assets/` run it too; "Attach to the release" waits for both builds and uploads the DMG, the setup and both checksums.
+
+| Check | Kind | Result |
+|---|---|---|
+| `npm run check` on macOS | Automated test | **passed**: 23 files, 348 tests (3 new in `tests/squirrel.test.ts`) |
+| `.ico` entries | Static inspection | **passed**: 7 PNG entries, 16–256 px, each the full icon |
+| `npm run package` on macOS after the shared module | Targeted build | **passed**: signature verified, "start check: the library is drawn", 92.8 MB DMG |
+| Workflow syntax | Static inspection | **passed**: jobs `package`, `windows`, `release` (needs both) |
+| `npm run package:win` and the Windows release job | Integration check | **not run yet**: needs the Windows runner, on the pull request |

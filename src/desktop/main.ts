@@ -19,9 +19,14 @@ import { DraftStore } from './generation-draft';
 import { Generator } from './generator';
 import { checkFormat, detectServer, discoverServers, localCompleter } from './local/runtimes';
 import { SettingsStore } from './settings-store';
+import { runSquirrel, squirrelAction } from './squirrel';
 import { DisassemblyStore } from './disassembly-store';
 import { LessonStore } from './lesson-store';
 import { hostIdFile, SafeStorageVault } from './secure-files';
+
+// The Windows installer starts the app only to make or remove its shortcuts; do that and quit before anything else.
+const squirrel = squirrelAction(process.platform, process.argv);
+if (squirrel) { runSquirrel(squirrel); app.exit(0); }
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'btw', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.setName('Break the Wall');
