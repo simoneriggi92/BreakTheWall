@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, net, protocol, safeStorage, session, shell } from 'electron';
+import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { join, resolve, sep } from 'node:path';
@@ -27,6 +28,8 @@ if (process.env.BTW_USER_DATA_DIR) app.setPath('userData', resolve(process.env.B
 const devURL = process.env.BTW_RENDERER_URL;
 if (devURL && devURL !== 'http://127.0.0.1:5173') throw new Error('Unsupported development origin');
 const origin = devURL ?? 'btw://app';
+/** The app icon (rendered from docs/images/brand/app-icon.svg by `npm run brand`); there is no packaged bundle to carry it. */
+const icon = resolve(__dirname, '../assets/icon.png');
 
 function trustedSender(event: Electron.IpcMainInvokeEvent) {
   const url = event.senderFrame?.url;
@@ -144,7 +147,7 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
 function createWindow() {
   const window = new BrowserWindow({
     title: 'Break the Wall', width: 1480, height: 980, minWidth: 720, minHeight: 650,
-    backgroundColor: '#f3f5ef',
+    backgroundColor: '#f3f5ef', ...(process.platform !== 'darwin' && existsSync(icon) ? { icon } : {}),
     webPreferences: { preload: join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -164,6 +167,7 @@ void app.whenReady().then(async () => {
     if (!path.startsWith(root + sep)) return new Response('Forbidden', { status: 403 });
     return net.fetch(pathToFileURL(path).href);
   });
+  if (process.platform === 'darwin' && existsSync(icon)) app.dock?.setIcon(icon);
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   ipcMain.handle('runtime:get', event => { trustedSender(event); return { platform: process.platform, mode: 'desktop', locale: systemLocale() }; });

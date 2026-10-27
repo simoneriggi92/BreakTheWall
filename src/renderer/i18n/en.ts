@@ -6,7 +6,7 @@ export const en: Messages = {
   common: {
     skip: 'Skip to content', opening: 'OPENING…', desktopRuntime: 'DESKTOP · LOCAL', browserRuntime: 'BROWSER PREVIEW',
     close: 'Close', closeNotice: 'Close notice', optional: 'optional', lines: 'lines', characters: 'characters',
-    brandTagline: 'ONE CONCEPT AT A TIME',
+    brandTagline: 'Take the text apart.',
   },
   preferences: {
     label: 'Preferences', theme: 'Theme', language: 'Language',
@@ -36,7 +36,7 @@ export const en: Messages = {
     previous: 'Previous step', next: 'Next step', openActivity: 'Open the activity to continue.', solveActivity: 'Solve the activity to continue.',
   },
   library: {
-    eyebrow: 'YOUR STUDY SPACE', resumeTitle: 'Pick up your connections again.', emptyTitle: 'What do you want to understand today?', subtitle: 'One source, one goal, one concept at a time.',
+    eyebrow: 'START WITH A SOURCE', resumeTitle: 'Pick up your connections again.', emptyTitle: 'Take the text apart.', subtitle: 'Turn a wall of text into parts you can inspect, test and put back together.',
     continueDraft: 'Continue the draft', create: 'Take apart a source', resumeEyebrow: 'PICK UP WHERE YOU LEFT OFF', resume: 'Resume',
     resumeStep: (n: number, total: number, title: string) => `Step ${n} of ${total} · ${title}`,
     yourPaths: 'Your paths', fromSources: 'FROM YOUR SOURCES', skipped: (n: number) => `${n} paths did not pass the check. The files stay on disk.`,
