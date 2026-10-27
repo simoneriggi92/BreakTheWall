@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose an improvement or a new capability.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Break the Wall has one loop for every subject: **disassemble → run → reassemble**, with every part tied to its source.
+        It is not a course, a chatbot, a summarizer or a flashcard app, and it has no subject-specific modes.
+        Please read the [product definition](https://github.com/simoneriggi92/BreakTheWall/blob/main/docs/product.md) before proposing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to understand or do, and where the app got in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Your proposal
+      description: What should change. A sketch or a mock-up helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: step
+    attributes:
+      label: Which step of the loop it serves
+      options:
+        - Disassemble (parts, joints, sources)
+        - Run (scenarios, load tests, new cases)
+        - Reassemble
+        - Generation and sources
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to work on this myself.

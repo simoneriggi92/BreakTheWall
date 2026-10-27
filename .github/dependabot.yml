@@ -1,0 +1,18 @@
+# Dependencies are pinned to exact versions and changed only on purpose, so updates arrive monthly and grouped.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    versioning-strategy: increase
+    groups:
+      development:
+        dependency-type: development
+      production:
+        dependency-type: production
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
