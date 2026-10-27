@@ -83,7 +83,7 @@ The prepared examples show a release runbook and Mill's harm principle. The same
 
 1. Download `Break-the-Wall-<version>-arm64.dmg` from the [latest release](https://github.com/simoneriggi92/BreakTheWall/releases).
 2. Open it and drag **Break the Wall** to **Applications**.
-3. Open the app. The first time, macOS says *Apple could not verify “Break the Wall” is free of malware that may harm your Mac or compromise your privacy* and does not open it, because the alpha is signed ad-hoc and not notarized by Apple. Choose **Done**, not Move to Trash. Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm. You do this once for each version.
+3. Open the app. The first time, macOS shows **“Break the Wall” Not Opened**: *Apple could not verify “Break the Wall” is free of malware that may harm your Mac or compromise your privacy.* The alpha is signed ad-hoc and not notarized by Apple, so this is expected. Choose **Done**. Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm with Touch ID or your password. Open the app again and choose **Open Anyway** in the dialog. You do this once for each download.
 
 To check the download, put the `.sha256` file from the release next to the DMG and run:
 
