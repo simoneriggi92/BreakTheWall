@@ -3,9 +3,9 @@ id: P-20261027-macos-dmg
 title: A downloadable macOS build - ad-hoc signed DMG for Apple Silicon, built in CI on a tag
 version: 1
 state: implementing
-current_task: K4
-last_evidence: phase package verified; the DMG holds no personal data and a new user starts with only Atlas and Mill, signed out; K5 docs written at the owner's request
-next_action: Owner reviews the docs; then "implement P-20261027-macos-dmg v1 --phase release" for K4 and K6
+current_task: K6
+last_evidence: K4 verified on PR #24 - the Release workflow built the DMG on macos-15-arm64 in 2 m 37 s, start check passed, 92.8 MB artifact; release job skipped as designed
+next_action: Owner chooses the version and confirms the tag; the tag run attaches the DMG to a draft release; owner installs from a download (K6)
 approval: approved
 ---
 
@@ -207,3 +207,33 @@ The owner asked to update the README now that there will be an installer ("aggio
 - SECURITY.md, CHANGELOG (Unreleased) and the AGENTS.md technical-direction line.
 
 Still open in K5: how a release is made (with K4), and the Open Anyway wording, to be confirmed against what K6 shows on macOS 27.
+
+### Phase `release` (K4, K5), 2026-10-27
+
+Started by the owner's command, typed as `vimplement P-20261027-macos-dmg v1 --phase release` and read as `implement` (plan, version and phase match the approval).
+
+- `.github/workflows/release.yml` (K4): on a `v*` tag, a `package` job on `macos-15` (Apple Silicon, checked with `uname -m`) checks that the tag equals `v` + the `package.json` version, runs `npm ci`, `npm run check` and `npm run package`, and uploads `release/` as an artifact; a `release` job with `contents: write` only for itself uploads the DMG and checksum to the tag's release, or creates a draft pre-release with generated notes. Workflow permissions default to `contents: read`.
+- **Deviation within K4:** the plan's check was a manual run on the branch. GitHub runs `workflow_dispatch` only for workflows already on the default branch, so before merging that is not possible. The workflow also runs on pull requests that touch packaging files (the workflow, the package script, `main.ts`, `app-files.ts`, `package.json`, the lockfile), building the artifact without touching releases. That pull-request run is K4's check; `workflow_dispatch` stays for later manual builds.
+- `docs/development.md` (K5): "Making a release": version and CHANGELOG through a pull request, the tag on `main`, what the workflow does, the owner's check and publication.
+
+K4 is verified when the workflow's pull-request run passes. K5's Open Anyway wording waits for K6.
+
+PR #23 (phase `package` and the docs) was merged before the workflow commit reached it, so the workflow went into PR #24, opened for that commit alone.
+
+### Verification of K4 and K5
+
+| Check | Kind | Result |
+|---|---|---|
+| Release workflow, pull-request path | Integration check | **passed** on PR #24 (run 40496803466): image `macos-15-arm64`, `uname -m` arm64, `npm ci`, `npm run check`, `npm run package` ("signature: ad-hoc, verified", "start check: the library is drawn"), artifact `break-the-wall-dmg` of 92,806,207 bytes; "Attach to the release" skipped, as it must be without a tag. 2 m 37 s |
+| CI on the same commit | Automated test | **passed**: "Types, tests and build" |
+| Release workflow, tag path | Integration check | **not run**: needs a tag the owner confirms; checked in K6 |
+| Release steps in `docs/development.md` | Static inspection | written; followed for real in K6 |
+
+| Task | Verdict |
+|---|---|
+| K4 | **verified** for pull requests; the tag path is verified in K6 |
+| K5 | **implemented**; the Open Anyway wording is confirmed in K6 |
+
+### Version for K6
+
+The owner chose `0.1.1-alpha` for the first DMG ("porta la versione a 0.1.1-alpha con la sezione nel CHANGELOG"). `package.json` and `package-lock.json` were set with `npm version 0.1.1-alpha --no-git-tag-version`, and the CHANGELOG has its section. The tag `v0.1.1-alpha` is pushed only after the owner confirms it, once this is on `main`.
