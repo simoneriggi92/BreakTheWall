@@ -66,6 +66,8 @@ export const it = {
     sourceName: 'Nome della fonte', sourceNamePlaceholder: 'es. Appunti sul TCP handshake', type: 'Tipo', text: 'Testo', otherCode: 'Altro codice', code: (language: string) => `Codice ${language}`,
     pastePlaceholder: 'Incolla qui il materiale da studiare…', charCount: (n: string, max: string) => `${n} / ${max} caratteri`, addSource: 'Aggiungi fonte',
     closeErrors: 'Chiudi errori', pasteFailed: 'Il testo non può essere importato.',
+    incomingAdded: (titles: string) => `Dal tuo assistente: ${titles}.`, closeNotice: 'Chiudi avviso',
+    incomingWaiting: (n: number) => n === 1 ? 'Il tuo assistente ha inviato un testo: sarà aggiunto quando finisce questa generazione.' : `Il tuo assistente ha inviato ${n} testi: saranno aggiunti quando finisce questa generazione.`,
     sourceMeta: (lines: string, chars: string, file: boolean) => `${lines} righe · ${chars} caratteri · ${file ? 'file' : 'incollato'}`,
     remove: (title: string) => `Rimuovi ${title}`, capacity: 'Spazio usato dalle fonti',
     capacityText: (n: number, max: number, chars: string, maxChars: string) => `${n}/${max} fonti · ${chars} / ${maxChars} caratteri`,

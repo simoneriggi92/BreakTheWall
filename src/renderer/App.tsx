@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Home, LockKeyhole, MessageSquareText, PanelRight, X } from 'lucide-react';
 import type { DesktopBridge, ProgressResult } from '../core/bridge';
+import type { IncomingSource } from '../core/provider';
 import { validateLesson, type Lesson } from '../core/lesson';
 import { canVisit, initialState, navigate, restoreState, solved, submit, type LearnerState, type RestoredState } from '../core/state';
 import { validateDisassembly, type Disassembly } from '../core/disassembly';
@@ -34,6 +35,9 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
   const [generated, setGenerated] = useState<Lesson[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [draft, setDraft] = useState<StudioDraft>(emptyDraft);
+  // Texts an AI assistant handed over: the library opens Studio, which takes them once no generation is running.
+  const [incoming, setIncoming] = useState<IncomingSource[]>([]);
+  useEffect(() => bridge.studio?.onIncomingSource?.(item => { setIncoming(list => [...list, item]); setSelected(undefined); }), [bridge]);
   useEffect(() => {
     let active = true;
     void bridge.studio?.listLessons().then(async result => {
@@ -70,7 +74,8 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
         versions={disassembly.family ? allDisassemblies.filter(x => x.family === disassembly.family && x.id !== disassembly.id) : []} openVersion={openDisassembly}/>
     : lesson
     ? <Player key={lesson.id} lesson={lesson} bridge={bridge} runtime={runtimeLabel} goHome={() => setSelected(undefined)}/>
-    : <><header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtimeLabel || t.common.opening}</span><PreferencesMenu/></header><Library lessons={lessons} generated={generated} disassemblies={allDisassemblies} bridge={bridge} error={error ? t.shell[error] : ''} skipped={skipped} draft={draft} setDraft={setDraft} onOpen={open} onOpenDisassembly={openDisassembly} onCreated={created}/></>}
+    : <><header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtimeLabel || t.common.opening}</span><PreferencesMenu/></header><Library lessons={lessons} generated={generated} disassemblies={allDisassemblies} bridge={bridge} error={error ? t.shell[error] : ''} skipped={skipped} draft={draft} setDraft={setDraft} onOpen={open} onOpenDisassembly={openDisassembly} onCreated={created}
+        incoming={incoming} onIncomingTaken={n => setIncoming(list => list.slice(n))}/></>}
   </>;
 }
 

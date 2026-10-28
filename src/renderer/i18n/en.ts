@@ -67,6 +67,8 @@ export const en: Messages = {
     sourceName: 'Source name', sourceNamePlaceholder: 'e.g. Notes on the TCP handshake', type: 'Type', text: 'Text', otherCode: 'Other code', code: (language: string) => `${language} code`,
     pastePlaceholder: 'Paste the material to study here…', charCount: (n: string, max: string) => `${n} / ${max} characters`, addSource: 'Add source',
     closeErrors: 'Close errors', pasteFailed: 'The text cannot be imported.',
+    incomingAdded: (titles: string) => `From your assistant: ${titles}.`, closeNotice: 'Close notice',
+    incomingWaiting: (n: number) => n === 1 ? 'Your assistant sent a text: it will be added when this generation ends.' : `Your assistant sent ${n} texts: they will be added when this generation ends.`,
     sourceMeta: (lines: string, chars: string, file: boolean) => `${lines} lines · ${chars} characters · ${file ? 'file' : 'pasted'}`,
     remove: (title: string) => `Remove ${title}`, capacity: 'Space used by the sources',
     capacityText: (n: number, max: number, chars: string, maxChars: string) => `${n}/${max} sources · ${chars} / ${maxChars} characters`,

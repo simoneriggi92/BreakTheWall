@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { jointTypeSchema, partIconSchema, partKindSchema, type Disassembly } from './disassembly';
-import { idSchema, type Lesson } from './lesson';
+import { idSchema, sourceSchema, type Lesson } from './lesson';
 import type { ImportErrorCode, ImportErrorParams, LearningGoal, UserSource } from './source';
 
 /** What the renderer may know about the account: never tokens, only state and capabilities. */
@@ -96,6 +96,8 @@ export const settingsSchema = z.strictObject({
   /** Optional, so settings files written before themes and languages stay valid. `system` follows the operating system. */
   theme: z.enum(['system', 'paper', 'blueprint']).optional(),
   language: z.enum(['system', 'it', 'en']).optional(),
+  /** "Connect AI assistants": the local entry point listens only while this is true. Absent means off. */
+  assistants: z.boolean().optional(),
 });
 export type StudioSettings = z.infer<typeof settingsSchema>;
 export const defaultSettings: StudioSettings = { version: 1, provider: 'chatgpt' };
@@ -154,6 +156,13 @@ export type ExpansionResult = { ok: true; disassembly: Disassembly; moved: boole
 export type PickError = { name: string; message: string; code?: ImportErrorCode | 'not-a-file' | 'unreadable' | 'truncated'; params?: ImportErrorParams };
 export interface PickedSources { sources: UserSource[]; errors: PickError[] }
 
+/** A text an AI assistant handed to the app (level A of P-20261028-mcp-integration), imported like a paste. */
+export const incomingSourceSchema = z.strictObject({
+  source: sourceSchema.extend({ origin: z.literal('user-pasted') }),
+  question: z.string().max(400),
+});
+export interface IncomingSource { source: UserSource; question: string }
+
 /** Desktop-only operations. Absent in the browser preview. */
 export interface StudioBridge {
   pickSources(): Promise<PickedSources>;
@@ -170,6 +179,8 @@ export interface StudioBridge {
   suggest?(request: SuggestionRequest): Promise<SuggestionResult>;
   cancelSuggestions?(): Promise<void>;
   onGenerationProgress(listener: (progress: GenerationProgress) => void): () => void;
+  /** Texts handed over by an AI assistant through the local entry point; the host keeps them until a listener is there. */
+  onIncomingSource?(listener: (incoming: IncomingSource) => void): () => void;
   listLessons(): Promise<{ lessons: unknown[]; skipped: number }>;
   /** Saved generated disassemblies; the renderer validates them again before showing them. */
   listDisassemblies?(): Promise<{ disassemblies: unknown[]; skipped: number }>;
