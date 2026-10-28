@@ -90,6 +90,8 @@ async function prepare(bridge: DesktopBridge, question = goal, language: 'it' | 
   await user.click(studio.getByLabelText(l.text));
   await user.paste(SOURCE_TEXT + '\r\n\r\n');
   await user.click(studio.getByRole('button', { name: l.add }));
+  // Adding hashes the text first; on a slow runner the next button is still disabled for a moment.
+  await waitFor(() => expect(studio.getByRole('button', { name: l.toGoal })).toBeEnabled());
   await user.click(studio.getByRole('button', { name: l.toGoal }));
   if (question) await user.type(studio.getByLabelText(l.outcome), question);
   return { user, studio };
