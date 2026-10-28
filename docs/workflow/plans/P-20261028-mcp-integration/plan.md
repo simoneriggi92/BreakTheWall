@@ -1,11 +1,11 @@
 ---
 id: P-20261028-mcp-integration
 title: Break the Wall in Claude through MCP - open a text in Studio (level A), then let the assistant's model write a disassembly the app checks (level B)
-version: 2
+version: 3
 state: implementing
 current_task: M8
-last_evidence: Phase assistant (M5-M7) verified without a model - 394 tests; Atlas through the bundled server was saved and opened in the app from source
-next_action: Owner reviews and merges phase assistant; then "implement P-20261028-mcp-integration v2 --phase release" (docs and the witnessed checks)
+last_evidence: M9 - level B passed twice in Claude Code against the packaged app ($0.40-0.42, 55-107 s), routing fix confirmed; Claude Desktop level B, the prompt and the GIF remain
+next_action: Owner runs level B in Claude Desktop (recorded for the README GIF), or decides to ship with the Claude Code evidence
 approval: approved
 ---
 
@@ -15,8 +15,8 @@ approval: approved
 
 Someone who uses Claude Desktop or Claude Code connects Break the Wall once, from a panel in the app, without installing Node or anything else. From then on:
 
-- **Level A.** In a conversation they say "open this in Break the Wall", or use the server's `break` prompt with a question: the app comes to the front with Studio holding the text and the question, and they generate as usual.
-- **Level B.** They say "take this apart with Break the Wall": Claude writes the disassembly itself, phase by phase, on their own Claude plan; every phase passes the app's own checks before the next one starts, and the finished disassembly appears in the library, marked as written by their assistant.
+- **Level A.** In a conversation they say "open this in Break the Wall": the app comes to the front with Studio holding the text and the question, and they generate as usual.
+- **Level B.** They say "take this apart with Break the Wall", or use the server's `break` prompt: Claude writes the disassembly itself, phase by phase, on their own Claude plan; every phase passes the app's own checks before the next one starts, and the finished disassembly appears in the library, marked as written by their assistant.
 
 ChatGPT is not included (it cannot reach a server on the user's computer; see the research).
 
@@ -43,6 +43,7 @@ Repository facts the plan builds on:
 - Distribution: inside the app. The server ships with the app; a panel in the app adds it to Claude Desktop (a `.mcpb` Desktop Extension) and gives the command for Claude Code, which runs the server with the app's own Electron in Node mode. The user installs nothing else.
 - Protocol: written by hand, as in the spike; no `@modelcontextprotocol/sdk`.
 - Version 2 (2026-10-28), after trying phase `server`: the server also offers one MCP prompt, `break`, so a learner can type a command with a question instead of asking in words ("si aggiungi il prompt nel server. Voglio il comando"). The owner also has a personal Claude Code command `/break` in `~/.claude/commands/`, outside the repository; it is not part of the product.
+- Version 3 (2026-10-28), after the first M9 run: the `break` prompt takes the text apart with level B (`start_disassembly` and the submit tools) instead of opening it in Studio. The owner wants generation through Claude, not ChatGPT ("Sì, livello B"). The personal `/break` was switched the same way.
 
 ## Scope
 
@@ -120,11 +121,14 @@ Acceptance: protocol tests drive the server through in-memory streams (handshake
 Acceptance: a test that the `.mcpb` is a valid zip whose manifest names the server; tests of the panel's command for macOS and Windows paths in both languages; `npm run package` and the Windows release job pass with the server and the `.mcpb` inside the app, and the packaged app's server answers `initialize` when run with `ELECTRON_RUN_AS_NODE=1` (added to the existing start check).
 
 **M4a. The `break` prompt (added in version 2).**
-- The server declares the `prompts` capability and answers `prompts/list` with one prompt, `break` ("Explain a topic and open it in Break the Wall"), whose single argument `topic` is optional, and `prompts/get` with one user message: write a complete, self-contained explanation of the topic in the user's language, then call `open_in_break_the_wall` with it, a title and the question; with no topic, send the last long answer of the conversation unchanged. An unknown prompt is a JSON-RPC invalid-params error.
+- The server declares the `prompts` capability and answers `prompts/list` with one prompt, `break` ("Explain a topic and take it apart with Break the Wall"), whose single argument `topic` is optional. It answers `prompts/get` with one user message:
+  - write a complete, self-contained explanation of the topic in the user's language; with no topic, use the last long answer of the conversation unchanged;
+  - then take it apart with level B (version 3): call `start_disassembly` with the text, a title, the question and the language, and follow the steps it returns through `submit_structure`, `submit_part` and `submit_runs`, fixing the app's findings;
+  - an unknown prompt is a JSON-RPC invalid-params error.
 - Claude Code lists MCP prompts as commands named after the server and the prompt (expected `/mcp__break-the-wall__break <topic>`); Claude Desktop lists them among the conversation's attachments. The exact names are checked at implementation and witnessed in M9; the short `/break` exists only as a personal command.
 - The `.mcpb` manifest lists the prompt next to the tool; the panel names the command in both languages.
 
-Acceptance: protocol tests for `initialize` (prompts capability), `prompts/list`, `prompts/get` with and without a topic, and an unknown prompt; the manifest test lists the prompt; the panel test finds the command's name in Italian and English; the packaged server check also lists the prompt.
+Acceptance: protocol tests for `initialize` (prompts capability), `prompts/list`, `prompts/get` with and without a topic (the message names `start_disassembly` and the submit tools, not the open tool), and an unknown prompt; the manifest test lists the prompt; the panel test and the README name the command and say it takes the text apart; the packaged server check also lists the prompt.
 
 ### Phase `assistant` (level B)
 
@@ -156,7 +160,7 @@ Acceptance: the steps match what M9 observes.
 3. level A in Claude Code with the command from the panel;
 4. level B in Claude Desktop or Claude Code on Atlas (English) and Mill (Italian): all three phases, the disassembly in the library with the assistant's origin, a run and a reassembly work; attempts, turns and cost are recorded;
 5. turning the connection off: the tool answer tells the assistant, and nothing reaches the app;
-6. the `break` prompt with a question, in Claude Code and in Claude Desktop: the explanation opens in Studio with the question.
+6. the `break` prompt with a question, in Claude Code and in Claude Desktop: Claude explains, takes it apart with level B, and the disassembly opens in the library.
 
 Acceptance: the owner reports each point; the README is corrected for anything that differs. Windows is covered by CI only, unless the owner also tries it in the virtual machine.
 
@@ -190,14 +194,25 @@ If the owner releases before the `assistant` phase is done, M8 and M9 cover leve
 Approve with:
 
 ```text
-Approve P-20261028-mcp-integration v2
+Approve P-20261028-mcp-integration v3
 ```
 
-Approval records it only. Implementation continues with a separate `implement P-20261028-mcp-integration v2 [--phase server | --phase assistant | --phase release]`. Phase `bridge` (merged) and the M3–M4 work of phase `server` were done under version 1 and are unchanged by version 2.
+Approval records it only. Implementation continues with a separate `implement P-20261028-mcp-integration v3 --phase release`. The changed prompt text ships with the docs of phase `release`, because phases `server` and `assistant` are merged. Their other work, done under versions 1 and 2, is unchanged.
 
 ## Approval record
 
-Version 2, approved:
+Version 3, approved:
+
+- Approver: project owner, through an explicit message in this conversation.
+- Received command: `Approve P-20261028-mcp-integration v3`.
+- Approved plan/version: `P-20261028-mcp-integration` / `3`.
+- Recorded at: `2026-10-28T17:17:36+01:00` (Europe/Rome).
+- Approved scope: as version 2, with M4a's `break` prompt taking the text apart with level B (shipped in phase `release`) and M9 point 6 to match.
+- Approved-content SHA-256: `10d1fc4b80f7dbe242f51a1cd95df17f0bb100505e0780ee236a6b1ccf1a539f`.
+- Digest definition: SHA-256 of the UTF-8 plan body from `# Break the Wall in Claude through MCP` up to, and not including, `## Approval`.
+- Authority boundary: as for version 1 below. Implementation needs a separate implement command naming v3.
+
+Version 2, approved (superseded by version 3):
 
 - Approver: project owner, through an explicit message in this conversation.
 - Received command: `Approve P-20261028-mcp-integration v2`.
@@ -378,3 +393,73 @@ Phase `server` was committed as `e654956` on `feature/mcp-server` and opened as 
 | M5 | **verified** |
 | M6 | **verified** without a model; a real model's run is witnessed in M9 |
 | M7 | **verified** in the app from source; Windows when the pull request's jobs pass |
+
+PR #31 (phase `assistant`) was merged into `main` at `e604d30`. On `89c5ffe`, these passed: "Types, tests and build", "Windows: types, tests and build", and "Windows x64 setup" (with the server check). The DMG job was still waiting for a GitHub macOS runner. **M7 is verified on Windows too, for the automated tests and the packaged server.**
+
+### Phase `release`, 2026-10-28
+
+Started by the owner's command `implement P-20261028-mcp-integration v2 --phase release`, on `feature/mcp-release` from `main` at `e604d30`.
+
+- **M8, written**:
+  - README:
+    - the header line and the alpha note name Claude;
+    - a new section, "Use with Claude", covers the two ways (open in Studio; Claude writes it), connecting once from the panel, the `break` prompt in each client with Claude Code's first-word limit, what leaves the computer in each way, the limits (no ChatGPT; add again after an update; an interrupted session is lost) and disconnecting or removing it;
+    - a "Your Claude assistant" row in the generation routes;
+    - the local entry point under privacy;
+    - an "Assistants" row in the tech stack;
+    - the plan and a "Claude integration" row in the project status;
+    - the roadmap: Claude ticked, ChatGPT open.
+  - SECURITY: the entry point and the MCP server in scope.
+  - `docs/development.md`:
+    - the server check in packaging;
+    - a section "The MCP server": the diagram, the build, running it from source, the address, the tests and the prompt-argument limit.
+  - CHANGELOG (Unreleased) and the adapter: `src/mcp` named as an owner, and in the technical direction.
+- **M8, still open**: during this phase the owner asked for a GIF of a real case with Claude in the README ("questa feature è davvero una killer feature"). It is to be made from the owner's own screen recording of an M9 run, and its frames reviewed for private content before anything is committed.
+
+#### M9, first run by the owner in Claude Desktop: the wrong tool
+
+The owner asked Claude Desktop to take a text apart with Break the Wall. Claude called `open_in_break_the_wall` (level A): it opened the text in Studio and told the owner to press Generate, which asks for ChatGPT or a local model. It should have called `start_disassembly` (level B). There were two causes:
+
+- **The descriptions overlapped.** The open tool's description included "take apart". The fix: the open tool now says it opens the text "WITHOUT taking it apart", should be used only to open or send a text for the app to generate, and should give way to `start_disassembly` for "take apart / break down / disassemble (smonta, scomponi)". `start_disassembly` now begins with "Take a text apart with Break the Wall", and the server's instructions say the same. A test in `tests/mcp-server.test.ts` guards the wording.
+- **The installed extension was out of date.** Its manifest, from a DMG built before the manifest listed the level B tools, named only the open tool. The server inside it already had all five. The rebuilt `.mcpb` lists all five.
+
+| Check | Kind | Result |
+|---|---|---|
+| `tests/mcp-server.test.ts`, `tests/mcp-assistant.test.ts`, `tests/assistants.test.ts` | Automated test | **passed**: 26 tests, then 13 with the new guard |
+| `scripts/package-mac.mjs` | Targeted build, integration check | **passed**: server check with the five tools and the prompt; DMG 93.2 MB; the manifest lists the five tools |
+| Level B in Claude Desktop with the new descriptions | Witnessed flow | **pending**: the owner reinstalls the app and the extension and tries again |
+
+#### M4a under version 3: the `break` prompt takes the text apart
+
+Started by the owner's command `implement P-20261028-mcp-integration v3 --phase release`.
+
+- **The prompt.** `src/mcp/prompts.json` now titles it "Take it apart with Break the Wall". Its text decides the text to take apart, as before (explain the topic, use the last long answer, or ask), then calls `start_disassembly` with the text, title, question and language. Claude then follows `submit_structure`, `submit_part` and `submit_runs`, fixing the app's findings. It never names the open tool.
+- **The panel.** Its introduction and the prompt hint describe both ways, in both languages: Claude takes a text apart, or Claude opens it in Studio.
+- **README and CHANGELOG** describe the prompt as "Claude writes it" in one step.
+
+| Check | Kind | Result |
+|---|---|---|
+| Types; `npx vitest run` | Static inspection, automated test | **passed**: 27 files, 394 tests. The prompt test requires the four level B tools and the absence of the open tool; the panel tests check the new hint in both languages |
+| `build-desktop.mjs`, `scripts/package-mac.mjs` | Targeted build, integration check | **passed**: the manifest's prompt text starts "The user wants to take something apart with Break the Wall"; server check with the five tools and the prompt; DMG 93.2 MB |
+
+#### M9 runs by the agent, on the owner's request ("prova tu")
+
+The owner could not record yet and asked the agent to try. The agent ran the packaged app from the new DMG, mounted read-only, with a temporary data folder and `assistants: true`, so the owner's installed app and data were untouched. It connected Claude Code (`claude -p`, model `sonnet`) through a temporary MCP config that runs the app's own server as the panel's command does (`ELECTRON_RUN_AS_NODE=1`), without changing the owner's Claude Code settings. The runs spent the owner's Claude usage, which the request authorized.
+
+| # | Run | Tools, in order | Result |
+|---|---|---|---|
+| A | "Spiegami come il browser verifica un certificato HTTPS, poi smonta la spiegazione con Break the Wall." Claude Code picked the owner's personal `/break` skill, which then called the server | `start_disassembly` (47 lines, Italian) → `submit_structure` ✓ (7 parts) → `submit_part` 0 ✗ then ✓ → parts 1–6 ✓ → `submit_runs` ✓ | **passed**: 7 parts, 3 runs; 15 turns, $0.42, 107 s. The app saved `g-…`, and the player opened tagged "Scritto dal tuo assistente", titled "Il tuo assistente · claude-code 2.1.303", with the drawing and the cited source |
+| B | "Smonta questo testo con Break the Wall:" plus a paragraph on a water mill, with `--disable-slash-commands`, so only the tool descriptions steer | `start_disassembly` → `submit_structure` ✓ (6 parts) → parts 0–5 ✓ → `submit_runs` ✓ | **passed**: every step accepted at the first attempt; 6 parts, 2 runs; 11 turns, $0.40, 55 s. The routing fix works: "smonta" now leads to level B |
+
+Observed in run B: the paragraph arrived as one line, so every citation points at line 1. The import keeps the user's text as it is, by design. A follow-up could ask, in `start_disassembly`'s description, for one sentence or step per line when the text is one paragraph, so that parts can cite lines.
+
+Earlier, the owner had seen level A in Claude Desktop (the text opened in Studio, Claude's answer quoted above) and the personal `/break` in Claude Code at level A (the text opened in Studio with the question filled in).
+
+| M9 point | Status |
+|---|---|
+| 1. Connection on; extension added to Claude Desktop with one click | **witnessed by the owner** (the extension was installed and used) |
+| 2. Level A in Claude Desktop | **witnessed by the owner**, with the app already open |
+| 3. Level A in Claude Code | **witnessed by the owner** through the personal `/break` (version 2 wording) |
+| 4. Level B | **passed in Claude Code** (runs A and B); Claude Desktop not yet |
+| 5. Connection off | covered by automated tests; not witnessed |
+| 6. The `break` prompt in both clients | not yet run |

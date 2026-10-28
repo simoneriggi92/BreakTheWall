@@ -9,7 +9,7 @@ export const it = {
   },
   assistants: {
     label: 'Usa con Claude', title: 'Usa Break the Wall da Claude',
-    intro: 'Chiedi a Claude di aprire un testo in Break the Wall: l’app passa in primo piano con il testo in Studio, e generi come sempre.',
+    intro: 'Claude può smontare un testo con Break the Wall, scrivendo lo smontaggio che l’app controlla e salva, oppure aprire un testo in Studio perché tu lo generi qui.',
     connect: 'Collega gli assistenti AI',
     connectOn: 'Attivo: le app che usi su questo computer possono passare testi a Break the Wall. Non si genera nulla finché non premi «Genera».',
     connectOff: 'Spento: Break the Wall non accetta testi da altre app.',
@@ -17,7 +17,7 @@ export const it = {
     desktopMissing: 'In questa copia dell’app manca l’estensione: creala con npm run build.',
     desktopOpened: 'Aperta in Claude Desktop: conferma lì l’installazione.', desktopFailed: 'L’estensione non si è aperta. Claude Desktop è installato?',
     codeTitle: 'Claude Code', codeHint: 'Esegui questo comando una volta in un terminale; poi Break the Wall è disponibile in ogni progetto.',
-    promptHint: 'Poi chiedi a Claude di aprire un testo in Break the Wall, oppure usa il prompt break: in Claude Code scrivi /break-the-wall:break e fai la domanda quando Claude te la chiede (Claude Code passa solo la prima parola dopo il comando); se c’è già una risposta lunga di Claude, apre quella. In Claude Desktop il prompt è tra gli allegati della conversazione, con un campo per la domanda.',
+    promptHint: 'Poi chiedi a Claude di smontare un testo con Break the Wall: Claude scrive lo smontaggio, l’app lo controlla e lo apre qui. Oppure chiedi a Claude di aprire un testo in Break the Wall, per generarlo in Studio. In Claude Code il prompt /break-the-wall:break fa la prima cosa: fai la domanda quando Claude te la chiede (Claude Code passa solo la prima parola dopo il comando); se c’è già una risposta lunga di Claude, smonta quella. In Claude Desktop il prompt è tra gli allegati della conversazione, con un campo per la domanda.',
     copy: 'Copia comando', copied: 'Copiato',
     codeWindows: 'Dopo aver installato una nuova versione di Break the Wall, copia di nuovo il comando ed eseguilo.',
     privacy: 'Claude vede solo ciò che condividi nella conversazione. Con questo collegamento Claude può passare testi a Break the Wall; Break the Wall non invia nulla a Claude.',

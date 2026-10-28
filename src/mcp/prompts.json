@@ -1,15 +1,15 @@
 [
   {
     "name": "break",
-    "title": "Break it down in Break the Wall",
-    "description": "Explain a topic and open the explanation in Break the Wall to take it apart. With no topic, open the last long answer, or say what to explain when asked.",
+    "title": "Take it apart with Break the Wall",
+    "description": "Explain a topic and take the explanation apart with Break the Wall: you write the disassembly, the app checks and saves it. With no topic, take apart the last long answer, or say what to explain when asked.",
     "arguments": [
       {
         "name": "topic",
-        "description": "The question or topic to explain. Leave it empty to open the last long answer of the conversation, or to be asked.",
+        "description": "The question or topic to explain. Leave it empty to take apart the last long answer of the conversation, or to be asked.",
         "required": false
       }
     ],
-    "text": "The user wants to take something apart in Break the Wall. What they asked for: ${arguments.topic}\n\n1. Decide what to send:\n   - if the line above says what to explain (a topic or a question), write a complete, self-contained explanation that answers it, in the user's language, as Markdown: the text the user will take apart, with the steps of the mechanism (or the argument) in order, and no more than about 30,000 characters;\n   - if it is empty or does not say what to explain (some clients pass only the first word, such as a lone \"Explain\"), and this conversation already has a long answer, use that answer unchanged;\n   - otherwise ask the user in one line what they want to understand, wait for the answer, then write the explanation for it.\n2. Call the Break the Wall tool open_in_break_the_wall with:\n   - text: that text, exactly as written;\n   - title: a short name for it (at most 120 characters);\n   - question: what the user wants to understand, as a question of 10 to 400 characters.\n3. Reply in one line that it is open in Break the Wall Studio. Do not repeat the text in the chat. If the tool reports a problem, tell the user what it says."
+    "text": "The user wants to take something apart with Break the Wall. What they asked for: ${arguments.topic}\n\n1. Decide the text:\n   - if the line above says what to explain (a topic or a question), write a complete, self-contained explanation that answers it, in the user's language, as Markdown: the text the user will take apart, with the steps of the mechanism (or the argument) in order, and no more than about 30,000 characters;\n   - if it is empty or does not say what to explain (some clients pass only the first word, such as a lone \"Explain\"), and this conversation already has a long answer, use that answer unchanged;\n   - otherwise ask the user in one line what they want to understand, wait for the answer, then write the explanation for it.\n2. Take it apart yourself with the Break the Wall tool start_disassembly, with:\n   - text: that text, exactly as written;\n   - title: a short name for it (at most 120 characters);\n   - question: what the user wants to understand, as a question of 10 to 400 characters;\n   - language: \"it\" or \"en\", the user's language.\n3. Follow the steps it returns: write the structure and call submit_structure, then each top-level part with submit_part, then the runs with submit_runs. When Break the Wall reports findings, fix exactly those and submit again.\n4. When it is saved, reply in one line that the disassembly is open in Break the Wall. Do not repeat it in the chat. If a step fails three times or the app cannot be reached, tell the user what the tool says."
   }
 ]

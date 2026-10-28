@@ -9,7 +9,7 @@
 
 <p align="center">AI gives you a wall of text. Break the Wall turns it into source-linked parts you can explore, test and put back together.</p>
 
-<p align="center"><strong>Open-source alpha · macOS · Windows · English &amp; Italian · Apache-2.0</strong></p>
+<p align="center"><strong>Open-source alpha · macOS · Windows · Works with Claude · English &amp; Italian · Apache-2.0</strong></p>
 
 <p align="center">
   <a href="https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="CI"></a>
@@ -24,7 +24,7 @@
 ![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted, then its sub-assembly opened one level down; a scenario predicted and run on the drawing, where a smoke test fails and the rollback takes over; the theme switched from blueprint to paper; Mill's harm principle, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
 
 > [!NOTE]
-> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental) or a local model on your Mac. PDF documents and repositories as sources are on the [roadmap](#roadmap).
+> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental), a local model on your computer, or [Claude Desktop and Claude Code](#use-with-claude), which can open a text in Studio or write the disassembly themselves. PDF documents and repositories as sources are on the [roadmap](#roadmap).
 
 ## Table of contents
 
@@ -40,6 +40,7 @@
   - [Generation](#generation)
   - [Progress and privacy](#progress-and-privacy)
 - [Local models](#local-models)
+- [Use with Claude](#use-with-claude)
 - [Tech stack](#tech-stack)
 - [Project status](#project-status)
 - [Roadmap](#roadmap)
@@ -187,6 +188,7 @@ Each phase can be repaired once with the app's findings. When the repair leaves 
 |---|---|---|---|
 | **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Experimental. Disassemblies generated live: in the last check, 4 of 4 public cases valid |
 | **Local model** | none | a server on `127.0.0.1` on your Mac | Witnessed for lessons; disassemblies not yet measured |
+| **Your Claude assistant** | your Claude Desktop or Claude Code | Anthropic, through your Claude app ([Use with Claude](#use-with-claude)) | Experimental. Checked with scripted answers; live runs witnessed by the owner |
 
 Lessons created before disassemblies stay readable, with their progress, under "Earlier paths".
 
@@ -196,6 +198,7 @@ Lessons created before disassemblies stay readable, with their progress, under "
 - **Interrupted generations:** at most one draft, `generation-draft.json`, with the text generated so far. It never leaves the device and is deleted on success, on "Start over" and when a new generation starts.
 - **Credentials:** ChatGPT tokens are encrypted with Electron `safeStorage` (the Keychain on macOS, the system's data protection on Windows) and never reach the interface or the logs.
 - **Isolation:** the renderer has no Node, filesystem or network access. Every desktop operation goes through narrow, validated IPC calls.
+- **Local entry point for assistants:** only while **Connect AI assistants** is on, the app listens on a socket in its data folder (readable only by you) or, on Windows, a named pipe. A text arriving there is imported like a paste. A disassembly arriving there is validated like a stored file and accepted only as a new one written by an assistant.
 
 ## Local models
 
@@ -217,6 +220,45 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 > [!TIP]
 > Use a model with at least ~30B parameters and a 32k context. Plan for 32 GB of memory or more. Only addresses on this machine are accepted, so your source never leaves the computer on this route.
 
+## Use with Claude
+
+Break the Wall works with **Claude Desktop** and **Claude Code** through a local MCP server that ships inside the app. You install nothing else. There are two ways to use it:
+
+| | You ask Claude | What happens | Who writes the disassembly |
+|---|---|---|---|
+| **Open in Studio** | "Explain how a browser checks an HTTPS certificate and open it in Break the Wall" | The app comes to the front with Claude's text and your question in Studio | Break the Wall, with the route you choose (ChatGPT or a local model), when you press Generate |
+| **Claude writes it** | "Take this apart with Break the Wall" | Claude writes the structure, then each part, then the runs. The app checks every phase with the same rules it uses for its own generations, and returns findings for Claude to fix (at most 3 attempts per step) | Claude, on your Claude plan; the result opens in the library as "Written by your assistant" |
+
+**Connect it once.** In the app, open **Use with Claude** at the top of the library:
+1. Turn on **Connect AI assistants**. While it is off, Break the Wall accepts nothing from other apps.
+2. **Claude Desktop:** press **Add to Claude Desktop**. Claude Desktop opens and asks to install the Break the Wall extension.
+3. **Claude Code:** press **Copy command** and run it once in a terminal. It adds the server for every project, using the app's own runtime:
+
+   ```bash
+   claude mcp add --scope user break-the-wall -e ELECTRON_RUN_AS_NODE=1 -- "<the app>" "<its MCP server>"
+   ```
+
+**The `break` prompt.**
+It explains your question and has Claude take the explanation apart: the "Claude writes it" way, in one step.
+- *Claude Desktop:* pick it among the conversation's attachments and type your question in its field.
+- *Claude Code:* type `/break-the-wall:break`. Claude Code passes on only the first word after a prompt's name, so Claude asks for your question. With nothing to ask, it takes apart Claude's last long answer.
+
+> [!NOTE]
+> **What leaves your computer.**
+> - *Open in Studio:* the text is written by Claude, in your Claude conversation, and reaches the app over a local socket. Nothing more leaves the computer until you press Generate, and then only to the route you choose.
+> - *Claude writes it:* your source goes to Anthropic, through your own Claude app and on your plan, because Claude is the one writing.
+>
+> Either way, Break the Wall itself sends nothing to Claude.
+
+**Limits.**
+- **Supported clients:** Claude Desktop and Claude Code. ChatGPT cannot reach a server on your computer: it needs a remote server, which would take your sources off the device, so it is not supported.
+- **After updating the app:** add the extension to Claude Desktop again. On Windows, copy the Claude Code command again too, since it names the app's version folder.
+- **Interrupted work:** an unfinished "Claude writes it" session lives only in that conversation. If the conversation ends, start again.
+
+**To disconnect,** turn the switch off. **To remove it:**
+- in Claude Desktop: Settings → Extensions;
+- in Claude Code: `claude mcp remove --scope user break-the-wall`.
+
 ## Tech stack
 
 | Layer | Stack |
@@ -225,12 +267,13 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 | Interface | React 19, TypeScript 7, Vite 8, SVG technical drawings, lucide icons, system fonts; markdown-it for sources read as documents, Mermaid for their diagrams (loaded on first use) |
 | Disassembly model | zod 4 contract with located findings, bill-of-materials check, deterministic layered layout and pure run/reassembly transitions; independent of React and Electron |
 | AI routes | Sign in with ChatGPT (OAuth + PKCE, Responses API); Ollama, LM Studio and llama.cpp over loopback |
+| Assistants | An MCP server over stdio, written without an SDK: 5 tools and 1 prompt. It ships as a Claude Desktop extension (`.mcpb`) and runs in Claude Code on the app's Electron in Node mode |
 | Storage | atomic JSON files in the app's data folder; credentials via `safeStorage` (Keychain on macOS, DPAPI on Windows) |
 | Tests | Vitest, Testing Library (jsdom): contract, layout geometry, contrast, catalogs, player interactions |
 
 ## Project status
 
-Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v7), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md) (v1) and [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) (v1). Evidence for each task is in its implementation record.
+Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v7), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md) (v1), [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) (v1) and [P-20261028-mcp-integration](docs/workflow/plans/P-20261028-mcp-integration/plan.md) (v2). Evidence for each task is in its implementation record.
 
 | Phase | Tasks | Status |
 |---|---|---|
@@ -243,6 +286,7 @@ Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-2
 | Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
 | macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built in CI on a tag and attached to [`v0.1.1-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha); install from a download witnessed by the owner |
 | Windows app | W1 Windows in CI · W2 platform-aware wording · W3–W5 icon, installer events, setup and release job · W6–W7 install steps and witnessed install | ✅ CI and start check on Windows; setup built in CI on a tag and attached to [`v0.2.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha); install witnessed by the owner in a Windows 11 VM |
+| Claude integration | M1–M2 local entry point and Studio hand-off · M3–M4a MCP server, Claude Desktop extension, panel and prompt · M5–M7 Claude writes the disassembly · M8–M9 docs and witnessed checks | ✅ code and automated tests on macOS and Windows, the packaged server checked on both; level B checked with scripted answers in the app; ⏳ live checks in Claude Desktop and Claude Code witnessed by the owner |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
@@ -263,7 +307,8 @@ Not claimed: learning effectiveness, correctness of generated explanations, plat
 - [ ] Signed and notarized macOS app (Apple Developer ID), with updates
 - [x] Downloadable Windows app for x64 (unsigned installer)
 - [ ] Code-signed Windows installer
-- [ ] Claude code integration
+- [x] Claude Desktop and Claude Code integration (MCP): open a text in Studio, or let Claude write the disassembly
+- [ ] ChatGPT integration (needs a remote MCP server; sources would leave the device)
 
 ## Contributing
 

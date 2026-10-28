@@ -589,7 +589,7 @@ describe('the "Use with Claude" panel (P-20261028-mcp-integration M4)', () => {
     expect(studio.copyClaudeCodeCommand).toHaveBeenCalledOnce();
     expect(await panel.findByRole('button', { name: 'Copiato' })).toBeInTheDocument();
     expect(panel.queryByText(/nuova versione di Break the Wall/)).toBeNull();
-    expect(panel.getByText(/scrivi \/break-the-wall:break e fai la domanda quando Claude te la chiede/)).toBeInTheDocument();
+    expect(panel.getByText(/il prompt \/break-the-wall:break fa la prima cosa: fai la domanda quando Claude te la chiede/)).toBeInTheDocument();
     await user.click(toggle);
     expect(studio.saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ assistants: false }));
   });
@@ -605,7 +605,7 @@ describe('the "Use with Claude" panel (P-20261028-mcp-integration M4)', () => {
     expect(panel.getByRole('button', { name: 'Add to Claude Desktop' })).toBeDisabled();
     expect(panel.getByText(/The extension is missing from this copy of the app/)).toBeInTheDocument();
     expect(panel.getByText(/Break the Wall sends nothing to Claude/)).toBeInTheDocument();
-    expect(panel.getByText(/type \/break-the-wall:break and write your question when Claude asks/)).toBeInTheDocument();
+    expect(panel.getByText(/the prompt \/break-the-wall:break does the first: write your question when Claude asks/)).toBeInTheDocument();
   });
 
   it('is not offered where the host cannot connect assistants', async () => {

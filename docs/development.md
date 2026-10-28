@@ -40,7 +40,7 @@ The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/br
 1. `assets/icon.png` becomes the bundle's `.icns` (`sips`, `iconutil`).
 2. `@electron/packager` makes `Break the Wall.app` for `darwin`/`arm64`. Only `dist/`, `dist-electron/`, `assets/` and `package.json` go into `app.asar`: every runtime dependency is already bundled, so there is no `node_modules`.
 3. The bundle is signed ad-hoc and checked with `codesign --verify --deep --strict`. It is built in a temporary folder, because a synced folder such as iCloud Documents adds Finder attributes that break the signature.
-4. The start check opens the packaged app with empty user data and `BTW_SMOKE_TEST=1`: the main process exits 0 once the library is drawn, or 1 on a load failure, a renderer crash or 30 s without the library. The script stops if it fails.
+4. The start check opens the packaged app with empty user data and `BTW_SMOKE_TEST=1`: the main process exits 0 once the library is drawn, or 1 on a load failure, a renderer crash or 30 s without the library. Then the server check runs the packaged MCP server with `ELECTRON_RUN_AS_NODE=1` and requires its tools and its prompt. The script stops if either fails.
 5. `hdiutil` writes the LZMA-compressed DMG with the app and an `Applications` link.
 
 The app uses the same data folder as `npm start` (`~/Library/Application Support/Break the Wall`), because the main process names the app before anything else. It needs macOS 13 or later (`LSMinimumSystemVersion`, from Electron).
@@ -57,6 +57,36 @@ On Windows, `npm run package:win` (`scripts/package-win.mjs`, on a Windows x64 m
 A pull request that changes packaging, or a manual run of the workflow, builds the same DMG and setup as workflow artifacts and touches no release.
 
 Ad-hoc signing lets the app run but not pass Gatekeeper: after a browser download, macOS blocks the first open until the user chooses Open Anyway. Signing with an Apple Developer ID and notarizing would replace the `codesign` step in `scripts/package-mac.mjs`; that needs an Apple Developer account and is not set up.
+
+## The MCP server (Claude Desktop and Claude Code)
+
+Plan [P-20261028-mcp-integration](workflow/plans/P-20261028-mcp-integration/plan.md); the README's [Use with Claude](../README.md#use-with-claude) is the user's side. The arrows below mean "sends to".
+
+```
+Claude Desktop (.mcpb, its own Node) / Claude Code (the app's Electron, ELECTRON_RUN_AS_NODE=1)
+  │ stdio, MCP JSON-RPC: src/mcp/protocol.ts (by hand, no SDK)
+  ▼
+src/mcp/server.ts: open_in_break_the_wall · start_disassembly · submit_structure · submit_part · submit_runs · prompt break
+  │ src/mcp/assistant.ts runs the app's own accept functions phase by phase (level B)
+  │ one JSON line per request: src/desktop/incoming.ts (hello, open, save)
+  ▼
+the app's main process (only while "Connect AI assistants" is on) → Studio, or saveFromAssistant → the library
+```
+
+- **Build.** `npm run build` bundles `src/mcp/main.ts` to `dist-electron/mcp-server.cjs` (Node 20). It also writes `dist-electron/break-the-wall.mcpb`, a zip with the MCPB 0.3 manifest, the server and the icon, made by `scripts/zip.mjs` with no dependency. The prompt's text lives once, in `src/mcp/prompts.json`, and is read by both the server and the manifest. Packaging unpacks both files from `app.asar`, so that other programs can read them.
+- **Run it from source.** After `npm run build`, start the app (`npm start`) and turn on **Use with Claude → Connect AI assistants**. Then copy the panel's Claude Code command: from source it names Electron in `node_modules` and `dist-electron/mcp-server.cjs`. Or drive the server by hand, one JSON-RPC message per line:
+
+  ```bash
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"dev","version":"1"}}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | node dist-electron/mcp-server.cjs
+  ```
+
+- **Address.** `incomingAddress` derives the socket or pipe from the data folder, so a copy started with `BTW_USER_DATA_DIR` has its own. The server finds it the same way: `defaultUserData`, with `BTW_USER_DATA_DIR` first.
+- **Tests.**
+  - `tests/incoming.test.ts`: the entry point on a real socket or pipe.
+  - `tests/mcp-server.test.ts`: the protocol, the open tool, the prompt, and the bundle started with plain Node.
+  - `tests/mcp-assistant.test.ts`: level B end to end with the prepared disassemblies' answers, and the saving rules.
+  - `tests/assistants.test.ts`: the `.mcpb` read back, and the Claude Code command.
+- **Claude Code and prompt arguments.** Claude Code splits a prompt's arguments on whitespace and passes only the first word (checked 2026-10-28). Prompts must not rely on a whole sentence arriving in one argument.
 
 ## Toolchain references
 
