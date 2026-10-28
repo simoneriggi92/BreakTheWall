@@ -2,10 +2,10 @@
 id: P-20261028-mcp-integration
 title: Break the Wall in Claude through MCP - open a text in Studio (level A), then let the assistant's model write a disassembly the app checks (level B)
 version: 4
-state: implementing
-current_task: M9
-last_evidence: M6a done - answer-length findings with numbers, three failures keep the work; 394 tests, packaged server checked
-next_action: Owner reinstalls the DMG and the extension and runs level B in Claude Desktop again; the README GIF is redone after that
+state: completed
+current_task: none
+last_evidence: M1-M9 verified - level B witnessed in Claude Desktop and Claude Code; M9 points 5-6 residual, covered by tests
+next_action: None; ChatGPT, level B drafts and expansion through MCP would be a new plan
 approval: approved
 ---
 
@@ -544,3 +544,43 @@ The owner asked for a clearer GIF ("focus sul prompt dell'utente, dove vedo la s
   The disassembly is the one Claude wrote in the real run: the calls the app accepted in that run were sent again, from its transcript, to the bundled server of a fresh app with a temporary data folder. Every call was accepted again.
 - **The README** shows two GIFs in order under the links: "1 · Claude writes it, Break the Wall checks it", the new one; then "2 · Explore it, run it, put it back together", the existing demo with the full run, theme switch, argument, reassembly and bill of materials. The paragraph in "Use with Claude" says the run is real, that the terminal is redrawn and summarized from its transcript, and that the app shows the disassembly from that run.
 - **Review:** contact sheets every 2–3 seconds; no private content. The temporary data folder was deleted.
+
+#### M9: level B in Claude Desktop, witnessed by the owner
+
+The owner installed the DMG with M6a, added the extension to Claude Desktop again, and asked in Italian: "Spiegami come funziona un MCP server su Claude su Break The Wall". The request does not use the word "smonta". The owner's screenshot shows:
+
+- **Tool choice.** Claude searched the tools, weighed opening against taking apart ("Valutando se smontare o aprire Break The Wall"), and called `start_disassembly` ("Write a Break the Wall disassembly"). The tool-description fix holds in Claude Desktop.
+- **Repairs.** `submit_structure` failed once, then was accepted. Of the six `submit_part` calls, three failed once each and were accepted on the next submit. `submit_runs` was accepted at the first attempt.
+- **Result.** Claude's reply: "Ho smontato la spiegazione in Break the Wall: è salvata nella tua libreria e già aperta, con 6 parti, 3 esercizi e la ricostruzione finale." The owner confirmed: "alcuni rifiuti ma alla fine ha funzionato".
+
+| M9 point | Status |
+|---|---|
+| 1. Connection on; extension added to Claude Desktop with one click | **witnessed by the owner** |
+| 2. Level A in Claude Desktop | **witnessed by the owner** |
+| 3. Level A in Claude Code | **witnessed by the owner**, through the personal `/break` |
+| 4. Level B | **passed**: in Claude Code (agent's runs A, B and the GIF run) and in Claude Desktop (owner's run above) |
+| 5. Connection off | covered by automated tests (`tests/incoming.test.ts`, `tests/mcp-server.test.ts`); not witnessed |
+| 6. The `break` prompt in both clients | not witnessed; its text and its level B steps are covered by `tests/mcp-server.test.ts` |
+
+### Completion, 2026-10-28
+
+The owner decided to close the plan with points 5 and 6 of M9 left as residual risks, covered by tests ("Sì, chiudi e push").
+
+| Task | Verdict |
+|---|---|
+| M1–M2 (bridge) | **verified**: macOS and Windows CI; app from source |
+| M3, M4, M4a (server) | **verified**: macOS and Windows CI; packaged server check on both systems; extension installed in Claude Desktop by the owner |
+| M5–M7 (assistant) | **verified**: end-to-end tests; level B saved and opened in the app from Claude Code and from Claude Desktop |
+| M6a (repairs) | **verified** by automated tests; the owner's Claude Desktop run recovered every rejection before the limit |
+| M8 (docs and GIF) | **verified**: README, SECURITY, development notes, CHANGELOG, adapter, and the README GIF of a real run |
+| M9 (witnessed checks) | **verified** for points 1–4; points 5–6 accepted as residual, covered by tests |
+
+Residual risks:
+- the `break` prompt was not witnessed in a client;
+- turning the connection off was not witnessed by hand;
+- level B on Windows is covered by CI only;
+- no level B session survives the end of its conversation;
+- the Claude Code command on Windows must be copied again after each update;
+- ChatGPT is not supported.
+
+The plan is completed. As its preconditions say, P-20261024-disassembly returns to `implementing`. The local spike branch `spike/mcp` can be deleted on the owner's confirmation.
