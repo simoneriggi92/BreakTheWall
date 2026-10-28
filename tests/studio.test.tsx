@@ -4,10 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge, ProgressKey } from '../src/core/bridge';
 import { validateDisassembly, type Disassembly } from '../src/core/disassembly';
 import { buildStructureInput } from '../src/core/disassembly-generation';
-import { defaultSettings, failure, type AccountStatus, type DraftState, type GenerationPreview, type GenerationProgress, type GenerationRequest, type GenerationStats, type LocalServer, type StudioBridge, type StudioSettings, type SuggestionRequest, type SuggestionResult } from '../src/core/provider';
+import { defaultSettings, failure, type AccountStatus, type DraftState, type GenerationPreview, type GenerationProgress, type GenerationRequest, type GenerationStats, type IncomingSource, type LocalServer, type StudioBridge, type StudioSettings, type SuggestionRequest, type SuggestionResult } from '../src/core/provider';
 import type { LearnerState } from '../src/core/state';
 import { loadPreparedLessons } from '../src/fixtures/lessons';
 import { App } from '../src/renderer/App';
+import { importSource } from '../src/core/source';
 import { mill } from './disassemblies';
 import { SOURCE_TEXT } from './draft';
 
@@ -30,6 +31,7 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
   let status: AccountStatus = { state: 'signed-out', storage: true };
   let settings: StudioSettings = options.settings ?? defaultSettings;
   const listeners: ((progress: GenerationProgress) => void)[] = [];
+  const arrivals: ((incoming: IncomingSource) => void)[] = [];
   const studio: StudioBridge = {
     pickSources: vi.fn(async () => ({ sources: [], errors: [{ name: 'a.pdf', message: '«a.pdf» non è supportato. Per ora puoi importare file .txt e .md.' }] })),
     accountStatus: async () => status,
@@ -43,6 +45,7 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
     suggest: vi.fn(options.suggest ?? (async (request: SuggestionRequest) => ({ ok: true as const, suggestions: suggestionsFor(request) }))),
     cancelSuggestions: vi.fn(async () => {}),
     onGenerationProgress: listener => { listeners.push(listener); return () => {}; },
+    onIncomingSource: listener => { arrivals.push(listener); return () => { arrivals.splice(arrivals.indexOf(listener), 1); }; },
     listLessons: async () => ({ lessons: [], skipped: 0 }),
     listDisassemblies: async () => ({ disassemblies: [], skipped: 0 }),
     openUsageSettings: vi.fn(async () => {}),
@@ -58,7 +61,7 @@ function desktop(options: { generate?: (request: GenerationRequest) => ReturnTyp
     saveProgress: async s => { saved.set(key(s), structuredClone(s) as LearnerState); },
     studio,
   };
-  return { bridge, studio, emit: (progress: GenerationProgress) => listeners.forEach(l => l(progress)) };
+  return { bridge, studio, emit: (progress: GenerationProgress) => listeners.forEach(l => l(progress)), hand: (incoming: IncomingSource) => arrivals.forEach(l => l(incoming)) };
 }
 /** Unmounts the app between two runs in one test, as a restart would. */
 const cleanupAndReset = () => { cleanup(); localStorage.clear(); sessionStorage.clear(); };
@@ -498,5 +501,56 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(within(sheet).getByText('3 di 3 pezzi scritti')).toBeInTheDocument();
     act(() => finish());
     expect(await studio.findByText(/Generazione annullata/)).toBeInTheDocument();
+  });
+});
+
+describe('texts handed over by an AI assistant (P-20261028-mcp-integration M2)', () => {
+  const handed = async (title: string, text: string, question = ''): Promise<IncomingSource> =>
+    ({ source: await importSource({ kind: 'paste', title, text }), question });
+
+  it('opens Studio from the library with the text and the question, and ignores the same text sent again', async () => {
+    const { bridge, hand } = desktop();
+    const user = userEvent.setup();
+    render(<App bridge={bridge} prepared={prepared} disassemblies={[]}/>);
+    await screen.findByRole('button', { name: 'Smonta una tua fonte' });
+    const https = await handed('Validazione HTTPS', 'Il client riceve il certificato.\nControlla la catena fino a una radice fidata.', 'Come verifica il browser un certificato?');
+    act(() => hand(https));
+    const studio = studioRegion();
+    expect(await studio.findByText('Dal tuo assistente: Validazione HTTPS.')).toBeInTheDocument();
+    expect(studio.getByText('Validazione HTTPS')).toBeInTheDocument();
+    const capacity = `1/4 fonti · ${https.source.text.length} / 60.000 caratteri`;
+    expect(studio.getByText(capacity)).toBeInTheDocument();
+    act(() => hand(https));
+    await waitFor(() => expect(studio.getByText(capacity)).toBeInTheDocument());
+    expect(studio.queryByRole('alert')).toBeNull();
+    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    expect(studio.getByLabelText(/cosa vuoi capire/i)).toHaveValue('Come verifica il browser un certificato?');
+  });
+
+  it('adds to a draft already open without dropping its sources or replacing its question', async () => {
+    const { bridge, hand } = desktop();
+    const { studio } = await prepare(bridge);
+    const other = await handed('Altro testo', 'Una riga.\nUn’altra riga.', 'Una domanda diversa dalla mia');
+    act(() => hand(other));
+    expect(await studio.findByText('Dal tuo assistente: Altro testo.')).toBeInTheDocument();
+    expect(studio.getByText('Appunti sul ciclo')).toBeInTheDocument();
+    expect(studio.getByText('Altro testo')).toBeInTheDocument();
+    expect(studio.getByLabelText(/cosa vuoi capire/i)).toHaveValue(goal);
+  });
+
+  it('keeps a text that arrives during a generation until it ends, and says so', async () => {
+    let finish!: () => void;
+    const { bridge, hand } = desktop({ settings: local, generate: () => new Promise(resolve => { finish = () => resolve({ ok: false, failure: failure('cancelled') }); }) });
+    const { user, studio } = await prepare(bridge);
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    await user.click(await studio.findByRole('button', { name: /Genera lo smontaggio/ }));
+    const late = await handed('Arrivato dopo', 'Testo inviato durante la generazione.');
+    act(() => hand(late));
+    expect(await studio.findByText('Il tuo assistente ha inviato un testo: sarà aggiunto quando finisce questa generazione.')).toBeInTheDocument();
+    expect(studio.queryByText('Arrivato dopo')).toBeNull();
+    act(() => finish());
+    expect(await studio.findByText('Dal tuo assistente: Arrivato dopo.')).toBeInTheDocument();
+    expect(studio.getByText('Arrivato dopo')).toBeInTheDocument();
+    expect(studio.queryByText(/sarà aggiunto quando finisce/)).toBeNull();
   });
 });

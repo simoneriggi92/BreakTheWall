@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, ClipboardPaste, Cpu, FileText, KeyRound, 
 import type { Disassembly } from '../core/disassembly';
 import { buildStructureInput, defaultContentLanguage, type ContentLanguage } from '../core/disassembly-generation';
 import { detectLanguage } from '../core/generation';
-import { resumable, RUNTIME_NAMES, type AccountStatus, type DraftState, type FormatCheck, type GenerationProgress, type GenerationRoute, type GenerationSetup, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioSettings, type Suggestion } from '../core/provider';
+import { resumable, RUNTIME_NAMES, type AccountStatus, type DraftState, type FormatCheck, type GenerationProgress, type GenerationRoute, type GenerationSetup, type IncomingSource, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioSettings, type Suggestion } from '../core/provider';
 import { checkSelection, CODE_LANGUAGES, goalSchema, importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
 import { GenerationPreview } from './disassembly/GenerationPreview';
 import { Icon } from './icons';
@@ -26,7 +26,7 @@ function importText(t: Messages, n: (x: number) => string, error: Pick<PickError
 }
 
 /** Source workspace → question → account and generation. Nothing leaves the device before "Genera lo smontaggio". */
-export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (disassembly: Disassembly) => void; onBusyChange?: (busy: boolean) => void }) {
+export function Studio({ studio, draft, setDraft, onCreated, onBusyChange, incoming = [], onIncomingTaken }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (disassembly: Disassembly) => void; onBusyChange?: (busy: boolean) => void; incoming?: IncomingSource[]; onIncomingTaken?: (count: number) => void }) {
   const { t, n: fmt, language: interfaceLanguage } = usePreferences();
   const language = draft.language ?? defaultContentLanguage(draft.outcome, interfaceLanguage);
   // A question the app reads as another language would be stored next to content it does not match.
@@ -60,6 +60,19 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { s
       if (add([source])) { setPaste({ title: '', text: '', language: '' }); setPasting(false); }
     } catch (error) { setErrors([error instanceof SourceImportError ? importText(t, fmt, error) : t.studio.pasteFailed]); }
   };
+  // A text from an AI assistant joins the sources already chosen, never during a generation (it waits until the end).
+  const [received, setReceived] = useState<string[]>([]);
+  useEffect(() => {
+    if (!incoming.length || busy) return;
+    const fresh = incoming.map(x => x.source).filter((s, i, list) => !draft.sources.some(x => x.sha256 === s.sha256) && list.findIndex(x => x.sha256 === s.sha256) === i);
+    add(fresh);
+    const question = incoming.map(x => x.question.trim()).find(x => x.length > 0);
+    if (question) setDraft(d => d.outcome.trim() ? d : { ...d, outcome: question });
+    setReceived(incoming.map(x => x.source.title));
+    setStep(0);
+    onIncomingTaken?.(incoming.length);
+    // `add` and the draft are read as they are when the text arrives; rerunning on their changes would add it twice.
+  }, [incoming, busy]);
   const pickFiles = async () => {
     if (!studio) return;
     const picked = await studio.pickSources();
@@ -68,6 +81,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { s
 
   return <section className="studio" aria-labelledby="studio-title">
     <div className="library-section-head"><div><span className="eyebrow">{t.studio.eyebrow}</span><h1 id="studio-title" ref={titleRef} tabIndex={-1}>{t.studio.title}</h1></div></div>
+    {incoming.length > 0 && busy && <p className="notice" role="status">{t.studio.incomingWaiting(incoming.length)}</p>}
     <nav className="creation-steps" aria-label={t.studio.steps}><ol>{t.studio.stepNames.map((label, i) => <li key={label}><button aria-current={step === i ? 'step' : undefined} disabled={busy || (i > 0 && !draft.sources.length) || (i > 1 && !goal.success)} onClick={() => setStep(i)}><span>{i + 1}</span>{label}</button></li>)}</ol></nav>
     <div className="studio-steps">
       <div className="studio-step" hidden={step !== 0}>
@@ -85,6 +99,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange }: { s
           <p className="micro plain">{t.studio.charCount(fmt(paste.text.length), fmt(SOURCE_LIMITS.maxCharsPerSource))}</p>
           <button className="primary" onClick={() => void addPaste()}>{t.studio.addSource}</button>
         </div>}
+        {received.length > 0 && <p className="notice" role="status">{t.studio.incomingAdded(received.join(', '))}<button aria-label={t.studio.closeNotice} onClick={() => setReceived([])}><X size={14}/></button></p>}
         {errors.length > 0 && <div className="error-banner" role="alert"><ul>{errors.map((e, i) => <li key={i}>{e}</li>)}</ul><button aria-label={t.studio.closeErrors} onClick={() => setErrors([])}><X size={14}/></button></div>}
         {draft.sources.length > 0 && <ul className="source-list">{draft.sources.map(source => <li key={source.id}><details>
           <summary><Icon name={source.language ? 'code' : 'book'} size={17}/><span><strong>{source.title}</strong><small>{t.studio.sourceMeta(fmt(source.text.split('\n').length), fmt(source.text.length), source.origin === 'user-file')}</small></span></summary>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Plus } from 'lucide-react';
 import type { DesktopBridge } from '../core/bridge';
 import type { Disassembly } from '../core/disassembly';
+import type { IncomingSource } from '../core/provider';
 import { restoreDisassemblyState, type DisassemblyState } from '../core/disassembly-state';
 import type { Lesson } from '../core/lesson';
 import { restoreState, type LearnerState } from '../core/state';
@@ -19,16 +20,20 @@ interface Props {
   lessons: Lesson[]; generated: Lesson[]; disassemblies: Disassembly[]; bridge: DesktopBridge; error: string; skipped: number;
   draft: StudioDraft; setDraft: (update: (draft: StudioDraft) => StudioDraft) => void;
   onOpen: (id: string) => void; onOpenDisassembly: (id: string) => void; onCreated: (disassembly: Disassembly) => void;
+  incoming?: IncomingSource[]; onIncomingTaken?: (count: number) => void;
 }
 type Resume = { kind: 'lesson'; lesson: Lesson; state: LearnerState } | { kind: 'disassembly'; disassembly: Disassembly; state: DisassemblyState };
 const touched = (state: DisassemblyState) => state.path.length > 0 || !!state.selected || Object.keys(state.runs).length > 0 || Object.keys(state.notes).length > 0 || Object.keys(state.reassembly.placements).length > 0;
 
-export function Library({ lessons, generated, disassemblies, bridge, error, skipped, draft, setDraft, onOpen, onOpenDisassembly, onCreated }: Props) {
+export function Library({ lessons, generated, disassemblies, bridge, error, skipped, draft, setDraft, onOpen, onOpenDisassembly, onCreated, incoming = [], onIncomingTaken }: Props) {
   const { t, language } = usePreferences();
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [otherLanguage, setOtherLanguage] = useState(false);
   const [resume, setResume] = useState<Resume>();
+  // A text from an AI assistant opens Studio, which adds it to the draft.
+  const arrived = incoming.length > 0;
+  useEffect(() => { if (arrived) setCreating(true); }, [arrived]);
   useEffect(() => {
     let active = true;
     // Opening an item shows the full recoverable load error, so a failure here only drops the resume card.
@@ -65,7 +70,7 @@ export function Library({ lessons, generated, disassemblies, bridge, error, skip
 
   if (creating) return <main id="main" className="library creation-page">
     <button className="text-button" disabled={busy} onClick={() => setCreating(false)}><ArrowLeft size={16}/>{t.library.back}</button>
-    <Studio studio={bridge.studio} draft={draft} setDraft={setDraft} onCreated={onCreated} onBusyChange={setBusy}/>
+    <Studio studio={bridge.studio} draft={draft} setDraft={setDraft} onCreated={onCreated} onBusyChange={setBusy} incoming={incoming} onIncomingTaken={onIncomingTaken}/>
     <p className="draft-note">{t.library.draftNote}</p>
   </main>;
 

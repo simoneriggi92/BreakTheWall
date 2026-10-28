@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { progressKeySchema, progressStateSchema, type DesktopBridge } from '../core/bridge';
-import { previewSchema, type StudioBridge } from '../core/provider';
+import { incomingSourceSchema, previewSchema, type StudioBridge } from '../core/provider';
 
 const studio = Object.freeze<StudioBridge>({
   pickSources: () => ipcRenderer.invoke('sources:pick'),
@@ -27,6 +27,16 @@ const studio = Object.freeze<StudioBridge>({
     };
     ipcRenderer.on('generation:progress', handler);
     return () => { ipcRenderer.removeListener('generation:progress', handler); };
+  },
+  onIncomingSource: listener => {
+    // Anything that does not parse as a pasted source is dropped; the host imported it, so this only guards the boundary.
+    const handler = (_event: unknown, incoming: unknown) => {
+      const parsed = incomingSourceSchema.safeParse(incoming);
+      if (parsed.success) listener(parsed.data);
+    };
+    ipcRenderer.on('studio:incoming', handler);
+    void ipcRenderer.invoke('incoming:ready');
+    return () => { ipcRenderer.removeListener('studio:incoming', handler); };
   },
   listLessons: () => ipcRenderer.invoke('lessons:list'),
   listDisassemblies: () => ipcRenderer.invoke('disassemblies:list'),

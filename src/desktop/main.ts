@@ -10,13 +10,14 @@ import { ProgressStore } from './progress-store';
 import { progressKeySchema, progressStateSchema } from '../core/bridge';
 import { resolveLanguage } from '../core/language';
 import { idSchema } from '../core/lesson';
-import { failure, localModelSchema, ProviderError, type GenerationProgress, type PickedSources } from '../core/provider';
-import { importSource, SOURCE_LIMITS, SourceImportError } from '../core/source';
+import { failure, localModelSchema, ProviderError, type GenerationProgress, type IncomingSource, type PickedSources } from '../core/provider';
+import { importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
 import { appFilePath, LIBRARY_DRAWN } from './app-files';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
 import { DraftStore } from './generation-draft';
 import { Generator } from './generator';
+import { IncomingServer, incomingAddress } from './incoming';
 import { checkFormat, detectServer, discoverServers, localCompleter } from './local/runtimes';
 import { SettingsStore } from './settings-store';
 import { runSquirrel, squirrelAction } from './squirrel';
@@ -120,7 +121,12 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     catch (error) { return asFailure(error); }
   });
   ipcMain.handle('settings:get', event => { trustedSender(event); return settings.read(); });
-  ipcMain.handle('settings:save', (event, input: unknown) => { trustedSender(event); return settings.write(input); });
+  ipcMain.handle('settings:save', async (event, input: unknown) => {
+    trustedSender(event);
+    const saved = await settings.write(input);
+    await syncIncoming();
+    return saved;
+  });
   ipcMain.handle('local:discover', event => { trustedSender(event); return discoverServers(localFetch); });
   ipcMain.handle('local:connect', async (event, address: unknown) => {
     trustedSender(event);
@@ -150,9 +156,50 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     return id.success && revision.success ? (await disassemblies.find(id.data, revision.data)) ?? null : null;
   });
   ipcMain.handle('account:usage-settings', async event => { trustedSender(event); await shell.openExternal('https://chatgpt.com/#settings'); });
+
+  // Texts handed over by an AI assistant wait here until the window's renderer listens for them, then go to Studio.
+  const waiting: IncomingSource[] = [];
+  const ready = new Set<Electron.WebContents>();
+  const deliver = () => {
+    const contents = BrowserWindow.getAllWindows()[0]?.webContents;
+    if (!contents || !ready.has(contents)) return;
+    for (const item of waiting.splice(0)) contents.send('studio:incoming', item);
+  };
+  ipcMain.handle('incoming:ready', event => {
+    trustedSender(event);
+    const contents = event.sender;
+    if (!ready.has(contents)) {
+      ready.add(contents);
+      // A reload or a closed window listens again only once its new page says so.
+      const forget = () => ready.delete(contents);
+      contents.once('did-start-loading', forget); contents.once('destroyed', forget);
+    }
+    deliver();
+  });
+  const incoming = new IncomingServer(incomingAddress(process.platform, userData), {
+    version: app.getVersion(),
+    open: async ({ title, text, question }) => {
+      const fallback = await language() === 'en' ? 'From your assistant' : 'Dal tuo assistente';
+      const source = await importSource({ kind: 'paste', title: title?.trim() || fallback, text }) as UserSource;
+      waiting.push({ source, question: (question ?? '').trim().slice(0, 400) });
+      if (waiting.length > SOURCE_LIMITS.maxSources) waiting.shift();
+      const window = BrowserWindow.getAllWindows()[0] ?? createWindow();
+      if (window.isMinimized()) window.restore();
+      window.show(); window.focus();
+      if (process.platform === 'darwin') app.focus({ steal: true });
+      deliver();
+      return { title: source.title, lines: source.text.split('\n').length };
+    },
+  }, process.platform, message => console.error(`[incoming] ${message}`));
+  // The entry point follows the learner's "Connect AI assistants" setting, at start and after every change.
+  async function syncIncoming() {
+    try { await incoming.setEnabled((await settings.read()).assistants === true); }
+    catch (error) { console.error('[incoming]', (error as Error)?.message); }
+  }
+  void syncIncoming();
 }
 
-function createWindow() {
+function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     title: 'Break the Wall', width: 1480, height: 980, minWidth: 720, minHeight: 650,
     backgroundColor: '#f3f5ef', show: !smokeTest, ...(process.platform !== 'darwin' && existsSync(icon) ? { icon } : {}),
@@ -162,6 +209,7 @@ function createWindow() {
   window.webContents.on('will-navigate', (event, url) => { if (!url.startsWith(origin + '/')) event.preventDefault(); });
   if (smokeTest) checkStart(window);
   void window.loadURL(origin + '/');
+  return window;
 }
 
 /** Exits 0 once the library is drawn, 1 if the page fails, its renderer dies, or nothing is drawn within 30 s. */
