@@ -4,13 +4,19 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0-alpha] - 2026-10-28
+
+Break the Wall works with Claude: Claude writes the disassembly, and the app checks it and saves it.
+
 ### Added
 - **Use with Claude:** Break the Wall works with Claude Desktop and Claude Code through a local MCP server that ships inside the app. Connect it once from **Use with Claude** at the top of the library: one click adds the extension to Claude Desktop, and one command adds the server to Claude Code. You install nothing else.
   - **Open in Studio:** ask Claude to open a text in Break the Wall, and the app comes to the front with it and your question in Studio.
   - **Claude writes it:** Claude writes the disassembly itself, phase by phase, on your Claude plan. The app checks each phase with its own rules and saves the result as "Written by your assistant".
   - **The `break` prompt** explains a topic and has Claude take it apart; with no topic, it takes apart Claude's last long answer.
-- **Repairs that land:** when a multiple-choice answer gives itself away by its length, the finding now says how many characters the correct option may have. This applies to every route. When Claude fails a step three times, what it already wrote is kept, and it asks you before trying again.
 - **A switch for the connection:** "Connect AI assistants" is off by default. While it is on, the app listens on a socket in its data folder, or a per-user pipe on Windows; it imports texts like a paste and validates disassemblies like stored files.
+
+### Changed
+- **Repairs that land:** when a multiple-choice answer gives itself away by its length, the finding now says how many characters the correct option may have. This applies to every route. When Claude fails a step three times, what it already wrote is kept, and it asks you before trying again.
 
 ## [0.2.0-alpha] - 2026-10-27
 
