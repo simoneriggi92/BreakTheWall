@@ -554,3 +554,62 @@ describe('texts handed over by an AI assistant (P-20261028-mcp-integration M2)',
     expect(studio.queryByText(/sarà aggiunto quando finisce/)).toBeNull();
   });
 });
+
+describe('the "Use with Claude" panel (P-20261028-mcp-integration M4)', () => {
+  const command = "claude mcp add --scope user break-the-wall -e 'ELECTRON_RUN_AS_NODE=1' -- '/Applications/Break the Wall.app/Contents/MacOS/Break the Wall' '/server.cjs'";
+  function withAssistants(platform: string, settings: StudioSettings = defaultSettings, extension = true) {
+    const made = desktop({ settings });
+    const studio = Object.assign(made.studio, {
+      assistantSetup: vi.fn(async () => ({ platform, claudeCode: command, desktopExtension: extension })),
+      addToClaudeDesktop: vi.fn(async () => ({ ok: true })),
+      copyClaudeCodeCommand: vi.fn(async () => {}),
+    });
+    return { ...made, studio };
+  }
+
+  it('turns the connection on, opens the extension and copies the command, in Italian', async () => {
+    const { bridge, studio } = withAssistants('darwin');
+    const user = userEvent.setup();
+    render(<App bridge={bridge} prepared={prepared} disassemblies={[]}/>);
+    await user.click(await screen.findByLabelText('Usa con Claude'));
+    const panel = within(screen.getByRole('region', { name: 'Usa Break the Wall da Claude' }));
+    const toggle = panel.getByRole('checkbox', { name: /Collega gli assistenti AI/ });
+    expect(toggle).not.toBeChecked();
+    expect(panel.getByText('Spento: Break the Wall non accetta testi da altre app.')).toBeInTheDocument();
+    await user.click(toggle);
+    expect(studio.saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ assistants: true }));
+    expect(await panel.findByText(/^Attivo: le app che usi su questo computer/)).toBeInTheDocument();
+    await user.click(panel.getByRole('button', { name: 'Aggiungi a Claude Desktop' }));
+    expect(studio.addToClaudeDesktop).toHaveBeenCalledOnce();
+    expect(await panel.findByText('Aperta in Claude Desktop: conferma lì l’installazione.')).toBeInTheDocument();
+    expect(panel.getByText(command)).toBeInTheDocument();
+    await user.click(panel.getByRole('button', { name: 'Copia comando' }));
+    expect(studio.copyClaudeCodeCommand).toHaveBeenCalledOnce();
+    expect(await panel.findByRole('button', { name: 'Copiato' })).toBeInTheDocument();
+    expect(panel.queryByText(/nuova versione di Break the Wall/)).toBeNull();
+    expect(panel.getByText(/scrivi \/break-the-wall:break e fai la domanda quando Claude te la chiede/)).toBeInTheDocument();
+    await user.click(toggle);
+    expect(studio.saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ assistants: false }));
+  });
+
+  it('words it in English, says to copy the command again on Windows, and explains a missing extension', async () => {
+    const { bridge } = withAssistants('win32', { ...defaultSettings, language: 'en', assistants: true }, false);
+    const user = userEvent.setup();
+    render(<App bridge={bridge} prepared={prepared} disassemblies={[]}/>);
+    await user.click(await screen.findByLabelText('Use with Claude'));
+    const panel = within(screen.getByRole('region', { name: 'Use Break the Wall from Claude' }));
+    expect(panel.getByRole('checkbox', { name: /Connect AI assistants/ })).toBeChecked();
+    expect(await panel.findByText('After installing a new version of Break the Wall, copy the command and run it again.')).toBeInTheDocument();
+    expect(panel.getByRole('button', { name: 'Add to Claude Desktop' })).toBeDisabled();
+    expect(panel.getByText(/The extension is missing from this copy of the app/)).toBeInTheDocument();
+    expect(panel.getByText(/Break the Wall sends nothing to Claude/)).toBeInTheDocument();
+    expect(panel.getByText(/type \/break-the-wall:break and write your question when Claude asks/)).toBeInTheDocument();
+  });
+
+  it('is not offered where the host cannot connect assistants', async () => {
+    const { bridge } = desktop();
+    render(<App bridge={bridge} prepared={prepared} disassemblies={[]}/>);
+    await screen.findByRole('button', { name: 'Smonta una tua fonte' });
+    expect(screen.queryByLabelText('Usa con Claude')).toBeNull();
+  });
+});

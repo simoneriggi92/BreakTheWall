@@ -5,7 +5,7 @@ import { createWindowsInstaller } from 'electron-winstaller';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checksum, COPYRIGHT, ignore, NAME, requireBuild, root, size, startCheck, version } from './package-common.mjs';
+import { asar, checksum, COPYRIGHT, ignore, NAME, requireBuild, root, serverCheck, size, startCheck, version } from './package-common.mjs';
 
 // Squirrel's names: no spaces in the executable or the package id; the Start menu shows the product name.
 const EXE = 'BreakTheWall';
@@ -19,12 +19,13 @@ rmSync(release, { recursive: true, force: true });
 const [app] = await packager({
   dir: root, out: join(build, 'out'), overwrite: true, platform: 'win32', arch: 'x64',
   name: NAME, executableName: EXE, appVersion: version, appCopyright: COPYRIGHT,
-  icon: join(root, 'assets/icon.ico'), asar: true, prune: false, ignore,
+  icon: join(root, 'assets/icon.ico'), asar, prune: false, ignore,
   win32metadata: { CompanyName: 'Simone Riggi', FileDescription: NAME, ProductName: NAME, InternalName: EXE, OriginalFilename: `${EXE}.exe` },
 });
 
-// 2. Start check: open the packaged app with empty user data and wait for the library to be drawn.
+// 2. Start check: open the packaged app with empty user data and wait for the library to be drawn; then run its MCP server.
 await startCheck(join(app, `${EXE}.exe`));
+await serverCheck(join(app, `${EXE}.exe`), join(app, 'resources'));
 
 // 3. The installer. Unsigned for the alpha (owner's decision, plan P-20261027-windows-alpha): SmartScreen asks the
 // user to confirm. Code signing would be the `windowsSign` option here.

@@ -17,3 +17,16 @@ Date: 2026-10-28. Reviewer: the agent, before asking for approval.
 | 11 | The CI check the ruleset requires could change name. | Resolved: no job is renamed; the new tests run inside the existing jobs. |
 
 No open findings.
+
+# Review of P-20261028-mcp-integration v2
+
+Date: 2026-10-28. Reviewer: the agent, before asking for approval again.
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | Version 1 excluded MCP prompts; adding one changes the scope. | Resolved: version 2, a new approval; M4a sits in phase `server`, which is not committed yet, so it ships with M3–M4. |
+| 2 | The owner wants `/break`, but MCP prompts are named by the client, not the server. | Resolved: M4a states the expected names, checks them at implementation and witnesses them in M9; the short `/break` is the owner's personal Claude Code command, kept outside the repository. |
+| 3 | A prompt that tells the model to write an explanation could produce a text over the source limits. | Resolved: the prompt states the limits, and the tool's refusals already tell the model how to shorten; tested in M3. |
+| 4 | A prompt without a topic must not invent one. | Resolved: with no topic it sends the last long answer unchanged; tested in M4a. |
+
+No open findings.

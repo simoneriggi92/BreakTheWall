@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checksum, COPYRIGHT, ignore, NAME, requireBuild, root, size, startCheck, version } from './package-common.mjs';
+import { asar, checksum, COPYRIGHT, ignore, NAME, requireBuild, root, serverCheck, size, startCheck, version } from './package-common.mjs';
 
 // The bundle is built outside the project: a synced folder (iCloud Documents) adds Finder attributes that break the signature.
 const build = mkdtempSync(join(tmpdir(), 'btw-package-')), release = join(root, 'release');
@@ -29,7 +29,7 @@ const [app] = await packager({
   dir: root, out: join(build, 'out'), overwrite: true, platform: 'darwin', arch: 'arm64',
   name: NAME, appBundleId: 'io.github.simoneriggi92.breakthewall', appVersion: version,
   appCategoryType: 'public.app-category.education', appCopyright: COPYRIGHT,
-  icon: join(build, 'icon.icns'), asar: true, prune: false, darwinDarkModeSupport: true,
+  icon: join(build, 'icon.icns'), asar, prune: false, darwinDarkModeSupport: true,
   ignore,
 });
 const bundle = join(app, `${NAME}.app`);
@@ -41,8 +41,9 @@ run('codesign', ['--force', '--deep', '--sign', '-', bundle]);
 run('codesign', ['--verify', '--deep', '--strict', bundle]);
 console.log('signature: ad-hoc, verified');
 
-// 4. Start check: open the packaged app with empty user data and wait for the library to be drawn.
+// 4. Start check: open the packaged app with empty user data and wait for the library to be drawn; then run its MCP server.
 await startCheck(join(bundle, 'Contents/MacOS', NAME));
+await serverCheck(join(bundle, 'Contents/MacOS', NAME), join(bundle, 'Contents/Resources'));
 
 // 5. The disk image: the app and a link to Applications, LZMA-compressed (ULMO: macOS 10.15+, the app needs 13).
 const stage = join(build, 'dmg');

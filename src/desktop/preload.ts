@@ -38,6 +38,9 @@ const studio = Object.freeze<StudioBridge>({
     void ipcRenderer.invoke('incoming:ready');
     return () => { ipcRenderer.removeListener('studio:incoming', handler); };
   },
+  assistantSetup: () => ipcRenderer.invoke('assistants:setup'),
+  addToClaudeDesktop: () => ipcRenderer.invoke('assistants:add-desktop'),
+  copyClaudeCodeCommand: () => ipcRenderer.invoke('assistants:copy-command'),
   listLessons: () => ipcRenderer.invoke('lessons:list'),
   listDisassemblies: () => ipcRenderer.invoke('disassemblies:list'),
   findDisassembly: key => ipcRenderer.invoke('disassemblies:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),

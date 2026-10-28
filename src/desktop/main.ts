@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, net, protocol, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, safeStorage, session, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
@@ -13,6 +13,7 @@ import { idSchema } from '../core/lesson';
 import { failure, localModelSchema, ProviderError, type GenerationProgress, type IncomingSource, type PickedSources } from '../core/provider';
 import { importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
 import { appFilePath, LIBRARY_DRAWN } from './app-files';
+import { claudeCodeCommand, unpackedPath } from './assistants';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
 import { DraftStore } from './generation-draft';
@@ -191,6 +192,12 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
       return { title: source.title, lines: source.text.split('\n').length };
     },
   }, process.platform, message => console.error(`[incoming] ${message}`));
+  // The "Use with Claude" panel: the server and the extension are built next to this file (unpacked from app.asar).
+  const claudeCode = claudeCodeCommand({ platform: process.platform, executable: process.execPath, server: unpackedPath(join(__dirname, 'mcp-server.cjs')), userData: process.env.BTW_USER_DATA_DIR ? userData : undefined });
+  const extension = unpackedPath(join(__dirname, 'break-the-wall.mcpb'));
+  ipcMain.handle('assistants:setup', event => { trustedSender(event); return { platform: process.platform, claudeCode, desktopExtension: existsSync(extension) }; });
+  ipcMain.handle('assistants:add-desktop', async event => { trustedSender(event); return { ok: existsSync(extension) && await shell.openPath(extension) === '' }; });
+  ipcMain.handle('assistants:copy-command', event => { trustedSender(event); clipboard.writeText(claudeCode); });
   // The entry point follows the learner's "Connect AI assistants" setting, at start and after every change.
   async function syncIncoming() {
     try { await incoming.setEnabled((await settings.read()).assistants === true); }
