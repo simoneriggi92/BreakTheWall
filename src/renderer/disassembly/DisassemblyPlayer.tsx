@@ -200,8 +200,8 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       }}/>;
 
   return <>
-    <header className="topbar workbench-topbar"><button className="brand-button" onClick={goHome} aria-label={t.player.backToLibrary}><Brand/></button>
-      <button className="text-button workbench-home" onClick={goHome}><Home size={16} aria-hidden="true"/><span>{t.player.backToLibrary}</span></button>
+    <header className="topbar workbench-topbar"><Brand/>
+      <button className="text-button workbench-home" aria-label={t.player.backToLibrary} onClick={goHome}><Home size={16} aria-hidden="true"/><span>{t.player.backToLibrary}</span></button>
       <span className="prepared-tag" title={d.generation ? originText(t, d.generation) : undefined}>{d.generation?.provider === 'assistant' ? t.d.tagAssistant : d.kind === 'generated' ? t.d.tagGenerated : t.d.tag}</span>
       <span className="save-status micro" role="status">{save}</span><PreferencesMenu/></header>
     {!loaded ? <main id="main" className="loading"><p role="status">{loadFailed ? t.player.loadFailed : t.player.resuming}</p><button onClick={goHome}>{t.player.backToLibrary}</button></main> :
