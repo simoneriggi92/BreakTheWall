@@ -615,3 +615,33 @@ describe('the "Use with Claude" panel (P-20261028-mcp-integration M4)', () => {
     expect(screen.queryByLabelText('Usa con Claude')).toBeNull();
   });
 });
+
+describe('a disassembly written by the assistant (P-20261028-mcp-integration M5, M7)', () => {
+  const written = (): Disassembly => ({ ...mill(), id: 'g-assistant', kind: 'generated', generation: { provider: 'assistant', model: 'claude-code 2.1.303', createdAt: '2026-10-28T10:00:00.000Z' } });
+
+  it('opens in the player when the host saves it, marked as written by the assistant, and stays in the library', async () => {
+    const made = desktop();
+    const arrivals: ((d: unknown) => void)[] = [];
+    made.studio.onAssistantDisassembly = listener => { arrivals.push(listener); return () => {}; };
+    const user = userEvent.setup();
+    render(<App bridge={made.bridge} prepared={prepared} disassemblies={[]}/>);
+    await screen.findByRole('button', { name: 'Smonta una tua fonte' });
+    act(() => arrivals.forEach(l => l({ not: 'a disassembly' })));
+    expect(screen.queryByText('Scritto dal tuo assistente')).toBeNull();
+    act(() => arrivals.forEach(l => l(written())));
+    const tag = await screen.findByText('Scritto dal tuo assistente');
+    expect(tag).toHaveAttribute('title', 'Il tuo assistente · claude-code 2.1.303');
+    await user.click(screen.getAllByRole('button', { name: 'Torna ai percorsi' })[0]);
+    const card = (await screen.findByText(written().title)).closest('button')!;
+    expect(within(card).getByText(/^Scritto dal tuo assistente/)).toHaveAttribute('title', 'Il tuo assistente · claude-code 2.1.303');
+  });
+
+  it('words the origin in English', async () => {
+    const made = desktop({ settings: { ...defaultSettings, language: 'en' } });
+    made.studio.listDisassemblies = async () => ({ disassemblies: [written()], skipped: 0 });
+    render(<App bridge={made.bridge} prepared={prepared} disassemblies={[]}/>);
+    const card = (await screen.findByText(written().title)).closest('button')!;
+    expect(within(card).getByText(/^Written by your assistant/)).toHaveAttribute('title', 'Your assistant · claude-code 2.1.303');
+  });
+});
+

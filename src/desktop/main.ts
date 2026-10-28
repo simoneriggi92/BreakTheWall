@@ -10,10 +10,10 @@ import { ProgressStore } from './progress-store';
 import { progressKeySchema, progressStateSchema } from '../core/bridge';
 import { resolveLanguage } from '../core/language';
 import { idSchema } from '../core/lesson';
-import { failure, localModelSchema, ProviderError, type GenerationProgress, type IncomingSource, type PickedSources } from '../core/provider';
+import { failure, localModelSchema, ProviderError, type GenerationProgress, type PickedSources } from '../core/provider';
 import { importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
 import { appFilePath, LIBRARY_DRAWN } from './app-files';
-import { claudeCodeCommand, unpackedPath } from './assistants';
+import { claudeCodeCommand, saveFromAssistant, unpackedPath } from './assistants';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
 import { DraftStore } from './generation-draft';
@@ -158,13 +158,14 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
   });
   ipcMain.handle('account:usage-settings', async event => { trustedSender(event); await shell.openExternal('https://chatgpt.com/#settings'); });
 
-  // Texts handed over by an AI assistant wait here until the window's renderer listens for them, then go to Studio.
-  const waiting: IncomingSource[] = [];
+  // What an AI assistant hands over (texts for Studio, saved disassemblies) waits here until the window's renderer
+  // listens, then goes to it.
+  const waiting: { channel: 'studio:incoming' | 'studio:disassembly'; payload: unknown }[] = [];
   const ready = new Set<Electron.WebContents>();
   const deliver = () => {
     const contents = BrowserWindow.getAllWindows()[0]?.webContents;
     if (!contents || !ready.has(contents)) return;
-    for (const item of waiting.splice(0)) contents.send('studio:incoming', item);
+    for (const item of waiting.splice(0)) contents.send(item.channel, item.payload);
   };
   ipcMain.handle('incoming:ready', event => {
     trustedSender(event);
@@ -177,19 +178,29 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     }
     deliver();
   });
+  const present = () => {
+    const window = BrowserWindow.getAllWindows()[0] ?? createWindow();
+    if (window.isMinimized()) window.restore();
+    window.show(); window.focus();
+    if (process.platform === 'darwin') app.focus({ steal: true });
+    deliver();
+  };
   const incoming = new IncomingServer(incomingAddress(process.platform, userData), {
     version: app.getVersion(),
     open: async ({ title, text, question }) => {
       const fallback = await language() === 'en' ? 'From your assistant' : 'Dal tuo assistente';
       const source = await importSource({ kind: 'paste', title: title?.trim() || fallback, text }) as UserSource;
-      waiting.push({ source, question: (question ?? '').trim().slice(0, 400) });
+      waiting.push({ channel: 'studio:incoming', payload: { source, question: (question ?? '').trim().slice(0, 400) } });
       if (waiting.length > SOURCE_LIMITS.maxSources) waiting.shift();
-      const window = BrowserWindow.getAllWindows()[0] ?? createWindow();
-      if (window.isMinimized()) window.restore();
-      window.show(); window.focus();
-      if (process.platform === 'darwin') app.focus({ steal: true });
-      deliver();
+      present();
       return { title: source.title, lines: source.text.split('\n').length };
+    },
+    // Level B: checked and stored like any generated disassembly, then opened in the player.
+    save: async input => {
+      const saved = await saveFromAssistant(disassemblies, input);
+      waiting.push({ channel: 'studio:disassembly', payload: saved });
+      present();
+      return { id: saved.id, title: saved.title };
     },
   }, process.platform, message => console.error(`[incoming] ${message}`));
   // The "Use with Claude" panel: the server and the extension are built next to this file (unpacked from app.asar).

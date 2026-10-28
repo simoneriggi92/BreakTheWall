@@ -156,6 +156,7 @@ export const it = {
     originGenerated: (by: string) => `${by}. Citazioni verificate sulle tue fonti; controlla anche il contenuto delle spiegazioni.`,
     originPrepared: 'Esempio preparato · fonti didattiche originali.',
     generatedBy: (local: boolean, model: string) => `${local ? 'Modello locale' : 'ChatGPT'} · ${model}`,
+    writtenByAssistant: (client: string) => `Il tuo assistente · ${client}`,
   },
   blocks: {
     linkSource: 'Collega alla fonte', yourSource: 'LA TUA FONTE', originalText: 'TESTO ORIGINALE', excerpts: 'Estratti disponibili', excerpt: (n: number) => `Estratto ${n}`,
@@ -184,7 +185,7 @@ export const it = {
     marks: { step: 'poi', keeps: 'resta uguale', caveat: 'attenzione' },
     reasons: { context: 'contesto', 'outside-question': 'fuori dalla domanda', repetition: 'ripetizione', detail: 'dettaglio', secrets: 'contiene segreti', generated: 'generato' },
     states: { ok: 'fatto', active: 'in corso', failed: 'fallito', restored: 'ripristinato' },
-    tag: 'Smontaggio preparato', tagGenerated: 'Smontaggio generato',
+    tag: 'Smontaggio preparato', tagGenerated: 'Smontaggio generato', tagAssistant: 'Scritto dal tuo assistente',
     expand: {
       action: 'Smonta questo pezzo', cost: (route: string) => `Una richiesta a ${route}, con le sole righe di questo pezzo.`,
       running: 'Smonto il pezzo…', repairing: 'seconda passata: correggo ciò che i controlli hanno trovato', shortening: 'accorcio i testi troppo lunghi',

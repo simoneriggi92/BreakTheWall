@@ -183,6 +183,8 @@ export interface StudioBridge {
   onGenerationProgress(listener: (progress: GenerationProgress) => void): () => void;
   /** Texts handed over by an AI assistant through the local entry point; the host keeps them until a listener is there. */
   onIncomingSource?(listener: (incoming: IncomingSource) => void): () => void;
+  /** Disassemblies an AI assistant wrote and the host saved (level B); the renderer validates them again before opening. */
+  onAssistantDisassembly?(listener: (disassembly: unknown) => void): () => void;
   assistantSetup?(): Promise<AssistantSetup>;
   /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */
   addToClaudeDesktop?(): Promise<{ ok: boolean }>;

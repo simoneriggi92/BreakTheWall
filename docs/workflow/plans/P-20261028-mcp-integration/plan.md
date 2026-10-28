@@ -3,9 +3,9 @@ id: P-20261028-mcp-integration
 title: Break the Wall in Claude through MCP - open a text in Studio (level A), then let the assistant's model write a disassembly the app checks (level B)
 version: 2
 state: implementing
-current_task: M5
-last_evidence: Phase server (M3, M4, M4a) verified on macOS - 384 tests; packaged server answers with the tool and the break prompt
-next_action: Owner tries the packaged app (panel, Claude Desktop, Claude Code, break prompt); then commit and PR for phase server
+current_task: M8
+last_evidence: Phase assistant (M5-M7) verified without a model - 394 tests; Atlas through the bundled server was saved and opened in the app from source
+next_action: Owner reviews and merges phase assistant; then "implement P-20261028-mcp-integration v2 --phase release" (docs and the witnessed checks)
 approval: approved
 ---
 
@@ -335,3 +335,46 @@ The owner tried phase `server` with the packaged app and asked for a command ("s
 | Task | Verdict |
 |---|---|
 | M4a | **verified** for the server, the manifest and the panel; the prompt in Claude Desktop and Claude Code with a real conversation is witnessed in M9 point 6 |
+
+PR #30 (phase `server`) was merged into `main` at `1ec41e3`. On `e654956`:
+- "Windows x64 setup" passed, with 372 tests, "start check: the library is drawn" and "server check: the MCP server 0.2.0-alpha answers with the tool open_in_break_the_wall and the prompt break" (setup 157.2 MB). **M3, M4 and M4a are verified on Windows too.**
+- "Apple Silicon DMG" was still queued on GitHub's macOS runners when the pull request was merged; the same script passed locally.
+- "Windows: types, tests and build" failed once. An older Studio test clicked "Continue to the question" while the added source was still being hashed. On the owner's yes, commit `98eccf7` makes the test helper wait for the enabled button, and both CI jobs passed on it.
+
+### Phase `assistant` (M5–M7), 2026-10-28
+
+Phase `server` was committed as `e654956` on `feature/mcp-server` and opened as PR #30, on the owner's request ("fai commit e PR"). Then came the command `implement P-20261028-mcp-integration v2 --phase assistant`. The work was done on top of `feature/mcp-server`; after PR #30 merged, it was moved onto `main` at `1ec41e3` as `feature/mcp-assistant`.
+
+- **M5**:
+  - `generation.provider`, and the provider of an expansion, also accept `assistant`, in `src/core/disassembly.ts`. `GenerationMeta` follows. Files written before stay valid.
+  - `originText` in `preferences.tsx` words the origin in one place. The library card and the player's tag say "Written by your assistant" / "Scritto dal tuo assistente", with "Your assistant · <client name and version>" as the title. ChatGPT and local origins read as before.
+- **M6**, `src/mcp/assistant.ts`: one `AssistantWriter` per server process.
+  - `start` imports the text like a paste, checks the question (10–400 characters) and picks the language: the one given, else the question's, else English. It records the origin as `assistant`, with the client's name and version from `initialize`.
+  - Each `submit_*` runs the app's accept function for that phase: `acceptStructure`, `acceptContent`, `acceptRuns`. On findings it returns `buildRepairRequest`; on success, the next step's instructions, schema and input, with "STEP n of N".
+  - The JSON may arrive as a string or as an object.
+  - At most 3 attempts per step; a success resets the count. After the third failure the session stops and suggests `open_in_break_the_wall`.
+  - Out-of-order calls say what comes next. A new `start_disassembly` replaces an unfinished session.
+  - `src/mcp/server.ts` exposes the four tools, and the server's instructions say when to use which.
+  - The server now targets Node 20 (bundle and manifest `>=20.0.0`), because importing a source uses the global Web Crypto, which Node 18 lacks.
+- **M7**:
+  - **Protocol**: `incoming.ts` gains `{ v: 1, type: 'save', disassembly }`. Validation findings come back as `invalid` with the first ten paths.
+  - **The rule**: `saveFromAssistant` in `src/desktop/assistants.ts` validates the disassembly like any stored file and accepts only a new generated disassembly with the `assistant` origin and no expansions. The same one sent again is returned; a different one under a stored id is refused.
+  - **Main process**: `main.ts` uses it, then queues `studio:disassembly` for the renderer (the queue is the one texts use) and brings the window forward. `App` validates it again, adds it to the library and opens it in the player.
+  - **If the app is unreachable**, `submit_runs` keeps the finished disassembly and says to call again; the next call saves it.
+  - **The extension's manifest** lists the five tools.
+
+| Check | Kind | Result |
+|---|---|---|
+| `tests/mcp-assistant.test.ts` (8 tests) | Automated test, integration check | **passed**: Atlas and Mill taken through every tool against a real socket and a temporary `DisassemblyStore`, and the stored disassembly equals `assembleDisassembly` over the same answers, with the origin `assistant` / `claude-code 2.1.303`; findings and the attempt limit; out-of-order calls, a short question, an oversized text, a replaced session, a malformed start; the save kept when the app is down and done on the next call, then repeated harmlessly; an invalid or malformed save, and an app without save support; `saveFromAssistant` refusing a prepared disassembly, another origin, expansions and a different disassembly under a stored id; the origin values in the contract |
+| `tests/studio.test.tsx` (2 new) | Automated test | **passed**: a saved disassembly sent by the host opens in the player tagged "Scritto dal tuo assistente" with its title, ignores a payload that is not a disassembly, and stays in the library; the card in English |
+| `tests/mcp-server.test.ts`, `tests/assistants.test.ts` | Automated test | **passed** with the five tools |
+| Types; `npx vitest run` | Static inspection, automated test | **passed**: 27 files, 394 tests |
+| `scripts/package-mac.mjs` | Targeted build, integration check | **passed**: "server check: the MCP server 0.2.0-alpha answers with the tools open_in_break_the_wall, start_disassembly, submit_structure, submit_part, submit_runs and the prompt break" (before the wording fix to "tools"); DMG 93.1 MB; server bundle 862 kB |
+| Level B in the app from source, without a model | Integration check | **passed**: Atlas's answers through the bundled server, run as Claude Code runs it (the app's Electron in Node mode), were accepted at every step (start, structure, 6 parts, runs); `main.ts` saved `g-…` in the data folder; the player opened with "Scritto dal tuo assistente", titled "Il tuo assistente · claude-code live-check" |
+| Level B with Claude itself | Witnessed flow | **not run**: it spends the owner's Claude usage and is M9 point 4 |
+
+| Task | Verdict |
+|---|---|
+| M5 | **verified** |
+| M6 | **verified** without a model; a real model's run is witnessed in M9 |
+| M7 | **verified** in the app from source; Windows when the pull request's jobs pass |

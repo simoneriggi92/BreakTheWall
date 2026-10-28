@@ -9,7 +9,7 @@ import {
 import { layoutDisassembly, readingNumbers } from '../../core/layout';
 import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
 import { Brand } from '../icons';
-import { PreferencesMenu, restoreText, usePreferences } from '../preferences';
+import { originText, PreferencesMenu, restoreText, usePreferences } from '../preferences';
 import { BillOfMaterials } from './BillOfMaterials';
 import { PartCard, TakeApart } from './PartCard';
 import { Reassemble } from './Reassemble';
@@ -175,7 +175,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   return <>
     <header className="topbar"><button className="brand-button" onClick={goHome} aria-label={t.player.backToLibrary}><Brand/></button>
       <div className="course-title"><span>{t.d.whole}</span><strong lang={d.language}>{d.title}</strong></div>
-      <span className="prepared-tag" title={d.generation ? t.tools.generatedBy(d.generation.provider === 'local', d.generation.model) : undefined}>{d.kind === 'generated' ? t.d.tagGenerated : t.d.tag}</span>
+      <span className="prepared-tag" title={d.generation ? originText(t, d.generation) : undefined}>{d.generation?.provider === 'assistant' ? t.d.tagAssistant : d.kind === 'generated' ? t.d.tagGenerated : t.d.tag}</span>
       <span className="save-status micro" role="status">{save}</span><PreferencesMenu/></header>
     {!loaded ? <main id="main" className="loading"><p role="status">{loadFailed ? t.player.loadFailed : t.player.resuming}</p><button onClick={goHome}>{t.player.backToLibrary}</button></main> :
       <main id="main" className={`disassembly mode-${mode}`}>

@@ -316,7 +316,7 @@ export function optionSets(runs: Run[]): { path: string; options: { text: string
     : run.type === 'scenario' ? run.steps.flatMap((s, k) => s.predict ? [{ path: `runs[${r}].steps[${k}].predict.options`, options: s.predict.options }] : []) : []);
 }
 
-export interface GenerationMeta { id: string; createdAt: string; provider: 'chatgpt' | 'local'; runtime?: 'ollama' | 'lmstudio' | 'llamacpp' | 'openai'; model: string }
+export interface GenerationMeta { id: string; createdAt: string; provider: 'chatgpt' | 'local' | 'assistant'; runtime?: 'ollama' | 'lmstudio' | 'llamacpp' | 'openai'; model: string }
 interface Draft { sources: UserSource[]; goal: LearningGoal; language: ContentLanguage; structure: StructureDraft; contents?: ContentDraft[]; runs?: RunsDraft; meta: GenerationMeta }
 const BLANK = '…';
 const BLANK_POINTS = [{ text: BLANK }, { text: BLANK }];

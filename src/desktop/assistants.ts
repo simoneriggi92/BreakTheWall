@@ -1,4 +1,6 @@
 import { sep } from 'node:path';
+import { DisassemblyError, validateDisassembly, type Disassembly } from '../core/disassembly';
+import type { DisassemblyStore } from './disassembly-store';
 
 /**
  * How the "Use with Claude" panel connects an assistant (P-20261028-mcp-integration M4). The MCP server and the
@@ -23,4 +25,17 @@ export function claudeCodeCommand({ platform, executable, server, userData }: { 
   const env = ['ELECTRON_RUN_AS_NODE=1', ...(userData ? [`BTW_USER_DATA_DIR=${userData}`] : [])].map(x => `-e ${quote(x, platform)}`).join(' ');
   // `-e` takes several values, so it follows the name, as in `claude mcp add --help`; `--` ends the options.
   return `claude mcp add --scope user break-the-wall ${env} -- ${quote(executable, platform)} ${quote(server, platform)}`;
+}
+
+/**
+ * Level B (M7): a disassembly an assistant wrote, saved through the local entry point. It passes the same validation
+ * as any stored file, and only a new disassembly with the assistant's origin is accepted. Sending the same one again
+ * (a retried save) returns it; a different one under a stored id is refused.
+ */
+export async function saveFromAssistant(store: Pick<DisassemblyStore, 'find' | 'save'>, input: unknown): Promise<Disassembly> {
+  const d = await validateDisassembly(input);
+  if (d.kind !== 'generated' || d.generation?.provider !== 'assistant' || d.expansions?.length) throw new DisassemblyError([{ path: 'generation', message: 'Only a new disassembly written by an assistant can be saved this way' }]);
+  const stored = await store.find(d.id, d.revision);
+  if (stored && JSON.stringify(stored) !== JSON.stringify(d)) throw new DisassemblyError([{ path: 'id', message: `${d.id} is already saved` }]);
+  return stored ?? store.save(d);
 }

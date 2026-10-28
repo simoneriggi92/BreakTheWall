@@ -39,6 +39,14 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
   // Texts an AI assistant handed over: the library opens Studio, which takes them once no generation is running.
   const [incoming, setIncoming] = useState<IncomingSource[]>([]);
   useEffect(() => bridge.studio?.onIncomingSource?.(item => { setIncoming(list => [...list, item]); setSelected(undefined); }), [bridge]);
+  // A disassembly the assistant wrote (level B) joins the library and opens, once it validates here too.
+  useEffect(() => bridge.studio?.onAssistantDisassembly?.(raw => {
+    void validateDisassembly(raw).then(item => {
+      if (item.kind !== 'generated') return;
+      setGeneratedDisassemblies(list => [item, ...list.filter(x => x.id !== item.id)]);
+      rememberLesson(item.id); setSelected({ kind: 'disassembly', id: item.id });
+    }).catch(() => {});
+  }), [bridge]);
   useEffect(() => {
     let active = true;
     void bridge.studio?.listLessons().then(async result => {
