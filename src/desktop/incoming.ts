@@ -4,6 +4,7 @@ import { createServer, type Server, type Socket } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { z } from 'zod';
+import { DisassemblyError } from '../core/disassembly';
 import { SourceImportError } from '../core/source';
 
 /**
@@ -68,15 +69,19 @@ const openSchema = z.strictObject({
   title: z.string().max(1000).optional(), text: z.string(), question: z.string().max(4000).optional(),
 });
 const helloSchema = z.strictObject({ v: z.literal(INCOMING_PROTOCOL), type: z.literal('hello') });
+const saveSchema = z.strictObject({ v: z.literal(INCOMING_PROTOCOL), type: z.literal('save'), disassembly: z.unknown() });
 
 export type IncomingReply =
   | { ok: true; app: 'break-the-wall'; version: string; protocol: number }
   | { ok: true; title: string; lines: number }
+  | { ok: true; saved: true; id: string; title: string }
   | { ok: false; code: string; message: string; params?: Record<string, unknown> };
 export interface IncomingHandlers {
   version: string;
   /** Imports the text like a paste and shows it in Studio; throws SourceImportError when the text breaks a limit. */
   open(input: { title?: string; text: string; question?: string }): Promise<{ title: string; lines: number }>;
+  /** Checks a disassembly written by an assistant, stores it and opens it; throws DisassemblyError when it is refused (M7). */
+  save?(disassembly: unknown): Promise<{ id: string; title: string }>;
 }
 
 /** One request line → one answer. Never throws: anything unexpected becomes an error answer. */
@@ -94,6 +99,15 @@ export async function answer(line: string, handlers: IncomingHandlers): Promise<
     catch (error) {
       if (error instanceof SourceImportError) return { ok: false, code: error.code, message: error.message, params: { ...error.params } };
       return { ok: false, code: 'unavailable', message: 'The app could not open the text.' };
+    }
+  }
+  if (type === 'save' && handlers.save) {
+    const save = saveSchema.safeParse(message);
+    if (!save.success) return { ok: false, code: 'bad-request', message: 'A save request needs a disassembly.' };
+    try { return { ok: true, saved: true, ...await handlers.save(save.data.disassembly) }; }
+    catch (error) {
+      if (error instanceof DisassemblyError) return { ok: false, code: 'invalid', message: error.findings.slice(0, 10).map(x => `${x.path}: ${x.message}`).join('; ') };
+      return { ok: false, code: 'unavailable', message: 'The app could not save the disassembly.' };
     }
   }
   return { ok: false, code: 'unknown-type', message: `Unknown request type ${JSON.stringify(type)}.` };

@@ -58,8 +58,14 @@ export function mcpbManifest(version, prompts = []) {
     license: 'Apache-2.0',
     icon: 'icon.png',
     server: { type: 'node', entry_point: 'server/index.js', mcp_config: { command: 'node', args: ['${__dirname}/server/index.js'] } },
-    tools: [{ name: 'open_in_break_the_wall', description: 'Open a text in Break the Wall Studio.' }],
+    tools: [
+      { name: 'open_in_break_the_wall', description: 'Open a text in Break the Wall Studio.' },
+      { name: 'start_disassembly', description: 'Write a Break the Wall disassembly yourself, checked by the app phase by phase.' },
+      { name: 'submit_structure', description: 'Submit the structure of the disassembly.' },
+      { name: 'submit_part', description: 'Submit the content of one top-level part.' },
+      { name: 'submit_runs', description: 'Submit the runs; the finished disassembly is saved and opened in Break the Wall.' },
+    ],
     prompts: prompts.map(p => ({ name: p.name, description: p.description, arguments: p.arguments.map(a => a.name), text: p.text })),
-    compatibility: { platforms: ['darwin', 'win32'], runtimes: { node: '>=18.0.0' } },
+    compatibility: { platforms: ['darwin', 'win32'], runtimes: { node: '>=20.0.0' } },
   };
 }

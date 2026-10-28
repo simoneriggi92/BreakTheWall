@@ -92,7 +92,8 @@ const scenarioCase = z.strictObject({
 export const runSchema = z.discriminatedUnion('type', [scenario, load, scenarioCase]);
 export const disassemblySchema = z.strictObject({
   schemaVersion: z.literal(1), id, revision: id, kind: z.enum(['prepared', 'generated']),
-  generation: z.strictObject({ provider: z.enum(['chatgpt', 'local']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime() }).optional(),
+  /** `assistant`: written by the learner's AI assistant through the MCP server, and checked by the app (P-20261028-mcp-integration). */
+  generation: z.strictObject({ provider: z.enum(['chatgpt', 'local', 'assistant']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime() }).optional(),
   title: short, question: text, language: z.enum(['it', 'en']),
   /** Versions of one disassembly in different languages share a family, so the player can offer the other one. */
   family: id.optional(),
@@ -109,7 +110,7 @@ export const disassemblySchema = z.strictObject({
   runs: z.array(runSchema).min(1).max(10),
   /** Parts taken apart after generation, with the route that did it: the origin of every level stays visible. */
   expansions: z.array(z.strictObject({
-    part: id, provider: z.enum(['chatgpt', 'local']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime(),
+    part: id, provider: z.enum(['chatgpt', 'local', 'assistant']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime(),
   })).max(500).optional(),
   reassemble: z.strictObject({
     title: short, instruction: text,

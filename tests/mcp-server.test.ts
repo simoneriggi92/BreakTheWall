@@ -83,8 +83,8 @@ describe('the open_in_break_the_wall tool against the app\'s entry point (M3)', 
   const app = async (at: string) => { const s = new IncomingServer(at, handlers); servers.push(s); await s.setEnabled(true); return s; };
   const call = (server: ReturnType<typeof createBreakTheWallServer>, args: object) => server.handle(request(2, 'tools/call', { name: 'open_in_break_the_wall', arguments: args }));
 
-  it('lists one tool whose schema needs only the text', async () => {
-    expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall']);
+  it('lists the open tool, whose schema needs only the text, before the level B tools', async () => {
+    expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall', 'start_disassembly', 'submit_structure', 'submit_part', 'submit_runs']);
     expect(TOOLS[0].inputSchema).toMatchObject({ required: ['text'] });
   });
 
@@ -159,7 +159,7 @@ describe('the bundled server (M3)', () => {
     const folder = mkdtempSync(join(tmpdir(), 'btw-mcp-'));
     try {
       const outfile = join(folder, 'mcp-server.cjs');
-      await build({ entryPoints: ['src/mcp/main.ts'], bundle: true, platform: 'node', target: 'node18', format: 'cjs', outfile, define: { BTW_VERSION: '"9.9.9"' }, logLevel: 'silent' });
+      await build({ entryPoints: ['src/mcp/main.ts'], bundle: true, platform: 'node', target: 'node20', format: 'cjs', outfile, define: { BTW_VERSION: '"9.9.9"' }, logLevel: 'silent' });
       const child = spawn(process.execPath, [outfile], { env: { ...process.env, BTW_USER_DATA_DIR: folder }, stdio: ['pipe', 'pipe', 'pipe'] });
       let out = '';
       child.stdout.on('data', chunk => { out += chunk; });

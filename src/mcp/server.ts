@@ -4,7 +4,9 @@ import { connect } from 'node:net';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { INCOMING_PROTOCOL, lineReader, type IncomingReply } from '../desktop/incoming';
-import { createMcpServer, type PromptDefinition, type ToolDefinition, type ToolResult } from './protocol';
+import type { Disassembly } from '../core/disassembly';
+import { AssistantWriter, type StepReply } from './assistant';
+import { createMcpServer, type ClientInfo, type PromptDefinition, type ToolDefinition, type ToolResult } from './protocol';
 import prompts from './prompts.json';
 
 /**
@@ -102,18 +104,75 @@ export const TOOLS: ToolDefinition[] = [{
     required: ['text'],
     additionalProperties: false,
   },
+}, {
+  name: 'start_disassembly',
+  title: 'Write a Break the Wall disassembly',
+  description: 'Write a Break the Wall disassembly of a text yourself, instead of opening it for the app to generate: use it when the user asks you to take a text apart with Break the Wall. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the numbered source and the JSON schema for the first phase.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'The full text to take apart, as plain text or Markdown (at most 40,000 characters and 1,500 lines).' },
+      title: { type: 'string', description: 'A short name for the source, shown in citations (at most 120 characters).' },
+      question: { type: 'string', description: 'What the user wants to understand about the text, as a question (10 to 400 characters).' },
+      language: { type: 'string', enum: ['it', 'en'], description: 'The language to write the disassembly in; by default the question\'s.' },
+    },
+    required: ['text', 'question'],
+    additionalProperties: false,
+  },
+}, {
+  name: 'submit_structure',
+  title: 'Submit the structure',
+  description: 'Submit the structure of the disassembly started with start_disassembly, as JSON matching the schema it gave. Returns either the findings to fix, or the instructions for the first part.',
+  inputSchema: { type: 'object', properties: { json: { type: 'string', description: 'The structure, as a JSON string.' } }, required: ['json'], additionalProperties: false },
+}, {
+  name: 'submit_part',
+  title: 'Submit one part',
+  description: 'Submit the content of one top-level part, in order, as JSON matching the schema the previous step gave. Returns either the findings to fix, or the instructions for the next part or for the runs.',
+  inputSchema: { type: 'object', properties: { index: { type: 'integer', minimum: 0, description: 'The part\'s index, as the previous step said.' }, json: { type: 'string', description: 'The part\'s content, as a JSON string.' } }, required: ['index', 'json'], additionalProperties: false },
+}, {
+  name: 'submit_runs',
+  title: 'Submit the runs',
+  description: 'Submit the runs and the reassembly, as JSON matching the schema the previous step gave. When accepted, the disassembly is saved in Break the Wall and opened there. If the app could not be reached, call it again once it runs.',
+  inputSchema: { type: 'object', properties: { json: { type: 'string', description: 'The runs and the reassembly, as a JSON string.' } }, required: ['json'], additionalProperties: false },
 }];
 
 /** The `break` prompt (M4a), shared with the Claude Desktop extension's manifest. */
 export const PROMPTS: PromptDefinition[] = prompts;
 
-export function createBreakTheWallServer(link: AppLink, version: string) {
+const asResult = (reply: StepReply): ToolResult => ({ content: [{ type: 'text', text: reply.text }], ...(reply.isError ? { isError: true } : {}) });
+const clientName = (client?: ClientInfo) => client ? `${client.name} ${client.version}`.trim() : 'assistant';
+const startArgs = z.object({ text: z.string(), title: z.string().optional(), question: z.string(), language: z.string().optional() });
+
+/** Hands a finished disassembly to the app, which checks it again and saves it in the library (M7). */
+async function save(link: AppLink, disassembly: Disassembly, done: string): Promise<ToolResult> {
+  let reply: IncomingReply;
+  try { reply = await reachApp(link, { type: 'save', disassembly }); }
+  catch (error) {
+    if (!(error instanceof AppUnreachable)) throw error;
+    return { content: [{ type: 'text', text: `${done} It could not be saved yet: ${error.message} Once Break the Wall runs, call submit_runs again with the same JSON to save it.` }], isError: true };
+  }
+  if (!reply.ok) return { content: [{ type: 'text', text: `${done} Break the Wall did not save it (${reply.code}): ${reply.message}` }], isError: true };
+  return { content: [{ type: 'text', text: `${done} It is saved in the user's Break the Wall library and open there. Tell the user in one line; do not repeat the disassembly in the chat.` }] };
+}
+
+export function createBreakTheWallServer(link: AppLink, version: string, writer = new AssistantWriter()) {
   return createMcpServer({
     info: { name: 'break-the-wall', title: 'Break the Wall', version },
-    instructions: 'Break the Wall is a desktop app on the user\'s computer. It takes a text apart into source-linked parts the user explores, runs and reassembles. Use open_in_break_the_wall when the user asks to open, study or take apart a text in Break the Wall.',
+    instructions: 'Break the Wall is a desktop app on the user\'s computer. It takes a text apart into source-linked parts the user explores, runs and reassembles. Use open_in_break_the_wall when the user asks to open or study a text in Break the Wall; use start_disassembly when the user asks you to take a text apart with Break the Wall yourself.',
     tools: TOOLS,
     prompts: PROMPTS,
-    call: async (name, args): Promise<ToolResult> => {
+    call: async (name, args, client): Promise<ToolResult> => {
+      if (name === 'start_disassembly') {
+        const input = startArgs.safeParse(args);
+        if (!input.success) return { content: [{ type: 'text', text: 'start_disassembly needs "text" and "question" as strings, and optionally "title" and "language" ("it" or "en").' }], isError: true };
+        return asResult(await writer.start(input.data, clientName(client)));
+      }
+      if (name === 'submit_structure') return asResult(writer.submitStructure(args.json));
+      if (name === 'submit_part') return asResult(writer.submitPart(args.index, args.json));
+      if (name === 'submit_runs') {
+        const reply = await writer.submitRuns(args.json);
+        return reply.finished ? save(link, reply.finished, reply.text) : asResult(reply);
+      }
       if (name !== 'open_in_break_the_wall') throw new Error(`Unknown tool ${name}`);
       const input = openArgs.safeParse(args);
       if (!input.success) return { content: [{ type: 'text', text: 'open_in_break_the_wall needs "text" as a string, and optionally "title" and "question" as strings.' }], isError: true };

@@ -87,6 +87,10 @@ export function PreferencesMenu() {
   </div></details>;
 }
 
+/** Who wrote a generated disassembly: ChatGPT or a local model with its model, or the learner's assistant (P-20261028-mcp-integration M5). */
+export const originText = (t: Messages, g: { provider: 'chatgpt' | 'local' | 'assistant'; model: string }) =>
+  g.provider === 'assistant' ? t.tools.writtenByAssistant(g.model) : t.tools.generatedBy(g.provider === 'local', g.model);
+
 /** Host failures are worded from their most specific code. */
 export const failureText = (t: Messages, failure: ProviderFailure) => failure.reason ? t.reasons[failure.reason] : t.failures[failure.code];
 /** Restore notices: disassemblies and lessons share codes but keep their own nouns. */

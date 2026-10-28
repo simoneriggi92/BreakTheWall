@@ -68,7 +68,7 @@ export async function serverCheck(executable, resources) {
   const tools = replies.find(x => x.id === 2)?.result?.tools?.map(t => t.name) ?? [];
   const prompts = replies.find(x => x.id === 3)?.result?.prompts?.map(p => p.name) ?? [];
   if (info?.name !== 'break-the-wall' || !tools.includes('open_in_break_the_wall') || !prompts.includes('break')) throw new Error(`The packaged MCP server did not answer: ${answered.slice(0, 300) || 'no output'}`);
-  console.log(`server check: the MCP server ${info.version} answers with the tool ${tools.join(', ')} and the prompt ${prompts.join(', ')}`);
+  console.log(`server check: the MCP server ${info.version} answers with the tools ${tools.join(', ')} and the prompt ${prompts.join(', ')}`);
 }
 
 /** Writes `<file>.sha256` in the format `shasum -a 256 -c` reads, and returns the digest. */

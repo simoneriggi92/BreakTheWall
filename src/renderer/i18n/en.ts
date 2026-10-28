@@ -157,6 +157,7 @@ export const en: Messages = {
     originGenerated: (by: string) => `${by}. Citations checked against your sources; check the explanations too.`,
     originPrepared: 'Prepared example · original teaching sources.',
     generatedBy: (local: boolean, model: string) => `${local ? 'Local model' : 'ChatGPT'} · ${model}`,
+    writtenByAssistant: (client: string) => `Your assistant · ${client}`,
   },
   blocks: {
     linkSource: 'Link to the source', yourSource: 'YOUR SOURCE', originalText: 'ORIGINAL TEXT', excerpts: 'Available excerpts', excerpt: (n: number) => `Excerpt ${n}`,
@@ -185,7 +186,7 @@ export const en: Messages = {
     marks: { step: 'then', keeps: 'stays the same', caveat: 'caution' },
     reasons: { context: 'context', 'outside-question': 'outside the question', repetition: 'repetition', detail: 'detail', secrets: 'contains secrets', generated: 'generated' },
     states: { ok: 'done', active: 'in progress', failed: 'failed', restored: 'restored' },
-    tag: 'Prepared disassembly', tagGenerated: 'Generated disassembly',
+    tag: 'Prepared disassembly', tagGenerated: 'Generated disassembly', tagAssistant: 'Written by your assistant',
     expand: {
       action: 'Take this part apart', cost: (route: string) => `One request to ${route}, with only this part's lines.`,
       running: 'Taking the part apart…', repairing: 'second pass: fixing what the checks found', shortening: 'shortening texts that are too long',

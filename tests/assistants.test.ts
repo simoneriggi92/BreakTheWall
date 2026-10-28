@@ -39,7 +39,7 @@ describe('the Claude Desktop extension (M4)', () => {
     expect(manifest).toMatchObject({ manifest_version: '0.3', name: 'break-the-wall', version: '0.3.0-alpha', author: { name: 'Simone Riggi' }, icon: 'icon.png',
       server: { type: 'node', entry_point: 'server/index.js', mcp_config: { command: 'node', args: ['${__dirname}/server/index.js'] } } });
     expect(files.has(manifest.server.entry_point)).toBe(true);
-    expect(manifest.tools.map((t: { name: string }) => t.name)).toEqual(['open_in_break_the_wall']);
+    expect(manifest.tools.map((t: { name: string }) => t.name)).toEqual(['open_in_break_the_wall', 'start_disassembly', 'submit_structure', 'submit_part', 'submit_runs']);
     // The manifest's prompt form: argument names, and the same text with ${arguments.topic}.
     expect(manifest.prompts).toEqual([{ name: 'break', description: PROMPTS[0].description, arguments: ['topic'], text: PROMPTS[0].text }]);
     expect(manifest.prompts[0].text).toContain('${arguments.topic}');

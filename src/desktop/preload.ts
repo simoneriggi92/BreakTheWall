@@ -38,6 +38,12 @@ const studio = Object.freeze<StudioBridge>({
     void ipcRenderer.invoke('incoming:ready');
     return () => { ipcRenderer.removeListener('studio:incoming', handler); };
   },
+  onAssistantDisassembly: listener => {
+    const handler = (_event: unknown, disassembly: unknown) => listener(disassembly);
+    ipcRenderer.on('studio:disassembly', handler);
+    void ipcRenderer.invoke('incoming:ready');
+    return () => { ipcRenderer.removeListener('studio:disassembly', handler); };
+  },
   assistantSetup: () => ipcRenderer.invoke('assistants:setup'),
   addToClaudeDesktop: () => ipcRenderer.invoke('assistants:add-desktop'),
   copyClaudeCodeCommand: () => ipcRenderer.invoke('assistants:copy-command'),

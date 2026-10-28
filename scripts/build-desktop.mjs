@@ -14,7 +14,7 @@ await build({
 // The MCP server runs outside Electron's app: on Claude Desktop's Node, or on the app's Electron in Node mode.
 await build({
   entryPoints: ['src/mcp/main.ts'],
-  bundle: true, platform: 'node', target: 'node18', format: 'cjs',
+  bundle: true, platform: 'node', target: 'node20', format: 'cjs',
   outfile: 'dist-electron/mcp-server.cjs', define: { BTW_VERSION: JSON.stringify(version) },
 });
 
