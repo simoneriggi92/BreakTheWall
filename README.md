@@ -21,11 +21,13 @@
 
 <p align="center"><a href="#try-the-alpha"><strong>Try the alpha</strong></a> · <a href="#how-it-works">How it works</a> · <a href="#roadmap">Roadmap</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 
+<p align="center"><strong>1 · Claude writes it, Break the Wall checks it</strong> · <a href="#use-with-claude">Use with Claude</a></p>
+
+![Demo with Claude: Use with Claude turned on in the app; in Claude Code the request is typed, Claude explains how a browser checks an HTTPS certificate and takes the explanation apart with Break the Wall, phase by phase; the app refuses the first structure and the first runs and Claude fixes them; the disassembly opens in the app marked as written by your assistant, a part shows its source lines, and the scenario is run step by step with a prediction](docs/images/claude.gif)
+
+<p align="center"><strong>2 · Explore it, run it, put it back together</strong></p>
+
 ![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted, then its sub-assembly opened one level down; a scenario predicted and run on the drawing, where a smoke test fails and the rollback takes over; the theme switched from blueprint to paper; Mill's harm principle, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
-
-**New: take a text apart from Claude.** Claude writes the disassembly, Break the Wall checks every phase and saves it. [Use with Claude](#use-with-claude)
-
-![Demo with Claude: Use with Claude turned on in the app; in Claude Code, with the tool calls of a real run, Claude explains how a browser checks an HTTPS certificate and takes the explanation apart with Break the Wall; the app refuses the first structure and the first runs, and Claude fixes them; the disassembly opens in the app marked as written by your assistant, a part shows its source lines, and a run steps through the drawing](docs/images/claude.gif)
 
 > [!NOTE]
 > **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental), a local model on your computer, or [Claude Desktop and Claude Code](#use-with-claude), which can open a text in Studio or write the disassembly themselves. PDF documents and repositories as sources are on the [roadmap](#roadmap).
@@ -228,7 +230,7 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 
 Break the Wall works with **Claude Desktop** and **Claude Code** through a local MCP server that ships inside the app. You install nothing else.
 
-The Claude demo near the top of this page is a real run in Claude Code, with Sonnet. It took 13 turns and about $0.38 on the user's plan. The terminal shows that run's tool calls, redrawn from its transcript, and the app frames are the app itself. The first structure and the first runs were refused, then fixed by Claude.
+The first demo at the top of this page comes from a real run in Claude Code, with Sonnet: 13 turns and about $0.38 on the user's plan. The first structure and the first runs were refused, and Claude fixed them. The terminal is redrawn from the run's transcript, with each result summarized. The app frames show the disassembly Claude wrote in that run.
 
 There are two ways to use it:
 

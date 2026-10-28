@@ -526,3 +526,21 @@ The owner's level B run in Claude Desktop ("Explain how a browser checks an HTTP
 | Task | Verdict |
 |---|---|
 | M6a | **verified** by automated tests; the owner's Claude Desktop run is the witnessed check |
+
+#### M8: the README GIF, second version
+
+The owner asked for a clearer GIF ("focus sul prompt dell'utente, dove vedo la scrittura del prompt … tema carta … dividi in due gif … occhio a non perdere la parte di esecuzione"), keeping the terminal ("tieni terminale, però rendilo più chiaro"). `docs/images/claude.gif` was remade: 960×540 at 10 fps, 43 s, 3.5 MB.
+
+- **The terminal:**
+  - text twice the size;
+  - the request typed in the input box, three characters a frame, with the box highlighted;
+  - each call as the tool's name and one line, ✓ or ✗ with a short, faithful summary of that call's result in the real run (for example "Not accepted: two joint labels and one lead are over their length limits").
+  The request is typed in words, not as `/break`. `/break` is the owner's personal command, and the server's prompt in Claude Code receives only the first word.
+- **The app, in paper:**
+  - the library, and the panel with its switch on (the command shown in the installed app's form);
+  - the disassembly arriving, tagged "Written by your assistant";
+  - a part with its source lines;
+  - the scenario run for four steps, ending on "Right prediction".
+  The disassembly is the one Claude wrote in the real run: the calls the app accepted in that run were sent again, from its transcript, to the bundled server of a fresh app with a temporary data folder. Every call was accepted again.
+- **The README** shows two GIFs in order under the links: "1 · Claude writes it, Break the Wall checks it", the new one; then "2 · Explore it, run it, put it back together", the existing demo with the full run, theme switch, argument, reassembly and bill of materials. The paragraph in "Use with Claude" says the run is real, that the terminal is redrawn and summarized from its transcript, and that the app shows the disassembly from that run.
+- **Review:** contact sheets every 2–3 seconds; no private content. The temporary data folder was deleted.
