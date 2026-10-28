@@ -228,7 +228,7 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 
 Break the Wall works with **Claude Desktop** and **Claude Code** through a local MCP server that ships inside the app. You install nothing else.
 
-The [demo at the top of this page](#readme) is a real run in Claude Code, with Sonnet. It took 13 turns and about $0.38 on the user's plan. The terminal shows that run's tool calls, redrawn from its transcript, and the app frames are the app itself. The first structure and the first runs were refused, then fixed by Claude.
+The Claude demo near the top of this page is a real run in Claude Code, with Sonnet. It took 13 turns and about $0.38 on the user's plan. The terminal shows that run's tool calls, redrawn from its transcript, and the app frames are the app itself. The first structure and the first runs were refused, then fixed by Claude.
 
 There are two ways to use it:
 
