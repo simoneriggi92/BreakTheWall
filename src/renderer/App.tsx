@@ -7,6 +7,7 @@ import { canVisit, initialState, navigate, restoreState, solved, submit, type Le
 import { validateDisassembly, type Disassembly } from '../core/disassembly';
 import { loadPreparedDisassemblies } from '../fixtures/disassemblies';
 import { DisassemblyPlayer } from './disassembly/DisassemblyPlayer';
+import { AssistantsMenu } from './Assistants';
 import { Brand } from './icons';
 import { LessonBlock } from './blocks';
 import { browserBridge } from './storage';
@@ -74,7 +75,7 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
         versions={disassembly.family ? allDisassemblies.filter(x => x.family === disassembly.family && x.id !== disassembly.id) : []} openVersion={openDisassembly}/>
     : lesson
     ? <Player key={lesson.id} lesson={lesson} bridge={bridge} runtime={runtimeLabel} goHome={() => setSelected(undefined)}/>
-    : <><header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtimeLabel || t.common.opening}</span><PreferencesMenu/></header><Library lessons={lessons} generated={generated} disassemblies={allDisassemblies} bridge={bridge} error={error ? t.shell[error] : ''} skipped={skipped} draft={draft} setDraft={setDraft} onOpen={open} onOpenDisassembly={openDisassembly} onCreated={created}
+    : <><header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtimeLabel || t.common.opening}</span><AssistantsMenu studio={bridge.studio}/><PreferencesMenu/></header><Library lessons={lessons} generated={generated} disassemblies={allDisassemblies} bridge={bridge} error={error ? t.shell[error] : ''} skipped={skipped} draft={draft} setDraft={setDraft} onOpen={open} onOpenDisassembly={openDisassembly} onCreated={created}
         incoming={incoming} onIncomingTaken={n => setIncoming(list => list.slice(n))}/></>}
   </>;
 }

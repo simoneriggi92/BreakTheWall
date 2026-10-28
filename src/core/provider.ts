@@ -162,6 +162,8 @@ export const incomingSourceSchema = z.strictObject({
   question: z.string().max(400),
 });
 export interface IncomingSource { source: UserSource; question: string }
+/** What the "Use with Claude" panel shows: the Claude Code command, and whether the Claude Desktop extension is there. */
+export interface AssistantSetup { platform: string; claudeCode: string; desktopExtension: boolean }
 
 /** Desktop-only operations. Absent in the browser preview. */
 export interface StudioBridge {
@@ -181,6 +183,11 @@ export interface StudioBridge {
   onGenerationProgress(listener: (progress: GenerationProgress) => void): () => void;
   /** Texts handed over by an AI assistant through the local entry point; the host keeps them until a listener is there. */
   onIncomingSource?(listener: (incoming: IncomingSource) => void): () => void;
+  assistantSetup?(): Promise<AssistantSetup>;
+  /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */
+  addToClaudeDesktop?(): Promise<{ ok: boolean }>;
+  /** Copies the Claude Code command; the host writes it, so the renderer cannot put anything else on the clipboard. */
+  copyClaudeCodeCommand?(): Promise<void>;
   listLessons(): Promise<{ lessons: unknown[]; skipped: number }>;
   /** Saved generated disassemblies; the renderer validates them again before showing them. */
   listDisassemblies?(): Promise<{ disassemblies: unknown[]; skipped: number }>;
