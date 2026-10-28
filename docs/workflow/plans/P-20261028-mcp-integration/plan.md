@@ -4,8 +4,8 @@ title: Break the Wall in Claude through MCP - open a text in Studio (level A), t
 version: 3
 state: implementing
 current_task: M8
-last_evidence: M9 - level B passed twice in Claude Code against the packaged app ($0.40-0.42, 55-107 s), routing fix confirmed; Claude Desktop level B, the prompt and the GIF remain
-next_action: Owner runs level B in Claude Desktop (recorded for the README GIF), or decides to ship with the Claude Code evidence
+last_evidence: M8 done with the README GIF of a real Claude Code level B run ($0.38); M9 level B passed in Claude Code; Claude Desktop and the prompt remain for the owner
+next_action: Owner reviews PR #32 (docs, routing fix, prompt v3, GIF); then level B and the break prompt in Claude Desktop close M9
 approval: approved
 ---
 
@@ -463,3 +463,24 @@ Earlier, the owner had seen level A in Claude Desktop (the text opened in Studio
 | 4. Level B | **passed in Claude Code** (runs A and B); Claude Desktop not yet |
 | 5. Connection off | covered by automated tests; not witnessed |
 | 6. The `break` prompt in both clients | not yet run |
+
+#### M8: the README GIF of a real Claude run
+
+The owner asked for the GIF to be made by the agent ("crea tu la GIF … rispetta lo stile della GIF già sul README"). `docs/images/claude.gif` is 960×540 at 10 fps, 36 s, 3.2 MB. It was made with the same pipeline as `docs/images/demo.gif`, rebuilt from this session's history: the composer that draws the wallpaper, the window, the cursor, the click rings, the pill captions and the end card. The composer gained a still event, a title per window and hard cuts.
+
+- **The run.** A real level B run: the app from source in English and blueprint, with a temporary data folder and `assistants: true`, and Claude Code (`claude -p`, Sonnet, `--disable-slash-commands`) through the bundled server. The prompt was "Explain how a browser checks an HTTPS certificate, then take your explanation apart with Break the Wall."
+  - `start_disassembly` (27 lines).
+  - `submit_structure` ✗: joint labels 30 and 31 characters long, for 24. Then ✓, 6 parts.
+  - Parts 0–5 ✓.
+  - `submit_runs` ✗: a slot label repeated a part's name, and a correct option was 1.85× as long as the wrong ones. Then ✓, saved.
+  - 13 turns, $0.38, 97 s.
+- **The app frames** are the app itself, captured over the DevTools protocol at 1440×860 @2x:
+  - the library;
+  - the "Use with Claude" panel with the switch on. Its command was replaced, in the page only, with the installed app's `/Applications/…` form, so that no local path or user name appears;
+  - the disassembly arriving, tagged "Written by your assistant";
+  - a part with its source lines;
+  - the scenario run for two steps.
+- **The terminal frames** are the run's tool calls and results, redrawn from its `stream-json` transcript in a terminal page, with long arguments shortened. They are not a screen capture of Claude Code, and the README says so.
+- **The end card**: "Claude writes it → the app checks it → you run it", with "Works with Claude Desktop and Claude Code · Open source · Alpha for macOS and Windows".
+- **Review.** Every 2–3 seconds of the GIF was checked on contact sheets. Two fixes followed: hard cuts between terminal states, because crossfades ghosted the scrolled text, and no cursor over the terminal. No private content appears: only the temporary data folder's app, the public examples and the run's own text. The temporary data folder and run directory were deleted.
+- **README.** A line and the GIF under the existing demo ("New: take a text apart from Claude"), and a paragraph in "Use with Claude" stating that the run is real, its cost, and that the terminal is redrawn from the transcript.
