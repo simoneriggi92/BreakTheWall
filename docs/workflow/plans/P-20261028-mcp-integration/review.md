@@ -43,3 +43,16 @@ Date: 2026-10-28. Reviewer: the agent, before asking for approval again.
 | 4 | With level B, a long explanation means many `submit_part` calls in one conversation. | Accepted as in version 1's risks; M9 records turns and cost. |
 
 No open findings.
+
+# Review of P-20261028-mcp-integration v4
+
+Date: 2026-10-28. Reviewer: the agent, before asking for approval again.
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | Losing an accepted structure and parts at the last step wastes the user's Claude usage and gives nothing back. | Resolved: the session keeps them, and the user decides whether to try the step again. |
+| 2 | Unlimited retries could spend the user's usage without end. | Resolved: retries come in batches of 3, and each new batch needs the user's go-ahead through the assistant. |
+| 3 | The answer-length message changes for the app's own routes too. | Accepted: it is the same check and only gains numbers; the tests that match its wording are updated. |
+| 4 | Phase `assistant` is merged; the fix needs a home. | Resolved: M6a ships with phase `release`, on the same pull request as the docs. |
+
+No open findings.

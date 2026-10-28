@@ -125,6 +125,10 @@ describe('two-phase generation contract (D9)', () => {
     run.options = [{ text: 'Because the vote spent the only repair on the sea wall, so the hall was never fixed', correct: true, why: 'Yes.' }, { text: 'The railway', correct: false, why: 'No.' }, { text: 'The storm', correct: false, why: 'No.' }];
     expect(answerLengthRatio(run.options)).toBeGreaterThan(1.6);
     expect(findings(() => acceptRuns(JSON.stringify(giveaway), base))).toContainEqual({ path: `runs[${c}].options`, message: expect.stringMatching(/gives it away/) });
+    // M6a: the finding says how far to go, in characters (wrong ones: 11 and 9, so 10 on average and 16 at most).
+    const correct = run.options[0].text.length;
+    expect(findings(() => acceptRuns(JSON.stringify(giveaway), base)).find(f => f.path === `runs[${c}].options`)?.message)
+      .toContain(`it has ${correct} characters and the wrong ones 10 on average, so it may have at most 16. Shorten the correct option, or make the wrong ones as specific and as long`);
     expect(findings(() => acceptRuns(JSON.stringify(drafts.runs), base))).toEqual([]);
   });
 

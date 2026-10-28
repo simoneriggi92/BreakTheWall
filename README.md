@@ -235,7 +235,7 @@ There are two ways to use it:
 | | You ask Claude | What happens | Who writes the disassembly |
 |---|---|---|---|
 | **Open in Studio** | "Explain how a browser checks an HTTPS certificate and open it in Break the Wall" | The app comes to the front with Claude's text and your question in Studio | Break the Wall, with the route you choose (ChatGPT or a local model), when you press Generate |
-| **Claude writes it** | "Take this apart with Break the Wall" | Claude writes the structure, then each part, then the runs. The app checks every phase with the same rules it uses for its own generations, and returns findings for Claude to fix (at most 3 attempts per step) | Claude, on your Claude plan; the result opens in the library as "Written by your assistant" |
+| **Claude writes it** | "Take this apart with Break the Wall" | Claude writes the structure, then each part, then the runs. The app checks every phase with the same rules it uses for its own generations, and returns findings for Claude to fix. After 3 attempts at a step, Claude asks you before trying again, and nothing already accepted is lost | Claude, on your Claude plan; the result opens in the library as "Written by your assistant" |
 
 **Connect it once.** In the app, open **Use with Claude** at the top of the library:
 1. Turn on **Connect AI assistants**. While it is off, Break the Wall accepts nothing from other apps.

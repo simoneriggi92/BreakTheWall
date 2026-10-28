@@ -87,7 +87,7 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     expect(app.opened.map(x => x.id)).toEqual([stored.id]);
   });
 
-  it('returns the app\'s findings, counts attempts and stops after the limit', async () => {
+  it('returns the app\'s findings, counts attempts, and after the limit keeps the work and waits for the user (M6a)', async () => {
     const d = atlas() as Disassembly;
     const server = createBreakTheWallServer({ address: 'unused', launch: async () => false }, '0.3.0');
     await call(server, 'start_disassembly', { text: d.sources[0].text, question: d.question });
@@ -98,13 +98,19 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     expect(first.result.isError).toBe(true);
     expect(textOf(first)).toMatch(new RegExp(`^Not accepted \\(attempt 1 of ${MAX_ATTEMPTS} for the structure\\)\\. `));
     expect(textOf(first)).toContain('parts[0].role');
-    // A good answer resets the count; then the first part, failing every time, ends the session.
+    // A good answer resets the count; then the first part fails every time.
     expect((await call(server, 'submit_structure', { json: JSON.stringify(drafts.structure) })).result.isError).toBeUndefined();
     for (let i = 1; i < MAX_ATTEMPTS; i++) expect(textOf(await call(server, 'submit_part', { index: 0, json: '{"points":[]}' }))).toContain(`attempt ${i} of ${MAX_ATTEMPTS}`);
     const last = await call(server, 'submit_part', { index: 0, json: 'not json' });
-    expect(textOf(last)).toContain(`did not accept part 0 after ${MAX_ATTEMPTS} attempts`);
+    expect(last.result.isError).toBe(true);
+    expect(textOf(last)).toContain(`did not accept part 0 after ${MAX_ATTEMPTS} attempts. Everything accepted so far is kept`);
+    expect(textOf(last)).toContain('ask whether to try this step again');
     expect(textOf(last)).toContain('open_in_break_the_wall');
-    expect(textOf(await call(server, 'submit_part', { index: 0, json: '{}' }))).toBe('No disassembly is in progress: call start_disassembly first.');
+    expect(textOf(last)).toContain('The previous answer does not pass the app checks');
+    // The structure is still accepted: a new try at part 0 starts a new count, and the rest finishes.
+    expect(textOf(await call(server, 'submit_part', { index: 0, json: '{"points":[]}' }))).toContain(`attempt 1 of ${MAX_ATTEMPTS}`);
+    for (const [index, content] of drafts.contents.entries()) expect((await call(server, 'submit_part', { index, json: JSON.stringify(content) })).result.isError).toBeUndefined();
+    expect(textOf(await call(server, 'submit_runs', { json: JSON.stringify(drafts.runs) }))).toContain('is complete: 6 parts');
   });
 
   it('refuses steps out of order, a short question and an oversized text; a new start replaces an unfinished session', async () => {

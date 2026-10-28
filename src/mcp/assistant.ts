@@ -110,7 +110,10 @@ export class AssistantWriter {
     return { text: `That step is not the current one. Next: ${next}.`, isError: true };
   }
 
-  /** Runs one accept function; findings become the app's repair request, and too many attempts end the session. */
+  /**
+   * Runs one accept function; findings become the app's repair request. After MAX_ATTEMPTS in a row the session keeps
+   * what was accepted and asks for the user's go-ahead; the next submit for the step starts a new count (M6a).
+   */
   private attempt(s: Session, what: string, accept: () => StepReply): StepReply {
     try {
       const reply = accept();
@@ -120,8 +123,8 @@ export class AssistantWriter {
       if (!(error instanceof DisassemblyError)) throw error;
       s.attempts++;
       if (s.attempts >= MAX_ATTEMPTS) {
-        this.session = undefined;
-        return { text: `Break the Wall did not accept ${what} after ${MAX_ATTEMPTS} attempts, so this disassembly has stopped. Tell the user, and offer to open the text in Break the Wall with open_in_break_the_wall instead, where the app generates it.`, isError: true };
+        s.attempts = 0;
+        return { text: `Break the Wall did not accept ${what} after ${MAX_ATTEMPTS} attempts. Everything accepted so far is kept, and this step is still the current one. Stop here: tell the user what Break the Wall reports below, and ask whether to try this step again. Only if they agree, submit it again, fixing exactly those findings; the count starts over. They can also open the text in Break the Wall with open_in_break_the_wall, where the app generates it.\n\n${buildRepairRequest(error.findings)}`, isError: true };
       }
       return { text: `Not accepted (attempt ${s.attempts} of ${MAX_ATTEMPTS} for ${what}). ${buildRepairRequest(error.findings)}`, isError: true };
     }
