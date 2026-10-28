@@ -3,6 +3,7 @@ import { allParts, billOfMaterials, type Cite, type Disassembly, type LineStatus
 import { readingPaths } from '../../core/layout';
 import { usePreferences } from '../preferences';
 import { citeLabel } from './PartCard';
+import { PartIcon } from './Sheet';
 
 /** Consecutive lines with the same status, so a long source draws as a few segments. */
 function runs(status: LineStatus[]) {
@@ -38,7 +39,7 @@ export function BillOfMaterials({ d, onFocus }: { d: Disassembly; onFocus: (c: C
       <thead><tr><th scope="col">{t.d.bom.item}</th><th scope="col">{t.d.bom.name}</th><th scope="col">{t.d.bom.lines}</th></tr></thead>
       <tbody>
         <tr><td className="mono">—</td><td lang={d.language}>{t.d.bom.whole} · {d.whole.name}</td><td>{ranges(d.whole.cites)}</td></tr>
-        {numbered.map(({ part, number }) => <tr key={part.id}><td className="mono">{number}</td><td lang={d.language}>{part.name} <span className="micro plain">· {t.d.kinds[part.kind]}</span></td><td>{ranges(part.cites)}</td></tr>)}
+        {numbered.map(({ part, number }) => <tr key={part.id}><td className="mono">{number}</td><td lang={d.language}><span className="bom-part-name"><PartIcon name={part.icon} size={17}/>{part.name}</span> <span className="micro plain">· {t.d.kinds[part.kind]}</span></td><td>{ranges(part.cites)}</td></tr>)}
         {joints.map((j, i) => <tr key={`j${i}`}><td className="mono">—</td><td lang={d.language}>{t.d.bom.joint(j.label)}</td><td>{ranges(j.cites!)}</td></tr>)}
       </tbody></table>
     <table className="bom-table excluded"><caption className="box-label">{t.d.bom.excluded}</caption>

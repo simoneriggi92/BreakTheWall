@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Ban, BookOpen, ClipboardCheck, Code2, Cpu, Database, Download, FileText, Fingerprint, Flag, Funnel, Gauge, GitBranch, Hammer, KeyRound, Layers, ListChecks, Lock, Map, MessageCircle, Package, Play, Plug, Repeat, Rocket, RotateCcw, Ruler, Scale, Search, Send, Settings, ShieldCheck, Sprout, Timer, TriangleAlert, UserRound, Users } from 'lucide-react';
 import { JOINT_FAMILY, type Joint, type Part } from '../../core/disassembly';
 import { labelBeside, readingNumbers, type LevelLayout, type Point, type Rect } from '../../core/layout';
@@ -62,6 +62,24 @@ const TITLE_BLOCK = 64;
 /** The exploded view: one level drawn from the automatic layout, as a technical sheet with a title block. */
 export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit }: SheetProps) {
   const { t } = usePreferences();
+  const scroll = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const host = scroll.current;
+    if (!host || !selected) return;
+    const bringIntoView = () => {
+      const plate = [...host.querySelectorAll<SVGGElement>('.plate')].find(p => p.dataset.id === selected);
+      if (!plate) return;
+      const area = host.getBoundingClientRect(); const box = plate.getBoundingClientRect();
+      if (!area.width || !box.width) return;
+      if (box.left < area.left + 16 || box.right > area.right - 16) host.scrollLeft += (box.left + box.right - area.left - area.right) / 2;
+      if (box.top < area.top + 16 || box.bottom > area.bottom - 16) host.scrollTop += (box.top + box.bottom - area.top - area.bottom) / 2;
+    };
+    bringIntoView();
+    const svg = host.querySelector('svg');
+    if (!svg || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(bringIntoView); observer.observe(svg);
+    return () => observer.disconnect();
+  }, [selected, layout, fit]);
   const width = Math.max(layout.width, 560); const height = layout.height + TITLE_BLOCK;
   const flowing = (j: Joint) => flow.some(([a, b]) => (a === j.from && b === j.to) || (a === j.to && b === j.from));
   const asides = useMemo(() => layout.joints.map((_, i) => labelBeside(layout, i)), [layout]);
@@ -69,7 +87,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
   const numbers = useMemo(() => readingNumbers(layout), [layout]);
   const plates = useMemo(() => [...layout.plates].sort((a, b) => numbers.get(a.id)! - numbers.get(b.id)!), [layout, numbers]);
   // Only the drawing scrolls sideways when it is wider than the room; the panels around it never do.
-  return <div className="sheet-scroll"><svg className={`sheet${fit ? ` fit-${fit}` : ''}`} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={t.d.sheetLabel(title)}
+  return <div ref={scroll} className="sheet-scroll"><svg className={`sheet${fit ? ` fit-${fit}` : ''}`} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={t.d.sheetLabel(title)}
     style={fit ? undefined : { minWidth: `${Math.round(width * 0.7)}px`, maxWidth: `${Math.round(width * 1.15)}px` }}>
     <defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" className="hatch-line"/></pattern></defs>
     <rect className="frame" x={8} y={8} width={width - 16} height={height - 16}/>

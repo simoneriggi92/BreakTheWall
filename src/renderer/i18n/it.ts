@@ -178,6 +178,7 @@ export const it = {
     trace: 'Una traccia per confrontarti', notAGrade: 'Non è un voto. Confronta le relazioni che hai spiegato e quelle che mancano.', backToPrinciple: 'Ritorna al principio nella fonte',
   },
   d: {
+    workbench: { part: 'Pezzo', activity: 'Attività', inspector: 'Pezzo, attività e fonte', resizeInspector: 'Larghezza del pannello di lettura', drawingTools: 'Strumenti del disegno', fit: 'Adatta il disegno', zoomIn: 'Ingrandisci il disegno', zoomOut: 'Riduci il disegno', focusCanvas: 'Concentrati sul disegno', restorePanels: 'Mostra disegno e pannello di lettura', runHint: 'Osserva la struttura mentre metti alla prova un collegamento.' },
     modes: { explode: 'Esploso', run: 'Fai girare', reassemble: 'Rimonta', bom: 'Distinta base' }, modesLabel: 'Cosa fare con lo smontaggio',
     kinds: { step: 'passo', component: 'componente', artifact: 'artefatto', premise: 'premessa', conclusion: 'tesi', ground: 'fondamento', limit: 'limite', objection: 'obiezione', consequence: 'conseguenza', rejected: 'scartato', event: 'evento', actor: 'attore' },
     verbs: { 'sends-to': 'invia a', causes: 'causa', 'depends-on': 'dipende da', supports: 'sostiene', attacks: 'attacca', limits: 'limita', 'leads-to': 'porta a', because: 'spiega' },
@@ -194,7 +195,7 @@ export const it = {
       noRoute: 'Scegli un modello in «Smonta una tua fonte» per smontare i pezzi.', local: (model: string) => `il modello locale ${model}`,
     },
     otherVersion: (language: string) => `Questo smontaggio esiste anche in ${language}. I progressi restano separati per ogni versione.`, openVersion: 'Apri quella versione',
-    widenSource: 'Allarga la fonte a tutta la riga', narrowSource: 'Riporta la fonte accanto alla scheda',
+    widenSource: 'Allarga la fonte a tutta l’area', narrowSource: 'Ripristina disegno e fonte',
     panes: { drawing: 'Altezza del disegno', source: 'Larghezza della fonte' },
     readingOrder: 'Numeri: ordine di lettura',
     viewLabel: 'Come mostrare la fonte', views: { lines: 'Righe', document: 'Documento' }, openReader: 'Leggi a tutta finestra', closeReader: 'Chiudi la lettura',
