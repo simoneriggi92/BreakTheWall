@@ -86,6 +86,10 @@ describe('the open_in_break_the_wall tool against the app\'s entry point (M3)', 
   it('lists the open tool, whose schema needs only the text, before the level B tools', async () => {
     expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall', 'start_disassembly', 'submit_structure', 'submit_part', 'submit_runs']);
     expect(TOOLS[0].inputSchema).toMatchObject({ required: ['text'] });
+    // "Take apart" belongs to level B: in Claude Desktop, "smonta questo testo" once picked the open tool (M9).
+    expect(TOOLS[0].description).toContain('WITHOUT taking it apart');
+    expect(TOOLS[0].description).toContain('use start_disassembly instead');
+    expect(TOOLS[1].description).toMatch(/^Take a text apart with Break the Wall/);
   });
 
   it('opens a text in the running app and says that nothing was generated yet', async () => {
@@ -129,7 +133,7 @@ describe('the break prompt (M4a)', () => {
     const s = server();
     expect(await s.handle(initialize())).toMatchObject({ result: { capabilities: { tools: {}, prompts: { listChanged: false } } } });
     const listed = await s.handle(request(2, 'prompts/list')) as { result: { prompts: Record<string, unknown>[] } };
-    expect(listed.result.prompts).toEqual([{ name: 'break', title: 'Break it down in Break the Wall', description: PROMPTS[0].description, arguments: [{ name: 'topic', description: PROMPTS[0].arguments[0].description, required: false }] }]);
+    expect(listed.result.prompts).toEqual([{ name: 'break', title: 'Take it apart with Break the Wall', description: PROMPTS[0].description, arguments: [{ name: 'topic', description: PROMPTS[0].arguments[0].description, required: false }] }]);
   });
 
   it('puts the topic into one user message that ends in the tool call', async () => {
@@ -138,8 +142,10 @@ describe('the break prompt (M4a)', () => {
     const { role, content } = got.result.messages[0];
     expect(role).toBe('user');
     expect(content.type).toBe('text');
-    expect(content.text).toMatch(/^The user wants to take something apart in Break the Wall\. What they asked for: How does a browser check a certificate\?\n/);
-    expect(content.text).toContain('Call the Break the Wall tool open_in_break_the_wall');
+    expect(content.text).toMatch(/^The user wants to take something apart with Break the Wall\. What they asked for: How does a browser check a certificate\?\n/);
+    // Version 3: the prompt takes the text apart with level B, never through the open tool.
+    for (const step of ['start_disassembly', 'submit_structure', 'submit_part', 'submit_runs']) expect(content.text).toContain(step);
+    expect(content.text).not.toContain('open_in_break_the_wall');
     expect(content.text).toContain('use that answer unchanged');
   });
 

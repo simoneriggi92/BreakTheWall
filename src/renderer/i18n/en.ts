@@ -10,7 +10,7 @@ export const en: Messages = {
   },
   assistants: {
     label: 'Use with Claude', title: 'Use Break the Wall from Claude',
-    intro: 'Ask Claude to open a text in Break the Wall: the app comes to the front with it in Studio, and you generate as usual.',
+    intro: 'Claude can take a text apart with Break the Wall, writing the disassembly that the app checks and saves, or open a text in Studio for you to generate here.',
     connect: 'Connect AI assistants',
     connectOn: 'On: apps you run on this computer can hand texts to Break the Wall. Nothing is generated until you press Generate.',
     connectOff: 'Off: Break the Wall accepts no texts from other apps.',
@@ -18,7 +18,7 @@ export const en: Messages = {
     desktopMissing: 'The extension is missing from this copy of the app: build it with npm run build.',
     desktopOpened: 'Opened in Claude Desktop: confirm the installation there.', desktopFailed: 'The extension did not open. Is Claude Desktop installed?',
     codeTitle: 'Claude Code', codeHint: 'Run this command once in a terminal; Break the Wall is then available in every project.',
-    promptHint: 'Then ask Claude to open a text in Break the Wall, or use the prompt break: in Claude Code type /break-the-wall:break and write your question when Claude asks (Claude Code passes on only the first word after the command); with nothing to ask, it opens Claude\'s last long answer. In Claude Desktop the prompt is among the conversation\'s attachments, with a field for the question.',
+    promptHint: 'Then ask Claude to take a text apart with Break the Wall: Claude writes the disassembly, the app checks it and opens it here. Or ask Claude to open a text in Break the Wall, to generate it in Studio. In Claude Code, the prompt /break-the-wall:break does the first: write your question when Claude asks (Claude Code passes on only the first word after the command); with nothing to ask, it takes apart Claude\'s last long answer. In Claude Desktop the prompt is among the conversation\'s attachments, with a field for the question.',
     copy: 'Copy command', copied: 'Copied',
     codeWindows: 'After installing a new version of Break the Wall, copy the command and run it again.',
     privacy: 'Claude sees only what you share in the conversation. Through this connection Claude can hand texts to Break the Wall; Break the Wall sends nothing to Claude.',

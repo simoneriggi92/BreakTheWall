@@ -30,3 +30,29 @@ Date: 2026-10-28. Reviewer: the agent, before asking for approval again.
 | 4 | A prompt without a topic must not invent one. | Resolved: with no topic it sends the last long answer unchanged; tested in M4a. |
 
 No open findings.
+
+# Review of P-20261028-mcp-integration v3
+
+Date: 2026-10-28. Reviewer: the agent, before asking for approval again.
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | Version 2's `break` prompt opened the text in Studio, so it still needed ChatGPT or a local model to generate; the owner wants generation through Claude. | Resolved: the prompt drives level B. Opening in Studio remains available through the open tool. |
+| 2 | Phases `server` and `assistant` are merged; the prompt text needs a home. | Resolved: the prompt change ships in phase `release`, with the docs that describe it, under the v3 approval. |
+| 3 | A level B run costs more than opening in Studio, and a prompt makes it one keystroke away. | Accepted: the run is on the user's own Claude plan, the README says so, and the open tool stays for users who want the app to generate. |
+| 4 | With level B, a long explanation means many `submit_part` calls in one conversation. | Accepted as in version 1's risks; M9 records turns and cost. |
+
+No open findings.
+
+# Review of P-20261028-mcp-integration v4
+
+Date: 2026-10-28. Reviewer: the agent, before asking for approval again.
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | Losing an accepted structure and parts at the last step wastes the user's Claude usage and gives nothing back. | Resolved: the session keeps them, and the user decides whether to try the step again. |
+| 2 | Unlimited retries could spend the user's usage without end. | Resolved: retries come in batches of 3, and each new batch needs the user's go-ahead through the assistant. |
+| 3 | The answer-length message changes for the app's own routes too. | Accepted: it is the same check and only gains numbers; the tests that match its wording are updated. |
+| 4 | Phase `assistant` is merged; the fix needs a home. | Resolved: M6a ships with phase `release`, on the same pull request as the docs. |
+
+No open findings.

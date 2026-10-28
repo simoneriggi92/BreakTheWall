@@ -417,7 +417,12 @@ export function acceptRuns(raw: string, input: Omit<Draft, 'runs'>): RunsDraft {
   });
   for (const set of optionSets(d.runs)) {
     const ratio = answerLengthRatio(set.options);
-    if (ratio !== undefined && ratio > ANSWER_LENGTH_LIMIT) findings.push({ path: set.path, message: `The correct option is ${ratio}× as long as the wrong ones, which gives it away: make the options similar in length` });
+    if (ratio !== undefined && ratio > ANSWER_LENGTH_LIMIT) {
+      // Numbers a model can act on (M6a): without a target, repairs kept the correct option too long.
+      const correct = set.options.find(o => o.correct)!.text.length;
+      const wrong = set.options.filter(o => !o.correct), mean = Math.round(wrong.reduce((sum, o) => sum + o.text.length, 0) / wrong.length);
+      findings.push({ path: set.path, message: `The correct option is ${ratio}× as long as the wrong ones, which gives it away: it has ${correct} characters and the wrong ones ${mean} on average, so it may have at most ${Math.floor(ANSWER_LENGTH_LIMIT * mean)}. Shorten the correct option, or make the wrong ones as specific and as long` });
+    }
   }
   findings.push(...languageFindings('runs', runs.runs.map(r => [r.title, r.type === 'load' ? r.bricks.map(b => b.explain).join(' ') : r.type === 'case' ? r.question : r.steps.map(s => s.explain).join(' ')].join(' ')).join(' '), input.language));
   if (findings.length) throw new DisassemblyError(findings);

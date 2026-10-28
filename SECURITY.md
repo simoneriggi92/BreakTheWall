@@ -21,6 +21,11 @@ Include what you found, how to reproduce it, and what an attacker could reach. Y
 - A source, or text derived from it, leaving the device through a route the learner did not choose, or a local-model request reaching a host other than this Mac.
 - Code execution from a source, a markdown document, a Mermaid diagram or a model's answer (the renderer must show them as data).
 - An IPC call that a page other than the app's own can reach, or that accepts input the host does not validate.
+- The local entry point for AI assistants (a socket in the data folder, mode 0600, or a per-user named pipe on Windows, open only while "Connect AI assistants" is on):
+  - anything reaching it while the switch is off, or from another user;
+  - a text that skips the paste import's limits;
+  - a disassembly stored through it without the app's validation, without the assistant origin, or over one already saved.
+- The MCP server (`src/mcp/`) writing anything but protocol to stdout, or sending a source anywhere except the local entry point.
 - A loosened content security policy in the production build.
 
 ## Out of scope

@@ -93,7 +93,7 @@ const openArgs = z.object({
 export const TOOLS: ToolDefinition[] = [{
   name: 'open_in_break_the_wall',
   title: 'Open in Break the Wall',
-  description: 'Open a text in Break the Wall, the desktop app that takes a wall of text apart into source-linked parts the user can explore, run and reassemble. Use it when the user wants to study, understand or take apart a long answer, a document or a Markdown file in Break the Wall. The app comes to the front with the text in Studio; the user then chooses how to generate and presses Generate there. Send the text exactly as the user should study it, as plain text or Markdown (at most 40,000 characters and 1,500 lines).',
+  description: 'Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates the disassembly in the app, with the app\'s own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), use start_disassembly instead. Send the text exactly as the user should study it, as plain text or Markdown (at most 40,000 characters and 1,500 lines).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -107,7 +107,7 @@ export const TOOLS: ToolDefinition[] = [{
 }, {
   name: 'start_disassembly',
   title: 'Write a Break the Wall disassembly',
-  description: 'Write a Break the Wall disassembly of a text yourself, instead of opening it for the app to generate: use it when the user asks you to take a text apart with Break the Wall. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the numbered source and the JSON schema for the first phase.',
+  description: 'Take a text apart with Break the Wall: you write the disassembly yourself, and Break the Wall checks it. This is the tool to use when the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), including an answer you just wrote. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the numbered source and the JSON schema for the first phase.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -158,7 +158,7 @@ async function save(link: AppLink, disassembly: Disassembly, done: string): Prom
 export function createBreakTheWallServer(link: AppLink, version: string, writer = new AssistantWriter()) {
   return createMcpServer({
     info: { name: 'break-the-wall', title: 'Break the Wall', version },
-    instructions: 'Break the Wall is a desktop app on the user\'s computer. It takes a text apart into source-linked parts the user explores, runs and reassembles. Use open_in_break_the_wall when the user asks to open or study a text in Break the Wall; use start_disassembly when the user asks you to take a text apart with Break the Wall yourself.',
+    instructions: 'Break the Wall is a desktop app on the user\'s computer. It takes a text apart into source-linked parts the user explores, runs and reassembles. When the user asks to take a text apart, break it down or disassemble it with Break the Wall, use start_disassembly: you write the disassembly and the app checks and saves it. Use open_in_break_the_wall only when the user asks to open a text in Break the Wall for the app to generate.',
     tools: TOOLS,
     prompts: PROMPTS,
     call: async (name, args, client): Promise<ToolResult> => {
