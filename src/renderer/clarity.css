@@ -280,3 +280,13 @@ body { font-size: 15px; }
 .assistants-command { display: block; width: 100%; box-sizing: border-box; padding: 8px; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; user-select: all; }
 @media (max-width: 640px) { .assistants-menu > summary { padding: 0 9px; } .assistants-menu > summary span { display: none; } .assistants-panel { position: fixed; left: 16px; right: 16px; top: 72px; width: auto; max-height: calc(100vh - 88px); } }
 .preferences-panel select { font: inherit; font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; }
+/* Library and Studio reading sizes, set with the player's redesign (P-20261029-ui-workbench). */
+.library-home .home-heading p, .library-disclosure { font-size: 15px; line-height: 1.7; }
+.library-home .lesson-card > p { font-size: 15px; line-height: 1.7; }
+.library-home .lesson-card { padding: 25px; gap: 17px; }
+.library-home .lesson-card:hover { background: var(--accent-soft); }
+.library-home .card-bottom { font-size: 12px; }
+.library-home .library-footer { font-size: 13px; }
+.creation-page .studio-step { padding: 28px; gap: 20px; }
+.creation-page .studio-step label { font-size: 15px; }
+.creation-page .studio-step input, .creation-page .studio-step textarea, .creation-page .studio-step select { font-size: 16px; line-height: 1.65; }

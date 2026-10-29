@@ -3,9 +3,9 @@ id: P-20261029-ui-workbench
 title: A lighter workbench - one row of chrome, claim and source side by side, the prediction first in Run
 version: 1
 state: implementing
-current_task: U7
-last_evidence: U4-U6 verified - explanation and cited lines on screen together; every run question and its options in view at 1440x900 and 1280x800; 408 tests pass
-next_action: Owner runs "implement P-20261029-ui-workbench v1 --phase type"
+current_task: U9
+last_evidence: U7-U8 verified - at most 5 text sizes and no uppercase label outside the drawing; one player stylesheet, no element moved in 17 states; CSS 1094 lines; 408 tests pass
+next_action: Owner runs "implement P-20261029-ui-workbench v1 --phase verify"
 approval: approved
 ---
 
@@ -196,4 +196,18 @@ Version 1, approved:
     - Atlas at 1440×900 with part 4 selected: the first citation is inside the part card's visible area and the highlighted line 30 is inside the source's visible area. After clicking "ll. 100–115", the heading is still in view and line 100 is highlighted in view. The page itself does not scroll;
     - runs at 1440×900 and at 1280×800: every element of the question and its options is inside the run panel's visible area without scrolling, for Atlas (scenario: 5 elements, new case: 4) and Mill (load test: 5, new case: 5);
     - Reassemble and the bill of materials: no element wider than 300 px has a rounded full border (no cards), and the page does not scroll.
+- **U8 verified (2026-10-29), done before U7 so that the refactor could be checked as a refactor.**
+  - `workbench.css` is removed. Its rules are merged into the base rules of `disassembly.css`, which is now the player's only stylesheet. A merged rule keeps the winning value of each property.
+  - Rules for the old layout are deleted: `.d-side` as a grid, `.d-wide`, `.sized`, `.d-bar`, the ink-bordered mode bar, sticky source panes, and `.disassembly .save-status`.
+  - `.study-workbench` remains only where a component also appears in Studio's generation preview (the part card, its points, and the sheet's frame and selected plate), and the file's header says why.
+  - The library and Studio sizes that Codex had put in `workbench.css` moved to `clarity.css`.
+  - 65 rules in `styles.css` are deleted. They styled classes that no source file uses any more, including template-built names (`tone-*` stays, because `tone-${…}` builds it): remnants of the earlier lesson player and library (`library-intro`, `learning-loop`, `context-dock`, `notes-panel`, `mini-branches`, `goal-card`, `meter`, and others).
+  - Renderer CSS: 1094 lines (`styles.css` 408, `clarity.css` 292, `disassembly.css` 394), down from 1244 on the branch at U3 and 1233 on Codex's branch (≤ 1100 required).
+  - Evidence (integration check on the built app). A DevTools script drove the app through 17 states and recorded, for every element, its box and 47 computed properties: the library, Studio, the Exploded view (overview, a part, document view, source widened and restored, the reader, a sub-assembly), a scenario run after one step, a new case, Reassemble with one piece placed, the bill of materials, Mill's load test, 800 px and 600 px widths, and blueprint. After the refactor, no element in any state changed position or size. The 40 remaining property differences have no visual effect: grid properties on a flex element, `top` on a static element, a radius on a fieldset without a border. That is fewer than the 47 differences between two runs of the same build, which come from a pulsing animation and focus timing. A first run after removing `styles.css` rules showed layout changes, which turned out to be states captured before the window's resize and the theme switch had landed. The script now dispatches the resize and waits for the theme, and two further runs confirmed the result.
+- **U7 verified (2026-10-29).**
+  - Outside the drawing, sizes come from one scale: 12 (labels, notes, hints), 14 (controls, run tabs, buttons), 16 (reading text, run actions, feedback, the bill's check), 18 (a part's lead) and 20 (headings, from 23 and 21). 26 is not used yet.
+  - Labels ("Joints", "Situation", "Instruments", "Step 1 of 5", "Before you run it", "Parts to put back", "Optional", the run types, the bill's column heads, "Source") are sentence case, 12 px, semibold, muted, in the body face. "Optional" loses its pill. Uppercase monospaced lettering stays in the drawing and the title block. The source's own page breaks are part of the source.
+  - Evidence (integration check on the built app, Atlas at 1440×900, every text element in the header and the work area except the drawing, the source text and the closed preferences menu): Exploded view with a part selected has 5 sizes, Run 4, Reassemble 4, and the bill of materials 3. No uppercase label is found in any mode (before: 9, 8, 8 and 6 sizes, with 3 to 6 uppercase labels).
+  - U4 and U5 were measured again after the change: the first citation and the highlighted lines are in view together, and every run's question and options fit without scrolling at 1440×900 and at a confirmed 1280×800, for Atlas and Mill. The page does not scroll.
+  - Automated tests: typecheck passed, and 28 files with 408 tests passed.
 
