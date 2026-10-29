@@ -1,8 +1,8 @@
 name: Release
 
 # A v* tag builds the Apple Silicon DMG and the Windows x64 setup and attaches them to the tag's release, as a draft
-# pre-release when there is none yet; the owner publishes it. A pull request that touches packaging, or a manual run,
-# only builds them as workflow artifacts.
+# pre-release titled from the CHANGELOG when there is none yet; the owner publishes that draft. A pull request that
+# touches packaging, or a manual run, only builds them as workflow artifacts.
 on:
   push:
     tags: ['v*']
@@ -89,6 +89,34 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+      # The draft takes its title and notes from the version's CHANGELOG section, so the owner recognizes it and only
+      # publishes it: a release made by hand next to it gets no files.
+      - name: The CHANGELOG has a section for the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          awk -v head="## [${TAG#v}]" '
+            index($0, head) == 1 { found = 1; next }
+            found && (/^## \[/ || /^\[[^]]+\]: /) { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' > "$RUNNER_TEMP/section.md"
+          if [ ! -s "$RUNNER_TEMP/section.md" ]; then
+            echo "::error::CHANGELOG.md has no section for ${TAG#v}"
+            exit 1
+          fi
+          # The first paragraph is the version's summary: the title, unless the section starts with a heading or a list.
+          title=$(head -n 1 "$RUNNER_TEMP/section.md")
+          if [ -n "$title" ] && ! printf '%s' "$title" | grep -q '^[#*-]'; then
+            echo "${title%.}" > "$RUNNER_TEMP/title.txt"
+            tail -n +2 "$RUNNER_TEMP/section.md" | sed -e '/./,$!d' > "$RUNNER_TEMP/notes.md"
+          else
+            echo "Break the Wall $TAG" > "$RUNNER_TEMP/title.txt"
+            cp "$RUNNER_TEMP/section.md" "$RUNNER_TEMP/notes.md"
+          fi
       - uses: actions/download-artifact@v4
         with:
           name: break-the-wall-dmg
@@ -106,5 +134,5 @@ jobs:
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" release/* --clobber
           else
-            gh release create "$TAG" release/* --draft --prerelease --verify-tag --title "Break the Wall $TAG" --generate-notes
+            gh release create "$TAG" release/* --draft --prerelease --verify-tag --title "$(cat "$RUNNER_TEMP/title.txt")" --notes-file "$RUNNER_TEMP/notes.md" --generate-notes
           fi
