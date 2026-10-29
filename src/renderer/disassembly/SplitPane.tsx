@@ -1,23 +1,27 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 /**
- * Pane sizes the learner can change: the reading column's width, as a share of the row. Sizes are a convenience for
- * this device, kept in local storage; anything unreadable falls back to the defaults. The drawing keeps no size: it
- * fits its area, and zoom is a scale over that fit for the session (P-20261029-ui-workbench). A drawing height saved
- * by an earlier version is ignored.
+ * Pane sizes the learner can change, kept per device in local storage; anything unreadable falls back to the defaults:
+ * - `source`: the reading column's width in the exploded view and the bill of materials, as a share of the row;
+ * - `activity`: the same column in a run, wider by default, because there the learner answers rather than reads;
+ * - `reading`: the explanation's share of the column's height, with the source below it.
+ * The drawing keeps no size: it fits its area, and zoom is a scale over that fit for the session
+ * (P-20261029-ui-workbench). A drawing height saved by an earlier version is ignored.
  */
 export const PANES = {
   source: { initial: 0.34, min: 0.2, max: 0.7 },
+  activity: { initial: 0.5, min: 0.3, max: 0.7 },
+  reading: { initial: 0.55, min: 0.25, max: 0.8 },
 } as const;
 export type PaneKey = keyof typeof PANES;
-export type PaneSizes = { source: number };
+export type PaneSizes = Record<PaneKey, number>;
 /** At or under this width the panes stack, as the stylesheet does, and no splitter is shown. */
 export const STACK_BELOW = 960;
 const STORAGE_KEY = 'btw:panes:v1';
 const STEP = 0.05;
 
 const clamp = (key: PaneKey, value: number) => Math.min(PANES[key].max, Math.max(PANES[key].min, value));
-const defaults = (): PaneSizes => ({ source: PANES.source.initial });
+const defaults = (): PaneSizes => ({ source: PANES.source.initial, activity: PANES.activity.initial, reading: PANES.reading.initial });
 
 export function readPaneSizes(): PaneSizes {
   const out = defaults();

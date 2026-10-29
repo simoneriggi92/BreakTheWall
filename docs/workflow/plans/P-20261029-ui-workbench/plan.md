@@ -3,9 +3,9 @@ id: P-20261029-ui-workbench
 title: A lighter workbench - one row of chrome, claim and source side by side, the prediction first in Run
 version: 1
 state: implementing
-current_task: U4
-last_evidence: U2-U3 verified - chrome 93 px (was 329), drawing area 781 px tall (was 504) at 1440x900; 406 tests pass
-next_action: Owner runs "implement P-20261029-ui-workbench v1 --phase reading"
+current_task: U7
+last_evidence: U4-U6 verified - explanation and cited lines on screen together; every run question and its options in view at 1440x900 and 1280x800; 408 tests pass
+next_action: Owner runs "implement P-20261029-ui-workbench v1 --phase type"
 approval: approved
 ---
 
@@ -172,4 +172,28 @@ Version 1, approved:
   - `t.d.panes.drawing` is removed from both languages.
   - Evidence. Automated tests: the D17 tests now expect only the reading-panel splitter in Exploded view and Run, and remember its width after reopening. A new test starts from a stored `drawing: 0.85` and checks fit, two zoom steps (`--zoom` 1.5, label "150%"), one step back, the return to fit, and a fit again after reopening. `tests/split-pane.test.tsx` checks that the old drawing value is ignored and drives the splitter on the source pane. Checks: typecheck passed, and 28 files with 406 tests passed. Integration check on the built app, starting with `drawing: 0.85` in storage: the sheet fits at 886 px, follows the widened panel to 606 px without a scrollbar, zooms to 757 px at 125% with a horizontal scrollbar, and returns to 606 px on fit. At 175% the sheet is centred, and selecting "deploy-staging" scrolls it into view.
   - Observed limit: Atlas's sheet is limited by the canvas width, not its height, so the extra height leaves paper above and below the sheet rather than enlarging the plates. Larger plates depend on the column split, which U4–U5 set; U9 measures plate size.
+- **U4 verified (2026-10-29).** `WorkbenchInspector.tsx` becomes `ReadingColumn.tsx`. Exploded view has no tabs: the explanation is on top, the source below, and a horizontal splitter ("Height of the explanation", kept per device as `reading`, 55% by default) sits between them. Selecting a part shows its explanation and highlights its first citation in the source. Clicking a citation highlights its lines and leaves the explanation in place. The column has no card; it reaches the window's right and bottom edges, with a hairline on its left. Three things changed along the way:
+  - the citations moved from the end of the part card to just under its lead, so the way to the source stays in view in the upper half of the column;
+  - the source still widens to the whole work area (as before, it then hides the drawing and the explanation) rather than to the column only, as the plan's text said. The behaviour is the one already tested, and the full-window reader is still there;
+  - two defects showed up once the source was always visible, and are fixed. Lines marked "cited" carry an absolutely positioned text for screen readers, which made the page itself 4552 px tall; `.source-text` now positions them. And the scroll to a citation measured `offsetTop`, which then counted from the wrong element; it now measures positions on screen (as `SourceDocument` already did).
+- **U4 adjustment after the owner's trial (2026-10-29).** The owner found that explanation and source read as one block ("sembra un tutt'uno che inganna l'occhio"). The boundary now has:
+  - an ink rule (the ink colour at 60%), 1.5 px, like the sheet's frame lines;
+  - a sunk band for the splitter;
+  - a header in the sunk tone that names the source ("SOURCE · release-runbook.md");
+  - the lines on the paper tone, a step darker than the explanation above.
+  The run's folded source header uses the same rule and tone, and the open source then does not repeat the label. Checked in the built app in paper and blueprint at 1440×900, from screenshots.
+- **U5 verified (2026-10-29).** A run has its own column width (`activity`, 50% by default, kept per device). In a scenario run the panel shows what just happened, then the next step and its prediction, then the situation and the instruments. The source in a run is folded to a header ("Source · release-runbook.md"), which opens on a click or when the learner follows a citation. The step button stays in the footer under the options.
+- **U6 verified (2026-10-29).** Reassemble keeps the drawing with the tray beside it, without a card, and the bill of materials keeps the table with the source beside it. The tab labels "Part" and "Activity" are removed from both languages.
+- **Evidence for U4–U6.**
+  - Automated tests:
+    - a new test checks that there are no tabs, that the explanation stays the same element and stays visible after a citation, and that the source highlights lines 30–33 and then 100;
+    - a new test checks, in a scenario run, that the prediction comes before the situation and the instruments, that the source starts folded and opens after a citation in the step's feedback, and that it folds again;
+    - the D17 test now expects two splitters in Exploded view and one in a run, a run width of 0.5, and the explanation's height remembered after reopening;
+    - the note and the Lines/Document choice survive a switch to the bill of materials and back;
+    - the source-document tests no longer open a tab.
+    Checks: typecheck passed, and 28 files with 408 tests passed.
+  - Integration check on the built app, in English with an empty data folder:
+    - Atlas at 1440×900 with part 4 selected: the first citation is inside the part card's visible area and the highlighted line 30 is inside the source's visible area. After clicking "ll. 100–115", the heading is still in view and line 100 is highlighted in view. The page itself does not scroll;
+    - runs at 1440×900 and at 1280×800: every element of the question and its options is inside the run panel's visible area without scrolling, for Atlas (scenario: 5 elements, new case: 4) and Mill (load test: 5, new case: 5);
+    - Reassemble and the bill of materials: no element wider than 300 px has a rounded full border (no cards), and the page does not scroll.
 

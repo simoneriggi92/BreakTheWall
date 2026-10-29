@@ -40,11 +40,10 @@ function ScenarioRun({ d, run, state, focus, running, actions }: { d: Disassembl
   const next = run.steps[nextIndex];
   const choice = progress?.choices[nextIndex];
   const lastChoice = progress && last ? progress.choices[progress.step] : undefined;
+  // What just happened, then what the learner does next, then the situation and the instruments for reference (U5):
+  // the question is the first thing in view, not the last.
   return <>
     <div className="run-reading">
-      <p className="run-setup" lang={d.language}><span className="box-label">{t.d.run.setup}</span>{run.setup}</p>
-      {Object.keys(vars).length > 0 && <table className="instruments"><caption className="box-label">{t.d.run.instruments}</caption><tbody>{Object.entries(vars).map(([k, v]) => <tr key={k} className={changed.has(k) ? 'changed' : undefined}>
-        <th scope="row">{k}</th><td>{v}{changed.has(k) && <span className="sr-only"> · {t.d.run.changed}</span>}</td></tr>)}</tbody></table>}
       {last && <div className="run-feedback" aria-live="polite">
         <span className="box-label">{t.d.run.stepOf(progress!.step + 1, run.steps.length)}</span>
         <p className="run-action" lang={d.language}>{last.action}</p>
@@ -58,6 +57,9 @@ function ScenarioRun({ d, run, state, focus, running, actions }: { d: Disassembl
           {next.predict.options.map((o, i) => <label key={i} className={choice === i ? 'selected' : undefined}><input type="radio" name={`${run.id}-${nextIndex}`} checked={choice === i} disabled={choice !== undefined} onChange={() => actions.predict(nextIndex, i)}/><span lang={d.language}>{o.text}</span></label>)}
         </fieldset>}
       </div> : <p className="run-done" role="status"><Check size={16}/>{t.d.run.done}</p>}
+      <p className="run-setup" lang={d.language}><span className="box-label">{t.d.run.setup}</span>{run.setup}</p>
+      {Object.keys(vars).length > 0 && <table className="instruments"><caption className="box-label">{t.d.run.instruments}</caption><tbody>{Object.entries(vars).map(([k, v]) => <tr key={k} className={changed.has(k) ? 'changed' : undefined}>
+        <th scope="row">{k}</th><td>{v}{changed.has(k) && <span className="sr-only"> · {t.d.run.changed}</span>}</td></tr>)}</tbody></table>}
     </div>
     <div className="run-footer">
       {progress && <button className="text-button" onClick={actions.restart}><RotateCcw size={14}/>{t.d.run.restart}</button>}

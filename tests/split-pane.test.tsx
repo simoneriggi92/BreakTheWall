@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PANES, readPaneSizes, Splitter } from '../src/renderer/disassembly/SplitPane';
 
 const KEY = 'btw:panes:v1';
+const DEFAULTS = { source: 0.34, activity: 0.5, reading: 0.55 };
 afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
 function Harness() {
@@ -15,16 +16,16 @@ function Harness() {
 
 describe('resizable panes (D17)', () => {
   it('reads saved sizes, and falls back to the defaults for bad values or failing storage', () => {
-    expect(readPaneSizes()).toEqual({ source: 0.34 });
+    expect(readPaneSizes()).toEqual(DEFAULTS);
     // A drawing height saved by an earlier version is ignored: the drawing now fits its area (P-20261029-ui-workbench).
     localStorage.setItem(KEY, JSON.stringify({ drawing: 0.7, source: 0.55 }));
-    expect(readPaneSizes()).toEqual({ source: 0.55 });
+    expect(readPaneSizes()).toEqual({ ...DEFAULTS, source: 0.55 });
     localStorage.setItem(KEY, JSON.stringify({ source: 'wide' }));
-    expect(readPaneSizes()).toEqual({ source: 0.34 });
+    expect(readPaneSizes()).toEqual(DEFAULTS);
     localStorage.setItem(KEY, '{not json');
-    expect(readPaneSizes()).toEqual({ source: 0.34 });
+    expect(readPaneSizes()).toEqual(DEFAULTS);
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    expect(readPaneSizes()).toEqual({ source: 0.34 });
+    expect(readPaneSizes()).toEqual(DEFAULTS);
   });
   it('is a separator the keyboard moves within its limits, and Enter or a double click resets', async () => {
     render(<Harness/>);

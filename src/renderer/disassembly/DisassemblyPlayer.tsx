@@ -16,7 +16,7 @@ import { Reassemble } from './Reassemble';
 import { RunPanel } from './RunPanel';
 import { Sheet } from './Sheet';
 import { SourcePane, type SourceView } from './SourcePane';
-import { WorkbenchInspector, type InspectorTab } from './WorkbenchInspector';
+import { ReadingColumn } from './ReadingColumn';
 import { Splitter, usePaneSizes } from './SplitPane';
 import { workbenchLayout } from './workbench-layout';
 
@@ -54,11 +54,14 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const layouts = useMemo(() => layoutDisassembly(d), [d]);
-  // Pane preferences remain device-local; the source-width preference now sizes the inspector that contains it.
+  // Pane sizes stay on the device: the reading column's width (one for reading, one for runs) and the explanation's height.
   const panes = usePaneSizes();
   const [sourceWide, setSourceWide] = useState(false);
   const [canvasOnly, setCanvasOnly] = useState(false);
-  const [inspector, setInspector] = useState<InspectorTab>('detail');
+  // In a run the source starts folded; following a citation opens it.
+  const [runSource, setRunSource] = useState(false);
+  const column = useRef<HTMLDivElement>(null);
+  const readingAt = (_x: number, y: number) => { const r = column.current?.getBoundingClientRect(); return r?.height ? (y - r.top) / r.height : undefined; };
   const work = useRef<HTMLDivElement>(null);
   // Zoom is a scale over the fitted sheet, for this session only: 1 fits the drawing to its area, whatever its size.
   const [scale, setScale] = useState(1);
@@ -86,7 +89,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
 
   const locateCite = (c: Cite) => { setFocus(c); setSourceId(c.source); };
   // An explicit citation opens the source. Merely selecting a part or completing a step keeps its explanation visible.
-  const focusCite = (c: Cite) => { locateCite(c); setInspector('source'); setCanvasOnly(false); };
+  const focusCite = (c: Cite) => { locateCite(c); if (mode === 'run') setRunSource(true); setCanvasOnly(false); };
 
   // Taking a part apart: only generated disassemblies in the desktop app, through the structure model of the Studio setup.
   const studio = bridge.studio;
@@ -121,9 +124,9 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
     setState(s => selectPart(d, s, next));
     const cite = next ? level.find(p => p.id === next)?.cites[0] : undefined;
     if (cite) locateCite(cite);
-    setInspector('detail'); setSourceWide(false);
+    setSourceWide(false);
   };
-  const enter = (id: string) => { setState(s => openPath(d, s, [...s.path, id])); setFocus(undefined); setInspector('detail'); };
+  const enter = (id: string) => { setState(s => openPath(d, s, [...s.path, id])); setFocus(undefined); };
   const leave = (depth: number) => { setState(s => openPath(d, s, s.path.slice(0, depth))); setFocus(undefined); };
   // Up one level: the part just left stays selected and its plate takes the focus, so the learner keeps their place.
   const [refocus, setRefocus] = useState<string>();
@@ -150,7 +153,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
     return () => window.removeEventListener('keydown', onKey);
   }, [mode, state.path.length]);
   // Runs act on the whole: the drawing returns to the top level while a run is open.
-  const setModeAndLevel = (next: Mode) => { setMode(next); setFeedback(undefined); setInspector('detail'); setSourceWide(false); setCanvasOnly(false); if (next === 'run' || next === 'reassemble') setState(s => openPath(d, s, [])); };
+  const setModeAndLevel = (next: Mode) => { setMode(next); setFeedback(undefined); setRunSource(false); setSourceWide(false); setCanvasOnly(false); if (next === 'run' || next === 'reassemble') setState(s => openPath(d, s, [])); };
   const runDecor = mode === 'run' && run.type === 'scenario' ? (() => {
     const v = scenarioView(run, state.runs[run.id]);
     const step = running?.runId === run.id ? run.steps[running.step] : undefined;
@@ -161,10 +164,14 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       const removed = state.runs[run.id]?.tried.at(-1); const brick = run.bricks.find(b => b.part === removed);
       return { bricks: run.bricks.map(b => b.part), removed, target: brick ? { id: run.target, verdict: brick.verdict } : undefined };
     })() : {};
-  const sourceWidth = { '--source-w': String(panes.sizes.source) } as CSSProperties;
-  const sourceSplitter = <Splitter pane="source" orientation="vertical" grows="ArrowLeft" value={panes.sizes.source}
+  // A run keeps its own column width, wider by default: there the learner answers rather than reads (U5).
+  const widthPane = mode === 'run' ? 'activity' : 'source';
+  const sourceWidth = { '--source-w': String(panes.sizes[widthPane]) } as CSSProperties;
+  const sourceSplitter = <Splitter pane={widthPane} orientation="vertical" grows="ArrowLeft" value={panes.sizes[widthPane]}
     label={mode === 'bom' ? t.d.panes.source : t.d.workbench.resizeInspector}
-    onChange={v => panes.set('source', v)} onReset={() => panes.reset('source')} fromPointer={x => sourceAt(x)}/>;
+    onChange={v => panes.set(widthPane, v)} onReset={() => panes.reset(widthPane)} fromPointer={x => sourceAt(x)}/>;
+  const readingSplitter = <Splitter pane="reading" orientation="horizontal" grows="ArrowDown" value={panes.sizes.reading} label={t.d.workbench.resizeReading}
+    onChange={v => panes.set('reading', v)} onReset={() => panes.reset('reading')} fromPointer={readingAt}/>;
   const zoom = (direction: -1 | 1) => setScale(s => Math.min(ZOOM.max, Math.max(1, s + direction * ZOOM.step)));
   const save = { opening: t.player.opening, saving: t.player.saving, saved: t.player.saved, failed: t.player.saveFailed }[saveStatus];
   const index = (id: string) => readingNumbers(layout).get(id);
@@ -175,11 +182,11 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   const other = d.language !== language ? versions.find(v => v.language === language) : undefined;
 
   const sourcePane = <SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus}
-    cited={mode === 'explode' && part ? part.cites : []} active={mode === 'bom' || inspector === 'source'}
-    wide={sourceWide} onWide={() => { setSourceWide(x => !x); setInspector('source'); }} {...viewProps}/>;
+    cited={mode === 'explode' && part ? part.cites : []} active={mode !== 'run' || runSource}
+    wide={sourceWide} onWide={() => setSourceWide(x => !x)} {...viewProps}/>;
   const detail = mode === 'explode'
     ? <PartCard d={d} part={part} owner={owner} above={state.path.length ? above : undefined} onUp={up} joints={joints} level={level}
-        number={part && index(part.id)} origin={origin} focus={focus} onFocus={focusCite} onEnter={enter} active={inspector === 'detail'}
+        number={part && index(part.id)} origin={origin} focus={focus} onFocus={focusCite} onEnter={enter}
         note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}
         takeApart={part && d.kind === 'generated' && studio?.expandPart && <TakeApart d={d} part={part} route={expandRoute}
           progress={expanding?.part === part.id ? expanding.progress : undefined} problem={expandProblem?.part === part.id ? expandProblem.failure : undefined}
@@ -251,9 +258,10 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
                 </>}
             </section>
             {panes.wide && !sourceWide && !canvasOnly && sourceSplitter}
-            <div className="inspector-host" hidden={canvasOnly}>
-              <WorkbenchInspector tab={inspector} onTab={tab => { setInspector(tab); if (tab === 'detail') setSourceWide(false); }}
-                activity={mode === 'run'} sourceOnly={mode === 'bom'} detail={mode === 'bom' ? undefined : detail} source={sourcePane}/>
+            <div className="inspector-host" ref={column} hidden={canvasOnly}>
+              <ReadingColumn detail={detail} source={sourcePane} sourceTitle={d.sources.find(x => x.id === sourceId)?.title ?? ''}
+                share={panes.sizes.reading} splitter={panes.wide ? readingSplitter : undefined} sourceOnly={mode === 'bom'} sourceWide={sourceWide}
+                {...(mode === 'run' ? { folded: !runSource, onFold: () => setRunSource(x => !x) } : {})}/>
             </div>
           </div>}
       </main>}

@@ -46,18 +46,33 @@
 .study-workbench .splitter-horizontal { flex-shrink: 0; height: 12px; background: var(--bg); border-radius: 0; }
 .study-workbench .splitter-vertical > span { position: static; }
 .study-workbench .inspector-host { min-width: 0; min-height: 0; }
-.study-workbench .workbench-inspector { display: flex; flex-direction: column; align-items: stretch; gap: 0; height: 100%; min-height: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
-.inspector-tabs, .inspector-heading { display: flex; align-items: stretch; gap: 22px; padding: 0 21px; height: 54px; min-height: 54px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-.inspector-heading { align-items: center; font-size: 14px; font-weight: 600; gap: 9px; }
-.inspector-tabs button { display: inline-flex; gap: 8px; align-items: center; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 0 1px; font-size: 14px; color: var(--muted); }
-.inspector-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 650; }
-.inspector-detail, .inspector-source { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+/* The reading column (U4): no card; it reaches the window's edge, and a hairline is its only border. The explanation
+   sits on top and the source it cites below, with a splitter between them. */
+.study-workbench .d-work { margin: 0 -20px -14px 0; }
+.study-workbench .reading-column { display: flex; flex-direction: column; align-items: stretch; gap: 0; height: 100%; min-height: 0; background: var(--surface); border-left: 1px solid var(--line); overflow: hidden; }
+.reading-detail { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; }
+.reading-column.split .reading-detail { flex: 0 0 var(--reading-share); }
+.reading-source { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; }
+/* The boundary between explanation and source must read at a glance: a sunk band with rules on both sides, then a
+   header that names the source, then the lines on the paper tone, a step darker than the explanation above. */
+.reading-detail + .reading-source { border-top: 1px solid var(--line); }
+.study-workbench .reading-column > .splitter-horizontal { height: 12px; background: var(--sunk); border-top: 1.5px solid color-mix(in srgb, var(--ink) 60%, transparent); border-bottom: 1px solid var(--line); }
+.study-workbench .reading-column > .splitter-horizontal > span { background: var(--muted); opacity: .45; }
+.study-workbench .reading-column > .splitter-horizontal:hover > span, .study-workbench .reading-column > .splitter-horizontal:focus-visible > span { opacity: 1; background: var(--ink); }
+.study-workbench .reading-source .source-pane { background: var(--bg); }
+.study-workbench .reading-source .source-head { background: var(--sunk); border-bottom: 1px solid var(--line); }
+.study-workbench .reading-source .source-head .box-label { display: inline-flex; color: var(--ink); }
+.source-fold + .reading-source .source-head .box-label { display: none; }
+.source-fold { display: flex; align-items: center; gap: 8px; flex-shrink: 0; width: 100%; padding: 11px 20px; border: 0; border-top: 1.5px solid color-mix(in srgb, var(--ink) 60%, transparent); border-radius: 0; background: var(--sunk); color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; }
+.source-fold:hover { background: var(--bg); }
+.source-fold > .micro { margin-right: auto; font-weight: 400; }
 .study-workbench .part-card, .study-workbench .run-panel { border: 0; border-radius: 0; background: transparent; min-height: 0; flex: 1; }
 .study-workbench .part-card { padding: 25px 24px; gap: 19px; overflow: auto; overscroll-behavior: contain; }
 .study-workbench .part-card > .eyebrow, .study-workbench .run-panel > .eyebrow { font-size: 11px; letter-spacing: .075em; color: var(--muted); }
 .study-workbench .part-card h2, .study-workbench .run-panel h2 { font-size: 23px; line-height: 1.35; letter-spacing: -.025em; overflow-wrap: anywhere; }
 .study-workbench .part-card h2 > svg { flex-shrink: 0; width: 22px; height: 22px; }
 .study-workbench .part-card .role, .study-workbench .part-card .role.lead { font-size: 18px; font-weight: 500; line-height: 1.65; margin: 13px 0 24px; }
+.study-workbench .part-card .role.lead + .cites { margin: -10px 0 22px; }
 .study-workbench .marked-points { font-size: 15.5px; line-height: 1.7; gap: 16px; margin: 0 0 24px; }
 .study-workbench .marked-points li { grid-template-columns: 19px minmax(0, 1fr); gap: 8px; }
 .study-workbench .marked-points li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
@@ -84,6 +99,8 @@
 .study-workbench .instruments th { font-weight: 500; color: var(--muted); }
 .study-workbench .instruments td { text-align: right; }
 .study-workbench .run-controls { gap: 15px; padding-top: 17px; }
+.study-workbench .run-reading > .run-controls:first-child { border-top: 0; padding-top: 0; }
+.study-workbench .run-reading > :is(.run-controls, .run-done) + .run-setup { border-top: 1px solid var(--line); padding-top: 17px; }
 .study-workbench .run-action { line-height: 1.6; font-size: 15px; }
 .study-workbench .predict { border: 0; padding: 0; gap: 10px; }
 .study-workbench .predict legend { font-size: 13px; font-weight: 500; padding: 0; color: var(--muted); margin-bottom: 9px; }
@@ -101,14 +118,14 @@
 .study-workbench .bricks button { padding: 13px 12px; line-height: 1.6; font-size: 14px; border-radius: 7px; }
 .study-workbench .bricks button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .study-workbench .source-pane { position: static; top: auto; flex: 1; height: 100%; border: 0; border-radius: 0; overflow: hidden; background: var(--surface); }
-.study-workbench .source-head { background: var(--surface); padding: 14px 17px; gap: 10px; flex-shrink: 0; }
+.study-workbench .source-head { background: var(--surface); padding: 10px 16px 10px 20px; gap: 10px; flex-shrink: 0; flex-wrap: nowrap; }
 .study-workbench .source-head > .micro { font-size: 12px; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 .study-workbench .source-head .box-label { display: none; }
-.study-workbench .source-tools { margin-left: 0; width: 100%; gap: 7px; }
+.study-workbench .source-tools { margin-left: auto; width: auto; gap: 7px; }
 .study-workbench .source-tools .icon-button { width: 32px; height: 32px; }
 .study-workbench .source-tools > .source-read { margin-left: auto; }
 .study-workbench .source-tabs { gap: 6px; }
-.study-workbench .source-text { flex: 1; min-height: 0; max-height: none; font-size: 14px; line-height: 1.85; padding: 14px 0; overscroll-behavior: contain; }
+.study-workbench .source-text { position: relative; flex: 1; min-height: 0; max-height: none; font-size: 14px; line-height: 1.85; padding: 14px 0; overscroll-behavior: contain; }
 .study-workbench .source-text li { padding-right: 16px; }
 .study-workbench .source-text.code { font-size: 13px; }
 .study-workbench .source-text .line-no { font-size: 11px; }
@@ -131,10 +148,10 @@
 .study-workbench .bom-table td:first-child { white-space: nowrap; }
 .bom-part-name { display: inline-flex; gap: 8px; align-items: baseline; }
 .bom-part-name > svg { align-self: center; flex-shrink: 0; }
-.study-workbench .workbench-reassembly { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 36%); gap: 16px; }
+.study-workbench .workbench-reassembly { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 36%); gap: 16px; margin: 0 -20px -14px 0; }
 .study-workbench .reassembly-drawing { min-height: 0; flex: 1; display: flex; align-items: center; overflow: auto; padding: 13px; background-color: var(--bg); background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 20px 20px; }
 .study-workbench .reassembly-drawing .sheet-scroll { width: 100%; max-height: 100%; overflow: auto; }
-.study-workbench .reassembly-controls { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.study-workbench .reassembly-controls { border-left: 1px solid var(--line); background: var(--surface); min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 .study-workbench .reassemble-head { padding: 21px 23px 15px; gap: 10px; flex-shrink: 0; }
 .study-workbench .reassemble-head > .pill { justify-self: start; }
 .study-workbench .reassemble-head h2 { font-size: 23px; line-height: 1.35; }
@@ -187,7 +204,10 @@
   .study-workbench .d-canvas { min-height: 360px; }
   .study-workbench .d-drawing { flex: none; height: clamp(280px, 43vh, 500px); min-height: 0; }
   .study-workbench .d-drawing .sheet-scroll { height: 100%; }
-  .study-workbench .workbench-inspector { height: min(700px, 75dvh); min-height: 420px; }
+  .study-workbench .d-work { margin: 0; }
+  .study-workbench .reading-column { height: auto; border-left: 0; border-top: 1px solid var(--line); }
+  .reading-detail, .reading-column.split .reading-detail { flex: none; }
+  .reading-source { flex: none; height: min(480px, 60dvh); }
   .study-workbench .inspector-host[hidden] { display: none; }
   .study-workbench .bom-scroll { max-height: 65vh; }
   .study-workbench .source-pane { position: static; }
@@ -195,7 +215,8 @@
   .study-workbench .workbench-reassembly { display: flex; flex-direction: column; }
   .study-workbench .reassembly-canvas { min-height: 350px; }
   .study-workbench .reassembly-drawing { min-height: 300px; max-height: 55vh; }
-  .study-workbench .reassembly-controls { height: 650px; max-height: 85dvh; min-height: 450px; }
+  .study-workbench .workbench-reassembly { margin: 0; }
+  .study-workbench .reassembly-controls { height: 650px; max-height: 85dvh; min-height: 450px; border-left: 0; border-top: 1px solid var(--line); }
   .source-reader .reader-body.with-outline { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(100px, 28%) minmax(0, 1fr); }
   .source-reader .reader-outline { border-right: 0; border-bottom: 1px solid var(--line); }
   .source-reader .source-document.reader-document { font-size: 16px; padding: 20px 24px 35px; }

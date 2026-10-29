@@ -30,7 +30,8 @@ export function SourcePane({ d, sourceId, onSource, focus, cited, wide, onWide, 
   useEffect(() => {
     if (!active) return;
     const host = list.current; const first = focus && focus.source === source.id ? host?.querySelector<HTMLElement>(`[data-line="${focus.from}"]`) : undefined;
-    if (host && first) host.scrollTop = first.offsetTop - host.offsetTop - 24;
+    // Measured on screen, so the result does not depend on which element positions the lines.
+    if (host && first) host.scrollTop += first.getBoundingClientRect().top - host.getBoundingClientRect().top - 24;
   }, [focus, source.id, shown, active]);
   return <section className="source-pane" aria-label={t.d.source}>
     <div className="source-head"><span className="box-label">{t.d.source}</span>

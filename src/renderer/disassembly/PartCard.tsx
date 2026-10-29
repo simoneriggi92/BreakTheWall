@@ -62,8 +62,10 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
     <span className="eyebrow">{t.d.partOf(number ?? 0, t.d.kinds[part.kind])}</span>
     <div lang={d.language}>
       <h2 ref={heading} tabIndex={-1}><PartIcon name={part.icon} size={20}/>{part.name}</h2>
-      {/* The lead opens the card; the points and the explanation add what it does not say (D20). */}
+      {/* The lead opens the card; the points and the explanation add what it does not say (D20). The citations follow
+          the lead, so the way to the source stays in view beside it (P-20261029-ui-workbench U4). */}
       <p className="role lead">{part.role}</p>
+      <Cites d={d} cites={part.cites} focus={focus} onFocus={onFocus}/>
       {part.points ? <Points points={part.points}/> : <p>{part.explain}</p>}
       {part.lens && <div className="card-box"><span className="box-label">{t.d.lens}</span><dl className="lens-list">
         <dt>{t.d.lensWhat}</dt><dd>{part.lens.what}</dd><dt>{t.d.lensWhy}</dt><dd>{part.lens.why}</dd>
@@ -74,7 +76,6 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
       {related.length > 0 && <div className="card-box"><span className="box-label">{t.d.joints}</span><ul className="joint-words">{related.map((j, i) => <li key={i}>
         {j.from === part.id ? t.d.jointOut(t.d.verbs[j.type], name(j.to)) : t.d.jointIn(name(j.from), t.d.verbs[j.type])}<span className="micro plain"> · {j.label}</span></li>)}</ul></div>}
     </div>
-    <Cites d={d} cites={part.cites} focus={focus} onFocus={onFocus}/>
     {part.parts && <button className="primary open-sub" onClick={() => onEnter(part.id)}>{part.relevant === false ? t.d.openClosed(part.parts.length) : t.d.openSub(part.parts.length)}<ArrowRight size={15}/></button>}
     {part.parts && part.relevant === false && <p className="micro plain">{t.d.closedNote}</p>}
     {!part.parts && takeApart}

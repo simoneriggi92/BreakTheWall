@@ -179,7 +179,7 @@ export const en: Messages = {
     trace: 'An outline to compare with', notAGrade: 'This is not a grade. Compare the relations you explained with the ones that are missing.', backToPrinciple: 'Go back to the principle in the source',
   },
   d: {
-    workbench: { part: 'Part', activity: 'Activity', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel' },
+    workbench: { resizeReading: 'Height of the explanation', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel' },
     modes: { explode: 'Exploded view', run: 'Run', reassemble: 'Reassemble', bom: 'Bill of materials' }, modesLabel: 'What to do with the disassembly',
     kinds: { step: 'step', component: 'component', artifact: 'artifact', premise: 'premise', conclusion: 'claim', ground: 'ground', limit: 'limit', objection: 'objection', consequence: 'consequence', rejected: 'set aside', event: 'event', actor: 'actor' },
     verbs: { 'sends-to': 'sends to', causes: 'causes', 'depends-on': 'depends on', supports: 'supports', attacks: 'attacks', limits: 'limits', 'leads-to': 'leads to', because: 'explains' },
