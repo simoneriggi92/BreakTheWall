@@ -18,7 +18,7 @@ describe('disassembly fixtures', () => {
     expect(await findings(fixture(path))).toEqual([]);
   });
   it('loads the prepared disassemblies through the boundary', async () => {
-    expect((await loadPreparedDisassemblies()).map(x => `${x.id}:${x.language}`)).toEqual(['atlas-release:it', 'mill-harm:it', 'atlas-release-en:en', 'mill-harm-en:en']);
+    expect((await loadPreparedDisassemblies()).map(x => `${x.id}:${x.language}`)).toEqual(['atlas-release:it', 'mill-harm:it', 'importer-signals:it', 'atlas-release-en:en', 'mill-harm-en:en', 'importer-signals-en:en']);
   });
   it.skipIf(!PRIVATE_FIXTURES.length).each(PRIVATE_FIXTURES)('local-only %s validates', async path => {
     expect(await findings(fixture(path))).toEqual([]);
@@ -33,6 +33,28 @@ describe('disassembly fixtures', () => {
     expect(pagesOf(d.sources[0], { from: 10, to: 14 })).toEqual({ first: 1, last: 2 });
     const repo = story(); repo.scope = { kind: 'repository', root: 'kessmouth', commit: 'a1b2c3d', modified: ['src/a.ts'] };
     expect(await findings(repo)).toEqual([]);
+  });
+  it('prepares a whole-source example in both languages (P-20261029-source-entry E8)', async () => {
+    const [it, en] = await Promise.all([PUBLIC_FIXTURES[5], PUBLIC_FIXTURES[6]].map(path => validateDisassembly(fixture(path))));
+    for (const d of [it, en]) {
+      expect(d.question).toBeUndefined();
+      expect(d.start?.part).toBe('round');
+      expect(d.parts.length).toBeGreaterThanOrEqual(3);
+      expect(d.parts.some(p => p.parts?.length)).toBe(true);
+      expect(d.runs.map(r => r.type).sort()).toEqual(['case', 'scenario']);
+      expect(JSON.stringify(d)).not.toContain('outside-question');
+      expect(billOfMaterials(d).counts.missing).toBe(0);
+    }
+    expect([it.family, it.language, en.family, en.language]).toEqual(['importer-signals', 'it', 'importer-signals', 'en']);
+    expect(it.sources).toEqual(en.sources);
+  });
+  it('takes the whole source apart without a question (P-20261029-source-entry E2)', async () => {
+    const input = mill(); delete input.question;
+    input.parts.forEach((p: any) => { delete p.relevant; });
+    input.start = { part: 'claim', why: 'Everything else in the essay supports or limits it.' };
+    const d = await validateDisassembly(input);
+    expect(d.question).toBeUndefined();
+    expect(d.start).toEqual({ part: 'claim', why: 'Everything else in the essay supports or limits it.' });
   });
   it('copies cited lines from the source instead of storing quotes', async () => {
     const d = await validateDisassembly(story());
@@ -69,6 +91,12 @@ describe('located findings', () => {
     ['part with no slot', story, x => { x.reassemble.slots.pop(); }, 'parts[6]', /No reassembly slot/],
     ['part with no hint', story, x => { delete x.reassemble.hints.storm; }, 'reassemble.hints.storm'],
     ['question in another language', mill, x => { x.question = 'When can society legitimately coerce an individual, according to Mill?'; }, 'question', /reads as en/],
+    ['no question and lines outside it', atlas, x => { delete x.question; }, 'bom.excluded[3].reason', /no line is outside it/],
+    ['no question and a part line outside it', atlas, x => { delete x.question; x.parts[2].excluded[0].reason = 'outside-question'; }, 'parts[2].excluded[0].reason', /no line is outside it/],
+    ['no question and a file outside it', story, x => { delete x.question; x.bom.excludedFiles = [{ path: 'notes/**', reason: 'outside-question' }]; }, 'bom.excludedFiles[0].reason', /no line is outside it/],
+    ['no question and a closed sub-assembly', mill, x => { delete x.question; }, 'parts[4].relevant', /no sub-assembly is closed/],
+    ['start on a sub-part', atlas, x => { x.start = { part: 'check-lock', why: 'It holds the lock.' }; }, 'start.part', /not a top-level part/],
+    ['start on an unknown part', atlas, x => { x.start = { part: 'missing', why: 'It is first.' }; }, 'start.part', /not a top-level part/],
     ['forgotten lines', atlas, x => { x.bom.excluded.shift(); }, 'sources[0]', /Lines 1–6 of release-runbook\.md/],
     ['exclusion reason outside the list', atlas, x => { x.bom.excluded[0].reason = 'boring'; }, 'bom.excluded[0].reason'],
     ['file exclusion reason outside the list', atlas, x => { x.bom.excludedFiles = [{ path: 'a', reason: 'boring' }]; }, 'bom.excludedFiles[0].reason'],

@@ -36,7 +36,7 @@ async function setup(d: Disassembly = story()) {
   const file = join(root, 'generation-draft.json');
   const keeper = new DraftStore(file);
   const generator = new Generator({ chatgpt: { complete }, local: () => ({ complete }) }, new DisassemblyStore(join(root, 'disassemblies')), () => new Date('2026-10-27T10:00:00Z'), undefined, keeper);
-  const request = (extra: object = {}) => ({ sources: [source], goal: { outcome: d.question, priorKnowledge: '' }, language: d.language, setup: { structure: gpt, content: gpt }, ...extra });
+  const request = (extra: object = {}) => ({ sources: [source], goal: { outcome: d.question ?? '', priorKnowledge: '' }, language: d.language, setup: { structure: gpt, content: gpt }, ...extra });
   const names = () => seen.map(x => x.schemaName);
   return { root, file, keeper, generator, request, seen, names, state, source, drafts };
 }

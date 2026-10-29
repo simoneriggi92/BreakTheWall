@@ -113,10 +113,10 @@ export const TOOLS: ToolDefinition[] = [{
     properties: {
       text: { type: 'string', description: 'The full text to take apart, as plain text or Markdown (at most 40,000 characters and 1,500 lines).' },
       title: { type: 'string', description: 'A short name for the source, shown in citations (at most 120 characters).' },
-      question: { type: 'string', description: 'What the user wants to understand about the text, as a question (10 to 400 characters).' },
-      language: { type: 'string', enum: ['it', 'en'], description: 'The language to write the disassembly in; by default the question\'s.' },
+      question: { type: 'string', description: 'What the user wants to understand about the text, as a question (10 to 400 characters), only if they asked one. Without it, the whole text is taken apart.' },
+      language: { type: 'string', enum: ['it', 'en'], description: 'The language to write the disassembly in; by default the question\'s, or the text\'s without a question.' },
     },
-    required: ['text', 'question'],
+    required: ['text'],
     additionalProperties: false,
   },
 }, {
@@ -141,7 +141,7 @@ export const PROMPTS: PromptDefinition[] = prompts;
 
 const asResult = (reply: StepReply): ToolResult => ({ content: [{ type: 'text', text: reply.text }], ...(reply.isError ? { isError: true } : {}) });
 const clientName = (client?: ClientInfo) => client ? `${client.name} ${client.version}`.trim() : 'assistant';
-const startArgs = z.object({ text: z.string(), title: z.string().optional(), question: z.string(), language: z.string().optional() });
+const startArgs = z.object({ text: z.string(), title: z.string().optional(), question: z.string().optional(), language: z.string().optional() });
 
 /** Hands a finished disassembly to the app, which checks it again and saves it in the library (M7). */
 async function save(link: AppLink, disassembly: Disassembly, done: string): Promise<ToolResult> {
@@ -164,7 +164,7 @@ export function createBreakTheWallServer(link: AppLink, version: string, writer 
     call: async (name, args, client): Promise<ToolResult> => {
       if (name === 'start_disassembly') {
         const input = startArgs.safeParse(args);
-        if (!input.success) return { content: [{ type: 'text', text: 'start_disassembly needs "text" and "question" as strings, and optionally "title" and "language" ("it" or "en").' }], isError: true };
+        if (!input.success) return { content: [{ type: 'text', text: 'start_disassembly needs "text" as a string, and optionally "title", "question" and "language" ("it" or "en").' }], isError: true };
         return asResult(await writer.start(input.data, clientName(client)));
       }
       if (name === 'submit_structure') return asResult(writer.submitStructure(args.json));

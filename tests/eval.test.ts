@@ -16,12 +16,19 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(d => rm(d, { recurs
 describe('evaluation cases (Q1, D9)', () => {
   it('loads the public set of D9: one case per kind of material, each with its content language, within the import limits', async () => {
     const cases = await loadCases(process.cwd(), { includePrivate: false });
-    expect(cases.map(c => [c.id, c.language]).sort()).toEqual([['core-pipeline', 'it'], ['kessmouth', 'en'], ['mill-harm', 'it'], ['release-runbook', 'it']]);
+    expect(cases.map(c => [c.id, c.language]).sort()).toEqual([['core-pipeline', 'it'], ['kessmouth', 'en'], ['mill-harm', 'it'], ['night-importer', 'en'], ['release-runbook', 'it']]);
     expect(cases.every(c => !c.private)).toBe(true);
     expect(cases.find(c => c.id === 'core-pipeline')!.sources).toHaveLength(4);
     // The story and the argument are the prepared disassemblies' own sources, so a generated one can be compared with them.
     expect(cases.find(c => c.id === 'kessmouth')!.sources[0].text).toBe(story().sources[0].text);
     expect(cases.find(c => c.id === 'mill-harm')!.sources[0].text).toBe(mill().sources[0].text);
+  });
+  it('loads a case without a question: the whole source, compared with the prepared example (P-20261029-source-entry E9)', async () => {
+    const cases = await loadCases(process.cwd(), { includePrivate: false });
+    const whole = cases.find(c => c.id === 'night-importer')!;
+    expect(whole.goal.outcome).toBe('');
+    expect(whole.sources[0].text).toBe(fixture(PUBLIC_FIXTURES[6]).sources[0].text);
+    expect(cases.filter(c => c.id !== 'night-importer').every(c => c.goal.outcome.length >= 10)).toBe(true);
   });
 
   it('keeps public case sources inside the public folder, so nothing private can be committed through them', async () => {

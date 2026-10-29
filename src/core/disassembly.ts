@@ -94,12 +94,15 @@ export const disassemblySchema = z.strictObject({
   schemaVersion: z.literal(1), id, revision: id, kind: z.enum(['prepared', 'generated']),
   /** `assistant`: written by the learner's AI assistant through the MCP server, and checked by the app (P-20261028-mcp-integration). */
   generation: z.strictObject({ provider: z.enum(['chatgpt', 'local', 'assistant']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(), model: short, createdAt: z.iso.datetime() }).optional(),
-  title: short, question: text, language: z.enum(['it', 'en']),
+  /** The learner's optional focus. Without one, the whole source is taken apart (owner, 2026-10-29). */
+  title: short, question: text.optional(), language: z.enum(['it', 'en']),
   /** Versions of one disassembly in different languages share a family, so the player can offer the other one. */
   family: id.optional(),
   scope: scopeSchema.optional(),
   sources: z.array(disassemblySourceSchema).min(1).max(64),
   whole: z.strictObject({ name: short, does: text, why: text, cites }),
+  /** A top-level part to begin with, and why: where the learner who does not know what to ask can start. */
+  start: z.strictObject({ part: id, why: text }).optional(),
   parts: z.array(partSchema).min(1).max(12),
   joints: z.array(jointSchema).max(20),
   bom: z.strictObject({
@@ -124,6 +127,7 @@ export type DisassemblySource = z.infer<typeof disassemblySourceSchema>;
 export type Cite = z.infer<typeof cite>;
 export type Joint = z.infer<typeof jointSchema>;
 export type Run = z.infer<typeof runSchema>;
+export type ExclusionReason = z.infer<typeof exclusionReasonSchema>;
 export type PartExclusion = z.infer<typeof partExclusion>;
 export type Part = z.infer<typeof partBase> & { parts?: Part[]; joints?: Joint[]; excluded?: PartExclusion[] };
 
@@ -219,6 +223,57 @@ export function billOfMaterials(d: Pick<Disassembly, 'sources' | 'whole' | 'part
     return { id: s.id, title: s.title, status, forgotten };
   });
   return { sources, counts };
+}
+
+/** A heading of a source, as the renderer reads it from Markdown: its level, its text and its first line. */
+export type SourceHeading = { level: number; text: string; from: number };
+export type SectionCoverage = {
+  heading: SourceHeading; to: number;
+  /** Whether the whole cites lines of the section: what the source is for is often said there. */
+  whole: boolean;
+  /** Top-level parts that take some of the section apart, in drawing order. */
+  parts: string[];
+  /** Non-blank lines of the section that no part takes apart, per exclusion reason. */
+  excluded: { reason: ExclusionReason; lines: number }[];
+};
+/**
+ * How a source is organised, computed from citations rather than written by a model: each section, from its heading to
+ * the next heading of the same or a higher level, with the top-level parts that take it apart (through their own lines,
+ * their sub-parts' or a joint's) and the lines left out with their reason. Sections are the top two heading levels; a
+ * lone top heading is the document's title, so the two levels below it are used.
+ */
+export function sectionCoverage(d: Pick<Disassembly, 'sources' | 'whole' | 'parts' | 'joints' | 'bom'>, source: string, headings: SourceHeading[]): SectionCoverage[] {
+  const text = d.sources.find(s => s.id === source)?.text.split('\n');
+  if (!text || !headings.length) return [];
+  let levels = [...new Set(headings.map(h => h.level))].sort((a, b) => a - b);
+  if (levels.length > 1 && headings.filter(h => h.level === levels[0]).length === 1) levels = levels.slice(1);
+  const kept = headings.filter(h => levels.slice(0, 2).includes(h.level)).sort((a, b) => a.from - b.from);
+
+  const whole = linesOf(d, d.whole.cites);
+  const owners = new Map<string, Set<string>>();
+  const own = (keys: Set<string>, id: string) => keys.forEach(k => { const set = owners.get(k) ?? new Set<string>(); set.add(id); owners.set(k, set); });
+  for (const top of d.parts) {
+    const walk = (part: Part) => { own(linesOf(d, part.cites), top.id); part.joints?.forEach(j => own(linesOf(d, j.cites), top.id)); part.parts?.forEach(walk); };
+    walk(top);
+  }
+  d.joints.forEach(j => { const keys = linesOf(d, j.cites); own(keys, j.from); own(keys, j.to); });
+  const reasons = new Map<string, ExclusionReason>();
+  for (const x of [...d.bom.excluded, ...allParts(d).flatMap(({ part }) => part.excluded ?? [])]) linesOf(d, [x]).forEach(k => { if (!reasons.has(k)) reasons.set(k, x.reason); });
+
+  return kept.map((heading, i) => {
+    const next = kept.slice(i + 1).find(h => h.level <= heading.level);
+    const to = next ? next.from - 1 : text.length;
+    const parts = new Set<string>(); const excluded = new Map<ExclusionReason, number>(); let inWhole = false;
+    for (let n = heading.from; n <= to; n++) {
+      const key = `${source}:${n}`;
+      if (!text[n - 1]?.trim()) continue;
+      const by = owners.get(key);
+      if (whole.has(key)) inWhole = true;
+      if (by) by.forEach(id => parts.add(id));
+      else if (!whole.has(key)) { const reason = reasons.get(key); if (reason) excluded.set(reason, (excluded.get(reason) ?? 0) + 1); }
+    }
+    return { heading, to, whole: inWhole, parts: d.parts.map(p => p.id).filter(id => parts.has(id)), excluded: [...excluded].map(([reason, lines]) => ({ reason, lines })) };
+  });
 }
 
 /** Structural host checks, shared by stored files and generated structures. Passing them is not evidence of truth. */
@@ -361,8 +416,20 @@ export function checkDisassembly(d: Disassembly): Finding[] {
   });
   Object.keys(re.hints).forEach(key => topPart(key, `reassemble.hints.${key}`));
 
-  const language = detectLanguage(d.question, 1);
-  if (language && language !== d.language) add('question', `The question reads as ${language}, but the disassembly language is ${d.language}`);
+  if (d.start) topPart(d.start.part, 'start.part');
+  if (d.question) {
+    const language = detectLanguage(d.question, 1);
+    if (language && language !== d.language) add('question', `The question reads as ${language}, but the disassembly language is ${d.language}`);
+  } else {
+    // Without a question nothing is outside it, and nothing is closed as not needed: the whole source is taken apart.
+    const outside = 'Without a question, no line is outside it: take these lines apart or give another reason';
+    d.bom.excluded.forEach((x, i) => { if (x.reason === 'outside-question') add(`bom.excluded[${i}].reason`, outside); });
+    d.bom.excludedFiles?.forEach((x, i) => { if (x.reason === 'outside-question') add(`bom.excludedFiles[${i}].reason`, outside); });
+    for (const { part, path } of parts) {
+      part.excluded?.forEach((x, i) => { if (x.reason === 'outside-question') add(`${path}.excluded[${i}].reason`, outside); });
+      if (part.relevant === false) add(`${path}.relevant`, 'Without a question, no sub-assembly is closed as not needed');
+    }
+  }
 
   const bom = billOfMaterials(d);
   bom.sources.forEach((s, i) => s.forgotten.forEach(x => add(`sources[${i}]`, `Lines ${x.from}–${x.to} of ${s.title} are in no part and not excluded`)));

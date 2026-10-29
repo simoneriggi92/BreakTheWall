@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { allParts, divisible, DisassemblyError, isExpansionOf, validateDisassembly, type Disassembly, type Finding } from '../core/disassembly';
 import {
   acceptContent, acceptExpansion, acceptRuns, acceptStructure, acceptSuggestions, applyShortened, assembleDisassembly, buildContentInput, buildExpansionInput,
-  buildRepairRequest, buildRunsInput, buildShortenInput, buildStructureInput, buildSuggestionInput, CONTENT_INSTRUCTIONS, contentJsonSchema, EXPANSION_INSTRUCTIONS,
-  expansionJsonSchema, generatedDisassemblyId, longTexts, RUNS_INSTRUCTIONS, runsJsonSchema, SHORTEN_INSTRUCTIONS, shortenJsonSchema, STRUCTURE_INSTRUCTIONS,
+  buildRepairRequest, buildRunsInput, buildShortenInput, buildStructureInput, buildSuggestionInput, CONTENT_INSTRUCTIONS, contentJsonSchema, expansionInstructions,
+  expansionJsonSchema, generatedDisassemblyId, longTexts, RUNS_INSTRUCTIONS, runsJsonSchema, SHORTEN_INSTRUCTIONS, shortenJsonSchema, instructionsFor,
   structureJsonSchema, SUGGEST_INSTRUCTIONS, suggestionsJsonSchema, type ContentDraft, type ContentLanguage, type GenerationMeta, type RunsDraft, type StructureDraft,
 } from '../core/disassembly-generation';
 import { idSchema } from '../core/lesson';
@@ -175,7 +175,7 @@ export class Generator {
 
       if (!structure) {
         structure = await ask('structure', setup.structure, {
-          model: setup.structure.model, instructions: STRUCTURE_INSTRUCTIONS, schemaName: 'break_the_wall_structure', schema: structureJsonSchema(sources),
+          model: setup.structure.model, instructions: instructionsFor(goal), schemaName: 'break_the_wall_structure', schema: structureJsonSchema(sources, goal),
           messages: [{ role: 'user', content: buildStructureInput(sources, goal, language) }],
         }, raw => acceptStructure(raw, base), controller.signal, 'structure');
         status.push(...structure.parts.map((): Status => 'waiting'));
@@ -268,7 +268,7 @@ export class Generator {
       const meta = { provider: route.provider, ...(route.provider === 'local' ? { runtime: route.runtime } : {}), model: route.model, createdAt: this.now().toISOString() };
       const report = (mode: Mode, received: number) => onProgress({ phase: 'structure', repairing: mode !== 'first', ...(mode === 'shorten' ? { shortening: true } : {}), received, requests: stats.requests });
       const next = await withRepair((body, mode) => { const sent = counted(this.completer(route), body, controller.signal, stats, mode, n => report(mode, n)); report(mode, 0); return sent; }, {
-        model: route.model, instructions: EXPANSION_INSTRUCTIONS, schemaName: 'break_the_wall_expansion', schema: expansionJsonSchema(previous, part.id),
+        model: route.model, instructions: expansionInstructions(!!previous.question), schemaName: 'break_the_wall_expansion', schema: expansionJsonSchema(previous, part.id),
         messages: [{ role: 'user', content: buildExpansionInput(previous, part.id) }],
       }, raw => acceptExpansion(raw, previous, part.id, meta), controller.signal, `part ${part.id}`, previous.language);
       const checked = await validateDisassembly(next);

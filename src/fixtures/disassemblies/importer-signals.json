@@ -1,0 +1,817 @@
+{
+ "schemaVersion": 1,
+ "id": "importer-signals",
+ "revision": "v1",
+ "kind": "prepared",
+ "title": "L’importatore di Larkspur, di notte",
+ "language": "it",
+ "family": "importer-signals",
+ "sources": [
+  {
+   "id": "importer",
+   "title": "night-importer.md",
+   "origin": "original-prepared",
+   "revision": "v1",
+   "text": "# Larkspur catalogue importer: telling a silent night apart\n\n**Purpose:** explain how the overnight importer shows what it is doing, so that\nwhoever is on call can tell a stopped importer from a quiet night.\n**Audience:** people who have never read the importer's code.\n**Note:** Larkspur is a fictional library network, written for the Break the Wall\nexamples. Names, numbers and times are illustrative.\n\n## 1. What the importer does\n\nEvery night, publishers add and correct records for the books they sell: titles,\nauthors, prices, cover images. The importer brings those records into the\nLarkspur catalogue, so that a branch librarian who searches in the morning finds\nyesterday's corrections.\n\nIt is a background process with no screen and no web page. It runs on one\nmachine, starts with the machine, and repeats the same round every ten minutes\nuntil it is stopped.\n\nA round asks each publisher's feed for records changed since the last round,\nhands every new record to a worker, and the worker writes it to the catalogue.\n\n## 2. Why silence is the hard failure\n\nWhen the importer crashes, the machine restarts it and someone gets an email.\nThat is the easy case. The hard case is silence: the morning catalogue has no\nnew records, and nothing says why.\n\nSilence has several causes that look the same from outside:\n\n- the importer is stuck inside a call that never returns;\n- someone paused it for maintenance and forgot to switch it back on;\n- the publishers really sent nothing new;\n- every round runs, but every record is turned away;\n- the workers report success for records they never wrote.\n\nThe importer's signals exist to separate these causes. Each one answers a\ndifferent question, and the design keeps the questions apart on purpose:\n\n1. Is the importer running at all?\n2. Do its rounds reach the end?\n3. What happened to each record?\n\nA single \"healthy\" light would have to answer all three at once, and it would\nbe wrong in at least one of the cases above.\n\n## 3. One round, step by step\n\nA round always goes through the same steps, in this order:\n\n1. **Wake and stamp.** The round writes the heartbeat stamp (section 4)\n   before it does anything that could fail or wait.\n2. **Read the switch.** It reads the pause switch (section 7). If the switch\n   is off, the round records that it is paused and ends here.\n3. **Fetch.** It asks each feed for records changed since the last round.\n   This is the step that can hang: a feed may accept the call and never answer.\n4. **Hand over.** It gives each record to a worker and moves on; it does not\n   wait for the worker to finish.\n5. **Close.** It writes the last-finished time (section 5) and goes back to\n   sleep until the next round.\n\nThe order matters. Because the stamp comes first, a round that hangs in step 3\nstill left a stamp behind, and the next missing stamp is what gives it away.\nBecause the last-finished time comes last, it moves only when a round really\nreached the end.\n\nA round that fails in step 3 with an error, rather than hanging, ends early: it\nlogs the error, skips step 5, and the next round starts on time.\n\n## 4. The heartbeat stamp\n\nThe heartbeat stamp is a single time, kept in the importer's memory and copied\nto a small file on the machine's disk: the moment the latest round started.\n\n- It is written at the start of every round, paused or not.\n- It is never written anywhere else.\n- Its age is the only thing it says: how long ago a round last began.\n\nWith rounds every ten minutes, a stamp younger than ten minutes is normal. A\nstamp thirty minutes old means three rounds did not start, or one round has\nbeen stuck for half an hour.\n\nThe stamp does not say whether rounds succeed. A round that fails on every\nfetch still stamps on time. That is deliberate: the stamp answers question 1\nand nothing else.\n\n## 5. The last-finished time\n\nThe last-finished time is the moment the latest round reached step 5.\n\n- It is written only at the end of a round that got through the fetch.\n- A paused round does not write it.\n- A round that fails in step 3 does not write it.\n\nSo the last-finished time can fall far behind the heartbeat stamp while the\nimporter is perfectly alive: during a pause, or while a feed keeps refusing\ncalls. The gap between the two times is itself information. A recent stamp and\nan old last-finished time mean \"running, but not getting through\".\n\nIt answers question 2. It says nothing about individual records.\n\n## 6. What happened to each record\n\n### 6.1 The four outcomes\n\nEvery record a worker receives ends in exactly one of four outcomes, written to\nthe outcome log with the record's identifier:\n\n- **Stored:** the record is in the catalogue.\n- **Waiting:** the publisher announced it, but its details are not ready yet.\n  The worker will try again in an hour, up to a day.\n- **Rejected:** the record is malformed or breaks a catalogue rule. Trying\n  again would not help, so nobody does.\n- **Failed:** something went wrong that might go right next time: the\n  catalogue was busy, a cover image did not download.\n\nThe log line always has the same shape, so a search for one record's\nidentifier returns its whole story across retries.\n\n### 6.2 Why \"the job succeeded\" is not enough\n\nThe workers run inside a job system that keeps its own score: a job either\nsucceeded or failed. That score is about the job, not the record.\n\nA worker that finds a rejected record finishes normally: there is nothing to\nretry. The job system counts it as a success. A worker that finds a waiting\nrecord asks for a retry, and the job system counts a failure, even though\nnothing is wrong. Read alone, the job score says \"all good\" on a night when\nevery record was rejected, and \"trouble\" on a night when publishers were\nmerely slow.\n\nThis is why the outcome log exists, and why the night board reads it instead\nof the job score. \"The job succeeded\" and \"the record is in the catalogue\" are\ntwo different facts.\n\n## 7. The pause switch\n\nOperators can pause the importer without stopping the process: a switch in\nthe configuration service, read at the start of every round.\n\nA paused importer keeps running its rounds. Each round stamps the heartbeat,\nreads the switch, sees it off, records \"paused\" and goes back to sleep. Nothing\nis fetched, nothing is handed over, and the last-finished time stays where it\nwas.\n\nThe heartbeat goes on during a pause on purpose. If a pause stopped the\nheartbeat, the restart rule (section 8) would take a deliberate pause for a\nstuck importer and restart it, again and again, for as long as the pause\nlasted.\n\nThe current state of the switch is shown on the night board, so that an old\nlast-finished time can be read next to \"paused since 01:40\".\n\n## 8. The restart rule\n\nThe machine runs a check every minute and restarts the importer when it looks\nstuck. The rule reads one thing only: the age of the heartbeat stamp.\n\n- Younger than three rounds (thirty minutes): leave it alone.\n- Older: restart the importer.\n- In the first five minutes after a start, leave it alone whatever the stamp\n  says, so that a slow start is not mistaken for a hang.\n\nThe rule does not read the last-finished time, the pause switch or the\noutcome log, and this is the point of the design. A restart can fix exactly\none problem: a round stuck inside a call that will never return. It cannot\nfix a feed that refuses calls, a publisher that sent nothing, or a record that\nbreaks a catalogue rule. Restarting for those would only add noise, and it\nwould interrupt the workers that were doing fine.\n\nThe rule also leaves the catalogue and the feeds out of its check. If it asked\nthe catalogue whether it was healthy, a slow catalogue would cause the\nimporter to be restarted, which repairs nothing.\n\n## 9. The night board\n\nThe night board is the page the on-call person opens. It shows three lights\nand two numbers, one for each question:\n\n- **Running:** green while the heartbeat stamp is younger than thirty minutes.\n- **Getting through:** green while the last-finished time is younger than an\n  hour, grey while the importer is paused.\n- **Records:** the counts of the four outcomes since midnight, and the share\n  of rejected records.\n- The age of the heartbeat stamp, in minutes.\n- The age of the last-finished time, in minutes.\n\nThe board reads the outcome log, not the job score (section 6.2).\n\nIt raises an alert in three cases: the running light turns red; the\ngetting-through light stays red for an hour while the switch is on; rejected\nrecords pass a quarter of the night's total.\n\n## 10. Reading the board\n\n| Running | Getting through | Records | Most likely |\n|---|---|---|---|\n| red | — | — | the importer is down or stuck; the restart rule acts |\n| green | grey | none | paused: check who paused it and when |\n| green | red | none | a feed refuses calls, or every fetch fails |\n| green | green | none | the publishers sent nothing tonight |\n| green | green | mostly rejected | a publisher changed its format |\n| green | green | mostly waiting | publishers are slow; nothing to do yet |\n| green | green | mostly stored | a normal night |\n\nTwo rows look alike at first: \"paused\" and \"a feed refuses calls\" both leave\nthe running light green and nothing in the records. The getting-through light\ntells them apart, grey for a pause and red for a refusing feed.\n\n## 11. One night, as the board saw it\n\nA night from last winter, reconstructed from the board and the outcome log.\n\n- **00:00 to 01:40.** All three lights green. Rounds every ten minutes, a few\n  hundred records stored, a handful waiting.\n- **01:40.** An operator pauses the importer to move the catalogue to a new\n  disk. Running stays green; getting through turns grey; no new outcomes.\n- **02:30.** The switch goes back on. The next round fetches the backlog of\n  fifty minutes and the last-finished time catches up.\n- **03:10.** One publisher's feed accepts the call and never answers. The\n  round stamped at 03:10 hangs in the fetch. No stamp at 03:20, 03:30, 03:40.\n- **03:41.** The heartbeat stamp is thirty-one minutes old. The restart rule\n  restarts the importer. The first round after the start stamps at 03:41,\n  times out on the silent feed after two minutes, and fetches the others.\n- **04:00.** Another publisher starts sending prices in a new format. Every\n  record from that publisher is rejected. Running and getting through are\n  green; the share of rejected records climbs past a quarter, and the board\n  raises an alert.\n- **04:20.** The on-call person sees the rejected records, all from one\n  publisher, and calls them. The importer itself needed nothing.\n\nThree alerts would have been one, or none, with a single \"healthy\" light: the\npause would have looked like a hang, the hang would have looked like a pause,\nand the format change would not have shown at all.\n\n## 12. Things this design does not catch\n\n- **A worker that writes a wrong record.** The outcome says stored; the\n  catalogue holds a mistake. Only a check of the content would see it.\n- **A feed that silently drops records.** If a publisher never announces a\n  record, no outcome is ever written for it.\n- **A full disk.** The heartbeat file cannot be updated; the restart rule sees\n  an old stamp and restarts the importer, which does not free the disk.\n- **A board that is itself down.** The lights cannot show their own absence.\n  The alert for a missing board comes from a different system.\n\nThese gaps are known. Each needs a signal of its own, and adding one would not\nmake the existing three answer more questions.\n\n## 13. Glossary\n\n- **Round:** one pass of the importer, every ten minutes.\n- **Heartbeat stamp:** when the latest round started.\n- **Last-finished time:** when the latest round reached its end.\n- **Outcome:** stored, waiting, rejected or failed; one per record.\n- **Job score:** the job system's own success or failure, about the job only.\n- **Pause switch:** an operator's way to stop fetching without stopping the\n  process.",
+   "sha256": "c64ac2e57739d1cdad2b11d533b1f805dc7fc7385bf832f2346137caf4e21ed4",
+   "language": "en"
+  }
+ ],
+ "whole": {
+  "name": "Importatore notturno",
+  "does": "Importa i record degli editori ogni dieci minuti e tiene separati tre segnali: se gira, se arriva in fondo e che cosa è successo a ogni record.",
+  "why": "Il silenzio ha diverse cause che da fuori si somigliano. Un segnale per ogni domanda è ciò che distingue una pausa da un blocco, e un blocco da un feed guasto.",
+  "cites": [
+   {
+    "source": "importer",
+    "from": 9,
+    "to": 45
+   },
+   {
+    "source": "importer",
+    "from": 247,
+    "to": 248
+   }
+  ]
+ },
+ "start": {
+  "part": "round",
+  "why": "Ogni segnale è scritto da un passo del giro: quando ne vedi l’ordine, ogni segnale dice che cosa può sapere e che cosa no."
+ },
+ "parts": [
+  {
+   "id": "round",
+   "name": "Il giro",
+   "kind": "step",
+   "icon": "repeat",
+   "role": "Ogni dieci minuti: timbra, legge l’interruttore, scarica, consegna, chiude.",
+   "points": [
+    {
+     "text": "Il timbro viene prima di qualsiasi passo che possa fallire o restare in attesa.",
+     "mark": "step"
+    },
+    {
+     "text": "L’ora di fine giro si scrive solo quando il giro arriva in fondo.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Lo scaricamento è il passo che si può bloccare: un feed può accettare la chiamata e non rispondere mai.",
+     "mark": "caveat"
+    }
+   ],
+   "metaphor": {
+    "text": "Il giro di una guardia notturna: timbra all’ingresso, guarda la bacheca, percorre i piani, consegna il rapporto.",
+    "limit": "Una guardia bloccata può chiedere aiuto; un giro fermo dentro una chiamata non può dire niente."
+   },
+   "cites": [
+    {
+     "source": "importer",
+     "from": 47,
+     "to": 68
+    }
+   ],
+   "parts": [
+    {
+     "id": "round-stamp",
+     "name": "Sveglia e timbro",
+     "kind": "step",
+     "icon": "play",
+     "role": "La prima cosa che fa un giro, prima di ogni passo che può fallire.",
+     "explain": "Un giro che poi si blocca ha comunque lasciato il suo timbro, e il timbro che non arriva dopo è ciò che rivela il blocco.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 51,
+       "to": 52
+      },
+      {
+       "source": "importer",
+       "from": 62,
+       "to": 63
+      }
+     ]
+    },
+    {
+     "id": "round-switch",
+     "name": "Legge l’interruttore",
+     "kind": "step",
+     "icon": "filter",
+     "role": "Decide se questo giro prosegue o finisce in pausa.",
+     "explain": "Se l’interruttore è spento, il giro annota che è in pausa e si ferma prima di scaricare qualsiasi cosa.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 53,
+       "to": 54
+      }
+     ]
+    },
+    {
+     "id": "round-fetch",
+     "name": "Scarica",
+     "kind": "step",
+     "icon": "download",
+     "role": "Chiede a ogni feed i record cambiati dal giro precedente.",
+     "explain": "Un errore chiude il giro in anticipo e in orario; una chiamata che non torna mai tiene il giro dentro questo passo.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 55,
+       "to": 56
+      },
+      {
+       "source": "importer",
+       "from": 67,
+       "to": 68
+      }
+     ]
+    },
+    {
+     "id": "round-hand",
+     "name": "Consegna",
+     "kind": "step",
+     "icon": "send",
+     "role": "Dà ogni record a un worker e va avanti.",
+     "explain": "Il giro non aspetta i worker, quindi come finisce ogni record lo scrive altrove il worker.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 57,
+       "to": 58
+      }
+     ]
+    },
+    {
+     "id": "round-close",
+     "name": "Chiude",
+     "kind": "step",
+     "icon": "flag",
+     "role": "Scrive l’ora di fine giro, poi dorme fino al giro successivo.",
+     "explain": "Essendo l’ultimo passo, si muove solo quando scaricamento e consegna sono avvenuti davvero.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 59,
+       "to": 60
+      },
+      {
+       "source": "importer",
+       "from": 64,
+       "to": 65
+      }
+     ]
+    }
+   ],
+   "joints": [
+    {
+     "from": "round-stamp",
+     "to": "round-switch",
+     "type": "sends-to",
+     "label": "poi"
+    },
+    {
+     "from": "round-switch",
+     "to": "round-fetch",
+     "type": "sends-to",
+     "label": "se è acceso"
+    },
+    {
+     "from": "round-fetch",
+     "to": "round-hand",
+     "type": "sends-to",
+     "label": "record nuovi"
+    },
+    {
+     "from": "round-hand",
+     "to": "round-close",
+     "type": "sends-to",
+     "label": "poi"
+    }
+   ],
+   "excluded": [
+    {
+     "source": "importer",
+     "from": 47,
+     "to": 47,
+     "reason": "context",
+     "note": "Il titolo della sezione."
+    },
+    {
+     "source": "importer",
+     "from": 49,
+     "to": 49,
+     "reason": "context",
+     "note": "La frase che introduce l’elenco dei passi."
+    }
+   ]
+  },
+  {
+   "id": "heartbeat",
+   "name": "Timbro di battito",
+   "kind": "artifact",
+   "icon": "timer",
+   "role": "Quando è iniziato l’ultimo giro: dice soltanto se l’importatore sta girando.",
+   "points": [
+    {
+     "text": "Si scrive all’inizio di ogni giro, in pausa o no, e in nessun altro punto.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Un timbro vecchio di trenta minuti vuol dire tre giri mai partiti, o uno fermo da mezz’ora.",
+     "mark": "step"
+    },
+    {
+     "text": "Un giro che fallisce ogni scaricamento timbra comunque in orario: il timbro non dice nulla sul successo.",
+     "mark": "caveat"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 70,
+     "to": 85
+    }
+   ]
+  },
+  {
+   "id": "finished",
+   "name": "Ora di fine giro",
+   "kind": "artifact",
+   "icon": "flag",
+   "role": "Quando l’ultimo giro è arrivato in fondo: dice se i giri riescono a finire.",
+   "points": [
+    {
+     "text": "Un giro in pausa e un giro con lo scaricamento fallito la lasciano dov’era.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Un timbro recente accanto a un’ora di fine vecchia vuol dire: gira, ma non arriva in fondo.",
+     "mark": "step"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 87,
+     "to": 100
+    }
+   ]
+  },
+  {
+   "id": "outcomes",
+   "name": "Registro degli esiti",
+   "kind": "artifact",
+   "icon": "file-text",
+   "role": "Una riga per record: archiviato, in attesa, rifiutato o fallito.",
+   "points": [
+    {
+     "text": "In attesa e fallito si ritentano; rifiutato mai, perché ritentare non servirebbe.",
+     "mark": "step"
+    },
+    {
+     "text": "Ogni riga ha la stessa forma, così una sola ricerca restituisce tutta la storia di un record.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Archiviato non vuol dire corretto, e un record che il feed non ha mai annunciato non lascia alcuna riga.",
+     "mark": "caveat"
+    }
+   ],
+   "lens": {
+    "what": "Il punteggio del sistema dei job: un job è riuscito oppure è fallito.",
+    "why": "Riguarda il job, non il record, quindi sbaglia sia sui fallimenti silenziosi sia sugli editori lenti.",
+    "how": "Un record rifiutato chiude il job normalmente (un successo); un record in attesa chiede un nuovo tentativo (un fallimento).",
+    "critical": "«Il job è riuscito» e «il record è nel catalogo» sono due fatti diversi."
+   },
+   "cites": [
+    {
+     "source": "importer",
+     "from": 102,
+     "to": 134
+    },
+    {
+     "source": "importer",
+     "from": 238,
+     "to": 241
+    }
+   ]
+  },
+  {
+   "id": "pause",
+   "name": "Interruttore di pausa",
+   "kind": "component",
+   "icon": "settings",
+   "role": "Permette a un operatore di fermare lo scaricamento senza fermare il processo.",
+   "points": [
+    {
+     "text": "Un giro in pausa timbra comunque il battito, poi annota «in pausa» e dorme.",
+     "mark": "step"
+    },
+    {
+     "text": "Se la pausa fermasse il timbro, la regola di riavvio riavvierebbe di continuo una pausa voluta.",
+     "mark": "caveat"
+    },
+    {
+     "text": "Il pannello mostra l’interruttore, così un’ora di fine vecchia si legge accanto a «in pausa dalle».",
+     "mark": "keeps"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 136,
+     "to": 152
+    },
+    {
+     "source": "importer",
+     "from": 216,
+     "to": 219
+    }
+   ]
+  },
+  {
+   "id": "restart",
+   "name": "Regola di riavvio",
+   "kind": "component",
+   "icon": "rotate-ccw",
+   "role": "Ogni minuto legge una sola cosa, l’età del timbro, e oltre i trenta minuti riavvia l’importatore.",
+   "points": [
+    {
+     "text": "Per cinque minuti lascia stare un avvio appena fatto, così un avvio lento non sembra un blocco.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Un riavvio ripara un giro fermo in una chiamata, e nient’altro: non un feed che rifiuta, non un record sbagliato.",
+     "mark": "caveat"
+    },
+    {
+     "text": "Non interroga mai il catalogo o i feed: la loro lentezza farebbe riavviare l’importatore senza riparare niente.",
+     "mark": "caveat"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 154,
+     "to": 173
+    },
+    {
+     "source": "importer",
+     "from": 220,
+     "to": 224
+    },
+    {
+     "source": "importer",
+     "from": 242,
+     "to": 243
+    }
+   ]
+  },
+  {
+   "id": "board",
+   "name": "Pannello notturno",
+   "kind": "component",
+   "icon": "gauge",
+   "role": "Tre luci e due età, una per domanda, e gli avvisi quando si scostano da una notte normale.",
+   "points": [
+    {
+     "text": "Legge il registro degli esiti, mai il punteggio dei job.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Arriva in fondo grigio vuol dire in pausa; rosso vuol dire che un feed rifiuta o che ogni scaricamento fallisce.",
+     "mark": "step"
+    },
+    {
+     "text": "Non può mostrare la propria assenza: un pannello spento lo segnala un altro sistema.",
+     "mark": "caveat"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 175,
+     "to": 208
+    },
+    {
+     "source": "importer",
+     "from": 214,
+     "to": 215
+    },
+    {
+     "source": "importer",
+     "from": 225,
+     "to": 234
+    },
+    {
+     "source": "importer",
+     "from": 244,
+     "to": 245
+    }
+   ]
+  }
+ ],
+ "joints": [
+  {
+   "from": "round",
+   "to": "heartbeat",
+   "type": "sends-to",
+   "label": "per primo",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 62,
+     "to": 63
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "finished",
+   "type": "sends-to",
+   "label": "per ultima",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 64,
+     "to": 65
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "outcomes",
+   "type": "sends-to",
+   "label": "per record",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 106,
+     "to": 107
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "pause",
+   "type": "depends-on",
+   "label": "a ogni giro",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 138,
+     "to": 139
+    }
+   ]
+  },
+  {
+   "from": "heartbeat",
+   "to": "restart",
+   "type": "sends-to",
+   "label": "la sua età",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 156,
+     "to": 157
+    }
+   ]
+  },
+  {
+   "from": "heartbeat",
+   "to": "board",
+   "type": "sends-to",
+   "label": "luce Gira",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 180,
+     "to": 180
+    }
+   ]
+  },
+  {
+   "from": "finished",
+   "to": "board",
+   "type": "sends-to",
+   "label": "luce Arriva in fondo",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 181,
+     "to": 182
+    }
+   ]
+  },
+  {
+   "from": "outcomes",
+   "to": "board",
+   "type": "sends-to",
+   "label": "conteggi",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 188,
+     "to": 188
+    }
+   ]
+  }
+ ],
+ "bom": {
+  "excluded": [
+   {
+    "source": "importer",
+    "from": 1,
+    "to": 7,
+    "reason": "context",
+    "note": "Intestazione: scopo, pubblico e la nota che Larkspur è inventata."
+   },
+   {
+    "source": "importer",
+    "from": 210,
+    "to": 212,
+    "reason": "context",
+    "note": "Titolo e introduzione del racconto della notte; ogni ora è assegnata al suo pezzo."
+   },
+   {
+    "source": "importer",
+    "from": 236,
+    "to": 236,
+    "reason": "context",
+    "note": "Titolo delle lacune note; ogni lacuna è assegnata al pezzo che riguarda."
+   },
+   {
+    "source": "importer",
+    "from": 250,
+    "to": 258,
+    "reason": "repetition",
+    "note": "Glossario: ogni termine è spiegato nel suo pezzo."
+   }
+  ]
+ },
+ "runs": [
+  {
+   "type": "scenario",
+   "id": "hang",
+   "title": "Un feed che non risponde mai",
+   "setup": "Sono le 03:10. I giri partono ogni dieci minuti e tutte le luci del pannello sono verdi.",
+   "vars": {
+    "età del timbro": "0 min",
+    "fine giro": "0 min",
+    "luce Gira": "verde"
+   },
+   "steps": [
+    {
+     "action": "Il giro delle 03:10 parte e comincia a scaricare",
+     "predict": {
+      "question": "Che cosa ha scritto finora il giro?",
+      "options": [
+       {
+        "text": "Il timbro di battito, e nient’altro per ora",
+        "correct": true,
+        "why": "Il timbro viene per primo; l’ora di fine giro si scrive solo alla fine."
+       },
+       {
+        "text": "Il timbro e l’ora di fine giro",
+        "correct": false,
+        "why": "L’ora di fine giro è l’ultimo passo del giro: non è ancora arrivato lì."
+       },
+       {
+        "text": "Solo l’ora di fine del giro precedente",
+        "correct": false,
+        "why": "Quell’ora è del giro prima; questo giro ha già timbrato."
+       }
+      ]
+     },
+     "effect": {
+      "round": "active",
+      "heartbeat": "ok"
+     },
+     "flow": [
+      [
+       "round",
+       "heartbeat"
+      ]
+     ],
+     "explain": "Timbrare per primo vuol dire che, qualunque cosa succeda dopo, questo giro ha lasciato un segno di quando è iniziato.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 51,
+       "to": 52
+      },
+      {
+       "source": "importer",
+       "from": 59,
+       "to": 60
+      }
+     ]
+    },
+    {
+     "action": "Il feed accetta la chiamata e non risponde mai",
+     "predict": {
+      "question": "Alle 03:20, che cosa succede al timbro?",
+      "options": [
+       {
+        "text": "Niente: il giro è ancora dentro lo scaricamento",
+        "correct": true,
+        "why": "Mentre questo giro è bloccato non ne parte un altro, quindi nessuno scrive un timbro nuovo."
+       },
+       {
+        "text": "Un nuovo giro lo timbra, come ogni dieci minuti",
+        "correct": false,
+        "why": "I giri si susseguono; un giro bloccato impedisce al successivo di partire."
+       },
+       {
+        "text": "Il giro lo timbra di nuovo mentre aspetta",
+        "correct": false,
+        "why": "Il timbro si scrive solo all’inizio di un giro, mai in un altro punto."
+       }
+      ]
+     },
+     "effect": {
+      "round": "failed"
+     },
+     "vars": {
+      "età del timbro": "10 min",
+      "fine giro": "10 min"
+     },
+     "explain": "Lo scaricamento è il passo che si può bloccare. Finché il giro è fermo non ne parte un altro, e il timbro invecchia soltanto.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 55,
+       "to": 56
+      },
+      {
+       "source": "importer",
+       "from": 220,
+       "to": 221
+      }
+     ]
+    },
+    {
+     "action": "Alle 03:41 il controllo legge un timbro vecchio di 31 minuti",
+     "predict": {
+      "question": "Che cosa fa la regola di riavvio?",
+      "options": [
+       {
+        "text": "Riavvia l’importatore",
+        "correct": true,
+        "why": "Più vecchio di tre giri: la regola riavvia, e non legge nient’altro."
+       },
+       {
+        "text": "Aspetta l’ora di fine giro",
+        "correct": false,
+        "why": "La regola non legge mai l’ora di fine giro, solo l’età del timbro."
+       },
+       {
+        "text": "Chiede al feed se sta bene",
+        "correct": false,
+        "why": "La regola lascia fuori di proposito i feed e il catalogo."
+       }
+      ]
+     },
+     "effect": {
+      "heartbeat": "failed",
+      "restart": "active"
+     },
+     "flow": [
+      [
+       "heartbeat",
+       "restart"
+      ]
+     ],
+     "vars": {
+      "età del timbro": "31 min",
+      "luce Gira": "rossa"
+     },
+     "explain": "Un timbro oltre i trenta minuti è l’unico problema che un riavvio può riparare: un giro fermo in una chiamata.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 159,
+       "to": 160
+      },
+      {
+       "source": "importer",
+       "from": 222,
+       "to": 223
+      }
+     ]
+    },
+    {
+     "action": "L’importatore riavviato fa il suo primo giro",
+     "effect": {
+      "round": "restored",
+      "heartbeat": "ok",
+      "restart": "ok"
+     },
+     "vars": {
+      "età del timbro": "0 min",
+      "luce Gira": "verde"
+     },
+     "explain": "Il nuovo giro timbra subito, rinuncia al feed muto dopo due minuti e scarica gli altri. Il riavvio ha riparato il blocco, non il feed.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 222,
+       "to": 224
+      },
+      {
+       "source": "importer",
+       "from": 165,
+       "to": 166
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "case",
+   "id": "grey-light",
+   "title": "Una luce grigia alle due di notte",
+   "scenario": "Alle 02:00 il pannello mostra Gira verde, Arriva in fondo grigio e nessun record nuovo dalle 01:40.",
+   "question": "Qual è la spiegazione più probabile?",
+   "options": [
+    {
+     "text": "Qualcuno ha messo in pausa l’importatore",
+     "correct": true,
+     "why": "Durante una pausa la luce Arriva in fondo è grigia, mentre il battito continua."
+    },
+    {
+     "text": "Un feed rifiuta ogni chiamata",
+     "correct": false,
+     "why": "Un feed che rifiuta rende rossa la luce Arriva in fondo, non grigia."
+    },
+    {
+     "text": "L’importatore è fermo in uno scaricamento",
+     "correct": false,
+     "why": "Un importatore bloccato non rende grigia la luce; grigio vuol dire solo in pausa."
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 181,
+     "to": 182
+    },
+    {
+     "source": "importer",
+     "from": 199,
+     "to": 200
+    }
+   ]
+  }
+ ],
+ "reassemble": {
+  "title": "Rimonta l’importatore",
+  "instruction": "Metti ogni pezzo al suo posto: che cosa si ripete, che cosa si scrive per primo e per ultimo, che cosa lascia ogni record, che cosa decide un operatore, che cosa riavvia e che cosa guarda chi è di turno.",
+  "slots": [
+   {
+    "id": "s-round",
+    "label": "Ogni dieci minuti",
+    "accepts": "round"
+   },
+   {
+    "id": "s-heartbeat",
+    "label": "Scritto per primo",
+    "accepts": "heartbeat"
+   },
+   {
+    "id": "s-finished",
+    "label": "Scritta per ultima",
+    "accepts": "finished"
+   },
+   {
+    "id": "s-outcomes",
+    "label": "Uno per record",
+    "accepts": "outcomes"
+   },
+   {
+    "id": "s-pause",
+    "label": "Deciso da un operatore",
+    "accepts": "pause"
+   },
+   {
+    "id": "s-restart",
+    "label": "Legge una sola età",
+    "accepts": "restart"
+   },
+   {
+    "id": "s-board",
+    "label": "Aperto da chi è di turno",
+    "accepts": "board"
+   }
+  ],
+  "hints": {
+   "round": "Scrive tutti gli altri segnali, un passo alla volta.",
+   "heartbeat": "Si scrive prima che qualcosa possa fallire o restare in attesa.",
+   "finished": "Si muove solo quando un giro arriva davvero in fondo.",
+   "outcomes": "Quattro parole, una per record, mai il punteggio del job.",
+   "pause": "Ferma lo scaricamento, non il processo e non il timbro.",
+   "restart": "Può riparare un solo problema, quindi guarda una sola cosa.",
+   "board": "Tre luci, una per domanda."
+  }
+ }
+}

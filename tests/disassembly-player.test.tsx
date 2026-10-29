@@ -37,6 +37,36 @@ const side = () => within(document.querySelector<HTMLElement>('.d-side')!);
 const focusedLines = () => [...document.querySelectorAll('.source-text li.focus')].map(x => Number((x as HTMLElement).dataset.line));
 
 describe('exploded view, part card and source', () => {
+  it('orients without a question: no question line, where to start, and how the source is organised (P-20261029-source-entry E7)', async () => {
+    const input = mill(); delete input.question; input.parts.forEach((p: any) => { delete p.relevant; });
+    input.start = { part: 'claim', why: 'Il resto del saggio lo sostiene o lo limita.' };
+    const d = await validateDisassembly(input); await play(d);
+    expect(document.querySelector('.workbench-question')).toBeNull();
+    const card = side();
+    expect(card.getByText('Comincia da qui')).toBeInTheDocument();
+    expect(card.getByText('Il resto del saggio lo sostiene o lo limita.')).toBeInTheDocument();
+    await user().click(card.getByRole('button', { name: /^Apri \d+\. / }));
+    expect(side().getByRole('heading', { name: new RegExp(d.parts.find(p => p.id === 'claim')!.name) })).toBeInTheDocument();
+    // Mill's source has a single heading: one section would be the whole source again, so no list is shown.
+    expect(screen.queryByText('Com’è organizzata la fonte')).toBeNull();
+  });
+  it('lists the sections of the source with the plates that take them apart, and shows a section in the source', async () => {
+    const d = await validateDisassembly(atlas()); await play(d);
+    const card = side();
+    expect(card.queryByText('Comincia da qui')).toBeNull();
+    const list = within(card.getByText('Com’è organizzata la fonte').closest('.card-box') as HTMLElement);
+    const rows = list.getAllByRole('listitem');
+    expect(rows).toHaveLength(14);
+    const before = rows.find(r => r.textContent!.startsWith('3. Before you start'))!;
+    expect(within(before).getAllByRole('button').map(b => b.getAttribute('aria-label'))).toEqual(['Mostra «3. Before you start» nella fonte', 'Apri 1. Preparazione e avvio']);
+    expect(rows.at(-1)).toHaveTextContent('non smontata: fuori dalla domanda');
+    expect(rows.filter(r => r.classList.contains('nested'))).toHaveLength(3);
+    await user().click(within(before).getByRole('button', { name: /^Mostra/ }));
+    expect(focusedLines()[0]).toBe(35);
+    expect(focusedLines().at(-1)).toBe(46);
+    await user().click(within(before).getByRole('button', { name: 'Apri 1. Preparazione e avvio' }));
+    expect(side().getByRole('heading', { name: /Preparazione e avvio/ })).toBeInTheDocument();
+  });
   it('shows a selected part with its marked points and highlights its first citation in the source', async () => {
     const d = await validateDisassembly(atlas()); await play(d);
     await user().click(plate(/^4\. deploy-staging/));
@@ -350,6 +380,14 @@ describe('reassembly and bill of materials', () => {
 });
 
 describe('content language and interface language', () => {
+  it('shows what the whole does on a library card when there is no question (P-20261029-source-entry E7)', async () => {
+    const input = story(); delete input.question;
+    const d = await validateDisassembly(input);
+    const { bridge } = memoryBridge('en-US');
+    render(<App bridge={bridge} prepared={[]} disassemblies={[d]}/>);
+    const card = await screen.findByRole('button', { name: new RegExp(d.title) });
+    expect(card).toHaveTextContent(d.whole.does);
+  });
   it('keeps Italian content marked as Italian under an English interface, and the reverse', async () => {
     const it = await validateDisassembly(atlas()); const en = await validateDisassembly(story());
     const { bridge } = memoryBridge('en-US');
@@ -359,7 +397,7 @@ describe('content language and interface language', () => {
     await user().click(screen.getByRole('checkbox', { name: /Also show the examples in Italian/ }));
     await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
     await screen.findByRole('button', { name: 'Exploded view' });
-    expect(screen.getByText(it.question)).toHaveAttribute('lang', 'it');
+    expect(screen.getByText(it.question!)).toHaveAttribute('lang', 'it');
     expect(document.documentElement.lang).toBe('en');
     await user().click(plate(/^4\. deploy-staging · step/));
     expect(side().getByText('Part 4 · step')).toBeInTheDocument();
@@ -491,7 +529,7 @@ describe('one row of chrome and the drawing on the paper (P-20261029-ui-workbenc
     expect(bar.getByRole('button', { name: 'Torna ai percorsi' })).toBeInTheDocument();
     expect(bar.getByRole('heading', { level: 1, name: d.title })).toBeInTheDocument();
     expect(within(bar.getByRole('group', { name: /Cosa fare con lo smontaggio/ })).getAllByRole('button')).toHaveLength(4);
-    expect(screen.getAllByText(d.question)).toHaveLength(1);
+    expect(screen.getAllByText(d.question!)).toHaveLength(1);
     const outsideDrawing = (text: string) => screen.queryAllByText(text).filter(e => !e.closest('.sheet'));
     expect(outsideDrawing(d.whole.name)).toHaveLength(1);
     expect(screen.getAllByText('Seleziona un pezzo per aprirlo. Invio apre il pezzo selezionato.')).toHaveLength(1);
