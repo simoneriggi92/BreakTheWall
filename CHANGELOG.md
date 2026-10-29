@@ -68,7 +68,8 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.2.0-alpha...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.3.0-alpha...HEAD
+[0.3.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.3.0-alpha
 [0.2.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha
 [0.1.1-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha
