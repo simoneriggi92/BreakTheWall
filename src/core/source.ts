@@ -78,8 +78,10 @@ export function checkSelection(sources: Source[]): void {
   if (total > SOURCE_LIMITS.maxTotalChars) throw new SourceImportError('total-too-large', `Le fonti insieme hanno ${fmt(total)} caratteri; il limite per un percorso è ${fmt(SOURCE_LIMITS.maxTotalChars)}.`, { chars: total, limit: SOURCE_LIMITS.maxTotalChars });
 }
 
+/** An empty question means the whole source (P-20261029-source-entry); a question, when given, keeps its 10–400 characters. */
 export const goalSchema = z.strictObject({
-  outcome: z.string().trim().min(10, 'Descrivi l’obiettivo in almeno 10 caratteri.').max(400, 'L’obiettivo deve restare sotto i 400 caratteri.'),
+  outcome: z.string().trim().max(400, 'L’obiettivo deve restare sotto i 400 caratteri.')
+    .refine(x => x === '' || x.length >= 10, 'Descrivi l’obiettivo in almeno 10 caratteri.'),
   priorKnowledge: z.string().trim().max(200, 'Le conoscenze di partenza devono restare sotto i 200 caratteri.'),
 });
 export type LearningGoal = z.infer<typeof goalSchema>;

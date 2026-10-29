@@ -3,9 +3,9 @@ id: P-20261029-source-entry
 title: Understand a source without a question - the question becomes an optional focus
 version: 1
 state: implementing
-current_task: E4
-last_evidence: Phase contract (E1-E3) verified - typecheck passed; 29 files, 423 tests passed
-next_action: Owner confirms the commit of phase contract, then "implement P-20261029-source-entry v1 --phase generation"
+current_task: E7
+last_evidence: Phase generation (E4-E6) verified - typecheck and build passed; 29 files, 431 tests passed
+next_action: Owner confirms the commit of phase generation, then "implement P-20261029-source-entry v1 --phase player"
 approval: approved
 ---
 
@@ -154,3 +154,19 @@ Version 1, approved:
 - **E3 verified (2026-10-29).** `sectionCoverage(d, source, headings)` in `src/core/disassembly.ts`. Two refinements, both within the task: a lone top heading is the document's title, so the two levels below it are the sections (otherwise every Markdown document with an `#` title would show one section holding everything); and each row says whether the whole cites lines in it, since the whole's own lines are neither a part nor an exclusion.
   - Evidence (automated tests, `tests/section-coverage.test.ts`): on Atlas's English runbook the title is dropped and 14 sections remain (11 at level 2, 3 at level 3); "3. Before you start" → `start`; "7." → `image`, `deploy`, `smoke` (a joint counts for both ends); "11. Production" has no part and 3 lines excluded as outside the question; every section of every public fixture has a part, the whole or an exclusion; no headings, or an unknown source, give an empty list.
 - **Phase `contract` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 423 tests (408 before, plus 15); `git diff --check` passed. CI waits for a push.
+- 2026-10-29: `implement P-20261029-source-entry v1 --phase generation`.
+- **E4 verified (2026-10-29).**
+  - The goal accepts an empty question (spaces trim to empty); a given one keeps 10–400 characters, with today's messages.
+  - `structureInstructions(focused)` and `expansionInstructions(focused)` replace the two constants, which stay as the question form. `instructionsFor(goal)` picks the form. Without a question, the instructions ask for the whole source ("what it is for and how it holds together", and "take apart how it works, not the order of its sections"), set `relevant` always true, require `start`, and offer no `outside-question`. The question form gains one line, for `start`, which may be null there.
+  - Requests without a question open with `FOCUS: none. The learner wants to understand the whole source.` instead of `QUESTION:`; so does the expansion request.
+  - Beyond the plan's text, and in its direction: without a question the structure's JSON schema itself leaves `outside-question` out of the reasons, so a model cannot choose it. Found by E6's test, which reads the request as the assistant receives it, schema included.
+  - `acceptStructure` reports a missing `start` without a question; `compose` carries `start` and leaves `question` out when empty.
+  - The content language without a question follows the interface. The plan said the sources' detected language; a first implementation did that, and the owner then decided otherwise: "voglio che si segua l'interfaccia per la domanda" (2026-10-29). With a question, unchanged: the question's language, else the interface's.
+  - The generator needs no change for the language check or the draft key: an empty question detects no language and matches as any other key.
+  - Lesson generation (`src/core/generation.ts`) is no longer reachable from the app: only `detectLanguage` is imported from it. The plan said it keeps requiring a question; with no caller, no guard was added.
+  - Evidence (automated tests, `tests/disassembly-generation.test.ts`, 6 new): the goal's three cases; the whole-source request and instructions; the question-led request still opening with `QUESTION:` and its instructions equal to `STRUCTURE_INSTRUCTIONS`; rejection of a missing `start`, a closed sub-assembly and an `outside-question` reason (the last by the schema); Mill taken apart as a whole source through the three phases, with no question, its `start`, and an expansion request with `FOCUS: none`; the content language from the interface without a question.
+- **E5 verified (2026-10-29).** Studio's second step is "Focus" ("Un focus, se lo vuoi" / "A focus, if you want one"); its hint says that without a question the app takes the whole source apart and suggests where to start. The question field is marked optional; "Continue" and "Continue to generation" are enabled with it empty; the summary shows "Tutta la fonte, senza domanda". Without a question, the content language follows the interface until the learner chooses one.
+  - Evidence (automated tests, `tests/studio.test.tsx`): a new test reaches generation with no question, checks that a 7-character question still blocks with today's message, and that the request shown is exactly `buildStructureInput` with an empty question, opening with `FOCUS: none`. The existing tests follow the renamed buttons. The English-interface suggestions test keeps expecting English suggestions on an Italian source.
+- **E6 verified (2026-10-29).** `start_disassembly` requires only `text`; its `question` and `language` descriptions say what happens without one; the `break` prompt says to leave the question out to take apart the whole text. The assistant uses `instructionsFor` and the schema for the goal, and adds one line when there is no question.
+  - Evidence (automated tests, `tests/mcp-assistant.test.ts`): with only `text`, the reply has the whole-source line, `FOCUS: none`, no `QUESTION:` and no `outside-question` anywhere, schema included, and is written in English, the assistant's default without a question or a language; with a question, it opens the request with `QUESTION:` and has no whole-source line. The missing-argument message names only `text` as required.
+- **Phase `generation` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 431 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed (the known `use client` directive warnings only); `git diff --check` passed. No generation was run: E10.3 does that, on the owner's confirmation.
