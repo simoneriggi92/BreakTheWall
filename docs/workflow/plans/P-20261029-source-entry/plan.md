@@ -4,8 +4,8 @@ title: Understand a source without a question - the question becomes an optional
 version: 1
 state: implementing
 current_task: E10
-last_evidence: Phase example (E8-E9) verified - typecheck and build passed; 29 files, 454 tests passed
-next_action: Owner confirms the commit of phase example, then "implement P-20261029-source-entry v1 --phase verify"
+last_evidence: E10.1 local checks and E10.2 integration check (32 combinations) passed; CI, a generation without a question (E10.3) and the owner trial (E10.4) pending
+next_action: Owner confirms push and pull request for CI, chooses the route for one generation without a question (E10.3), and tries their own document (E10.4)
 approval: approved
 ---
 
@@ -191,3 +191,14 @@ Version 1, approved:
   - The private case for the owner's document is not added: the plan leaves it to the owner, or to me on the owner's request. `git status` shows `.local/` ignored and nothing staged from it.
   - Not run: no evaluation was run. The ChatGPT budget is counted per generation, so a fifth public case changes no limit; the runner refuses a run that would pass it.
 - **Phase `example` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 454 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed; `git diff --check` passed.
+- 2026-10-29: `implement P-20261029-source-entry v1 --phase verify`.
+- **E10, points 1–2 (2026-10-29).**
+  1. **Local checks** (automated tests, macOS): `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 454 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed; `git diff --check` passed. `npm run check` is not run as such: the iCloud duplicates in the working tree (` 2.ts` files, untracked) break its typecheck; the check configuration in `.local` covers the same tracked files. CI on macOS and Windows needs the branch pushed and a pull request.
+  2. **Integration check on the built app** (DevTools protocol, empty scratch data folder; the script stays in the scratchpad): English and Italian, paper and blueprint, 1440×900 and 1280×800, 32 checks.
+     - Library: the third example is listed in each language, its card showing what the whole does.
+     - The third example: no question line; "Start here" and its button in view without scrolling; the button selects "The round" / "Il giro", with its first citation and highlighted lines in view together, and offers its sub-assembly; 15 sections, 2 nested; "8. The restart rule" shows lines from 154 in view, and its first plate number selects the heartbeat stamp (a joint's lines count for both ends, as E3 states); Run has 2 runs, with the question and options in view; Reassemble has 7 slots; the bill of materials does not scroll the page; the page never scrolls. 6 text sizes outside the drawing in the overview.
+     - Atlas and Mill, unchanged: question line, no "Start here", 14 sections for Atlas and none for Mill; a plate selects its part with claim and source in view together.
+     - Studio: with a pasted source and no question, the focus step says that the whole source will be taken apart, "Continue to generation" is enabled, the summary reads "The whole source, no question" / "Tutta la fonte, senza domanda", and the request shown opens with `FOCUS: none`.
+     - Three fixes came out of the first two runs. At 1440×900, then at 1280×800, the "Start here" button fell below the explanation's fold on the third example, whose lead is three lines and cites two ranges: "Start here" now sits closer to the citations, and its button comes before its reason. And in the drawing, two of the third example's joint labels were covered by plates ("stamped first", "one line per record"): the four labels from "The round" are now one or two words ("first", "last", "per record", "each round"; "per primo", "per ultima", "per record", "a ogni giro").
+  3. **One generation without a question** on a public source: not run. It spends a route the owner chooses (a local model, ChatGPT or the MCP assistant).
+  4. **The owner's document**: pending, on the owner's device.

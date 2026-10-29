@@ -102,9 +102,10 @@ function Orientation({ d, numberOf, onSelect, onFocus, why }: { d: Disassembly; 
   const name = (id: string) => d.parts.find(p => p.id === id)?.name ?? id;
   const byNumber = (ids: string[]) => [...ids].sort((a, b) => (numberOf(a) ?? 0) - (numberOf(b) ?? 0));
   return <>
+    {/* The action before its reason: on a short window the reason may fall below the fold, the button must not. */}
     {start && <div className="card-box start-here"><span className="box-label">{t.d.startHere}</span>
-      <p lang={d.language}>{d.start!.why}</p>
-      <button className="subtle start-open" onClick={() => onSelect(start.id)}><PartIcon name={start.icon} size={16}/><span lang={d.language}>{t.d.startOpen(numberOf(start.id) ?? 0, start.name)}</span><ArrowRight size={15}/></button></div>}
+      <button className="subtle start-open" onClick={() => onSelect(start.id)}><PartIcon name={start.icon} size={16}/><span lang={d.language}>{t.d.startOpen(numberOf(start.id) ?? 0, start.name)}</span><ArrowRight size={15}/></button>
+      <p lang={d.language}>{d.start!.why}</p></div>}
     {why}
     {organised.map(({ source, rows }) => {
       const top = Math.min(...rows.map(r => r.heading.level));

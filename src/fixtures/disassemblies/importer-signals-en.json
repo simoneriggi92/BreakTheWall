@@ -416,7 +416,7 @@
    "from": "round",
    "to": "heartbeat",
    "type": "sends-to",
-   "label": "stamped first",
+   "label": "first",
    "cites": [
     {
      "source": "importer",
@@ -429,7 +429,7 @@
    "from": "round",
    "to": "finished",
    "type": "sends-to",
-   "label": "written last",
+   "label": "last",
    "cites": [
     {
      "source": "importer",
@@ -442,7 +442,7 @@
    "from": "round",
    "to": "outcomes",
    "type": "sends-to",
-   "label": "one line per record",
+   "label": "per record",
    "cites": [
     {
      "source": "importer",
@@ -455,7 +455,7 @@
    "from": "round",
    "to": "pause",
    "type": "depends-on",
-   "label": "read every round",
+   "label": "each round",
    "cites": [
     {
      "source": "importer",

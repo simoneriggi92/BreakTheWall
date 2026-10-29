@@ -416,7 +416,7 @@
    "from": "round",
    "to": "heartbeat",
    "type": "sends-to",
-   "label": "timbrato per primo",
+   "label": "per primo",
    "cites": [
     {
      "source": "importer",
@@ -429,7 +429,7 @@
    "from": "round",
    "to": "finished",
    "type": "sends-to",
-   "label": "scritta per ultima",
+   "label": "per ultima",
    "cites": [
     {
      "source": "importer",
@@ -442,7 +442,7 @@
    "from": "round",
    "to": "outcomes",
    "type": "sends-to",
-   "label": "una riga per record",
+   "label": "per record",
    "cites": [
     {
      "source": "importer",
@@ -455,7 +455,7 @@
    "from": "round",
    "to": "pause",
    "type": "depends-on",
-   "label": "letto a ogni giro",
+   "label": "a ogni giro",
    "cites": [
     {
      "source": "importer",

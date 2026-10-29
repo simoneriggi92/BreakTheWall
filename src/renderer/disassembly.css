@@ -183,6 +183,7 @@
 .cite[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .open-sub { align-self: flex-start; }
 /* The whole's orientation (P-20261029-source-entry E7): where to start, and each section with the plates that take it apart. */
+.part-card .card-box.start-here { margin-top: 0; padding-top: 14px; gap: 8px; }
 .start-here .start-open { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .section-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .section-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px dotted var(--line); }
