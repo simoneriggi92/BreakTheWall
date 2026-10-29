@@ -4,8 +4,8 @@ title: A lighter workbench - one row of chrome, claim and source side by side, t
 version: 1
 state: implementing
 current_task: U9
-last_evidence: U7-U8 verified - at most 5 text sizes and no uppercase label outside the drawing; one player stylesheet, no element moved in 17 states; CSS 1094 lines; 408 tests pass
-next_action: Owner runs "implement P-20261029-ui-workbench v1 --phase verify"
+last_evidence: U9 points 1-3 verified locally - acceptance met in 4 theme and language combinations; keyboard paths pass; 408 tests pass. CI and the owner judgement pending
+next_action: Owner confirms the push and pull request for CI (macOS and Windows), then judges the built app (U9.4)
 approval: approved
 ---
 
@@ -210,4 +210,32 @@ Version 1, approved:
   - Evidence (integration check on the built app, Atlas at 1440×900, every text element in the header and the work area except the drawing, the source text and the closed preferences menu): Exploded view with a part selected has 5 sizes, Run 4, Reassemble 4, and the bill of materials 3. No uppercase label is found in any mode (before: 9, 8, 8 and 6 sizes, with 3 to 6 uppercase labels).
   - U4 and U5 were measured again after the change: the first citation and the highlighted lines are in view together, and every run's question and options fit without scrolling at 1440×900 and at a confirmed 1280×800, for Atlas and Mill. The page does not scroll.
   - Automated tests: typecheck passed, and 28 files with 408 tests passed.
+- **U9, points 1–3 (2026-10-29).**
+  1. **The measurements again** (integration check on the built app, at `0bfda27`). One DevTools session measured 32 combinations: Atlas and Mill; 1440×900, 1280×800, 1024×700 and 800×900; paper and blueprint; English and Italian.
+     - Chrome: the bar is 56 px and the drawing starts at 93 px at every wide size (≤ 110). The drawing area is 807 px tall at 1440×900 (≥ 700).
+     - The whole's name appears once outside the drawing, and the hint once, everywhere.
+     - Claim and source: the first citation and the highlighted lines are in view together, and a citation keeps the explanation in view, at 1440, 1280 and 1024, for both examples, in every theme and language.
+     - Runs: every question and its options are in view without scrolling at 1440×900 and 1280×800, for all four runs. At 1024×700, Atlas's scenario needs scrolling to reach its last option; the plan sets no requirement at that size. In every run the source starts folded.
+     - Type: 5 sizes in Exploded view, 4 in Run, 4 in Reassemble and 3 in the bill of materials, and no uppercase label, in every combination.
+     - No cards in Reassemble or the bill of materials. The page itself does not scroll, sideways or, above 960 px, down.
+     - The title is not truncated at 1024 px, in English and Italian.
+     - At 800 px the layout stacks: the bar wraps to 99 px with the modes on a second row, and the page scrolls by design, so the "in view" checks do not apply there.
+     - Plate size on screen, from the sheet's scale (13 px plate titles, 11 px joint labels in the layout):
+
+       | | Codex `1f09169` | `0bfda27` |
+       |---|---|---|
+       | Atlas plate titles, 1440×900 | 13.3 px | 13.7 px |
+       | Atlas plate titles, 1280×800 | 11.7 px | 12.1 px |
+       | Mill plate titles, 1440×900 | 10.1 px | 10.3 px |
+       | Mill plate titles, 1280×800 | 8.8 px | 9.1 px |
+       | Mill joint labels, 1440×900 | 8.5 px | 8.7 px |
+
+       Mill stays under 11 px at 1440×900, so, as the scope states, graph layouts need a separate plan. The space gained here is height, and Mill's sheet is limited by its width.
+  2. **Keyboard** (integration check with real key events over the DevTools protocol, Atlas at 1440×900):
+     - Tab moves from plate 1 to plate 2 in reading order. Enter selects the plate and moves the focus to its card's heading, and Tab reaches "Open the sub-assembly anyway". Enter there enters it, and the path shows "Release chain › check". Escape goes back with the focus on plate 2, and so does Alt+↑.
+     - The explanation's splitter moves 55 → 60 with ↓. The column's splitter moves 34 → 39 with ←, and Enter resets it to 34.
+     - Enter on the "Run" mode opens the run. Space checks a prediction, and Enter on "Run the step" runs it, so the feedback appears.
+     - In Reassemble, Enter picks a tray part, and Enter on a slot places it.
+  3. **Local checks** (automated tests, macOS): `npx tsc --noEmit -p .local/tsconfig.check.json` passed, and `npx vitest run` passed with 28 files and 408 tests. CI on macOS and Windows needs the branch pushed and a pull request; that waits for the owner's confirmation.
+  4. **Owner's judgement**: pending.
 
