@@ -104,7 +104,8 @@ describe('keeping a failed generation and resuming it (D21)', () => {
     const gate = new Promise<void>(resolve => { release = resolve; });
     state.answer = async r => { if (writing('bell')(r)) await gate; return undefined; };
     const pending = generator.generate(request(), () => {});
-    await vi.waitFor(async () => expect((await keeper.state()).draft?.kept).toBe(6));
+    // A loaded CI runner can take more than waitFor's default second to write six parts.
+    await vi.waitFor(async () => expect((await keeper.state()).draft?.kept).toBe(6), { timeout: 10_000 });
     generator.cancel(); release();
     expect(await pending).toMatchObject({ ok: false, failure: { code: 'cancelled' } });
     expect((await keeper.state()).draft).toMatchObject({ parts: 7, kept: 6, runs: false });
