@@ -3,6 +3,8 @@
 Owner-requested implementation, 2026-10-28. Branch: `codex/ui-focus-workbench`.
 Based on `origin/main` at `e637524`, including the MCP release. Scope was directly authorized by the owner: implement the local redesign in a branch from main, preserving the technical-sheet identity and existing learning/source tools. This record does not change another plan's approval or status.
 
+Since 2026-10-29 this work, at `1f09169`, is the starting point of plan [P-20261029-ui-workbench](workflow/plans/P-20261029-ui-workbench/plan.md), which makes the workbench lighter and puts the source back beside the explanation. This file records Codex's work as it was merged; the plan records what changed after it.
+
 ## Result
 
 The player separates the technical sheet from a reading inspector with Part/Activity and Source tabs. Tabs retain notes and the selected source view. Selecting a part keeps its explanation visible; explicit citations open the source. Run actions stay visible while the explanation scrolls.
