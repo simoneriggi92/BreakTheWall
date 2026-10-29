@@ -97,6 +97,7 @@ describe('the source pane with its document view and reader (D18)', () => {
   it('switches a prose source between lines and document, and a citation highlights its blocks', async () => {
     await play(await validateDisassembly(atlas()));
     await userEvent.click(screen.getByRole('button', { name: /^4\. deploy-staging/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Fonte' }));
     const views = within(screen.getByRole('group', { name: 'Come mostrare la fonte' }));
     await userEvent.click(views.getByRole('button', { name: 'Documento' }));
     const focused = [...document.querySelectorAll<HTMLElement>('.source-document .focus')];
@@ -110,6 +111,7 @@ describe('the source pane with its document view and reader (D18)', () => {
     await play(await validateDisassembly(atlas()));
     await userEvent.click(screen.getByRole('button', { name: /^2\. check/ }));
     await userEvent.click(screen.getByRole('button', { name: /Apri comunque il sottoassieme/ }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Fonte' }));
     const open = screen.getByRole('button', { name: 'Leggi a tutta finestra' });
     await userEvent.click(open);
     const reader = screen.getByRole('dialog', { name: 'Lettura: release-runbook.md' });
@@ -125,6 +127,7 @@ describe('the source pane with its document view and reader (D18)', () => {
   it('offers neither view switch nor reader for code', async () => {
     const d = atlas(); d.sources[0].language = 'TypeScript';
     await play(await validateDisassembly(d));
+    await userEvent.click(screen.getByRole('tab', { name: 'Fonte' }));
     expect(screen.queryByRole('group', { name: 'Come mostrare la fonte' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leggi a tutta finestra' })).toBeNull();
   });
@@ -139,4 +142,25 @@ describe('diagrams under the content policy (D18)', async () => {
     const node = box.querySelector<SVGGElement>('.node')!;
     expect(node.style.stroke).toBe('blue');
   });
+});
+
+
+it('keeps the full-window outline reachable in a narrow window and returns focus on close', async () => {
+  Object.defineProperty(window, 'innerWidth', { value: 720, configurable: true });
+  try {
+    const d = await validateDisassembly(atlas());
+    render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
+    await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
+    await userEvent.click(screen.getByRole('tab', { name: 'Fonte' }));
+    const open = screen.getByRole('button', { name: 'Leggi a tutta finestra' });
+    await userEvent.click(open);
+    const reader = screen.getByRole('dialog');
+    expect(within(reader).queryByRole('navigation', { name: 'Indice' })).toBeNull();
+    await userEvent.click(within(reader).getByRole('button', { name: 'Indice' }));
+    expect(within(reader).getByRole('navigation', { name: 'Indice' })).toBeVisible();
+    await userEvent.click(within(reader).getByRole('button', { name: '2. Pipelines' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(open).toHaveFocus();
+  } finally { Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true }); }
 });

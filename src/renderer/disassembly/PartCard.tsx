@@ -32,13 +32,15 @@ interface Props {
   focus?: Cite; onFocus: (c: Cite) => void; onEnter: (id: string) => void;
   note: string; onNote: (value: string) => void;
   /** Taking this part apart, when the disassembly allows it. */
-  takeApart?: ReactNode;
+  takeApart?: ReactNode; active?: boolean;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart }: Props) {
+export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { if (part) heading.current?.focus({ preventScroll: true }); }, [part]);
+  const opened = useRef<Part | undefined>(undefined);
+  // Selecting a different part focuses its heading; returning through a tab keeps focus on that tab.
+  useEffect(() => { if (part && active && opened.current !== part) heading.current?.focus({ preventScroll: true }); opened.current = part; }, [part, active]);
   if (!part) {
     const whole = owner ?? d.whole;
     return <section className="part-card" aria-live="polite">

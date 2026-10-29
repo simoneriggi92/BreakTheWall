@@ -179,6 +179,7 @@ export const en: Messages = {
     trace: 'An outline to compare with', notAGrade: 'This is not a grade. Compare the relations you explained with the ones that are missing.', backToPrinciple: 'Go back to the principle in the source',
   },
   d: {
+    workbench: { part: 'Part', activity: 'Activity', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel', runHint: 'Watch the structure while you test a connection.' },
     modes: { explode: 'Exploded view', run: 'Run', reassemble: 'Reassemble', bom: 'Bill of materials' }, modesLabel: 'What to do with the disassembly',
     kinds: { step: 'step', component: 'component', artifact: 'artifact', premise: 'premise', conclusion: 'claim', ground: 'ground', limit: 'limit', objection: 'objection', consequence: 'consequence', rejected: 'set aside', event: 'event', actor: 'actor' },
     verbs: { 'sends-to': 'sends to', causes: 'causes', 'depends-on': 'depends on', supports: 'supports', attacks: 'attacks', limits: 'limits', 'leads-to': 'leads to', because: 'explains' },
@@ -195,7 +196,7 @@ export const en: Messages = {
       noRoute: 'Choose a model in "Take apart a source" to take parts apart.', local: (model: string) => `the local model ${model}`,
     },
     otherVersion: (language: string) => `This disassembly also exists in ${language}. Progress stays separate for each version.`, openVersion: 'Open that version',
-    widenSource: 'Widen the source to the whole row', narrowSource: 'Put the source back beside the card',
+    widenSource: 'Focus on the source', narrowSource: 'Show drawing and source',
     panes: { drawing: 'Height of the drawing', source: 'Width of the source' },
     readingOrder: 'Numbers: reading order',
     viewLabel: 'How to show the source', views: { lines: 'Lines', document: 'Document' }, openReader: 'Read in a full window', closeReader: 'Close the reader',

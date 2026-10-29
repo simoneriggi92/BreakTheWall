@@ -12,9 +12,9 @@ export type SourceView = 'lines' | 'document';
  * never the page. Documents show their page breaks; many files get a picker. A prose source can also be read
  * rendered, beside the card or in a full-window reader (D18); code keeps its lines.
  */
-export function SourcePane({ d, sourceId, onSource, focus, cited, wide, onWide, view = 'lines', onView }: {
+export function SourcePane({ d, sourceId, onSource, focus, cited, wide, onWide, view = 'lines', onView, active = true }: {
   d: Disassembly; sourceId: string; onSource: (id: string) => void; focus?: Cite; cited: Cite[]; wide?: boolean; onWide?: () => void;
-  view?: SourceView; onView?: (view: SourceView) => void;
+  view?: SourceView; onView?: (view: SourceView) => void; active?: boolean;
 }) {
   const { t } = usePreferences();
   const source = d.sources.find(s => s.id === sourceId) ?? d.sources[0];
@@ -28,9 +28,10 @@ export function SourcePane({ d, sourceId, onSource, focus, cited, wide, onWide, 
   const inFocus = (n: number) => !!focus && focus.source === source.id && n >= focus.from && n <= focus.to;
   const inCited = (n: number) => cited.some(c => c.source === source.id && n >= c.from && n <= c.to);
   useEffect(() => {
+    if (!active) return;
     const host = list.current; const first = focus && focus.source === source.id ? host?.querySelector<HTMLElement>(`[data-line="${focus.from}"]`) : undefined;
     if (host && first) host.scrollTop = first.offsetTop - host.offsetTop - 24;
-  }, [focus, source.id, shown]);
+  }, [focus, source.id, shown, active]);
   return <section className="source-pane" aria-label={t.d.source}>
     <div className="source-head"><span className="box-label">{t.d.source}</span>
       {d.sources.length > 3
@@ -44,7 +45,7 @@ export function SourcePane({ d, sourceId, onSource, focus, cited, wide, onWide, 
       {onWide && <button className="icon-button source-widen" aria-pressed={!!wide} aria-label={wide ? t.d.narrowSource : t.d.widenSource} title={wide ? t.d.narrowSource : t.d.widenSource} onClick={onWide}>{wide ? <Minimize2 size={15}/> : <Maximize2 size={15}/>}</button>}</span>
     </div>
     {reading && <SourceReader source={source} focus={focus} cited={cited} onClose={() => { setReading(false); opener.current?.focus(); }}/>}
-    {shown === 'document' ? <SourceDocument source={source} focus={focus} cited={cited}/> : <ol ref={list} className={`source-text ${source.language && !/^[a-z]{2}$/.test(source.language) ? 'code' : ''}`} aria-label={t.d.sourceLines(source.title)} tabIndex={0}>
+    {shown === 'document' ? <SourceDocument source={source} focus={focus} cited={cited} active={active}/> : <ol ref={list} className={`source-text ${source.language && !/^[a-z]{2}$/.test(source.language) ? 'code' : ''}`} aria-label={t.d.sourceLines(source.title)} tabIndex={0}>
       {lines.map((text, i) => {
         const n = i + 1; const page = pageStarts.get(n);
         return <li key={n} data-line={n} className={inFocus(n) ? 'focus' : inCited(n) ? 'cited' : undefined}>

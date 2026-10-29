@@ -153,24 +153,24 @@ describe('resizable drawing, card and source (D17)', () => {
     localStorage.clear();
     const d = await validateDisassembly(atlas());
     const view = await play(d);
-    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza della fonte']);
+    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza del pannello di lettura']);
     const drawing = document.querySelector<HTMLElement>('.d-drawing')!;
-    expect(drawing.style.height).toBe('50vh');
+    expect(drawing.style.getPropertyValue('--drawing-height')).toBe('50vh');
     screen.getByRole('separator', { name: 'Altezza del disegno' }).focus();
     await user().keyboard('{ArrowDown}{ArrowDown}');
-    expect(drawing.style.height).toBe('60vh');
-    screen.getByRole('separator', { name: 'Larghezza della fonte' }).focus();
+    expect(drawing.style.getPropertyValue('--drawing-height')).toBe('60vh');
+    screen.getByRole('separator', { name: 'Larghezza del pannello di lettura' }).focus();
     await user().keyboard('{ArrowLeft}');
-    expect(document.querySelector<HTMLElement>('.d-side')!.style.getPropertyValue('--source-w')).toBe(String(0.34 + 0.05));
+    expect(document.querySelector<HTMLElement>('.d-work')!.style.getPropertyValue('--source-w')).toBe(String(0.34 + 0.05));
     await user().click(screen.getByRole('button', { name: 'Fai girare' }));
-    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza della fonte']);
+    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza del pannello di lettura']);
     await user().click(screen.getByRole('button', { name: 'Distinta base' }));
     expect(separators()).toEqual(['Larghezza della fonte']);
     await user().click(screen.getByRole('button', { name: 'Rimonta' }));
     expect(separators()).toEqual([]);
     view.unmount();
     await play(d);
-    expect(document.querySelector<HTMLElement>('.d-drawing')!.style.height).toBe('60vh');
+    expect(document.querySelector<HTMLElement>('.d-drawing')!.style.getPropertyValue('--drawing-height')).toBe('60vh');
     localStorage.clear();
   });
   it('shows the whole sheet until the learner sets a height, then follows it, and fits again on reset', async () => {
@@ -189,11 +189,15 @@ describe('resizable drawing, card and source (D17)', () => {
   });
   it('widens the source to the whole row and back, hiding the card meanwhile', async () => {
     await play(await validateDisassembly(atlas()));
-    await user().click(screen.getByRole('button', { name: 'Allarga la fonte a tutta la riga' }));
-    expect(document.querySelector('.part-card')).toBeNull();
+    await user().click(screen.getByRole('tab', { name: 'Fonte' }));
+    await user().click(screen.getByRole('button', { name: 'Allarga la fonte a tutta l’area' }));
+    expect(document.querySelector('.part-card')).not.toBeVisible();
+    expect(document.querySelector('.d-canvas')).not.toBeVisible();
     expect(screen.queryByRole('separator', { name: 'Larghezza della fonte' })).toBeNull();
-    await user().click(screen.getByRole('button', { name: 'Riporta la fonte accanto alla scheda' }));
-    expect(document.querySelector('.part-card')).not.toBeNull();
+    await user().click(screen.getByRole('button', { name: 'Ripristina disegno e fonte' }));
+    expect(document.querySelector('.d-canvas')).toBeVisible();
+    await user().click(screen.getByRole('tab', { name: 'Pezzo' }));
+    expect(document.querySelector('.part-card')).toBeVisible();
   });
   it('stacks the panes without splitters on a narrow window', async () => {
     setWidth(800);
@@ -443,5 +447,35 @@ describe('taking a part apart on demand (D14)', () => {
     await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
     expect(side().queryByRole('button', { name: 'Smonta questo pezzo' })).not.toBeInTheDocument();
     expect(side().queryByText(/non si smonta oltre/)).not.toBeInTheDocument();
+  });
+});
+
+
+describe('workbench reading and cognitive landmarks', () => {
+  it('keeps the note and source view when switching tabs, and lets the keyboard move between the tabs', async () => {
+    await play(await validateDisassembly(atlas()));
+    await user().click(plate(/^4\. deploy-staging/));
+    await user().type(side().getByLabelText(/I tuoi appunti/), 'Same digest, different stage.');
+    const detail = screen.getByRole('tab', { name: 'Pezzo' });
+    detail.focus(); await user().keyboard('{ArrowRight}');
+    const source = screen.getByRole('tab', { name: 'Fonte' });
+    expect(source).toHaveFocus();
+    expect(source).toHaveAttribute('aria-selected', 'true');
+    await user().click(screen.getByRole('button', { name: 'Documento' }));
+    expect(document.querySelector('.source-document')).toBeVisible();
+    source.focus(); await user().keyboard('{ArrowLeft}');
+    expect(detail).toHaveFocus();
+    expect(side().getByLabelText(/I tuoi appunti/)).toHaveValue('Same digest, different stage.');
+    await user().click(source);
+    expect(screen.getByRole('button', { name: 'Documento' })).toHaveAttribute('aria-pressed', 'true');
+  });
+  it('keeps an icon on every plate and gives the tray and a placed piece the same cognitive cue', async () => {
+    const d = await validateDisassembly(atlas()); await play(d);
+    expect(document.querySelectorAll('.plate .plate-icon svg')).toHaveLength(d.parts.length);
+    await user().click(screen.getByRole('button', { name: 'Rimonta' }));
+    expect(document.querySelectorAll('.tray-part svg')).toHaveLength(d.parts.length);
+    await user().click(screen.getByRole('button', { name: 'Preparazione e avvio' }));
+    await user().click(screen.getByRole('button', { name: 'Spazio 1, vuoto' }));
+    expect(document.querySelector('.slot.filled .plate-icon svg')).not.toBeNull();
   });
 });

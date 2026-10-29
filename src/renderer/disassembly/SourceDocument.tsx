@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { List, X } from 'lucide-react';
 import type { Cite, Disassembly } from '../../core/disassembly';
 import { renderDiagram } from '../diagrams';
 import { renderMarkdown } from '../markdown';
@@ -12,7 +12,7 @@ type Source = Disassembly['sources'][number];
  * A prose source read as a document (D18). Citations still work: the innermost blocks whose source lines meet the
  * focused citation are highlighted and scrolled into view inside this pane, and the open part's blocks are shaded.
  */
-export function SourceDocument({ source, focus, cited, className = '' }: { source: Source; focus?: Cite; cited: Cite[]; className?: string }) {
+export function SourceDocument({ source, focus, cited, className = '', active = true }: { source: Source; focus?: Cite; cited: Cite[]; className?: string; active?: boolean }) {
   const { t, theme } = usePreferences();
   const rendered = useMemo(() => renderMarkdown(source.text), [source.text]);
   const host = useRef<HTMLDivElement>(null);
@@ -20,13 +20,13 @@ export function SourceDocument({ source, focus, cited, className = '' }: { sourc
   // Diagrams are drawn after the text, each in its own figure; one that does not parse keeps its code, with a note.
   useEffect(() => {
     const el = host.current;
-    if (!el || !rendered.diagrams) return;
-    let active = true;
+    if (!el || !rendered.diagrams || !active) return;
+    let live = true;
     const unmount: (() => void)[] = [];
     el.querySelectorAll<HTMLElement>('.md-diagram').forEach(figure => {
       const code = figure.querySelector('.md-diagram-source')?.textContent ?? '';
       void renderDiagram(code, theme).then(svg => {
-        if (!active) return;
+        if (!live) return;
         let box = figure.querySelector<HTMLElement>('.md-diagram-svg');
         if (!box) { box = document.createElement('div'); box.className = 'md-diagram-svg'; figure.prepend(box); }
         unmount.push(mountSvg(box, svg));
@@ -37,12 +37,12 @@ export function SourceDocument({ source, focus, cited, className = '' }: { sourc
         figure.append(note); figure.classList.add('failed');
       });
     });
-    return () => { active = false; unmount.forEach(f => f()); };
-  }, [rendered, theme, t]);
+    return () => { live = false; unmount.forEach(f => f()); };
+  }, [rendered, theme, t, active]);
 
   useEffect(() => {
     const el = host.current;
-    if (!el) return;
+    if (!el || !active) return;
     const blocks = [...el.querySelectorAll<HTMLElement>('[data-from]')];
     const meets = (ranges: Cite[]) => (b: HTMLElement) => {
       const from = Number(b.dataset.from); const to = Number(b.dataset.to);
@@ -55,7 +55,7 @@ export function SourceDocument({ source, focus, cited, className = '' }: { sourc
     focused.forEach(b => { b.classList.remove('cited'); b.classList.add('focus'); });
     // Rectangles, not offsetTop: a table row's offset is relative to its table.
     if (focused[0]) el.scrollTop += focused[0].getBoundingClientRect().top - el.getBoundingClientRect().top - 24;
-  }, [focus, cited, rendered, source.id]);
+  }, [focus, cited, rendered, source.id, active]);
 
   return <div ref={host} className={`source-document ${className}`} tabIndex={0} aria-label={t.d.sourceDocument(source.title)} dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }
@@ -67,6 +67,7 @@ export function SourceReader({ source, focus, cited, onClose }: { source: Source
   const headings = useMemo(() => renderMarkdown(source.text).headings, [source.text]);
   // The document mounts once the dialog is open, so it can scroll to the focused citation.
   const [open, setOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 960);
   useEffect(() => {
     const el = dialog.current;
     if (el && !el.open) el.showModal();
@@ -80,9 +81,9 @@ export function SourceReader({ source, focus, cited, onClose }: { source: Source
   };
   return <dialog ref={dialog} className="source-reader" aria-label={t.d.reader(source.title)}
     onCancel={e => { e.preventDefault(); onClose(); }} onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } }}>
-    <div className="dialog-head"><strong>{source.title}</strong><button className="icon-button" aria-label={t.d.closeReader} onClick={onClose}><X size={18}/></button></div>
-    <div className="reader-body">
-      {headings.length > 0 && <nav className="reader-outline" aria-label={t.d.outline}><ol>{headings.map((h, i) =>
+    <div className="dialog-head"><strong>{source.title}</strong>{headings.length > 0 && <button className="subtle reader-outline-toggle" aria-expanded={outlineOpen} aria-controls="reader-outline" onClick={() => setOutlineOpen(x => !x)}><List size={16} aria-hidden="true"/>{t.d.outline}</button>}<button className="icon-button" aria-label={t.d.closeReader} onClick={onClose}><X size={18}/></button></div>
+    <div className={`reader-body${outlineOpen && headings.length ? ' with-outline' : ' without-outline'}`}>
+      {headings.length > 0 && <nav id="reader-outline" className="reader-outline" aria-label={t.d.outline} hidden={!outlineOpen}><ol>{headings.map((h, i) =>
         <li key={i} style={{ paddingLeft: `${(h.level - 1) * 12}px` }}><button className="text-button" onClick={() => go(h.from)}>{h.text}</button></li>)}</ol></nav>}
       {open && <SourceDocument source={source} focus={focus} cited={cited} className="reader-document"/>}
     </div>
