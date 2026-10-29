@@ -250,7 +250,7 @@ export const en: Messages = {
     empty: (p: ImportErrorParams) => p.name ? `"${p.name}" is empty.` : 'The source is empty.',
     'not-utf8': () => 'The file is not UTF-8 text. Save it as UTF-8 or paste the text.',
     'unsupported-type': (p: ImportErrorParams) => p.name ? `"${p.name}" is not supported. For now you can import .txt and .md files.` : 'Only imported sources can generate a disassembly.',
-    'too-large': (p: ImportErrorParams, n: (x: number) => string) => p.name ? `"${p.name}" is ${n(p.kb ?? 0)} kB; the limit is ${n(p.limit ?? 0)} kB.` : `The source has ${n(p.chars ?? 0)} characters; the limit is ${n(p.limit ?? 0)}. Select the part you want to study.`,
+    'too-large': (p: ImportErrorParams, n: (x: number) => string) => p.kb !== undefined ? `"${p.name}" is ${n(p.kb)} kB; the limit is ${n(p.limit ?? 0)} kB.` : `${p.name ? `"${p.name}" has` : 'The source has'} ${n(p.chars ?? 0)} characters; the limit is ${n(p.limit ?? 0)}. Select the part you want to study.`,
     'too-many-lines': (p: ImportErrorParams, n: (x: number) => string) => `The source has ${n(p.lines ?? 0)} lines; the limit is ${n(p.limit ?? 0)}.`,
     'line-too-long': (p: ImportErrorParams, n: (x: number) => string) => `Line ${p.line} is longer than ${n(p.limit ?? 0)} characters: line citations would not be readable.`,
     binary: () => 'The source contains control characters: it looks like a binary file, not text.',

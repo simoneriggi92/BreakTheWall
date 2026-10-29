@@ -249,7 +249,7 @@ export const it = {
     empty: (p: ImportErrorParams) => p.name ? `«${p.name}» è vuoto.` : 'La fonte è vuota.',
     'not-utf8': () => 'Il file non è testo UTF-8. Salvalo come UTF-8 oppure incolla il testo.',
     'unsupported-type': (p: ImportErrorParams) => p.name ? `«${p.name}» non è supportato. Per ora puoi importare file .txt e .md.` : 'Solo le fonti importate possono generare uno smontaggio.',
-    'too-large': (p: ImportErrorParams, n: (x: number) => string) => p.name ? `«${p.name}» pesa ${n(p.kb ?? 0)} kB; il limite è ${n(p.limit ?? 0)} kB.` : `La fonte ha ${n(p.chars ?? 0)} caratteri; il limite è ${n(p.limit ?? 0)}. Seleziona la parte che vuoi studiare.`,
+    'too-large': (p: ImportErrorParams, n: (x: number) => string) => p.kb !== undefined ? `«${p.name}» pesa ${n(p.kb)} kB; il limite è ${n(p.limit ?? 0)} kB.` : `${p.name ? `«${p.name}» ha` : 'La fonte ha'} ${n(p.chars ?? 0)} caratteri; il limite è ${n(p.limit ?? 0)}. Seleziona la parte che vuoi studiare.`,
     'too-many-lines': (p: ImportErrorParams, n: (x: number) => string) => `La fonte ha ${n(p.lines ?? 0)} righe; il limite è ${n(p.limit ?? 0)}.`,
     'line-too-long': (p: ImportErrorParams, n: (x: number) => string) => `La riga ${p.line} supera ${n(p.limit ?? 0)} caratteri: le citazioni per riga non sarebbero leggibili.`,
     binary: () => 'La fonte contiene caratteri di controllo: sembra un file binario, non testo.',
