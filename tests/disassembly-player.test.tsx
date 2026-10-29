@@ -359,7 +359,7 @@ describe('content language and interface language', () => {
     await user().click(screen.getByRole('checkbox', { name: /Also show the examples in Italian/ }));
     await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
     await screen.findByRole('button', { name: 'Exploded view' });
-    expect(screen.getByText(it.question)).toHaveAttribute('lang', 'it');
+    expect(screen.getByText(it.question!)).toHaveAttribute('lang', 'it');
     expect(document.documentElement.lang).toBe('en');
     await user().click(plate(/^4\. deploy-staging · step/));
     expect(side().getByText('Part 4 · step')).toBeInTheDocument();
@@ -491,7 +491,7 @@ describe('one row of chrome and the drawing on the paper (P-20261029-ui-workbenc
     expect(bar.getByRole('button', { name: 'Torna ai percorsi' })).toBeInTheDocument();
     expect(bar.getByRole('heading', { level: 1, name: d.title })).toBeInTheDocument();
     expect(within(bar.getByRole('group', { name: /Cosa fare con lo smontaggio/ })).getAllByRole('button')).toHaveLength(4);
-    expect(screen.getAllByText(d.question)).toHaveLength(1);
+    expect(screen.getAllByText(d.question!)).toHaveLength(1);
     const outsideDrawing = (text: string) => screen.queryAllByText(text).filter(e => !e.closest('.sheet'));
     expect(outsideDrawing(d.whole.name)).toHaveLength(1);
     expect(screen.getAllByText('Seleziona un pezzo per aprirlo. Invio apre il pezzo selezionato.')).toHaveLength(1);

@@ -20,7 +20,7 @@ import { CONTENT_INSTRUCTIONS, EXPANSION_INSTRUCTIONS, STRUCTURE_INSTRUCTIONS } 
 import { deepDisassembly, draftsFrom, generatedFrom, pastedSource, scriptedAnswer, splitAnswer } from './disassembly-drafts';
 
 const meta: GenerationMeta = { id: 'g-test', createdAt: '2026-10-26T10:00:00.000Z', provider: 'chatgpt', model: 'model-a' };
-const goalOf = (d: Disassembly) => ({ outcome: d.question, priorKnowledge: '' });
+const goalOf = (d: Disassembly) => ({ outcome: d.question ?? '', priorKnowledge: '' });
 async function setupFor(d: Disassembly) {
   const source = await pastedSource(d);
   return { d, source, sources: [source], goal: goalOf(d), language: d.language, drafts: draftsFrom(d, source.id) };

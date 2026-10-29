@@ -34,6 +34,14 @@ describe('disassembly fixtures', () => {
     const repo = story(); repo.scope = { kind: 'repository', root: 'kessmouth', commit: 'a1b2c3d', modified: ['src/a.ts'] };
     expect(await findings(repo)).toEqual([]);
   });
+  it('takes the whole source apart without a question (P-20261029-source-entry E2)', async () => {
+    const input = mill(); delete input.question;
+    input.parts.forEach((p: any) => { delete p.relevant; });
+    input.start = { part: 'claim', why: 'Everything else in the essay supports or limits it.' };
+    const d = await validateDisassembly(input);
+    expect(d.question).toBeUndefined();
+    expect(d.start).toEqual({ part: 'claim', why: 'Everything else in the essay supports or limits it.' });
+  });
   it('copies cited lines from the source instead of storing quotes', async () => {
     const d = await validateDisassembly(story());
     expect(citedLines(d, d.parts[0].cites[0])).toEqual(d.sources[0].text.split('\n').slice(4, 6));
@@ -69,6 +77,12 @@ describe('located findings', () => {
     ['part with no slot', story, x => { x.reassemble.slots.pop(); }, 'parts[6]', /No reassembly slot/],
     ['part with no hint', story, x => { delete x.reassemble.hints.storm; }, 'reassemble.hints.storm'],
     ['question in another language', mill, x => { x.question = 'When can society legitimately coerce an individual, according to Mill?'; }, 'question', /reads as en/],
+    ['no question and lines outside it', atlas, x => { delete x.question; }, 'bom.excluded[3].reason', /no line is outside it/],
+    ['no question and a part line outside it', atlas, x => { delete x.question; x.parts[2].excluded[0].reason = 'outside-question'; }, 'parts[2].excluded[0].reason', /no line is outside it/],
+    ['no question and a file outside it', story, x => { delete x.question; x.bom.excludedFiles = [{ path: 'notes/**', reason: 'outside-question' }]; }, 'bom.excludedFiles[0].reason', /no line is outside it/],
+    ['no question and a closed sub-assembly', mill, x => { delete x.question; }, 'parts[4].relevant', /no sub-assembly is closed/],
+    ['start on a sub-part', atlas, x => { x.start = { part: 'check-lock', why: 'It holds the lock.' }; }, 'start.part', /not a top-level part/],
+    ['start on an unknown part', atlas, x => { x.start = { part: 'missing', why: 'It is first.' }; }, 'start.part', /not a top-level part/],
     ['forgotten lines', atlas, x => { x.bom.excluded.shift(); }, 'sources[0]', /Lines 1–6 of release-runbook\.md/],
     ['exclusion reason outside the list', atlas, x => { x.bom.excluded[0].reason = 'boring'; }, 'bom.excluded[0].reason'],
     ['file exclusion reason outside the list', atlas, x => { x.bom.excludedFiles = [{ path: 'a', reason: 'boring' }]; }, 'bom.excludedFiles[0].reason'],

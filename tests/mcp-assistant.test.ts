@@ -79,7 +79,7 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     expect(saved).toHaveLength(1);
     const [stored] = saved;
     expect(stored.generation).toMatchObject({ provider: 'assistant', model: 'claude-code 2.1.303' });
-    const base = { sources: [source], goal: { outcome: d.question, priorKnowledge: '' }, language: d.language, meta: { id: stored.id, createdAt: stored.generation!.createdAt, provider: 'assistant' as const, model: 'claude-code 2.1.303' } };
+    const base = { sources: [source], goal: { outcome: d.question ?? '', priorKnowledge: '' }, language: d.language, meta: { id: stored.id, createdAt: stored.generation!.createdAt, provider: 'assistant' as const, model: 'claude-code 2.1.303' } };
     const s = acceptStructure(JSON.stringify(drafts.structure), base);
     const contents = drafts.contents.map((c, i) => acceptContent(JSON.stringify(c), s, i, d.language));
     const runs = acceptRuns(JSON.stringify(drafts.runs), { ...base, structure: s, contents });
