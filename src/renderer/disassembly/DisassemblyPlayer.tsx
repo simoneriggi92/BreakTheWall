@@ -187,6 +187,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   const detail = mode === 'explode'
     ? <PartCard d={d} part={part} owner={owner} above={state.path.length ? above : undefined} onUp={up} joints={joints} level={level}
         number={part && index(part.id)} origin={origin} focus={focus} onFocus={focusCite} onEnter={enter}
+        numberOf={owner ? undefined : index} onSelect={owner ? undefined : select}
         note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}
         takeApart={part && d.kind === 'generated' && studio?.expandPart && <TakeApart d={d} part={part} route={expandRoute}
           progress={expanding?.part === part.id ? expanding.progress : undefined} problem={expandProblem?.part === part.id ? expandProblem.failure : undefined}
@@ -224,7 +225,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       <span className={`save-status micro save-${saveStatus}`} role="status">{save}</span><PreferencesMenu/></header>
     {!loaded ? <main id="main" className="loading"><p role="status">{loadFailed ? t.player.loadFailed : t.player.resuming}</p><button onClick={goHome}>{t.player.backToLibrary}</button></main> :
       <main id="main" className={`disassembly study-workbench mode-${mode}`}>
-        <p className="question workbench-question" lang={d.language} title={d.question}>{d.question}</p>
+        {d.question && <p className="question workbench-question" lang={d.language} title={d.question}>{d.question}</p>}
         {other && openVersion && <div className="notice version-notice" role="status"><span>{t.d.otherVersion(t.languageNames[other.language])}</span><button onClick={() => openVersion(other.id)}>{t.d.openVersion}</button></div>}
         {notice && <div className="notice" role="status">{restoreText(t, notice, 'disassembly')}<button aria-label={t.common.closeNotice} onClick={() => setNotice(undefined)}><X size={15}/></button></div>}
         {saveStatus === 'failed' && <div className="error-banner" role="alert">{t.player.unsaved} <button onClick={() => setRetry(x => x + 1)}>{t.player.retrySave}</button></div>}

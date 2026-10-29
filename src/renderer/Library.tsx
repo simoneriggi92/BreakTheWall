@@ -104,6 +104,6 @@ function DisassemblyCard({ d, onOpen }: { d: Disassembly; onOpen: (id: string) =
   const { t, language } = usePreferences();
   return <button className="lesson-card disassembly-card" onClick={() => onOpen(d.id)}><span className="card-head"><span className="card-symbol"><PartIcon name={d.parts[0].icon} size={25}/></span>
     <span className="micro" title={d.generation ? originText(t, d.generation) : undefined}>{d.generation?.provider === 'assistant' ? t.d.tagAssistant : d.kind === 'generated' ? t.d.tagGenerated : t.d.tag}{d.language !== language ? ` · ${t.library.contentLanguage(t.languageNames[d.language])}` : ''}</span></span>
-    <h3 lang={d.language}>{d.title}</h3><p lang={d.language}>{d.question}</p>
+    <h3 lang={d.language}>{d.title}</h3><p lang={d.language}>{d.question ?? d.whole.does}</p>
     <span className="card-bottom"><span>{t.library.disassemblyCounts(d.parts.length, d.runs.length)}</span><ArrowRight size={18}/></span></button>;
 }

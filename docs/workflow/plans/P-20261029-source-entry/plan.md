@@ -3,9 +3,9 @@ id: P-20261029-source-entry
 title: Understand a source without a question - the question becomes an optional focus
 version: 1
 state: implementing
-current_task: E7
-last_evidence: Phase generation (E4-E6) verified - typecheck and build passed; 29 files, 431 tests passed
-next_action: Owner confirms the commit of phase generation, then "implement P-20261029-source-entry v1 --phase player"
+current_task: E8
+last_evidence: Phase player (E7) verified - 434 tests; integration check on the built app, 16 combinations
+next_action: Owner confirms the commit of phase player, then "implement P-20261029-source-entry v1 --phase example"
 approval: approved
 ---
 
@@ -170,3 +170,12 @@ Version 1, approved:
 - **E6 verified (2026-10-29).** `start_disassembly` requires only `text`; its `question` and `language` descriptions say what happens without one; the `break` prompt says to leave the question out to take apart the whole text. The assistant uses `instructionsFor` and the schema for the goal, and adds one line when there is no question.
   - Evidence (automated tests, `tests/mcp-assistant.test.ts`): with only `text`, the reply has the whole-source line, `FOCUS: none`, no `QUESTION:` and no `outside-question` anywhere, schema included, and is written in English, the assistant's default without a question or a language; with a question, it opens the request with `QUESTION:` and has no whole-source line. The missing-argument message names only `text` as required.
 - **Phase `generation` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 431 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed (the known `use client` directive warnings only); `git diff --check` passed. No generation was run: E10.3 does that, on the owner's confirmation.
+- 2026-10-29: `implement P-20261029-source-entry v1 --phase player`.
+- **E7 verified (2026-10-29).**
+  - The question line under the title appears only when there is a question; a library card shows the question, else what the whole does.
+  - The overview of the whole, at the top level only: its name, its lead (now styled as a part's lead) with its citations, then "Start here" when `start` is set (its reason and a button "Open N. name" that selects the part as a plate click does), then the whole's why, then "How the source is organised" for each source with at least two sections: each section's title (a button that shows its lines in the source pane) and the plate numbers that take it apart (each selects its part), or "the whole", or "not taken apart: reason". Level-3 sections are indented. Sub-assemblies keep their overview as before.
+  - Two choices made while implementing. A source with a single section gets no list, since one row would be the whole source again (Mill has one heading). "Start here" comes before the whole's why: placed after it, as first written, it fell below the explanation's fold at 1440×900 in the integration check.
+  - Evidence (automated tests, `tests/disassembly-player.test.tsx`, 3 new): a question-less Mill with `start` shows no question line, shows "Comincia da qui" with its reason, and its button selects the part; Mill shows no section list. Atlas shows no "Start here" and 14 sections, 3 of them nested; "3. Before you start" offers "Mostra … nella fonte" and "Apri 1. Preparazione e avvio"; the last row says "non smontata: fuori dalla domanda"; the section button highlights lines 35–46, and the number selects the part. A question-less story shows what the whole does on its library card.
+  - Evidence (integration check on the built app, DevTools protocol, scratch data folder with a question-less Mill seeded as a generated disassembly; the script stays in the scratchpad): Atlas and the question-less Mill, at 1440×900 and 1280×800, paper and blueprint, English and Italian, 16 combinations. In all of them: the page does not scroll and the source pane is visible beside the overview; Atlas shows its question line and 14 sections, a section's title highlights line 35 onwards in view while the overview stays, and its plate number selects "Preparation and start" with its first citation and highlighted lines in view together; the question-less Mill has no question line, and "Start here" selects "Only to prevent harm to others" with its lines in view. Text sizes outside the drawing in the overview: 6, within U7's limit.
+  - The third example (E8) is checked in E10.2; this phase had none to show.
+- **Phase `player` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 434 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed; `git diff --check` passed.

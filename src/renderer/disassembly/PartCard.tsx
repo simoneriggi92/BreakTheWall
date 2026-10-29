@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { ArrowRight, ArrowUp, Hammer, Link2 } from 'lucide-react';
-import { DISASSEMBLY_LIMITS, divisible, linesOf, pagesOf, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
+import { DISASSEMBLY_LIMITS, divisible, linesOf, pagesOf, sectionCoverage, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
 import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
 import type { Messages } from '../i18n/it';
+import { renderMarkdown } from '../markdown';
 import { failureText, usePreferences } from '../preferences';
 import { PartIcon } from './Sheet';
 
@@ -35,9 +36,11 @@ interface Props {
   takeApart?: ReactNode; active?: boolean;
   /** Where the disassembly comes from, shown with the whole: prepared, generated, or written by the learner's assistant. */
   origin?: string;
+  /** The whole's orientation: plate numbers of the top level, and selecting one of its parts. */
+  numberOf?: (id: string) => number | undefined; onSelect?: (id: string) => void;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true, origin }: Props) {
+export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true, origin, numberOf, onSelect }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
   const opened = useRef<Part | undefined>(undefined);
@@ -47,10 +50,14 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
     const whole = owner ?? d.whole;
     return <section className="part-card" aria-live="polite">
       <span className="eyebrow">{owner ? t.d.subassembly(t.d.kinds[owner.kind]) : t.d.whole}</span>
-      <div lang={d.language}><h2>{owner ? owner.name : d.whole.name}</h2>
-        <p className="role">{owner ? owner.role : d.whole.does}</p>
-        {owner ? owner.points ? <Points points={owner.points}/> : <p>{owner.explain}</p> : <p>{d.whole.why}</p>}</div>
-      <Cites d={d} cites={'cites' in whole ? whole.cites : []} focus={focus} onFocus={onFocus}/>
+      {owner ? <>
+        <div lang={d.language}><h2>{owner.name}</h2><p className="role">{owner.role}</p>{owner.points ? <Points points={owner.points}/> : <p>{owner.explain}</p>}</div>
+        <Cites d={d} cites={whole.cites} focus={focus} onFocus={onFocus}/>
+      </> : <>
+        {/* The whole as a part: its lead, then its lines; where to start comes before the why, so it is in view (E7). */}
+        <div lang={d.language}><h2>{d.whole.name}</h2><p className="role lead">{d.whole.does}</p><Cites d={d} cites={d.whole.cites} focus={focus} onFocus={onFocus}/></div>
+        {numberOf && onSelect ? <Orientation d={d} numberOf={numberOf} onSelect={onSelect} onFocus={onFocus} why={<p lang={d.language}>{d.whole.why}</p>}/> : <p lang={d.language}>{d.whole.why}</p>}
+      </>}
       {!owner && origin && <p className="micro plain origin">{origin}</p>}
       <p className="micro plain hint">{t.d.selectHint}{above && ` ${t.d.upHint}`}</p>
       {above && onUp && <button className="subtle level-up" onClick={onUp}><ArrowUp size={15}/>{t.d.up(above)}</button>}
@@ -81,6 +88,35 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
     {!part.parts && takeApart}
     <label className="part-note">{t.d.notes}<textarea rows={3} maxLength={4000} value={note} placeholder={t.d.notesPlaceholder} onChange={e => onNote(e.target.value)}/></label>
   </section>;
+}
+
+/**
+ * Orientation for a learner who does not know what to ask (P-20261029-source-entry E7): where to start, and how the source
+ * is organised, computed from headings and citations. Nothing here is generated prose about the whole.
+ */
+function Orientation({ d, numberOf, onSelect, onFocus, why }: { d: Disassembly; numberOf: (id: string) => number | undefined; onSelect: (id: string) => void; onFocus: (c: Cite) => void; why: ReactNode }) {
+  const { t } = usePreferences();
+  // One section is the whole source again: a list only helps from two sections up.
+  const organised = useMemo(() => d.sources.map(source => ({ source, rows: sectionCoverage(d, source.id, renderMarkdown(source.text).headings) })).filter(x => x.rows.length > 1), [d]);
+  const start = d.start && d.parts.find(p => p.id === d.start!.part);
+  const name = (id: string) => d.parts.find(p => p.id === id)?.name ?? id;
+  const byNumber = (ids: string[]) => [...ids].sort((a, b) => (numberOf(a) ?? 0) - (numberOf(b) ?? 0));
+  return <>
+    {start && <div className="card-box start-here"><span className="box-label">{t.d.startHere}</span>
+      <p lang={d.language}>{d.start!.why}</p>
+      <button className="subtle start-open" onClick={() => onSelect(start.id)}><PartIcon name={start.icon} size={16}/><span lang={d.language}>{t.d.startOpen(numberOf(start.id) ?? 0, start.name)}</span><ArrowRight size={15}/></button></div>}
+    {why}
+    {organised.map(({ source, rows }) => {
+      const top = Math.min(...rows.map(r => r.heading.level));
+      return <div key={source.id} className="card-box source-sections"><span className="box-label">{t.d.organised}{d.sources.length > 1 ? ` · ${source.title}` : ''}</span>
+        <ul className="section-list">{rows.map(r => <li key={r.heading.from} className={r.heading.level > top ? 'nested' : undefined}>
+          <button className="section-title" lang={d.language} aria-label={t.d.sectionShow(r.heading.text)} onClick={() => onFocus({ source: source.id, from: r.heading.from, to: r.to })}>{r.heading.text}</button>
+          <span className="section-parts">{r.parts.length
+            ? byNumber(r.parts).map(id => <button key={id} className="section-part" aria-label={t.d.sectionPart(numberOf(id) ?? 0, name(id))} title={name(id)} onClick={() => onSelect(id)}>{numberOf(id)}</button>)
+            : <span className="micro plain">{r.whole ? t.d.sectionWhole : t.d.sectionExcluded(r.excluded.map(x => t.d.reasons[x.reason]).join(', '))}</span>}</span>
+        </li>)}</ul></div>;
+    })}
+  </>;
 }
 
 /**

@@ -182,6 +182,17 @@
 .cite { display: inline-flex; align-items: center; gap: 4px; font-family: var(--f-mono); font-size: 12px; line-height: 1.55; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 4px 8px; color: var(--accent); }
 .cite[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .open-sub { align-self: flex-start; }
+/* The whole's orientation (P-20261029-source-entry E7): where to start, and each section with the plates that take it apart. */
+.start-here .start-open { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.section-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.section-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px dotted var(--line); }
+.section-list li.nested { padding-left: 16px; }
+.section-title { all: unset; cursor: pointer; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.section-title:hover { color: var(--accent); text-decoration: underline; }
+.section-title:focus-visible, .section-part:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.section-parts { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; flex-shrink: 0; }
+.section-part { font-family: var(--f-mono); font-size: 12px; min-width: 22px; height: 22px; padding: 0 5px; border: 1px solid var(--accent); border-radius: 50%; background: var(--bg); color: var(--accent); }
+.section-part:hover { background: var(--accent-soft); }
 .part-note { display: grid; gap: 9px; border-top: 1px solid var(--line); padding-top: 19px; margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .part-note textarea { font: inherit; font-size: 16px; font-weight: 400; line-height: 1.7; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 12px; resize: vertical; }
 /* Taking a part apart: the action sits under the card's citations. */
