@@ -145,8 +145,8 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     await waitFor(() => expect(studio.getByLabelText('Modello')).toHaveValue('model-a'));
     await user.click(studio.getByRole('button', { name: /Genera lo smontaggio/ }));
     expect(fake.generate).toHaveBeenCalledWith(expect.objectContaining({ language: 'it', setup: { structure: { provider: 'chatgpt', model: 'model-a' }, content: { provider: 'chatgpt', model: 'model-a' } }, goal: { outcome: goal, priorKnowledge: '' } }));
-    const tag = await screen.findByText('Smontaggio generato');
-    expect(tag).toHaveAttribute('title', 'ChatGPT · model-a');
+    // The origin now sits with the whole in the reading column (P-20261029-ui-workbench U2).
+    expect(await screen.findByText('Smontaggio generato · ChatGPT · model-a')).toBeInTheDocument();
     expect(screen.getByText(mill().title)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Torna ai percorsi' }));
     expect(await screen.findByRole('region', { name: 'Smontaggi' })).toHaveTextContent(mill().title);
@@ -225,7 +225,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     const route = { provider: 'local', runtime: 'llamacpp', baseUrl: 'http://127.0.0.1:8080', model: 'qwen3.6-35b-a3b.gguf' };
     expect(fake.generate).toHaveBeenCalledWith(expect.objectContaining({ setup: { structure: route, content: route } }));
     expect(fake.signIn).not.toHaveBeenCalled();
-    expect(await screen.findByText('Smontaggio generato')).toHaveAttribute('title', 'Modello locale · qwen3.6-35b-a3b.gguf');
+    expect(await screen.findByText('Smontaggio generato · Modello locale · qwen3.6-35b-a3b.gguf')).toBeInTheDocument();
   });
 
   it('warns when a local server ignores the lesson format', async () => {
@@ -320,7 +320,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(fake.saveSettings).toHaveBeenLastCalledWith(expect.objectContaining({ chatgptContentModel: 'model-b' }));
     await user.click(studio.getByRole('button', { name: /Genera lo smontaggio/ }));
     expect(fake.generate).toHaveBeenCalledWith(expect.objectContaining({ setup: { structure: { provider: 'chatgpt', model: 'model-a' }, content: { provider: 'chatgpt', model: 'model-b' } } }));
-    expect(await screen.findByText('Smontaggio generato')).toHaveAttribute('title', 'ChatGPT · model-a + model-b');
+    expect(await screen.findByText('Smontaggio generato · ChatGPT · model-a + model-b')).toBeInTheDocument();
   });
 
   it('shows a failed check as a summary in the interface language, with the located findings as technical detail', async () => {
@@ -443,7 +443,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     await again.user.click(again.studio.getByRole('button', { name: 'Continua alla generazione' }));
     await again.user.click(await again.studio.findByRole('button', { name: /^Riprendi$/ }));
     expect(host.studio.generate).toHaveBeenLastCalledWith(expect.objectContaining({ resume: true }));
-    expect(await screen.findByText('Smontaggio generato')).toBeInTheDocument();
+    expect(await screen.findByText(/^Smontaggio generato · /)).toBeInTheDocument();
   });
 
   it('starts over without resuming, and offers no resume for another question; in English too (D21)', async () => {
@@ -629,8 +629,7 @@ describe('a disassembly written by the assistant (P-20261028-mcp-integration M5,
     act(() => arrivals.forEach(l => l({ not: 'a disassembly' })));
     expect(screen.queryByText('Scritto dal tuo assistente')).toBeNull();
     act(() => arrivals.forEach(l => l(written())));
-    const tag = await screen.findByText('Scritto dal tuo assistente');
-    expect(tag).toHaveAttribute('title', 'Il tuo assistente · claude-code 2.1.303');
+    expect(await screen.findByText('Scritto dal tuo assistente · claude-code 2.1.303')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Torna ai percorsi' })[0]);
     const card = (await screen.findByText(written().title)).closest('button')!;
     expect(within(card).getByText(/^Scritto dal tuo assistente/)).toHaveAttribute('title', 'Il tuo assistente · claude-code 2.1.303');

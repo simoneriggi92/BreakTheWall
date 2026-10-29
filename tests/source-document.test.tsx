@@ -140,3 +140,23 @@ describe('diagrams under the content policy (D18)', async () => {
     expect(node.style.stroke).toBe('blue');
   });
 });
+
+
+it('keeps the full-window outline reachable in a narrow window and returns focus on close', async () => {
+  Object.defineProperty(window, 'innerWidth', { value: 720, configurable: true });
+  try {
+    const d = await validateDisassembly(atlas());
+    render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
+    await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
+    const open = screen.getByRole('button', { name: 'Leggi a tutta finestra' });
+    await userEvent.click(open);
+    const reader = screen.getByRole('dialog');
+    expect(within(reader).queryByRole('navigation', { name: 'Indice' })).toBeNull();
+    await userEvent.click(within(reader).getByRole('button', { name: 'Indice' }));
+    expect(within(reader).getByRole('navigation', { name: 'Indice' })).toBeVisible();
+    await userEvent.click(within(reader).getByRole('button', { name: '2. Pipelines' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(open).toHaveFocus();
+  } finally { Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true }); }
+});

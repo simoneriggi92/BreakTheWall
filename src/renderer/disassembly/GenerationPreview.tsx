@@ -4,6 +4,7 @@ import { layoutLevel, readingNumbers } from '../../core/layout';
 import type { GenerationPreview as Preview } from '../../core/provider';
 import { usePreferences } from '../preferences';
 import { PartIcon, Sheet } from './Sheet';
+import { workbenchLayout } from './workbench-layout';
 
 const STATE = { waiting: undefined, writing: 'active', done: 'ok', failed: 'failed' } as const;
 
@@ -21,7 +22,7 @@ export function GenerationPreview({ preview, language }: { preview: Preview; lan
   })), [preview]);
   // The drawing changes only with the structure, not with each status, so plates keep their place.
   const shape = JSON.stringify([preview.parts.map(p => p.id), preview.joints]);
-  const layout = useMemo(() => layoutLevel(parts, preview.joints), [shape]);
+  const layout = useMemo(() => workbenchLayout(layoutLevel(parts, preview.joints), preview.joints), [shape]);
   const numbers = useMemo(() => readingNumbers(layout), [layout]);
   const states = Object.fromEntries(preview.parts.flatMap(p => STATE[p.status] ? [[p.id, STATE[p.status]!]] : []));
   const done = preview.parts.filter(p => p.status === 'done').length;

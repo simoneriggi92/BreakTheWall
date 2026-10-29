@@ -32,13 +32,17 @@ interface Props {
   focus?: Cite; onFocus: (c: Cite) => void; onEnter: (id: string) => void;
   note: string; onNote: (value: string) => void;
   /** Taking this part apart, when the disassembly allows it. */
-  takeApart?: ReactNode;
+  takeApart?: ReactNode; active?: boolean;
+  /** Where the disassembly comes from, shown with the whole: prepared, generated, or written by the learner's assistant. */
+  origin?: string;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart }: Props) {
+export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true, origin }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { if (part) heading.current?.focus({ preventScroll: true }); }, [part]);
+  const opened = useRef<Part | undefined>(undefined);
+  // Selecting a different part focuses its heading; returning through a tab keeps focus on that tab.
+  useEffect(() => { if (part && active && opened.current !== part) heading.current?.focus({ preventScroll: true }); opened.current = part; }, [part, active]);
   if (!part) {
     const whole = owner ?? d.whole;
     return <section className="part-card" aria-live="polite">
@@ -47,6 +51,7 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
         <p className="role">{owner ? owner.role : d.whole.does}</p>
         {owner ? owner.points ? <Points points={owner.points}/> : <p>{owner.explain}</p> : <p>{d.whole.why}</p>}</div>
       <Cites d={d} cites={'cites' in whole ? whole.cites : []} focus={focus} onFocus={onFocus}/>
+      {!owner && origin && <p className="micro plain origin">{origin}</p>}
       <p className="micro plain hint">{t.d.selectHint}{above && ` ${t.d.upHint}`}</p>
       {above && onUp && <button className="subtle level-up" onClick={onUp}><ArrowUp size={15}/>{t.d.up(above)}</button>}
     </section>;
@@ -57,8 +62,10 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
     <span className="eyebrow">{t.d.partOf(number ?? 0, t.d.kinds[part.kind])}</span>
     <div lang={d.language}>
       <h2 ref={heading} tabIndex={-1}><PartIcon name={part.icon} size={20}/>{part.name}</h2>
-      {/* The lead opens the card; the points and the explanation add what it does not say (D20). */}
+      {/* The lead opens the card; the points and the explanation add what it does not say (D20). The citations follow
+          the lead, so the way to the source stays in view beside it (P-20261029-ui-workbench U4). */}
       <p className="role lead">{part.role}</p>
+      <Cites d={d} cites={part.cites} focus={focus} onFocus={onFocus}/>
       {part.points ? <Points points={part.points}/> : <p>{part.explain}</p>}
       {part.lens && <div className="card-box"><span className="box-label">{t.d.lens}</span><dl className="lens-list">
         <dt>{t.d.lensWhat}</dt><dd>{part.lens.what}</dd><dt>{t.d.lensWhy}</dt><dd>{part.lens.why}</dd>
@@ -69,7 +76,6 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
       {related.length > 0 && <div className="card-box"><span className="box-label">{t.d.joints}</span><ul className="joint-words">{related.map((j, i) => <li key={i}>
         {j.from === part.id ? t.d.jointOut(t.d.verbs[j.type], name(j.to)) : t.d.jointIn(name(j.from), t.d.verbs[j.type])}<span className="micro plain"> · {j.label}</span></li>)}</ul></div>}
     </div>
-    <Cites d={d} cites={part.cites} focus={focus} onFocus={onFocus}/>
     {part.parts && <button className="primary open-sub" onClick={() => onEnter(part.id)}>{part.relevant === false ? t.d.openClosed(part.parts.length) : t.d.openSub(part.parts.length)}<ArrowRight size={15}/></button>}
     {part.parts && part.relevant === false && <p className="micro plain">{t.d.closedNote}</p>}
     {!part.parts && takeApart}
