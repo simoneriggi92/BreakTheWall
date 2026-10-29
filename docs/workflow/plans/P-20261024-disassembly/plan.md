@@ -2,10 +2,10 @@
 id: P-20261024-disassembly
 title: Disassemblies replace lessons - contract, player, two-phase generation, technical-drawing themes
 version: 7
-state: blocked
+state: implementing
 current_task: D8
 last_evidence: identity and presentation verified, including the owner's Dock icon check; v0.1.0-alpha published as a pre-release
-next_action: Blocked while P-20261029-ui-workbench implements; then the owner witnesses D8 (library and store) and D10 (generated disassembly in Studio); D11–D12 stay gated
+next_action: The owner witnesses D8 (library and store) and D10 (generated disassembly in Studio); D11–D12 stay gated
 approval: approved
 ---
 
@@ -1633,3 +1633,4 @@ The plan is not complete: D8's and D10's witnessed flows remain, and D11–D12 s
 - 2026-10-28: `implementing` → `blocked`, as P-20261028-mcp-integration's approved precondition requires. Waiting for the owner's witnessed checks (D8, D10); D11–D12 gated. It returns to `implementing` when that plan completes or the owner resumes it.
 - 2026-10-28: `blocked` → `implementing`, as P-20261028-mcp-integration is completed.
 - 2026-10-29: `implementing` → `blocked`, as P-20261029-ui-workbench's approved precondition requires. Waiting for the owner's witnessed checks (D8, D10); D11–D12 gated. It returns to `implementing` when that plan completes or the owner resumes it.
+- 2026-10-29: `blocked` → `implementing`, as P-20261029-ui-workbench is completed.

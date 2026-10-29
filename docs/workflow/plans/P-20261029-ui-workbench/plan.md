@@ -2,10 +2,10 @@
 id: P-20261029-ui-workbench
 title: A lighter workbench - one row of chrome, claim and source side by side, the prediction first in Run
 version: 1
-state: implementing
-current_task: U9
-last_evidence: U9 points 1-3 verified locally - acceptance met in 4 theme and language combinations; keyboard paths pass; 408 tests pass. CI and the owner judgement pending
-next_action: Owner confirms the push and pull request for CI (macOS and Windows), then judges the built app (U9.4)
+state: completed
+current_task: none
+last_evidence: U1-U9 verified - 32 measured combinations, keyboard paths, 408 tests, CI green on macOS and Windows at 27a4764, owner's positive judgement of the built app
+next_action: Owner merges pull request 35; graph layout legibility (Mill plate titles 10.3 px) needs its own plan
 approval: approved
 ---
 
@@ -238,4 +238,8 @@ Version 1, approved:
      - In Reassemble, Enter picks a tray part, and Enter on a slot places it.
   3. **Local checks** (automated tests, macOS): `npx tsc --noEmit -p .local/tsconfig.check.json` passed, and `npx vitest run` passed with 28 files and 408 tests. CI on macOS and Windows needs the branch pushed and a pull request; that waits for the owner's confirmation.
   4. **Owner's judgement**: pending.
+- **U9 verified (2026-10-29).**
+  - CI on [pull request 35](https://github.com/simoneriggi92/BreakTheWall/pull/35) at `27a4764`: "Types, tests and build" (macOS), "Windows: types, tests and build" and GitGuardian passed.
+  - The owner used the built app through the phases and judged it positively on 2026-10-29, so the plan completes without a version 2.
+  - Left for other plans: Mill's plate titles stay at 10.3 px at 1440×900, so graph layouts need their own plan; at 1024×700 Atlas's scenario needs scrolling to reach its last option.
 
