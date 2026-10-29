@@ -194,7 +194,7 @@ Each phase can be repaired once with the app's findings. When the repair leaves 
 |---|---|---|---|
 | **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Experimental. Disassemblies generated live: in the last check, 4 of 4 public cases valid |
 | **Local model** | none | a server on `127.0.0.1` on your Mac | Witnessed for lessons; disassemblies not yet measured |
-| **Your Claude assistant** | your Claude Desktop or Claude Code | Anthropic, through your Claude app ([Use with Claude](#use-with-claude)) | Experimental. Checked with scripted answers; live runs witnessed by the owner |
+| **Your Claude assistant** | your Claude Desktop or Claude Code | Anthropic, through your Claude app ([Use with Claude](#use-with-claude)) | Experimental. Witnessed in Claude Desktop and Claude Code: findings sent back and fixed, every run saved and opened |
 
 Lessons created before disassemblies stay readable, with their progress, under "Earlier paths".
 
@@ -296,7 +296,7 @@ Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-2
 | Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
 | macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built in CI on a tag and attached to [`v0.1.1-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha); install from a download witnessed by the owner |
 | Windows app | W1 Windows in CI · W2 platform-aware wording · W3–W5 icon, installer events, setup and release job · W6–W7 install steps and witnessed install | ✅ CI and start check on Windows; setup built in CI on a tag and attached to [`v0.2.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha); install witnessed by the owner in a Windows 11 VM |
-| Claude integration | M1–M2 local entry point and Studio hand-off · M3–M4a MCP server, Claude Desktop extension, panel and prompt · M5–M7 Claude writes the disassembly · M8–M9 docs and witnessed checks | ✅ code and automated tests on macOS and Windows, the packaged server checked on both; level B checked with scripted answers in the app; ⏳ live checks in Claude Desktop and Claude Code witnessed by the owner |
+| Claude integration | M1–M2 local entry point and Studio hand-off · M3–M4a MCP server, Claude Desktop extension, panel and prompt · M5–M7 Claude writes the disassembly · M8–M9 docs and witnessed checks | ✅ code and automated tests on macOS and Windows, the packaged server checked on both; Claude writing a disassembly witnessed in Claude Desktop and Claude Code |
 | Repository (gated) | D11 local repository as a source | ⏳ after D9 |
 | Document (gated) | D12 PDF document as a source | ⏳ after D9 |
 
