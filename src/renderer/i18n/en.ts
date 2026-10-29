@@ -35,7 +35,7 @@ export const en: Messages = {
     desktopUnavailable: 'The connection to the desktop app is not available. Reopen the app.',
   },
   player: {
-    backToLibrary: 'Back to your library', yourPaths: 'Your paths', prepared: 'Prepared example', generatedLocal: 'Generated locally', generatedAi: 'Generated with AI',
+    library: 'Library', backToLibrary: 'Back to your library', yourPaths: 'Your paths', prepared: 'Prepared example', generatedLocal: 'Generated locally', generatedAi: 'Generated with AI',
     tools: 'Tools', resuming: 'Resuming where you left off…', opening: 'Opening…', saving: 'Saving…', saved: 'Saved on this device', saveFailed: 'Saving failed',
     loadFailed: 'Your progress could not be read. To protect your data, the player was not opened. Go back to your library and try again.',
     path: 'THE PATH', stepsNav: 'Steps of the lesson', navigation: 'NAVIGATION', navigationMode: 'Navigation mode', guided: 'Guided', explore: 'Explore',
@@ -179,7 +179,7 @@ export const en: Messages = {
     trace: 'An outline to compare with', notAGrade: 'This is not a grade. Compare the relations you explained with the ones that are missing.', backToPrinciple: 'Go back to the principle in the source',
   },
   d: {
-    workbench: { part: 'Part', activity: 'Activity', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel', runHint: 'Watch the structure while you test a connection.' },
+    workbench: { part: 'Part', activity: 'Activity', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel' },
     modes: { explode: 'Exploded view', run: 'Run', reassemble: 'Reassemble', bom: 'Bill of materials' }, modesLabel: 'What to do with the disassembly',
     kinds: { step: 'step', component: 'component', artifact: 'artifact', premise: 'premise', conclusion: 'claim', ground: 'ground', limit: 'limit', objection: 'objection', consequence: 'consequence', rejected: 'set aside', event: 'event', actor: 'actor' },
     verbs: { 'sends-to': 'sends to', causes: 'causes', 'depends-on': 'depends on', supports: 'supports', attacks: 'attacks', limits: 'limits', 'leads-to': 'leads to', because: 'explains' },
@@ -197,7 +197,7 @@ export const en: Messages = {
     },
     otherVersion: (language: string) => `This disassembly also exists in ${language}. Progress stays separate for each version.`, openVersion: 'Open that version',
     widenSource: 'Focus on the source', narrowSource: 'Show drawing and source',
-    panes: { drawing: 'Height of the drawing', source: 'Width of the source' },
+    panes: { source: 'Width of the source' },
     readingOrder: 'Numbers: reading order',
     viewLabel: 'How to show the source', views: { lines: 'Lines', document: 'Document' }, openReader: 'Read in a full window', closeReader: 'Close the reader',
     reader: (title: string) => `Reading: ${title}`, sourceDocument: (title: string) => `Document: ${title}`, outline: 'Outline',

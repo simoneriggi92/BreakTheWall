@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { ArrowUp, ChevronRight, Home, Layers, ListChecks, Maximize2, Minimize2, Play, Puzzle, Scan, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowUp, ChevronRight, Layers, ListChecks, Maximize2, Minimize2, Play, Puzzle, Scan, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { DesktopBridge, ProgressResult } from '../../core/bridge';
 import type { Cite, Disassembly, Part } from '../../core/disassembly';
 import {
@@ -8,7 +8,7 @@ import {
 } from '../../core/disassembly-state';
 import { layoutDisassembly, readingNumbers } from '../../core/layout';
 import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
-import { Brand } from '../icons';
+import { BrandMark } from '../icons';
 import { originText, PreferencesMenu, restoreText, usePreferences } from '../preferences';
 import { BillOfMaterials } from './BillOfMaterials';
 import { PartCard, TakeApart } from './PartCard';
@@ -17,12 +17,14 @@ import { RunPanel } from './RunPanel';
 import { Sheet } from './Sheet';
 import { SourcePane, type SourceView } from './SourcePane';
 import { WorkbenchInspector, type InspectorTab } from './WorkbenchInspector';
-import { PANES, Splitter, usePaneSizes } from './SplitPane';
+import { Splitter, usePaneSizes } from './SplitPane';
 import { workbenchLayout } from './workbench-layout';
 
 type Mode = 'explode' | 'run' | 'reassemble' | 'bom';
 const MODES: Mode[] = ['explode', 'run', 'reassemble', 'bom'];
 const MODE_ICONS = { explode: Layers, run: Play, reassemble: Puzzle, bom: ListChecks };
+/** Zoom steps over the fitted sheet. */
+const ZOOM = { step: 0.25, max: 3 };
 
 /** Plays one disassembly: exploded view, runs, reassembly and bill of materials, with progress kept on the device. */
 /** How long a step shows as running before its effects land; zero when the system asks for reduced motion. */
@@ -58,8 +60,8 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [inspector, setInspector] = useState<InspectorTab>('detail');
   const work = useRef<HTMLDivElement>(null);
-  const drawing = useRef<HTMLDivElement>(null);
-  const drawingAt = (_x: number, y: number) => { const top = drawing.current?.getBoundingClientRect().top; return top === undefined ? undefined : (y - top) / window.innerHeight; };
+  // Zoom is a scale over the fitted sheet, for this session only: 1 fits the drawing to its area, whatever its size.
+  const [scale, setScale] = useState(1);
   const sourceAt = (x: number) => { const r = work.current?.getBoundingClientRect(); return r?.width ? (r.right - x) / r.width : undefined; };
   const saveQueue = useRef(Promise.resolve());
   const saveVersion = useRef(0);
@@ -159,18 +161,16 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       const removed = state.runs[run.id]?.tried.at(-1); const brick = run.bricks.find(b => b.part === removed);
       return { bricks: run.bricks.map(b => b.part), removed, target: brick ? { id: run.target, verdict: brick.verdict } : undefined };
     })() : {};
-  const drawingShare = panes.sizes.drawing ?? PANES.drawing.initial;
   const sourceWidth = { '--source-w': String(panes.sizes.source) } as CSSProperties;
-  const drawingStyle = { '--drawing-height': `${Math.round(drawingShare * 1000) / 10}vh` } as CSSProperties;
   const sourceSplitter = <Splitter pane="source" orientation="vertical" grows="ArrowLeft" value={panes.sizes.source}
     label={mode === 'bom' ? t.d.panes.source : t.d.workbench.resizeInspector}
     onChange={v => panes.set('source', v)} onReset={() => panes.reset('source')} fromPointer={x => sourceAt(x)}/>;
-  const zoom = (direction: -1 | 1) => {
-    const current = panes.sizes.drawing ?? (drawing.current?.clientHeight ?? window.innerHeight * PANES.drawing.initial) / window.innerHeight;
-    panes.set('drawing', current + direction * 0.1);
-  };
+  const zoom = (direction: -1 | 1) => setScale(s => Math.min(ZOOM.max, Math.max(1, s + direction * ZOOM.step)));
   const save = { opening: t.player.opening, saving: t.player.saving, saved: t.player.saved, failed: t.player.saveFailed }[saveStatus];
   const index = (id: string) => readingNumbers(layout).get(id);
+  // The origin sits with the whole in the reading column; the assistant's name and version stay visible there.
+  const origin = d.generation?.provider === 'assistant' ? `${t.d.tagAssistant} · ${d.generation.model}`
+    : d.generation ? `${t.d.tagGenerated} · ${originText(t, d.generation)}` : t.d.tag;
   // Content never changes language by itself; when a version in the interface language exists, the player offers it.
   const other = d.language !== language ? versions.find(v => v.language === language) : undefined;
 
@@ -179,7 +179,7 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
     wide={sourceWide} onWide={() => { setSourceWide(x => !x); setInspector('source'); }} {...viewProps}/>;
   const detail = mode === 'explode'
     ? <PartCard d={d} part={part} owner={owner} above={state.path.length ? above : undefined} onUp={up} joints={joints} level={level}
-        number={part && index(part.id)} focus={focus} onFocus={focusCite} onEnter={enter} active={inspector === 'detail'}
+        number={part && index(part.id)} origin={origin} focus={focus} onFocus={focusCite} onEnter={enter} active={inspector === 'detail'}
         note={part ? state.notes[part.id] ?? '' : ''} onNote={value => part && setState(s => ({ ...s, notes: { ...s.notes, [part.id]: value } }))}
         takeApart={part && d.kind === 'generated' && studio?.expandPart && <TakeApart d={d} part={part} route={expandRoute}
           progress={expanding?.part === part.id ? expanding.progress : undefined} problem={expandProblem?.part === part.id ? expandProblem.failure : undefined}
@@ -200,25 +200,24 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       }}/>;
 
   return <>
-    <header className="topbar workbench-topbar"><Brand/>
-      <button className="text-button workbench-home" aria-label={t.player.backToLibrary} onClick={goHome}><Home size={16} aria-hidden="true"/><span>{t.player.backToLibrary}</span></button>
-      <span className="prepared-tag" title={d.generation ? originText(t, d.generation) : undefined}>{d.generation?.provider === 'assistant' ? t.d.tagAssistant : d.kind === 'generated' ? t.d.tagGenerated : t.d.tag}</span>
-      <span className="save-status micro" role="status">{save}</span><PreferencesMenu/></header>
+    {/* One row of chrome (P-20261029-ui-workbench U2): the way home, where the learner is, what they are doing. */}
+    <header className="topbar workbench-topbar">
+      <button className="text-button workbench-home" aria-label={t.player.backToLibrary} title={t.player.backToLibrary} onClick={goHome}><BrandMark/><span>{t.player.library}</span></button>
+      <div className="workbench-title"><h1 lang={d.language}>{d.title}</h1>
+        {/* The path shows once the learner is inside a sub-assembly; at the top the title block names the whole. */}
+        {crumbs.length > 0 && <nav className="crumbs" aria-label={t.d.breadcrumbs}><ol>
+          <li><button className="text-button" onClick={() => leave(0)} lang={d.language}>{d.whole.name}</button></li>
+          {crumbs.map(c => <li key={c.id}><ChevronRight size={13} aria-hidden="true"/>{c.depth < crumbs.length ? <button className="text-button" onClick={() => leave(c.depth)} lang={d.language}>{c.name}</button> : <span aria-current="location" lang={d.language}>{c.name}</span>}</li>)}
+        </ol></nav>}
+      </div>
+      {loaded && <div className="mode-tabs" role="group" aria-label={t.d.modesLabel}>{MODES.map(m => {
+        const ModeIcon = MODE_ICONS[m];
+        return <button key={m} aria-pressed={mode === m} onClick={() => setModeAndLevel(m)}><ModeIcon size={16} aria-hidden="true"/>{t.d.modes[m]}</button>;
+      })}</div>}
+      <span className={`save-status micro save-${saveStatus}`} role="status">{save}</span><PreferencesMenu/></header>
     {!loaded ? <main id="main" className="loading"><p role="status">{loadFailed ? t.player.loadFailed : t.player.resuming}</p><button onClick={goHome}>{t.player.backToLibrary}</button></main> :
       <main id="main" className={`disassembly study-workbench mode-${mode}`}>
-        <div className="workbench-heading">
-          <nav className="crumbs" aria-label={t.d.breadcrumbs}><ol>
-            <li>{crumbs.length ? <button className="text-button" onClick={() => leave(0)} lang={d.language}>{d.whole.name}</button> : <span aria-current="location" lang={d.language}>{d.whole.name}</span>}</li>
-            {crumbs.map(c => <li key={c.id}><ChevronRight size={13} aria-hidden="true"/>{c.depth < crumbs.length ? <button className="text-button" onClick={() => leave(c.depth)} lang={d.language}>{c.name}</button> : <span aria-current="location" lang={d.language}>{c.name}</span>}</li>)}
-          </ol></nav>
-          <h1 lang={d.language}>{d.title}</h1><p className="question" lang={d.language}>{d.question}</p>
-        </div>
-        <div className="d-bar">
-          <div className="mode-tabs" role="group" aria-label={t.d.modesLabel}>{MODES.map(m => {
-            const ModeIcon = MODE_ICONS[m];
-            return <button key={m} aria-pressed={mode === m} onClick={() => setModeAndLevel(m)}><ModeIcon size={16} aria-hidden="true"/>{t.d.modes[m]}</button>;
-          })}</div>
-        </div>
+        <p className="question workbench-question" lang={d.language} title={d.question}>{d.question}</p>
         {other && openVersion && <div className="notice version-notice" role="status"><span>{t.d.otherVersion(t.languageNames[other.language])}</span><button onClick={() => openVersion(other.id)}>{t.d.openVersion}</button></div>}
         {notice && <div className="notice" role="status">{restoreText(t, notice, 'disassembly')}<button aria-label={t.common.closeNotice} onClick={() => setNotice(undefined)}><X size={15}/></button></div>}
         {saveStatus === 'failed' && <div className="error-banner" role="alert">{t.player.unsaved} <button onClick={() => setRetry(x => x + 1)}>{t.player.retrySave}</button></div>}
@@ -229,28 +228,26 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
               clear={() => { setFeedback(undefined); setState(clearReassembly); }}/>
           : <div className={`d-work${mode === 'bom' ? ' workbench-bom' : ''}${sourceWide ? ' source-expanded' : ''}${canvasOnly ? ' canvas-only' : ''}`} ref={work} style={sourceWidth}>
             <section className="d-canvas" aria-label={mode === 'bom' ? t.d.modes.bom : t.d.sheetLabel(owner?.name ?? d.whole.name)} hidden={sourceWide}>
-              <div className="canvas-toolbar"><strong lang={d.language}>{mode === 'bom' ? t.d.modes.bom : owner?.name ?? d.whole.name}</strong>
-                {mode !== 'bom' && <div className="canvas-tools" role="group" aria-label={t.d.workbench.drawingTools}>
-                  <button className="icon-button" aria-label={t.d.workbench.zoomOut} title={t.d.workbench.zoomOut} onClick={() => zoom(-1)}><ZoomOut size={16}/></button>
-                  <button className="text-button fit-drawing" onClick={() => panes.reset('drawing')} title={t.d.workbench.fit}><Scan size={16} aria-hidden="true"/>{t.d.workbench.fit}</button>
-                  <button className="icon-button" aria-label={t.d.workbench.zoomIn} title={t.d.workbench.zoomIn} onClick={() => zoom(1)}><ZoomIn size={16}/></button>
-                  <button className="icon-button" aria-label={canvasOnly ? t.d.workbench.restorePanels : t.d.workbench.focusCanvas}
-                    title={canvasOnly ? t.d.workbench.restorePanels : t.d.workbench.focusCanvas} aria-pressed={canvasOnly} onClick={() => setCanvasOnly(x => !x)}>
-                    {canvasOnly ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}</button>
-                </div>}
-              </div>
+              {/* The drawing lies on the paper; its tools float in a corner instead of a bar (U3). */}
+              {mode !== 'bom' && <div className="canvas-tools" role="group" aria-label={t.d.workbench.drawingTools}>
+                <button className="icon-button" aria-label={t.d.workbench.zoomOut} title={t.d.workbench.zoomOut} disabled={scale === 1} onClick={() => zoom(-1)}><ZoomOut size={16}/></button>
+                {/* While zoomed, the fit button shows the scale, so the learner sees why the drawing no longer follows the room. */}
+                <button className={`icon-button fit-drawing${scale > 1 ? ' zoomed' : ''}`} aria-label={t.d.workbench.fit} title={t.d.workbench.fit} onClick={() => setScale(1)}>
+                  {scale > 1 ? `${Math.round(scale * 100)}%` : <Scan size={16}/>}</button>
+                <button className="icon-button" aria-label={t.d.workbench.zoomIn} title={t.d.workbench.zoomIn} disabled={scale === ZOOM.max} onClick={() => zoom(1)}><ZoomIn size={16}/></button>
+                <button className="icon-button" aria-label={canvasOnly ? t.d.workbench.restorePanels : t.d.workbench.focusCanvas}
+                  title={canvasOnly ? t.d.workbench.restorePanels : t.d.workbench.focusCanvas} aria-pressed={canvasOnly} onClick={() => setCanvasOnly(x => !x)}>
+                  {canvasOnly ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}</button>
+              </div>}
               {mode === 'bom' ? <div className="bom-scroll"><BillOfMaterials d={d} onFocus={focusCite}/></div>
                 : <>
-                  <div className="d-drawing" ref={drawing} style={drawingStyle}>
+                  <div className="d-drawing">
                     {mode === 'explode' && state.path.length > 0 && <button className="subtle level-up" onClick={up} aria-label={t.d.upLabel(above)} lang={d.language}><ArrowUp size={15}/>{above}</button>}
                     <Sheet layout={layout} parts={level} joints={joints} title={owner?.name ?? d.whole.name} language={d.language}
                       subtitle={t.d.sheetSub(t.d.modes[mode], state.path.length + 1, level.length)} selected={state.selected}
                       onSelect={id => mode === 'run' && run.type === 'load' && run.bricks.some(b => b.part === id) ? setState(s => removeBrick(d, s, run.id, id)) : select(id)}
-                      onEnter={id => mode === 'explode' && enter(id)} fit={panes.sizes.drawing !== null ? 'height' : panes.wide ? 'contain' : undefined} {...runDecor}/>
+                      onEnter={id => mode === 'explode' && enter(id)} fit={scale > 1 ? 'zoom' : panes.wide ? 'contain' : undefined} zoom={scale} {...runDecor}/>
                   </div>
-                  {panes.wide && <Splitter pane="drawing" orientation="horizontal" grows="ArrowDown" value={drawingShare} label={t.d.panes.drawing}
-                    onChange={v => panes.set('drawing', v)} onReset={() => panes.reset('drawing')} fromPointer={drawingAt}/>}
-                  <div className="canvas-footnote"><span>{mode === 'run' ? t.d.workbench.runHint : t.d.selectHint}</span></div>
                 </>}
             </section>
             {panes.wide && !sourceWide && !canvasOnly && sourceSplitter}

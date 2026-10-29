@@ -8,39 +8,40 @@ const KEY = 'btw:panes:v1';
 afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
 function Harness() {
-  const [value, setValue] = useState<number>(PANES.drawing.initial);
-  return <Splitter pane="drawing" orientation="horizontal" grows="ArrowDown" value={value} label="Altezza del disegno"
-    onChange={v => setValue(Math.min(PANES.drawing.max, Math.max(PANES.drawing.min, v)))} onReset={() => setValue(PANES.drawing.initial)} fromPointer={() => undefined}/>;
+  const [value, setValue] = useState<number>(PANES.source.initial);
+  return <Splitter pane="source" orientation="vertical" grows="ArrowLeft" value={value} label="Larghezza della fonte"
+    onChange={v => setValue(Math.min(PANES.source.max, Math.max(PANES.source.min, v)))} onReset={() => setValue(PANES.source.initial)} fromPointer={() => undefined}/>;
 }
 
 describe('resizable panes (D17)', () => {
   it('reads saved sizes, and falls back to the defaults for bad values or failing storage', () => {
-    expect(readPaneSizes()).toEqual({ drawing: null, source: 0.34 });
+    expect(readPaneSizes()).toEqual({ source: 0.34 });
+    // A drawing height saved by an earlier version is ignored: the drawing now fits its area (P-20261029-ui-workbench).
     localStorage.setItem(KEY, JSON.stringify({ drawing: 0.7, source: 0.55 }));
-    expect(readPaneSizes()).toEqual({ drawing: 0.7, source: 0.55 });
-    localStorage.setItem(KEY, JSON.stringify({ drawing: 3, source: 'wide' }));
-    expect(readPaneSizes()).toEqual({ drawing: null, source: 0.34 });
+    expect(readPaneSizes()).toEqual({ source: 0.55 });
+    localStorage.setItem(KEY, JSON.stringify({ source: 'wide' }));
+    expect(readPaneSizes()).toEqual({ source: 0.34 });
     localStorage.setItem(KEY, '{not json');
-    expect(readPaneSizes()).toEqual({ drawing: null, source: 0.34 });
+    expect(readPaneSizes()).toEqual({ source: 0.34 });
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    expect(readPaneSizes()).toEqual({ drawing: null, source: 0.34 });
+    expect(readPaneSizes()).toEqual({ source: 0.34 });
   });
   it('is a separator the keyboard moves within its limits, and Enter or a double click resets', async () => {
     render(<Harness/>);
-    const bar = screen.getByRole('separator', { name: 'Altezza del disegno' });
-    expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
-    expect(bar).toHaveAttribute('aria-valuenow', '50');
+    const bar = screen.getByRole('separator', { name: 'Larghezza della fonte' });
+    expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+    expect(bar).toHaveAttribute('aria-valuenow', '34');
     bar.focus();
-    await userEvent.keyboard('{ArrowDown}{ArrowDown}');
-    expect(bar).toHaveAttribute('aria-valuenow', '60');
-    await userEvent.keyboard('{End}{ArrowDown}');
-    expect(bar).toHaveAttribute('aria-valuenow', '85');
-    await userEvent.keyboard('{Home}{ArrowUp}');
-    expect(bar).toHaveAttribute('aria-valuenow', '25');
+    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}');
+    expect(bar).toHaveAttribute('aria-valuenow', '44');
+    await userEvent.keyboard('{End}{ArrowLeft}');
+    expect(bar).toHaveAttribute('aria-valuenow', '70');
+    await userEvent.keyboard('{Home}{ArrowRight}');
+    expect(bar).toHaveAttribute('aria-valuenow', '20');
     await userEvent.keyboard('{Enter}');
-    expect(bar).toHaveAttribute('aria-valuenow', '50');
+    expect(bar).toHaveAttribute('aria-valuenow', '34');
     await userEvent.keyboard('{End}');
     await userEvent.dblClick(bar);
-    expect(bar).toHaveAttribute('aria-valuenow', '50');
+    expect(bar).toHaveAttribute('aria-valuenow', '34');
   });
 });

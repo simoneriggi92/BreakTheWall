@@ -33,9 +33,11 @@ interface Props {
   note: string; onNote: (value: string) => void;
   /** Taking this part apart, when the disassembly allows it. */
   takeApart?: ReactNode; active?: boolean;
+  /** Where the disassembly comes from, shown with the whole: prepared, generated, or written by the learner's assistant. */
+  origin?: string;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true }: Props) {
+export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true, origin }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
   const opened = useRef<Part | undefined>(undefined);
@@ -49,6 +51,7 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
         <p className="role">{owner ? owner.role : d.whole.does}</p>
         {owner ? owner.points ? <Points points={owner.points}/> : <p>{owner.explain}</p> : <p>{d.whole.why}</p>}</div>
       <Cites d={d} cites={'cites' in whole ? whole.cites : []} focus={focus} onFocus={onFocus}/>
+      {!owner && origin && <p className="micro plain origin">{origin}</p>}
       <p className="micro plain hint">{t.d.selectHint}{above && ` ${t.d.upHint}`}</p>
       {above && onUp && <button className="subtle level-up" onClick={onUp}><ArrowUp size={15}/>{t.d.up(above)}</button>}
     </section>;

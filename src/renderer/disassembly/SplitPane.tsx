@@ -1,25 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
 /**
- * Pane sizes the learner can change: the drawing's height, as a share of the window height, and the source's width,
- * as a share of the row below the drawing. The drawing has no size until the learner sets one: it then fits the whole
- * sheet's width. Sizes are a convenience for this device, kept in local storage; anything unreadable falls back to
- * the defaults.
+ * Pane sizes the learner can change: the reading column's width, as a share of the row. Sizes are a convenience for
+ * this device, kept in local storage; anything unreadable falls back to the defaults. The drawing keeps no size: it
+ * fits its area, and zoom is a scale over that fit for the session (P-20261029-ui-workbench). A drawing height saved
+ * by an earlier version is ignored.
  */
 export const PANES = {
-  drawing: { initial: 0.5, min: 0.25, max: 0.85 },
   source: { initial: 0.34, min: 0.2, max: 0.7 },
 } as const;
 export type PaneKey = keyof typeof PANES;
-/** `drawing: null` means fit the sheet's width. */
-export type PaneSizes = { drawing: number | null; source: number };
+export type PaneSizes = { source: number };
 /** At or under this width the panes stack, as the stylesheet does, and no splitter is shown. */
 export const STACK_BELOW = 960;
 const STORAGE_KEY = 'btw:panes:v1';
 const STEP = 0.05;
 
 const clamp = (key: PaneKey, value: number) => Math.min(PANES[key].max, Math.max(PANES[key].min, value));
-const defaults = (): PaneSizes => ({ drawing: null, source: PANES.source.initial });
+const defaults = (): PaneSizes => ({ source: PANES.source.initial });
 
 export function readPaneSizes(): PaneSizes {
   const out = defaults();
@@ -51,7 +49,7 @@ export function usePaneSizes() {
     return next;
   }), []);
   const reset = useCallback((key: PaneKey) => setSizes(s => {
-    const next = { ...s, [key]: key === 'drawing' ? null : PANES[key].initial };
+    const next = { ...s, [key]: PANES[key].initial };
     writePaneSizes(next);
     return next;
   }), []);

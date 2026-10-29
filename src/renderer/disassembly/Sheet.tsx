@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Ban, BookOpen, ClipboardCheck, Code2, Cpu, Database, Download, FileText, Fingerprint, Flag, Funnel, Gauge, GitBranch, Hammer, KeyRound, Layers, ListChecks, Lock, Map, MessageCircle, Package, Play, Plug, Repeat, Rocket, RotateCcw, Ruler, Scale, Search, Send, Settings, ShieldCheck, Sprout, Timer, TriangleAlert, UserRound, Users } from 'lucide-react';
 import { JOINT_FAMILY, type Joint, type Part } from '../../core/disassembly';
 import { labelBeside, readingNumbers, type LevelLayout, type Point, type Rect } from '../../core/layout';
@@ -55,12 +55,13 @@ export interface SheetProps {
    * Inside a resizable pane (D17): `contain` shows the whole sheet, shrinking plates when the sheet is wide;
    * `height` follows a height the learner set, so dragging the pane down draws bigger plates and a wide sheet scrolls.
    */
-  fit?: 'contain' | 'height';
+  /** `contain` fits the sheet to its area; `zoom` scales that fit by `zoom` and lets the area scroll. */
+  fit?: 'contain' | 'zoom'; zoom?: number;
 }
 const TITLE_BLOCK = 64;
 
 /** The exploded view: one level drawn from the automatic layout, as a technical sheet with a title block. */
-export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit }: SheetProps) {
+export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1 }: SheetProps) {
   const { t } = usePreferences();
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -79,8 +80,20 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
     if (!svg || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(bringIntoView); observer.observe(svg);
     return () => observer.disconnect();
-  }, [selected, layout, fit]);
+  }, [selected, layout, fit, zoom]);
   const width = Math.max(layout.width, 560); const height = layout.height + TITLE_BLOCK;
+  // Zoom scales the fitted size, so the sheet grows from what the learner saw and leaves no blank paper around it.
+  const [room, setRoom] = useState<{ w: number; h: number }>();
+  useEffect(() => {
+    const host = scroll.current;
+    if (fit !== 'zoom' || !host || typeof ResizeObserver === 'undefined') return;
+    const measure = () => { const r = host.getBoundingClientRect(); setRoom({ w: r.width, h: r.height }); };
+    measure();
+    const observer = new ResizeObserver(measure); observer.observe(host);
+    return () => observer.disconnect();
+  }, [fit]);
+  const fitted = room && Math.min(room.w / width, room.h / height);
+  const zoomStyle = { '--zoom': String(zoom), ...(fitted ? { width: `${Math.floor(width * fitted * zoom)}px`, height: `${Math.floor(height * fitted * zoom)}px` } : {}) } as CSSProperties;
   const flowing = (j: Joint) => flow.some(([a, b]) => (a === j.from && b === j.to) || (a === j.to && b === j.from));
   const asides = useMemo(() => layout.joints.map((_, i) => labelBeside(layout, i)), [layout]);
   // Numbers follow the reading order, and plates are drawn in it, so the Tab key follows the numbers too.
@@ -88,7 +101,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
   const plates = useMemo(() => [...layout.plates].sort((a, b) => numbers.get(a.id)! - numbers.get(b.id)!), [layout, numbers]);
   // Only the drawing scrolls sideways when it is wider than the room; the panels around it never do.
   return <div ref={scroll} className="sheet-scroll"><svg className={`sheet${fit ? ` fit-${fit}` : ''}`} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={t.d.sheetLabel(title)}
-    style={fit ? undefined : { minWidth: `${Math.round(width * 0.7)}px`, maxWidth: `${Math.round(width * 1.15)}px` }}>
+    style={fit === 'zoom' ? zoomStyle : fit ? undefined : { minWidth: `${Math.round(width * 0.7)}px`, maxWidth: `${Math.round(width * 1.15)}px` }}>
     <defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" className="hatch-line"/></pattern></defs>
     <rect className="frame" x={8} y={8} width={width - 16} height={height - 16}/>
     <rect className="frame-inner" x={13} y={13} width={width - 26} height={height - 26}/>

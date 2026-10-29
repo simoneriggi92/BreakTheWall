@@ -78,7 +78,6 @@ export function Reassemble({ d, layout, state, place, check, clear, feedback, wo
   if (!workbench) return <div className="reassemble">{heading}{diagram}{trayView}{actionsView}{feedbackView}</div>;
   return <div className="reassemble workbench-reassembly">
     <section className="reassembly-canvas" aria-label={d.reassemble.title}>
-      <div className="canvas-toolbar"><strong lang={d.language}>{d.whole.name}</strong></div>
       <div className="reassembly-drawing">{diagram}</div>
     </section>
     <section className="reassembly-controls" aria-label={t.d.reassemble.tray}>

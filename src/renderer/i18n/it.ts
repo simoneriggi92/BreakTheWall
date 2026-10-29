@@ -34,7 +34,7 @@ export const it = {
     desktopUnavailable: 'Il collegamento al desktop non è disponibile. Riapri l’app.',
   },
   player: {
-    backToLibrary: 'Torna ai percorsi', yourPaths: 'I tuoi percorsi', prepared: 'Esempio preparato', generatedLocal: 'Generato in locale', generatedAi: 'Generato con AI',
+    library: 'Percorsi', backToLibrary: 'Torna ai percorsi', yourPaths: 'I tuoi percorsi', prepared: 'Esempio preparato', generatedLocal: 'Generato in locale', generatedAi: 'Generato con AI',
     tools: 'Strumenti', resuming: 'Riprendo il tuo percorso…', opening: 'Apertura…', saving: 'Salvataggio…', saved: 'Salvato sul dispositivo', saveFailed: 'Salvataggio non riuscito',
     loadFailed: 'Non è stato possibile leggere i progressi. Per proteggere i dati, il player non è stato aperto. Torna ai percorsi e riprova.',
     path: 'IL PERCORSO', stepsNav: 'Tappe della lezione', navigation: 'NAVIGAZIONE', navigationMode: 'Modalità di navigazione', guided: 'Guidata', explore: 'Esplora',
@@ -178,7 +178,7 @@ export const it = {
     trace: 'Una traccia per confrontarti', notAGrade: 'Non è un voto. Confronta le relazioni che hai spiegato e quelle che mancano.', backToPrinciple: 'Ritorna al principio nella fonte',
   },
   d: {
-    workbench: { part: 'Pezzo', activity: 'Attività', inspector: 'Pezzo, attività e fonte', resizeInspector: 'Larghezza del pannello di lettura', drawingTools: 'Strumenti del disegno', fit: 'Adatta il disegno', zoomIn: 'Ingrandisci il disegno', zoomOut: 'Riduci il disegno', focusCanvas: 'Concentrati sul disegno', restorePanels: 'Mostra disegno e pannello di lettura', runHint: 'Osserva la struttura mentre metti alla prova un collegamento.' },
+    workbench: { part: 'Pezzo', activity: 'Attività', inspector: 'Pezzo, attività e fonte', resizeInspector: 'Larghezza del pannello di lettura', drawingTools: 'Strumenti del disegno', fit: 'Adatta il disegno', zoomIn: 'Ingrandisci il disegno', zoomOut: 'Riduci il disegno', focusCanvas: 'Concentrati sul disegno', restorePanels: 'Mostra disegno e pannello di lettura' },
     modes: { explode: 'Esploso', run: 'Fai girare', reassemble: 'Rimonta', bom: 'Distinta base' }, modesLabel: 'Cosa fare con lo smontaggio',
     kinds: { step: 'passo', component: 'componente', artifact: 'artefatto', premise: 'premessa', conclusion: 'tesi', ground: 'fondamento', limit: 'limite', objection: 'obiezione', consequence: 'conseguenza', rejected: 'scartato', event: 'evento', actor: 'attore' },
     verbs: { 'sends-to': 'invia a', causes: 'causa', 'depends-on': 'dipende da', supports: 'sostiene', attacks: 'attacca', limits: 'limita', 'leads-to': 'porta a', because: 'spiega' },
@@ -196,7 +196,7 @@ export const it = {
     },
     otherVersion: (language: string) => `Questo smontaggio esiste anche in ${language}. I progressi restano separati per ogni versione.`, openVersion: 'Apri quella versione',
     widenSource: 'Allarga la fonte a tutta l’area', narrowSource: 'Ripristina disegno e fonte',
-    panes: { drawing: 'Altezza del disegno', source: 'Larghezza della fonte' },
+    panes: { source: 'Larghezza della fonte' },
     readingOrder: 'Numeri: ordine di lettura',
     viewLabel: 'Come mostrare la fonte', views: { lines: 'Righe', document: 'Documento' }, openReader: 'Leggi a tutta finestra', closeReader: 'Chiudi la lettura',
     reader: (title: string) => `Lettura: ${title}`, sourceDocument: (title: string) => `Documento: ${title}`, outline: 'Indice',

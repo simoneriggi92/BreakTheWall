@@ -149,41 +149,47 @@ describe('back to the level above (D16)', () => {
 describe('resizable drawing, card and source (D17)', () => {
   const separators = () => screen.queryAllByRole('separator').map(x => x.getAttribute('aria-label'));
   const setWidth = (width: number) => act(() => { Object.defineProperty(window, 'innerWidth', { value: width, configurable: true }); window.dispatchEvent(new Event('resize')); });
-  it('offers both splitters in the exploded view and in runs, one in the bill of materials, and remembers the sizes', async () => {
+  it('offers the reading panel splitter in the exploded view and in runs, the source one in the bill of materials, and remembers the width', async () => {
     localStorage.clear();
     const d = await validateDisassembly(atlas());
     const view = await play(d);
-    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza del pannello di lettura']);
-    const drawing = document.querySelector<HTMLElement>('.d-drawing')!;
-    expect(drawing.style.getPropertyValue('--drawing-height')).toBe('50vh');
-    screen.getByRole('separator', { name: 'Altezza del disegno' }).focus();
-    await user().keyboard('{ArrowDown}{ArrowDown}');
-    expect(drawing.style.getPropertyValue('--drawing-height')).toBe('60vh');
+    expect(separators()).toEqual(['Larghezza del pannello di lettura']);
     screen.getByRole('separator', { name: 'Larghezza del pannello di lettura' }).focus();
     await user().keyboard('{ArrowLeft}');
     expect(document.querySelector<HTMLElement>('.d-work')!.style.getPropertyValue('--source-w')).toBe(String(0.34 + 0.05));
     await user().click(screen.getByRole('button', { name: 'Fai girare' }));
-    expect(separators()).toEqual(['Altezza del disegno', 'Larghezza del pannello di lettura']);
+    expect(separators()).toEqual(['Larghezza del pannello di lettura']);
     await user().click(screen.getByRole('button', { name: 'Distinta base' }));
     expect(separators()).toEqual(['Larghezza della fonte']);
     await user().click(screen.getByRole('button', { name: 'Rimonta' }));
     expect(separators()).toEqual([]);
     view.unmount();
     await play(d);
-    expect(document.querySelector<HTMLElement>('.d-drawing')!.style.getPropertyValue('--drawing-height')).toBe('60vh');
+    expect(document.querySelector<HTMLElement>('.d-work')!.style.getPropertyValue('--source-w')).toBe(String(0.34 + 0.05));
     localStorage.clear();
   });
-  it('shows the whole sheet until the learner sets a height, then follows it, and fits again on reset', async () => {
+  it('fits the sheet to its area, zooms in steps over that fit for the session only, and shows the scale until it fits again', async () => {
     localStorage.clear();
-    await play(await validateDisassembly(atlas()));
+    localStorage.setItem('btw:panes:v1', JSON.stringify({ drawing: 0.85, source: 0.34 }));
+    const d = await validateDisassembly(atlas());
+    const view = await play(d);
     const sheet = () => document.querySelector<SVGSVGElement>('.d-drawing .sheet')!;
+    // A drawing height saved by the earlier layout no longer turns the sheet into a fixed size.
     expect(sheet()).toHaveClass('fit-contain');
-    expect(sheet().style.minWidth).toBe('');
-    const bar = screen.getByRole('separator', { name: 'Altezza del disegno' });
-    bar.focus();
-    await user().keyboard('{ArrowDown}');
-    expect(sheet()).toHaveClass('fit-height');
-    await user().keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Riduci il disegno' })).toBeDisabled();
+    await user().click(screen.getByRole('button', { name: 'Ingrandisci il disegno' }));
+    await user().click(screen.getByRole('button', { name: 'Ingrandisci il disegno' }));
+    expect(sheet()).toHaveClass('fit-zoom');
+    expect(sheet().style.getPropertyValue('--zoom')).toBe('1.5');
+    expect(screen.getByRole('button', { name: 'Adatta il disegno' })).toHaveTextContent('150%');
+    await user().click(screen.getByRole('button', { name: 'Riduci il disegno' }));
+    expect(sheet().style.getPropertyValue('--zoom')).toBe('1.25');
+    await user().click(screen.getByRole('button', { name: 'Adatta il disegno' }));
+    expect(sheet()).toHaveClass('fit-contain');
+    expect(screen.getByRole('button', { name: 'Adatta il disegno' })).toHaveTextContent('');
+    await user().click(screen.getByRole('button', { name: 'Ingrandisci il disegno' }));
+    view.unmount();
+    await play(d);
     expect(sheet()).toHaveClass('fit-contain');
     localStorage.clear();
   });
@@ -479,3 +485,37 @@ describe('workbench reading and cognitive landmarks', () => {
     expect(document.querySelector('.slot.filled .plate-icon svg')).not.toBeNull();
   });
 });
+
+describe('one row of chrome and the drawing on the paper (P-20261029-ui-workbench U2-U3)', () => {
+  it('puts home, title and modes in one bar, the question once, and the whole and the hint once outside the drawing', async () => {
+    const d = await validateDisassembly(atlas()); await play(d);
+    const bar = within(document.querySelector<HTMLElement>('header')!);
+    expect(bar.getByRole('button', { name: 'Torna ai percorsi' })).toBeInTheDocument();
+    expect(bar.getByRole('heading', { level: 1, name: d.title })).toBeInTheDocument();
+    expect(within(bar.getByRole('group', { name: /Cosa fare con lo smontaggio/ })).getAllByRole('button')).toHaveLength(4);
+    expect(screen.getAllByText(d.question)).toHaveLength(1);
+    const outsideDrawing = (text: string) => screen.queryAllByText(text).filter(e => !e.closest('.sheet'));
+    expect(outsideDrawing(d.whole.name)).toHaveLength(1);
+    expect(screen.getAllByText('Seleziona un pezzo per aprirlo. Invio apre il pezzo selezionato.')).toHaveLength(1);
+    expect(screen.queryByRole('navigation', { name: 'Livelli dello smontaggio' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Strumenti del disegno' }).closest('.d-canvas')).not.toBeNull();
+  });
+  it('shows where the disassembly comes from in the overview, not in the bar', async () => {
+    await play(await validateDisassembly(atlas()));
+    expect(side().getByText('Smontaggio preparato')).toBeInTheDocument();
+    expect(within(document.querySelector<HTMLElement>('header')!).queryByText('Smontaggio preparato')).toBeNull();
+  });
+  it('keeps the save status quiet until a save fails, then says so next to the way to retry', async () => {
+    const { bridge } = memoryBridge();
+    const first = await play(await validateDisassembly(atlas()));
+    await waitFor(() => expect(document.querySelector('.save-status')).toHaveClass('save-saved'));
+    first.unmount();
+    const failing: DesktopBridge = { ...bridge, saveProgress: async () => { throw new Error('disk full'); } };
+    await play(await validateDisassembly(mill()), failing);
+    await user().click(plate(/^1\. /));
+    expect(await screen.findByRole('alert')).toHaveTextContent('non sono stati salvati');
+    expect(document.querySelector('.save-status')).toHaveClass('save-failed');
+    expect(screen.getByRole('button', { name: 'Riprova il salvataggio' })).toBeInTheDocument();
+  });
+});
+
