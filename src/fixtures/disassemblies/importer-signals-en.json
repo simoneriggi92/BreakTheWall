@@ -1,0 +1,817 @@
+{
+ "schemaVersion": 1,
+ "id": "importer-signals-en",
+ "revision": "v1",
+ "kind": "prepared",
+ "title": "The Larkspur importer at night",
+ "language": "en",
+ "family": "importer-signals",
+ "sources": [
+  {
+   "id": "importer",
+   "title": "night-importer.md",
+   "origin": "original-prepared",
+   "revision": "v1",
+   "text": "# Larkspur catalogue importer: telling a silent night apart\n\n**Purpose:** explain how the overnight importer shows what it is doing, so that\nwhoever is on call can tell a stopped importer from a quiet night.\n**Audience:** people who have never read the importer's code.\n**Note:** Larkspur is a fictional library network, written for the Break the Wall\nexamples. Names, numbers and times are illustrative.\n\n## 1. What the importer does\n\nEvery night, publishers add and correct records for the books they sell: titles,\nauthors, prices, cover images. The importer brings those records into the\nLarkspur catalogue, so that a branch librarian who searches in the morning finds\nyesterday's corrections.\n\nIt is a background process with no screen and no web page. It runs on one\nmachine, starts with the machine, and repeats the same round every ten minutes\nuntil it is stopped.\n\nA round asks each publisher's feed for records changed since the last round,\nhands every new record to a worker, and the worker writes it to the catalogue.\n\n## 2. Why silence is the hard failure\n\nWhen the importer crashes, the machine restarts it and someone gets an email.\nThat is the easy case. The hard case is silence: the morning catalogue has no\nnew records, and nothing says why.\n\nSilence has several causes that look the same from outside:\n\n- the importer is stuck inside a call that never returns;\n- someone paused it for maintenance and forgot to switch it back on;\n- the publishers really sent nothing new;\n- every round runs, but every record is turned away;\n- the workers report success for records they never wrote.\n\nThe importer's signals exist to separate these causes. Each one answers a\ndifferent question, and the design keeps the questions apart on purpose:\n\n1. Is the importer running at all?\n2. Do its rounds reach the end?\n3. What happened to each record?\n\nA single \"healthy\" light would have to answer all three at once, and it would\nbe wrong in at least one of the cases above.\n\n## 3. One round, step by step\n\nA round always goes through the same steps, in this order:\n\n1. **Wake and stamp.** The round writes the heartbeat stamp (section 4)\n   before it does anything that could fail or wait.\n2. **Read the switch.** It reads the pause switch (section 7). If the switch\n   is off, the round records that it is paused and ends here.\n3. **Fetch.** It asks each feed for records changed since the last round.\n   This is the step that can hang: a feed may accept the call and never answer.\n4. **Hand over.** It gives each record to a worker and moves on; it does not\n   wait for the worker to finish.\n5. **Close.** It writes the last-finished time (section 5) and goes back to\n   sleep until the next round.\n\nThe order matters. Because the stamp comes first, a round that hangs in step 3\nstill left a stamp behind, and the next missing stamp is what gives it away.\nBecause the last-finished time comes last, it moves only when a round really\nreached the end.\n\nA round that fails in step 3 with an error, rather than hanging, ends early: it\nlogs the error, skips step 5, and the next round starts on time.\n\n## 4. The heartbeat stamp\n\nThe heartbeat stamp is a single time, kept in the importer's memory and copied\nto a small file on the machine's disk: the moment the latest round started.\n\n- It is written at the start of every round, paused or not.\n- It is never written anywhere else.\n- Its age is the only thing it says: how long ago a round last began.\n\nWith rounds every ten minutes, a stamp younger than ten minutes is normal. A\nstamp thirty minutes old means three rounds did not start, or one round has\nbeen stuck for half an hour.\n\nThe stamp does not say whether rounds succeed. A round that fails on every\nfetch still stamps on time. That is deliberate: the stamp answers question 1\nand nothing else.\n\n## 5. The last-finished time\n\nThe last-finished time is the moment the latest round reached step 5.\n\n- It is written only at the end of a round that got through the fetch.\n- A paused round does not write it.\n- A round that fails in step 3 does not write it.\n\nSo the last-finished time can fall far behind the heartbeat stamp while the\nimporter is perfectly alive: during a pause, or while a feed keeps refusing\ncalls. The gap between the two times is itself information. A recent stamp and\nan old last-finished time mean \"running, but not getting through\".\n\nIt answers question 2. It says nothing about individual records.\n\n## 6. What happened to each record\n\n### 6.1 The four outcomes\n\nEvery record a worker receives ends in exactly one of four outcomes, written to\nthe outcome log with the record's identifier:\n\n- **Stored:** the record is in the catalogue.\n- **Waiting:** the publisher announced it, but its details are not ready yet.\n  The worker will try again in an hour, up to a day.\n- **Rejected:** the record is malformed or breaks a catalogue rule. Trying\n  again would not help, so nobody does.\n- **Failed:** something went wrong that might go right next time: the\n  catalogue was busy, a cover image did not download.\n\nThe log line always has the same shape, so a search for one record's\nidentifier returns its whole story across retries.\n\n### 6.2 Why \"the job succeeded\" is not enough\n\nThe workers run inside a job system that keeps its own score: a job either\nsucceeded or failed. That score is about the job, not the record.\n\nA worker that finds a rejected record finishes normally: there is nothing to\nretry. The job system counts it as a success. A worker that finds a waiting\nrecord asks for a retry, and the job system counts a failure, even though\nnothing is wrong. Read alone, the job score says \"all good\" on a night when\nevery record was rejected, and \"trouble\" on a night when publishers were\nmerely slow.\n\nThis is why the outcome log exists, and why the night board reads it instead\nof the job score. \"The job succeeded\" and \"the record is in the catalogue\" are\ntwo different facts.\n\n## 7. The pause switch\n\nOperators can pause the importer without stopping the process: a switch in\nthe configuration service, read at the start of every round.\n\nA paused importer keeps running its rounds. Each round stamps the heartbeat,\nreads the switch, sees it off, records \"paused\" and goes back to sleep. Nothing\nis fetched, nothing is handed over, and the last-finished time stays where it\nwas.\n\nThe heartbeat goes on during a pause on purpose. If a pause stopped the\nheartbeat, the restart rule (section 8) would take a deliberate pause for a\nstuck importer and restart it, again and again, for as long as the pause\nlasted.\n\nThe current state of the switch is shown on the night board, so that an old\nlast-finished time can be read next to \"paused since 01:40\".\n\n## 8. The restart rule\n\nThe machine runs a check every minute and restarts the importer when it looks\nstuck. The rule reads one thing only: the age of the heartbeat stamp.\n\n- Younger than three rounds (thirty minutes): leave it alone.\n- Older: restart the importer.\n- In the first five minutes after a start, leave it alone whatever the stamp\n  says, so that a slow start is not mistaken for a hang.\n\nThe rule does not read the last-finished time, the pause switch or the\noutcome log, and this is the point of the design. A restart can fix exactly\none problem: a round stuck inside a call that will never return. It cannot\nfix a feed that refuses calls, a publisher that sent nothing, or a record that\nbreaks a catalogue rule. Restarting for those would only add noise, and it\nwould interrupt the workers that were doing fine.\n\nThe rule also leaves the catalogue and the feeds out of its check. If it asked\nthe catalogue whether it was healthy, a slow catalogue would cause the\nimporter to be restarted, which repairs nothing.\n\n## 9. The night board\n\nThe night board is the page the on-call person opens. It shows three lights\nand two numbers, one for each question:\n\n- **Running:** green while the heartbeat stamp is younger than thirty minutes.\n- **Getting through:** green while the last-finished time is younger than an\n  hour, grey while the importer is paused.\n- **Records:** the counts of the four outcomes since midnight, and the share\n  of rejected records.\n- The age of the heartbeat stamp, in minutes.\n- The age of the last-finished time, in minutes.\n\nThe board reads the outcome log, not the job score (section 6.2).\n\nIt raises an alert in three cases: the running light turns red; the\ngetting-through light stays red for an hour while the switch is on; rejected\nrecords pass a quarter of the night's total.\n\n## 10. Reading the board\n\n| Running | Getting through | Records | Most likely |\n|---|---|---|---|\n| red | — | — | the importer is down or stuck; the restart rule acts |\n| green | grey | none | paused: check who paused it and when |\n| green | red | none | a feed refuses calls, or every fetch fails |\n| green | green | none | the publishers sent nothing tonight |\n| green | green | mostly rejected | a publisher changed its format |\n| green | green | mostly waiting | publishers are slow; nothing to do yet |\n| green | green | mostly stored | a normal night |\n\nTwo rows look alike at first: \"paused\" and \"a feed refuses calls\" both leave\nthe running light green and nothing in the records. The getting-through light\ntells them apart, grey for a pause and red for a refusing feed.\n\n## 11. One night, as the board saw it\n\nA night from last winter, reconstructed from the board and the outcome log.\n\n- **00:00 to 01:40.** All three lights green. Rounds every ten minutes, a few\n  hundred records stored, a handful waiting.\n- **01:40.** An operator pauses the importer to move the catalogue to a new\n  disk. Running stays green; getting through turns grey; no new outcomes.\n- **02:30.** The switch goes back on. The next round fetches the backlog of\n  fifty minutes and the last-finished time catches up.\n- **03:10.** One publisher's feed accepts the call and never answers. The\n  round stamped at 03:10 hangs in the fetch. No stamp at 03:20, 03:30, 03:40.\n- **03:41.** The heartbeat stamp is thirty-one minutes old. The restart rule\n  restarts the importer. The first round after the start stamps at 03:41,\n  times out on the silent feed after two minutes, and fetches the others.\n- **04:00.** Another publisher starts sending prices in a new format. Every\n  record from that publisher is rejected. Running and getting through are\n  green; the share of rejected records climbs past a quarter, and the board\n  raises an alert.\n- **04:20.** The on-call person sees the rejected records, all from one\n  publisher, and calls them. The importer itself needed nothing.\n\nThree alerts would have been one, or none, with a single \"healthy\" light: the\npause would have looked like a hang, the hang would have looked like a pause,\nand the format change would not have shown at all.\n\n## 12. Things this design does not catch\n\n- **A worker that writes a wrong record.** The outcome says stored; the\n  catalogue holds a mistake. Only a check of the content would see it.\n- **A feed that silently drops records.** If a publisher never announces a\n  record, no outcome is ever written for it.\n- **A full disk.** The heartbeat file cannot be updated; the restart rule sees\n  an old stamp and restarts the importer, which does not free the disk.\n- **A board that is itself down.** The lights cannot show their own absence.\n  The alert for a missing board comes from a different system.\n\nThese gaps are known. Each needs a signal of its own, and adding one would not\nmake the existing three answer more questions.\n\n## 13. Glossary\n\n- **Round:** one pass of the importer, every ten minutes.\n- **Heartbeat stamp:** when the latest round started.\n- **Last-finished time:** when the latest round reached its end.\n- **Outcome:** stored, waiting, rejected or failed; one per record.\n- **Job score:** the job system's own success or failure, about the job only.\n- **Pause switch:** an operator's way to stop fetching without stopping the\n  process.",
+   "sha256": "c64ac2e57739d1cdad2b11d533b1f805dc7fc7385bf832f2346137caf4e21ed4",
+   "language": "en"
+  }
+ ],
+ "whole": {
+  "name": "Night importer",
+  "does": "Imports publishers' records every ten minutes, and keeps three signals apart: running, getting through, and what happened to each record.",
+  "why": "Silence has several causes that look alike from outside. One signal per question is what tells a pause from a hang, and a hang from a bad feed.",
+  "cites": [
+   {
+    "source": "importer",
+    "from": 9,
+    "to": 45
+   },
+   {
+    "source": "importer",
+    "from": 247,
+    "to": 248
+   }
+  ]
+ },
+ "start": {
+  "part": "round",
+  "why": "Every signal is written by one step of the round: once you see the order, each signal says what it can and cannot know."
+ },
+ "parts": [
+  {
+   "id": "round",
+   "name": "The round",
+   "kind": "step",
+   "icon": "repeat",
+   "role": "Every ten minutes: stamp, read the switch, fetch, hand over, close.",
+   "points": [
+    {
+     "text": "The stamp comes before anything that could fail or wait.",
+     "mark": "step"
+    },
+    {
+     "text": "The last-finished time is written only when the round reaches its end.",
+     "mark": "keeps"
+    },
+    {
+     "text": "The fetch is the step that can hang: a feed may accept a call and never answer.",
+     "mark": "caveat"
+    }
+   ],
+   "metaphor": {
+    "text": "A night guard's patrol: clock in at the door, check the notice board, walk the floors, hand in the report.",
+    "limit": "A guard who gets stuck can call for help; a round stuck in a call cannot say anything at all."
+   },
+   "cites": [
+    {
+     "source": "importer",
+     "from": 47,
+     "to": 68
+    }
+   ],
+   "parts": [
+    {
+     "id": "round-stamp",
+     "name": "Wake and stamp",
+     "kind": "step",
+     "icon": "play",
+     "role": "The first thing a round does, before any step that can fail.",
+     "explain": "A round that later hangs has still left its stamp, so the stamp that never follows it is what gives the hang away.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 51,
+       "to": 52
+      },
+      {
+       "source": "importer",
+       "from": 62,
+       "to": 63
+      }
+     ]
+    },
+    {
+     "id": "round-switch",
+     "name": "Read the switch",
+     "kind": "step",
+     "icon": "filter",
+     "role": "Decides whether this round goes on or ends as paused.",
+     "explain": "When the switch is off, the round records that it is paused and stops before fetching anything.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 53,
+       "to": 54
+      }
+     ]
+    },
+    {
+     "id": "round-fetch",
+     "name": "Fetch",
+     "kind": "step",
+     "icon": "download",
+     "role": "Asks each feed for the records changed since the last round.",
+     "explain": "An error ends the round early and on time; a call that never returns keeps the round inside this step.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 55,
+       "to": 56
+      },
+      {
+       "source": "importer",
+       "from": 67,
+       "to": 68
+      }
+     ]
+    },
+    {
+     "id": "round-hand",
+     "name": "Hand over",
+     "kind": "step",
+     "icon": "send",
+     "role": "Gives each record to a worker and moves on.",
+     "explain": "The round does not wait for the workers, so how each record ends is written elsewhere, by the worker.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 57,
+       "to": 58
+      }
+     ]
+    },
+    {
+     "id": "round-close",
+     "name": "Close",
+     "kind": "step",
+     "icon": "flag",
+     "role": "Writes the last-finished time, then sleeps until the next round.",
+     "explain": "Being last, it moves only when the fetch and the hand-over really happened.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 59,
+       "to": 60
+      },
+      {
+       "source": "importer",
+       "from": 64,
+       "to": 65
+      }
+     ]
+    }
+   ],
+   "joints": [
+    {
+     "from": "round-stamp",
+     "to": "round-switch",
+     "type": "sends-to",
+     "label": "then"
+    },
+    {
+     "from": "round-switch",
+     "to": "round-fetch",
+     "type": "sends-to",
+     "label": "if switched on"
+    },
+    {
+     "from": "round-fetch",
+     "to": "round-hand",
+     "type": "sends-to",
+     "label": "new records"
+    },
+    {
+     "from": "round-hand",
+     "to": "round-close",
+     "type": "sends-to",
+     "label": "then"
+    }
+   ],
+   "excluded": [
+    {
+     "source": "importer",
+     "from": 47,
+     "to": 47,
+     "reason": "context",
+     "note": "The section heading."
+    },
+    {
+     "source": "importer",
+     "from": 49,
+     "to": 49,
+     "reason": "context",
+     "note": "The sentence that introduces the list of steps."
+    }
+   ]
+  },
+  {
+   "id": "heartbeat",
+   "name": "Heartbeat stamp",
+   "kind": "artifact",
+   "icon": "timer",
+   "role": "When the latest round started: it answers only whether the importer is running.",
+   "points": [
+    {
+     "text": "Written at the start of every round, paused or not, and nowhere else.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Thirty minutes old means three rounds did not start, or one has been stuck for half an hour.",
+     "mark": "step"
+    },
+    {
+     "text": "A round that fails every fetch still stamps on time: the stamp says nothing about success.",
+     "mark": "caveat"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 70,
+     "to": 85
+    }
+   ]
+  },
+  {
+   "id": "finished",
+   "name": "Last-finished time",
+   "kind": "artifact",
+   "icon": "flag",
+   "role": "When the latest round reached its end: it answers whether rounds get through.",
+   "points": [
+    {
+     "text": "A paused round and a round whose fetch fails both leave it where it was.",
+     "mark": "keeps"
+    },
+    {
+     "text": "A recent stamp next to an old last-finished time means running, but not getting through.",
+     "mark": "step"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 87,
+     "to": 100
+    }
+   ]
+  },
+  {
+   "id": "outcomes",
+   "name": "Outcome log",
+   "kind": "artifact",
+   "icon": "file-text",
+   "role": "One line per record: stored, waiting, rejected or failed.",
+   "points": [
+    {
+     "text": "Waiting and failed are tried again; rejected never is, because trying again would not help.",
+     "mark": "step"
+    },
+    {
+     "text": "Every line has the same shape, so one search returns a record's whole story.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Stored does not mean correct, and a record the feed never announced leaves no line at all.",
+     "mark": "caveat"
+    }
+   ],
+   "lens": {
+    "what": "The job system's own score: a job either succeeded or failed.",
+    "why": "It is about the job, not the record, so it gets both quiet failures and slow publishers wrong.",
+    "how": "A rejected record ends the job normally (a success); a waiting record asks for a retry (a failure).",
+    "critical": "\"The job succeeded\" and \"the record is in the catalogue\" are two different facts."
+   },
+   "cites": [
+    {
+     "source": "importer",
+     "from": 102,
+     "to": 134
+    },
+    {
+     "source": "importer",
+     "from": 238,
+     "to": 241
+    }
+   ]
+  },
+  {
+   "id": "pause",
+   "name": "Pause switch",
+   "kind": "component",
+   "icon": "settings",
+   "role": "Lets an operator stop the fetching without stopping the process.",
+   "points": [
+    {
+     "text": "A paused round still stamps the heartbeat, then records \"paused\" and sleeps.",
+     "mark": "step"
+    },
+    {
+     "text": "If a pause stopped the stamp, the restart rule would restart a deliberate pause again and again.",
+     "mark": "caveat"
+    },
+    {
+     "text": "The board shows the switch, so an old last-finished time reads next to \"paused since\".",
+     "mark": "keeps"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 136,
+     "to": 152
+    },
+    {
+     "source": "importer",
+     "from": 216,
+     "to": 219
+    }
+   ]
+  },
+  {
+   "id": "restart",
+   "name": "Restart rule",
+   "kind": "component",
+   "icon": "rotate-ccw",
+   "role": "Every minute it reads one thing, the stamp's age, and restarts the importer past thirty minutes.",
+   "points": [
+    {
+     "text": "It leaves a fresh start alone for five minutes, so a slow start is not taken for a hang.",
+     "mark": "keeps"
+    },
+    {
+     "text": "A restart fixes a round stuck in a call, and nothing else: not a refusing feed, not a bad record.",
+     "mark": "caveat"
+    },
+    {
+     "text": "It never asks the catalogue or the feeds, which would restart the importer for their slowness.",
+     "mark": "caveat"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 154,
+     "to": 173
+    },
+    {
+     "source": "importer",
+     "from": 220,
+     "to": 224
+    },
+    {
+     "source": "importer",
+     "from": 242,
+     "to": 243
+    }
+   ]
+  },
+  {
+   "id": "board",
+   "name": "Night board",
+   "kind": "component",
+   "icon": "gauge",
+   "role": "Three lights and two ages, one per question, and alerts when they disagree with a normal night.",
+   "points": [
+    {
+     "text": "It reads the outcome log, never the job score.",
+     "mark": "keeps"
+    },
+    {
+     "text": "Grey getting-through means paused; red means a feed refuses calls or every fetch fails.",
+     "mark": "step"
+    },
+    {
+     "text": "It cannot show its own absence: a missing board is reported by another system.",
+     "mark": "caveat"
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 175,
+     "to": 208
+    },
+    {
+     "source": "importer",
+     "from": 214,
+     "to": 215
+    },
+    {
+     "source": "importer",
+     "from": 225,
+     "to": 234
+    },
+    {
+     "source": "importer",
+     "from": 244,
+     "to": 245
+    }
+   ]
+  }
+ ],
+ "joints": [
+  {
+   "from": "round",
+   "to": "heartbeat",
+   "type": "sends-to",
+   "label": "stamped first",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 62,
+     "to": 63
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "finished",
+   "type": "sends-to",
+   "label": "written last",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 64,
+     "to": 65
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "outcomes",
+   "type": "sends-to",
+   "label": "one line per record",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 106,
+     "to": 107
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "pause",
+   "type": "depends-on",
+   "label": "read every round",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 138,
+     "to": 139
+    }
+   ]
+  },
+  {
+   "from": "heartbeat",
+   "to": "restart",
+   "type": "sends-to",
+   "label": "its age",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 156,
+     "to": 157
+    }
+   ]
+  },
+  {
+   "from": "heartbeat",
+   "to": "board",
+   "type": "sends-to",
+   "label": "running light",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 180,
+     "to": 180
+    }
+   ]
+  },
+  {
+   "from": "finished",
+   "to": "board",
+   "type": "sends-to",
+   "label": "getting through",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 181,
+     "to": 182
+    }
+   ]
+  },
+  {
+   "from": "outcomes",
+   "to": "board",
+   "type": "sends-to",
+   "label": "counts",
+   "cites": [
+    {
+     "source": "importer",
+     "from": 188,
+     "to": 188
+    }
+   ]
+  }
+ ],
+ "bom": {
+  "excluded": [
+   {
+    "source": "importer",
+    "from": 1,
+    "to": 7,
+    "reason": "context",
+    "note": "Header: purpose, audience, and the note that Larkspur is fictional."
+   },
+   {
+    "source": "importer",
+    "from": 210,
+    "to": 212,
+    "reason": "context",
+    "note": "Heading and introduction of the night's account; each hour is assigned to its part."
+   },
+   {
+    "source": "importer",
+    "from": 236,
+    "to": 236,
+    "reason": "context",
+    "note": "Heading of the known gaps; each gap is assigned to the part it concerns."
+   },
+   {
+    "source": "importer",
+    "from": 250,
+    "to": 258,
+    "reason": "repetition",
+    "note": "Glossary: every term is explained in its part."
+   }
+  ]
+ },
+ "runs": [
+  {
+   "type": "scenario",
+   "id": "hang",
+   "title": "A feed that never answers",
+   "setup": "It is 03:10. Rounds start every ten minutes and every light on the board is green.",
+   "vars": {
+    "stamp age": "0 min",
+    "last finished": "0 min",
+    "running light": "green"
+   },
+   "steps": [
+    {
+     "action": "The 03:10 round starts and begins to fetch",
+     "predict": {
+      "question": "What has the round written so far?",
+      "options": [
+       {
+        "text": "The heartbeat stamp, and nothing else yet",
+        "correct": true,
+        "why": "The stamp comes first; the last-finished time is written only at the end."
+       },
+       {
+        "text": "The stamp and the last-finished time",
+        "correct": false,
+        "why": "The last-finished time is the round's last step: it has not been reached."
+       },
+       {
+        "text": "Only the last-finished time of the round before",
+        "correct": false,
+        "why": "That time is from the previous round; this round has already stamped."
+       }
+      ]
+     },
+     "effect": {
+      "round": "active",
+      "heartbeat": "ok"
+     },
+     "flow": [
+      [
+       "round",
+       "heartbeat"
+      ]
+     ],
+     "explain": "Stamping first means that whatever happens next, this round has left a mark of when it began.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 51,
+       "to": 52
+      },
+      {
+       "source": "importer",
+       "from": 59,
+       "to": 60
+      }
+     ]
+    },
+    {
+     "action": "The feed accepts the call and never answers",
+     "predict": {
+      "question": "At 03:20, what happens to the stamp?",
+      "options": [
+       {
+        "text": "Nothing: the round is still inside the fetch",
+        "correct": true,
+        "why": "No new round starts while this one is stuck, so no one writes a new stamp."
+       },
+       {
+        "text": "A new round stamps it, as every ten minutes",
+        "correct": false,
+        "why": "Rounds follow one another; a stuck round keeps the next one from starting."
+       },
+       {
+        "text": "The round stamps it again while it waits",
+        "correct": false,
+        "why": "The stamp is written only at the start of a round, never anywhere else."
+       }
+      ]
+     },
+     "effect": {
+      "round": "failed"
+     },
+     "vars": {
+      "stamp age": "10 min",
+      "last finished": "10 min"
+     },
+     "explain": "The fetch is the step that can hang. While the round is stuck no new round starts, so the stamp only grows older.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 55,
+       "to": 56
+      },
+      {
+       "source": "importer",
+       "from": 220,
+       "to": 221
+      }
+     ]
+    },
+    {
+     "action": "At 03:41 the check reads a stamp 31 minutes old",
+     "predict": {
+      "question": "What does the restart rule do?",
+      "options": [
+       {
+        "text": "It restarts the importer",
+        "correct": true,
+        "why": "Older than three rounds: the rule restarts, and reads nothing else."
+       },
+       {
+        "text": "It waits for the last-finished time",
+        "correct": false,
+        "why": "The rule never reads the last-finished time, only the stamp's age."
+       },
+       {
+        "text": "It asks the feed whether it is healthy",
+        "correct": false,
+        "why": "The rule leaves the feeds and the catalogue out on purpose."
+       }
+      ]
+     },
+     "effect": {
+      "heartbeat": "failed",
+      "restart": "active"
+     },
+     "flow": [
+      [
+       "heartbeat",
+       "restart"
+      ]
+     ],
+     "vars": {
+      "stamp age": "31 min",
+      "running light": "red"
+     },
+     "explain": "A stamp past thirty minutes is the one problem a restart can fix: a round stuck in a call.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 159,
+       "to": 160
+      },
+      {
+       "source": "importer",
+       "from": 222,
+       "to": 223
+      }
+     ]
+    },
+    {
+     "action": "The restarted importer runs its first round",
+     "effect": {
+      "round": "restored",
+      "heartbeat": "ok",
+      "restart": "ok"
+     },
+     "vars": {
+      "stamp age": "0 min",
+      "running light": "green"
+     },
+     "explain": "The new round stamps at once, times out on the silent feed after two minutes, and fetches the others. The restart fixed the hang, not the feed.",
+     "cites": [
+      {
+       "source": "importer",
+       "from": 222,
+       "to": 224
+      },
+      {
+       "source": "importer",
+       "from": 165,
+       "to": 166
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "case",
+   "id": "grey-light",
+   "title": "A grey light at two in the morning",
+   "scenario": "At 02:00 the board shows running green, getting through grey, and no new records since 01:40.",
+   "question": "What is the most likely explanation?",
+   "options": [
+    {
+     "text": "Someone paused the importer",
+     "correct": true,
+     "why": "Grey is the getting-through light during a pause, while the heartbeat goes on."
+    },
+    {
+     "text": "A feed is refusing every call",
+     "correct": false,
+     "why": "A refusing feed turns getting through red, not grey."
+    },
+    {
+     "text": "The importer is stuck in a fetch",
+     "correct": false,
+     "why": "A stuck importer does not make the light grey; grey only means paused."
+    }
+   ],
+   "cites": [
+    {
+     "source": "importer",
+     "from": 181,
+     "to": 182
+    },
+    {
+     "source": "importer",
+     "from": 199,
+     "to": 200
+    }
+   ]
+  }
+ ],
+ "reassemble": {
+  "title": "Reassemble the importer",
+  "instruction": "Put each piece where it belongs: what repeats, what is written first and last, what each record leaves, what an operator controls, what restarts, and what the on-call person sees.",
+  "slots": [
+   {
+    "id": "s-round",
+    "label": "Every ten minutes",
+    "accepts": "round"
+   },
+   {
+    "id": "s-heartbeat",
+    "label": "Written first",
+    "accepts": "heartbeat"
+   },
+   {
+    "id": "s-finished",
+    "label": "Moves at the end",
+    "accepts": "finished"
+   },
+   {
+    "id": "s-outcomes",
+    "label": "One per record",
+    "accepts": "outcomes"
+   },
+   {
+    "id": "s-pause",
+    "label": "Set by an operator",
+    "accepts": "pause"
+   },
+   {
+    "id": "s-restart",
+    "label": "Reads one age",
+    "accepts": "restart"
+   },
+   {
+    "id": "s-board",
+    "label": "Opened by on-call",
+    "accepts": "board"
+   }
+  ],
+  "hints": {
+   "round": "It writes every other signal, one step at a time.",
+   "heartbeat": "It is written before anything can fail or wait.",
+   "finished": "It moves only when a round really gets to the end.",
+   "outcomes": "Four words, one per record, never the job's own score.",
+   "pause": "It stops the fetching, not the process, and not the stamp.",
+   "restart": "It can fix only one problem, so it looks at only one thing.",
+   "board": "Three lights, one per question."
+  }
+ }
+}

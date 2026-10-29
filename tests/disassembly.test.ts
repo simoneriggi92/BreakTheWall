@@ -18,7 +18,7 @@ describe('disassembly fixtures', () => {
     expect(await findings(fixture(path))).toEqual([]);
   });
   it('loads the prepared disassemblies through the boundary', async () => {
-    expect((await loadPreparedDisassemblies()).map(x => `${x.id}:${x.language}`)).toEqual(['atlas-release:it', 'mill-harm:it', 'atlas-release-en:en', 'mill-harm-en:en']);
+    expect((await loadPreparedDisassemblies()).map(x => `${x.id}:${x.language}`)).toEqual(['atlas-release:it', 'mill-harm:it', 'importer-signals:it', 'atlas-release-en:en', 'mill-harm-en:en', 'importer-signals-en:en']);
   });
   it.skipIf(!PRIVATE_FIXTURES.length).each(PRIVATE_FIXTURES)('local-only %s validates', async path => {
     expect(await findings(fixture(path))).toEqual([]);
@@ -33,6 +33,20 @@ describe('disassembly fixtures', () => {
     expect(pagesOf(d.sources[0], { from: 10, to: 14 })).toEqual({ first: 1, last: 2 });
     const repo = story(); repo.scope = { kind: 'repository', root: 'kessmouth', commit: 'a1b2c3d', modified: ['src/a.ts'] };
     expect(await findings(repo)).toEqual([]);
+  });
+  it('prepares a whole-source example in both languages (P-20261029-source-entry E8)', async () => {
+    const [it, en] = await Promise.all([PUBLIC_FIXTURES[5], PUBLIC_FIXTURES[6]].map(path => validateDisassembly(fixture(path))));
+    for (const d of [it, en]) {
+      expect(d.question).toBeUndefined();
+      expect(d.start?.part).toBe('round');
+      expect(d.parts.length).toBeGreaterThanOrEqual(3);
+      expect(d.parts.some(p => p.parts?.length)).toBe(true);
+      expect(d.runs.map(r => r.type).sort()).toEqual(['case', 'scenario']);
+      expect(JSON.stringify(d)).not.toContain('outside-question');
+      expect(billOfMaterials(d).counts.missing).toBe(0);
+    }
+    expect([it.family, it.language, en.family, en.language]).toEqual(['importer-signals', 'it', 'importer-signals', 'en']);
+    expect(it.sources).toEqual(en.sources);
   });
   it('takes the whole source apart without a question (P-20261029-source-entry E2)', async () => {
     const input = mill(); delete input.question;

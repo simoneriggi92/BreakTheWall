@@ -47,7 +47,10 @@ describe('two-phase generation contract (D9)', () => {
     // Slots follow the parts' order; the hand-made files sometimes list them differently.
     const slotSet = (x: Disassembly) => x.reassemble.slots.map(s => JSON.stringify([s.label, s.accepts])).sort();
     expect(slotSet(rebuilt)).toEqual(slotSet(d));
-    expect(rebuilt).toMatchObject({ kind: 'generated', revision: 'v1', language: d.language, question: d.question, generation: { provider: 'chatgpt', model: 'model-a' } });
+    expect(rebuilt).toMatchObject({ kind: 'generated', revision: 'v1', language: d.language, generation: { provider: 'chatgpt', model: 'model-a' } });
+    // A whole-source fixture has no question and a start; generation keeps both as they are.
+    expect(rebuilt.question).toBe(d.question);
+    expect(rebuilt.start).toEqual(d.start);
   });
 
   it('sends strict schemas: closed lists of sources, parts and sub-parts, and every field required', async () => {

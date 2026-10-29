@@ -3,9 +3,9 @@ id: P-20261029-source-entry
 title: Understand a source without a question - the question becomes an optional focus
 version: 1
 state: implementing
-current_task: E8
-last_evidence: Phase player (E7) verified - 434 tests; integration check on the built app, 16 combinations
-next_action: Owner confirms the commit of phase player, then "implement P-20261029-source-entry v1 --phase example"
+current_task: E10
+last_evidence: Phase example (E8-E9) verified - typecheck and build passed; 29 files, 454 tests passed
+next_action: Owner confirms the commit of phase example, then "implement P-20261029-source-entry v1 --phase verify"
 approval: approved
 ---
 
@@ -179,3 +179,15 @@ Version 1, approved:
   - Evidence (integration check on the built app, DevTools protocol, scratch data folder with a question-less Mill seeded as a generated disassembly; the script stays in the scratchpad): Atlas and the question-less Mill, at 1440×900 and 1280×800, paper and blueprint, English and Italian, 16 combinations. In all of them: the page does not scroll and the source pane is visible beside the overview; Atlas shows its question line and 14 sections, a section's title highlights line 35 onwards in view while the overview stays, and its plate number selects "Preparation and start" with its first citation and highlighted lines in view together; the question-less Mill has no question line, and "Start here" selects "Only to prevent harm to others" with its lines in view. Text sizes outside the drawing in the overview: 6, within U7's limit.
   - The third example (E8) is checked in E10.2; this phase had none to show.
 - **Phase `player` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 434 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed; `git diff --check` passed.
+- 2026-10-29: `implement P-20261029-source-entry v1 --phase example`.
+- **E8 verified (2026-10-29).**
+  - The source, `eval/cases/sources/night-importer.md` (258 lines, English, 13 sections, one with two subsections), is an original document written for this repository: the overnight importer of Larkspur, a fictional library network, and the three signals that tell its silent failures apart (a heartbeat stamp, a last-finished time and a per-record outcome log), with a pause switch, a restart rule that reads only the stamp, a night board, a table for reading it, one night told hour by hour, the known gaps and a glossary. It uses general ideas only. A scan of the new files for the private document's names and technical vocabulary (product, framework and service names, and words such as liveness, freshness, gauge, counter, cursor, polling, connector) found none.
+  - The disassembly, `src/fixtures/disassemblies/importer-signals.json` (Italian) and `importer-signals-en.json` (English), one family over the same source: no question; `start` on "The round", with its reason; 7 top-level parts (the round, heartbeat stamp, last-finished time, outcome log, pause switch, restart rule, night board) and 8 typed joints; the round is a sub-assembly of 5 steps with 4 joints and its own exclusions; a lens, a metaphor; a 4-step scenario (a feed that never answers, through the restart) and a case (a grey light at two in the morning); a reassembly of 7 slots. The bill of materials has 178 assigned lines, 17 excluded (header, glossary, two headings and one introduction, all as context or repetition) and none forgotten; no `outside-question` anywhere.
+  - Built from two scripts in the scratchpad that take every citation from the source's line numbers. The generation checks found one slot label, "Written last", that shares a word with its part's name ("Last-finished time"); it became "Moves at the end".
+  - `loadPreparedDisassemblies` lists it after Atlas and Mill in each language.
+  - Evidence (automated tests): both versions validate and pass the two-phase rebuild in whole-source mode (`start` required, no `outside-question` offered), with the question still absent and `start` unchanged after the rebuild (`tests/disassembly-generation.test.ts`; the rebuild check now compares `question` and `start` directly); a new test checks no question, `start`, a sub-assembly, a scenario and a case, no `outside-question`, no forgotten line, one family and the same source (`tests/disassembly.test.ts`); every section of the source has a part, the whole or an exclusion (`tests/section-coverage.test.ts`, which now covers it as a public fixture).
+- **E9 verified (2026-10-29).** The case schema already took the goal schema, so it accepts an empty question since E4. `eval/cases/night-importer.json` is a public case on E8's source with no question, in English.
+  - Evidence (automated tests, `tests/eval.test.ts`): the public set lists five cases; the new one has an empty question and the same source text as the prepared example; the others keep questions of at least 10 characters.
+  - The private case for the owner's document is not added: the plan leaves it to the owner, or to me on the owner's request. `git status` shows `.local/` ignored and nothing staged from it.
+  - Not run: no evaluation was run. The ChatGPT budget is counted per generation, so a fifth public case changes no limit; the runner refuses a run that would pass it.
+- **Phase `example` checks (2026-10-29).** `npx tsc --noEmit -p .local/tsconfig.check.json` passed; `npx vitest run` passed with 29 files and 454 tests; `npx vite build` and `node scripts/build-desktop.mjs` passed; `git diff --check` passed.
