@@ -4,6 +4,20 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0-alpha] - 2026-10-29
+
+A lighter player: the drawing, the explanation and its source on one screen.
+
+### Changed
+- **More room for the drawing:** one row of controls at the top; the drawing sits on the paper, with zoom over a view that fits it.
+- **Claim and source together:** with a part selected, its explanation and the lines it cites are on screen at once; a citation highlights its lines without hiding the explanation.
+- **Runs start with the question:** at the first step, the prediction and its options are in view without scrolling.
+- **One voice for text:** fewer text sizes, sentence case for labels, each name shown once.
+- The README demos are recorded on the new interface.
+
+### Known limits
+- A level laid out as one long row draws small in the drawing's column.
+
 ## [0.3.0-alpha] - 2026-10-28
 
 Break the Wall works with Claude: Claude writes the disassembly, and the app checks it and saves it.
@@ -68,7 +82,8 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.3.0-alpha...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.4.0-alpha...HEAD
+[0.4.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.4.0-alpha
 [0.3.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.3.0-alpha
 [0.2.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha
 [0.1.1-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha
