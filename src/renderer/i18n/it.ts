@@ -185,6 +185,7 @@ export const it = {
       drawing: 'Disegno del passaggio', drawingDetail: 'Dettaglio dell’esploso', showSource: 'Mostra nella fonte',
       noPart: 'Questo passaggio non è collegato a un pezzo nello smontaggio. La fonte resta leggibile.',
       excluded: 'Fuori dallo smontaggio',
+      resizeReading: 'Divisione tra passaggio e fonte', resizeDrawing: 'Divisione tra fonte e disegno',
     },
     workbench: { resizeReading: 'Altezza della spiegazione', inspector: 'Pezzo, attività e fonte', resizeInspector: 'Larghezza del pannello di lettura', drawingTools: 'Strumenti del disegno', fit: 'Adatta il disegno', zoomIn: 'Ingrandisci il disegno', zoomOut: 'Riduci il disegno', focusCanvas: 'Concentrati sul disegno', restorePanels: 'Mostra disegno e pannello di lettura' },
     modes: { explode: 'Esploso', run: 'Fai girare', reassemble: 'Rimonta', bom: 'Distinta base' }, modesLabel: 'Cosa fare con lo smontaggio',

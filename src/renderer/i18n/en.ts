@@ -186,6 +186,7 @@ export const en: Messages = {
       drawing: 'Passage drawing', drawingDetail: 'Exploded-view detail', showSource: 'Show in source',
       noPart: 'This passage is not linked to a part in the disassembly. The source remains readable.',
       excluded: 'Outside the disassembly',
+      resizeReading: 'Passage and source split', resizeDrawing: 'Source and drawing split',
     },
     workbench: { resizeReading: 'Height of the explanation', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel' },
     modes: { explode: 'Exploded view', run: 'Run', reassemble: 'Reassemble', bom: 'Bill of materials' }, modesLabel: 'What to do with the disassembly',

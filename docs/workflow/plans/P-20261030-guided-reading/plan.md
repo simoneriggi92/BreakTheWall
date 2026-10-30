@@ -4,7 +4,7 @@ title: A finite source-ordered reading view inside the existing player
 version: 1
 state: completed
 current_task: none
-last_evidence: TypeScript and 407 tests pass; production build passes; Atlas and Mill inspected in browser, both themes and 390-1280 px layouts
+last_evidence: TypeScript and 408 tests pass; production build passes; source pane drag resizing, expansion and restoration verified at desktop and mobile widths
 next_action: Owner tests codex/guided-source-reading locally; generation and learning-effectiveness work remain separate
 approval: approved
 ---

@@ -22,6 +22,28 @@ const mount = (d: Awaited<ReturnType<typeof validateDisassembly>>, bridge: Deskt
   render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
 
 describe('guided source reading in the player', () => {
+  it('resizes both splits, remembers their sizes, and expands and restores the original source', async () => {
+    localStorage.removeItem('btw:panes:v1');
+    const d = await validateDisassembly(atlas()), saved = store(), user = userEvent.setup();
+    const view = mount(d, saved.bridge);
+    const height = await screen.findByRole('separator', { name: 'Divisione tra passaggio e fonte' });
+    height.focus(); await user.keyboard('{ArrowUp}');
+    expect(height).toHaveAttribute('aria-valuenow', '50');
+    const width = screen.getByRole('separator', { name: 'Divisione tra fonte e disegno' });
+    width.focus(); await user.keyboard('{ArrowLeft}');
+    expect(width).toHaveAttribute('aria-valuenow', '39');
+    await user.click(screen.getByRole('button', { name: 'Allarga la fonte a tutta l’area' }));
+    expect(document.querySelector('.guided-passage')).not.toBeVisible();
+    expect(document.querySelector('.guided-context')).not.toBeVisible();
+    expect(screen.queryByRole('separator')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Ripristina disegno e fonte' }));
+    expect(document.querySelector('.guided-passage')).toBeVisible();
+    await waitFor(() => expect(saved.state().reading?.view).toBe('guided'));
+    view.unmount(); mount(d, saved.bridge);
+    expect(await screen.findByRole('separator', { name: 'Divisione tra passaggio e fonte' })).toHaveAttribute('aria-valuenow', '50');
+    expect(screen.getByRole('separator', { name: 'Divisione tra fonte e disegno' })).toHaveAttribute('aria-valuenow', '39');
+    localStorage.removeItem('btw:panes:v1');
+  });
   it('opens a new source in reading order; jumps and back/forward keep the highlighted original source', async () => {
     const d = await validateDisassembly(atlas()), saved = store(), user = userEvent.setup();
     mount(d, saved.bridge);

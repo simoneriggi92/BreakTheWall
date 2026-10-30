@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Layers, Link2 } from 'lucide-react';
 import type { Cite, Disassembly, Joint, Part } from '../../core/disassembly';
 import { layoutLevel, readingNumbers, type LevelLayout } from '../../core/layout';
@@ -9,6 +9,7 @@ import { Points } from './PartCard';
 import { PartIcon, Sheet } from './Sheet';
 import { SourceDocument } from './SourceDocument';
 import { SourcePane, type SourceView } from './SourcePane';
+import { Splitter, usePaneSizes } from './SplitPane';
 
 /** A second navigation of the same sources and parts, not another decomposition or learning loop. */
 export function GuidedReading({ d, position, onPosition, onExplore }: {
@@ -23,6 +24,10 @@ export function GuidedReading({ d, position, onPosition, onExplore }: {
   const [focus, setFocus] = useState<Cite>(passage);
   const [views, setViews] = useState<Record<string, SourceView>>({});
   const [wide, setWide] = useState(false);
+  const panes = usePaneSizes();
+  const workspace = useRef<HTMLDivElement>(null);
+  const center = useRef<HTMLDivElement>(null);
+  const cited = useMemo(() => [passage], [passage]);
   const navigation = useRef<HTMLOListElement>(null);
   const article = useRef<HTMLElement>(null);
   const proof = useRef<HTMLDivElement>(null);
@@ -54,7 +59,8 @@ export function GuidedReading({ d, position, onPosition, onExplore }: {
     const next = route.findIndex(p => part?.cites.some(c => c.source === p.source && c.from <= p.to && c.to >= p.from));
     if (next >= 0) go(next);
   };
-  return <div className={`guided-reading${wide ? ' guided-source-wide' : ''}`}>
+  return <div ref={workspace} className={`guided-reading${wide ? ' guided-source-wide' : ''}`}
+    style={{ '--guided-reading': panes.sizes.reading, '--guided-drawing': panes.sizes.source } as CSSProperties}>
     <nav className="guided-navigation" aria-label={x.contents}>
       <h2>{x.contents}</h2>
       <ol ref={navigation}>
@@ -67,7 +73,7 @@ export function GuidedReading({ d, position, onPosition, onExplore }: {
         </li>)}
       </ol>
     </nav>
-    <div className="guided-center">
+    <div className="guided-center" ref={center}>
       <article ref={article} className="guided-passage" tabIndex={-1} aria-label={x.passage(index + 1)} hidden={wide} lang={isProse(source) ? source.language : undefined}>
         {isProse(source) ? <SourceDocument key={`${passage.source}:${passage.from}`} source={source} passage={passage} cited={[]}/>
           : <pre className="guided-code">{source.text.split('\n').slice(passage.from - 1, passage.to).join('\n')}</pre>}
@@ -75,12 +81,18 @@ export function GuidedReading({ d, position, onPosition, onExplore }: {
           <button className="cite" onClick={() => locate(c)}>{t.d.lines(c.from, c.to)}</button> {t.d.reasons[c.reason]}{c.note && <> · {c.note}</>}
         </li>)}</ul></details>}
       </article>
+      {!wide && <Splitter pane="reading" orientation="horizontal" grows="ArrowDown" value={panes.sizes.reading} label={x.resizeReading}
+        onChange={v => panes.set('reading', v)} onReset={() => panes.reset('reading')}
+        fromPointer={(_x, y) => { const r = center.current?.getBoundingClientRect(); return r?.height ? (y - r.top) / r.height : undefined; }}/>}
       <div className="guided-proof" ref={proof} tabIndex={-1}>
-        <SourcePane d={d} sourceId={focus.source} onSource={id => go(route.findIndex(p => p.source === id))} focus={focus} cited={[passage]}
+        <SourcePane d={d} sourceId={focus.source} onSource={id => go(route.findIndex(p => p.source === id))} focus={focus} cited={cited}
           wide={wide} onWide={() => setWide(v => !v)} view={views[focus.source] ?? 'lines'}
           onView={view => setViews(v => ({ ...v, [focus.source]: view }))}/>
       </div>
     </div>
+    {panes.wide && !wide && <Splitter pane="source" orientation="vertical" grows="ArrowLeft" value={panes.sizes.source} label={x.resizeDrawing}
+      onChange={v => panes.set('source', v)} onReset={() => panes.reset('source')}
+      fromPointer={x => { const r = workspace.current?.getBoundingClientRect(); return r?.width ? (r.right - x) / r.width : undefined; }}/>}
     <aside className="guided-context" hidden={wide} aria-label={x.drawing}>
       <div className="guided-drafting">
         {context.root ? <>

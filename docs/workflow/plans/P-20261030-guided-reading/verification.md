@@ -27,6 +27,12 @@ Screenshots remain local and are not repository assets. No private source was us
 
 ## Limits
 
+### Owner-requested pane correction
+
+The guided source now reuses the existing keyboard/pointer splitters and device-local pane sizes. Its height is adjustable above the source; the vertical divider adjusts its width against the drawing. Explicit hidden rules fix the source expansion button being overridden by flex/grid display rules. Expanded source hides the passage and drawing and restores both without losing the location.
+
+Follow-up verification: TypeScript and all 408 tests pass, including a regression for keyboard resize, remembered dimensions and expand/restore. Actual browser pointer drags at 1280×800 increased source height from 296 to 386 px and width from 594 to 670 px; full expansion reached 1029 px, then restored the prior size. At 390 px the horizontal divider remains usable and document width stays at 390 px. The same production build command was rerun successfully.
+
 The central passage is original source, not a generated lesson. Passage boundaries follow original blocks and headings; they do not prove semantic or pedagogical completeness. Oversized indivisible blocks and code files can remain long. Drawing details use existing citations and relations as context, not a claim that every displayed relation is asserted in the currently highlighted interval.
 
 New sessions start in reading; old progress keeps the overview until the learner chooses Reading. Navigation position is persisted, not a completion score or per-pixel scroll position.
