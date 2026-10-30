@@ -178,6 +178,14 @@ export const it = {
     trace: 'Una traccia per confrontarti', notAGrade: 'Non è un voto. Confronta le relazioni che hai spiegato e quelle che mancano.', backToPrinciple: 'Ritorna al principio nella fonte',
   },
   d: {
+    guided: {
+      reading: 'Lettura', overview: 'Insieme', openOverview: 'Apri nell’insieme', views: 'Come esplorare la fonte', contents: 'Contenuti',
+      passage: (n: number) => `Passaggio ${n}`, position: (n: number, total: number) => `Passaggio ${n} di ${total}`,
+      back: 'Indietro', next: 'Continua', end: 'Guarda l’insieme', returnReading: 'Torna alla lettura',
+      drawing: 'Disegno del passaggio', drawingDetail: 'Dettaglio dell’esploso', showSource: 'Mostra nella fonte',
+      noPart: 'Questo passaggio non è collegato a un pezzo nello smontaggio. La fonte resta leggibile.',
+      excluded: 'Fuori dallo smontaggio',
+    },
     workbench: { resizeReading: 'Altezza della spiegazione', inspector: 'Pezzo, attività e fonte', resizeInspector: 'Larghezza del pannello di lettura', drawingTools: 'Strumenti del disegno', fit: 'Adatta il disegno', zoomIn: 'Ingrandisci il disegno', zoomOut: 'Riduci il disegno', focusCanvas: 'Concentrati sul disegno', restorePanels: 'Mostra disegno e pannello di lettura' },
     modes: { explode: 'Esploso', run: 'Fai girare', reassemble: 'Rimonta', bom: 'Distinta base' }, modesLabel: 'Cosa fare con lo smontaggio',
     kinds: { step: 'passo', component: 'componente', artifact: 'artefatto', premise: 'premessa', conclusion: 'tesi', ground: 'fondamento', limit: 'limite', objection: 'obiezione', consequence: 'conseguenza', rejected: 'scartato', event: 'evento', actor: 'attore' },

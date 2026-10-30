@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { ArrowUp, ChevronRight, Layers, ListChecks, Maximize2, Minimize2, Play, Puzzle, Scan, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowUp, BookOpen, ChevronRight, Layers, ListChecks, Maximize2, Minimize2, Play, Puzzle, Scan, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { DesktopBridge, ProgressResult } from '../../core/bridge';
 import type { Cite, Disassembly, Part } from '../../core/disassembly';
 import {
   answerCase, checkReassembly, clearReassembly, execute, initialDisassemblyState, openLevel, openPath, place, predict, removeBrick, restartRun,
-  restoreDisassemblyState, scenarioView, selectPart, type DisassemblyState, type RestoredDisassemblyState,
+  restoreDisassemblyState, scenarioView, selectPart, locateReading, type DisassemblyState, type RestoredDisassemblyState,
 } from '../../core/disassembly-state';
 import { layoutDisassembly, readingNumbers } from '../../core/layout';
 import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
@@ -19,6 +19,7 @@ import { SourcePane, type SourceView } from './SourcePane';
 import { ReadingColumn } from './ReadingColumn';
 import { Splitter, usePaneSizes } from './SplitPane';
 import { workbenchLayout } from './workbench-layout';
+import { GuidedReading } from './GuidedReading';
 
 type Mode = 'explode' | 'run' | 'reassemble' | 'bom';
 const MODES: Mode[] = ['explode', 'run', 'reassemble', 'bom'];
@@ -74,7 +75,9 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
     void bridge.loadProgress({ disassemblyId: d.id, revision: d.revision }).then(result => {
       if (!active) return;
       const restored = restoreDisassemblyState(d, result.state);
-      setState(restored.state); setNotice(result.noticeCode ? result : restored.notice ? restored : undefined); setLoaded(true);
+      // New sources open in reading order; existing progress keeps its former overview until the learner chooses.
+      setState(result.state == null ? locateReading(d, restored.state, { source: d.sources[0].id, from: 1, view: 'guided' }) : restored.state);
+      setNotice(result.noticeCode ? result : restored.notice ? restored : undefined); setLoaded(true);
     }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
   }, [bridge, d]);
@@ -180,6 +183,16 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
     : d.generation ? `${t.d.tagGenerated} · ${originText(t, d.generation)}` : t.d.tag;
   // Content never changes language by itself; when a version in the interface language exists, the player offers it.
   const other = d.language !== language ? versions.find(v => v.language === language) : undefined;
+  const guided = mode === 'explode' && state.reading?.view === 'guided';
+  const readingView = (view: 'guided' | 'overview') => setState(s => locateReading(d, s,
+    { source: s.reading?.source ?? sourceId, from: s.reading?.from ?? (focus?.source === sourceId ? focus.from : 1), view }));
+  const exploreFromReading = (id?: string) => {
+    setState(s => {
+      const next = locateReading(d, s, { source: s.reading?.source ?? d.sources[0].id, from: s.reading?.from ?? 1, view: 'overview' });
+      return id ? selectPart(d, openPath(d, next, []), id) : next;
+    });
+    if (id) { const cite = d.parts.find(p => p.id === id)?.cites[0]; if (cite) locateCite(cite); }
+  };
 
   const sourcePane = <SourcePane d={d} sourceId={sourceId} onSource={setSourceId} focus={focus}
     cited={mode === 'explode' && part ? part.cites : []} active={mode !== 'run' || runSource}
@@ -223,12 +236,17 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
       })}</div>}
       <span className={`save-status micro save-${saveStatus}`} role="status">{save}</span><PreferencesMenu/></header>
     {!loaded ? <main id="main" className="loading"><p role="status">{loadFailed ? t.player.loadFailed : t.player.resuming}</p><button onClick={goHome}>{t.player.backToLibrary}</button></main> :
-      <main id="main" className={`disassembly study-workbench mode-${mode}`}>
-        <p className="question workbench-question" lang={d.language} title={d.question}>{d.question}</p>
+      <main id="main" className={`disassembly study-workbench mode-${mode}${guided ? ' guided-view' : ''}`}>
+        {mode === 'explode' && <div className="reading-view-bar">{guided && d.generation && <span className="micro plain guided-origin">{origin}</span>}<div className="reading-view-options" role="group" aria-label={t.d.guided.views}>
+          <button aria-pressed={guided} onClick={() => readingView('guided')}><BookOpen size={15}/>{t.d.guided.reading}</button>
+          <button aria-pressed={!guided} onClick={() => readingView('overview')}><Layers size={15}/>{t.d.guided.overview}</button>
+        </div></div>}
+        {!guided && <p className="question workbench-question" lang={d.language} title={d.question}>{d.question}</p>}
         {other && openVersion && <div className="notice version-notice" role="status"><span>{t.d.otherVersion(t.languageNames[other.language])}</span><button onClick={() => openVersion(other.id)}>{t.d.openVersion}</button></div>}
         {notice && <div className="notice" role="status">{restoreText(t, notice, 'disassembly')}<button aria-label={t.common.closeNotice} onClick={() => setNotice(undefined)}><X size={15}/></button></div>}
         {saveStatus === 'failed' && <div className="error-banner" role="alert">{t.player.unsaved} <button onClick={() => setRetry(x => x + 1)}>{t.player.retrySave}</button></div>}
-        {mode === 'reassemble'
+        {guided ? <GuidedReading d={d} position={state.reading} onPosition={p => setState(s => locateReading(d, s, p))} onExplore={exploreFromReading}/>
+          : mode === 'reassemble'
           ? <Reassemble d={d} layout={rootLayout} state={state} feedback={feedback} workbench
               place={(slot, p) => { setFeedback(undefined); setState(s => place(d, s, slot, p)); }}
               check={() => { const result = checkReassembly(d, state); setState(result.state); setFeedback({ wrong: result.wrong, complete: result.complete }); }}

@@ -179,6 +179,14 @@ export const en: Messages = {
     trace: 'An outline to compare with', notAGrade: 'This is not a grade. Compare the relations you explained with the ones that are missing.', backToPrinciple: 'Go back to the principle in the source',
   },
   d: {
+    guided: {
+      reading: 'Reading', overview: 'Overview', openOverview: 'Open overview', views: 'How to explore the source', contents: 'Contents',
+      passage: (n: number) => `Passage ${n}`, position: (n: number, total: number) => `Passage ${n} of ${total}`,
+      back: 'Back', next: 'Continue', end: 'See the whole', returnReading: 'Back to reading',
+      drawing: 'Passage drawing', drawingDetail: 'Exploded-view detail', showSource: 'Show in source',
+      noPart: 'This passage is not linked to a part in the disassembly. The source remains readable.',
+      excluded: 'Outside the disassembly',
+    },
     workbench: { resizeReading: 'Height of the explanation', inspector: 'Part, activity and source', resizeInspector: 'Width of the reading panel', drawingTools: 'Drawing tools', fit: 'Fit drawing', zoomIn: 'Enlarge the drawing', zoomOut: 'Reduce the drawing', focusCanvas: 'Focus on the drawing', restorePanels: 'Show drawing and reading panel' },
     modes: { explode: 'Exploded view', run: 'Run', reassemble: 'Reassemble', bom: 'Bill of materials' }, modesLabel: 'What to do with the disassembly',
     kinds: { step: 'step', component: 'component', artifact: 'artifact', premise: 'premise', conclusion: 'claim', ground: 'ground', limit: 'limit', objection: 'objection', consequence: 'consequence', rejected: 'set aside', event: 'event', actor: 'actor' },

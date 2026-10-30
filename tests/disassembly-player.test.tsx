@@ -29,6 +29,7 @@ function memoryBridge(locale = 'it-IT') {
 async function play(d: Disassembly, bridge = memoryBridge().bridge) {
   const view = render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
   await screen.findByRole('group', { name: /Cosa fare con lo smontaggio|What to do/ });
+  await userEvent.click(screen.getByRole('button', { name: /^(Insieme|Overview)$/ }));
   return view;
 }
 const user = () => userEvent.setup();
@@ -359,6 +360,7 @@ describe('content language and interface language', () => {
     await user().click(screen.getByRole('checkbox', { name: /Also show the examples in Italian/ }));
     await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
     await screen.findByRole('button', { name: 'Exploded view' });
+    await user().click(screen.getByRole('button', { name: 'Overview' }));
     expect(screen.getByText(it.question)).toHaveAttribute('lang', 'it');
     expect(document.documentElement.lang).toBe('en');
     await user().click(plate(/^4\. deploy-staging · step/));
@@ -372,6 +374,7 @@ describe('content language and interface language', () => {
     await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
     expect(await screen.findByText(/This disassembly also exists in English/)).toBeInTheDocument();
     await user().click(screen.getByRole('button', { name: 'Open that version' }));
+    await user().click(await screen.findByRole('button', { name: 'Overview' }));
     expect(await screen.findByText('How do you release a new version of the web client to staging, and how do you go back if something goes wrong?')).toBeInTheDocument();
     expect(screen.queryByText(/also exists in/)).not.toBeInTheDocument();
   });
@@ -433,6 +436,7 @@ describe('taking a part apart on demand (D14)', () => {
     render(<App bridge={bridge} prepared={[]} disassemblies={[]}/>);
     await user().click(await screen.findByRole('button', { name: (name: string) => name.includes(d.title) }));
     await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
+    await user().click(screen.getByRole('button', { name: 'Insieme' }));
     await user().click(plate(new RegExp(`^\\d+\\. ${small.name} · `)));
     expect(side().getByText(new RegExp(`Questo pezzo non si smonta oltre: cita ${linesOf(d, small.cites).size} righe, ne servono almeno 6`))).toBeInTheDocument();
     await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
