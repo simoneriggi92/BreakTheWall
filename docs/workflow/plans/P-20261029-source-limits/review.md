@@ -13,3 +13,17 @@ Date: 2026-10-29. Reviewer: Claude (self-review against the research and the cod
 | 7 | One plan implements at a time. | Resolved: the precondition waits for P-20261029-source-entry to complete. |
 
 No open findings. The plan can go to the owner for approval.
+
+## Version 2
+
+Date: 2026-10-30. Reviewer: Claude (self-review of the change in preconditions, against `feature/source-entry` at `7f05151`).
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | Version 1 starts from `main`, but this plan and the code it changes (`server.ts`, `assistant.ts`) exist only on `feature/source-entry`. A branch from `main` would miss both. | Resolved: version 2 starts from `feature/source-entry`. |
+| 2 | Two plans cannot be active at once, and P-20261029-source-entry is still `implementing`. | Resolved: that plan moves to `blocked` with its reason recorded; it resumes for E10.3 and E10.4 after this one. |
+| 3 | A pull request stacked on #36 merges in the wrong order if it is merged first. | Resolved: its base is `feature/source-entry`; #36 merges first, and the stacked request is retargeted to `main`. |
+| 4 | E10.4 and S4.4 both ask for the owner's document. | Resolved: one trial with an empty question serves both, recorded in each plan. |
+| 5 | The tasks are unchanged, but the approval of version 1 named a starting point that no longer holds. | Resolved: version 2 needs its own approval; the version 1 record stays as history. |
+
+No open findings.

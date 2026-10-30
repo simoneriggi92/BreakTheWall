@@ -12,7 +12,8 @@ const refs = z.array(id).min(1).max(12);
 export const sourceOriginSchema = z.enum(['original-prepared', 'user-pasted', 'user-file']);
 export const sourceSchema = z.strictObject({
   id, title: short, origin: sourceOriginSchema, revision: id,
-  text: z.string().min(1).max(100_000), sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  // A stored source holds as much as an import allows (SOURCE_LIMITS.maxTotalChars in source.ts, which imports this file).
+  text: z.string().min(1).max(120_000), sha256: z.string().regex(/^[a-f0-9]{64}$/),
   language: z.string().max(30).optional(),
 });
 export const evidenceSchema = z.strictObject({ id, sourceId: id, startLine: z.number().int().positive(), endLine: z.number().int().positive(), quote: z.string().min(1).max(20_000), highlights: z.array(z.number().int().positive()).max(100) });

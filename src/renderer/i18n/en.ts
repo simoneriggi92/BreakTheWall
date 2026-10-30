@@ -292,6 +292,7 @@ export const en: Messages = {
     'local-stopped': 'The local server stopped answering. No disassembly was saved.',
     'local-no-template': 'The llama.cpp server does not expose its chat template.',
     'local-unreadable': 'The local server sent unreadable data. No disassembly was saved.',
+    'local-window': 'These sources are too long for a local model: the request does not fit the context the app can ask of Ollama. Use ChatGPT or your Claude assistant, or use fewer sources.',
     'sign-in-busy': 'A sign-in is already in progress in the browser.',
     'sign-in-denied': 'Sign-in was not authorized in the browser. No credentials were saved.',
     'sign-in-other-app': 'The browser returned a different app registration. Sign-in stopped.',

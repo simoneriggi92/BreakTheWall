@@ -135,7 +135,7 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     const server = createBreakTheWallServer({ address: 'unused', launch: async () => false }, '0.3.0');
     expect(textOf(await call(server, 'submit_structure', { json: '{}' }))).toBe('No disassembly is in progress: call start_disassembly first.');
     expect(textOf(await call(server, 'start_disassembly', { text: 'one line', question: 'Why?' }))).toContain('10 to 400 characters');
-    expect(textOf(await call(server, 'start_disassembly', { text: 'x'.repeat(40_001), question: 'What does this text say?' }))).toContain('at most 40000');
+    expect(textOf(await call(server, 'start_disassembly', { text: 'x'.repeat(120_001), question: 'What does this text say?' }))).toContain('at most 120000');
     expect((await call(server, 'start_disassembly', { text: 'a\nb', question: 'What does this text say?' })).result.isError).toBeUndefined();
     expect(textOf(await call(server, 'submit_runs', { json: '{}' }))).toBe('That step is not the current one. Next: submit_structure.');
     // The real session: Mill, from the start again.

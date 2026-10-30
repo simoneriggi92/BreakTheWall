@@ -104,7 +104,7 @@ describe('the open_in_break_the_wall tool against the app\'s entry point (M3)', 
   it('words the app\'s refusals and a malformed call for the model', async () => {
     const at = address(); await app(at);
     const server = createBreakTheWallServer({ address: at, launch: async () => false }, '0.3.0');
-    expect(await call(server, { text: 'x'.repeat(40_001) })).toMatchObject({ result: { isError: true, content: [{ text: 'Break the Wall refused the text: it has 40,001 characters, and a source may have at most 40,000. Send only the part the user wants to understand.' }] } });
+    expect(await call(server, { text: 'x'.repeat(120_001) })).toMatchObject({ result: { isError: true, content: [{ text: 'Break the Wall refused the text: it has 120,001 characters, and a source may have at most 120,000. Send only the part the user wants to understand.' }] } });
     expect(await call(server, { title: 'no text' })).toMatchObject({ result: { isError: true, content: [{ text: expect.stringContaining('needs "text"') }] } });
     expect(refusalText({ ok: false, code: 'line-too-long', message: '', params: { line: 12, limit: 4000 } })).toBe('Break the Wall refused the text: line 12 is longer than 4,000 characters. Break long lines before sending it.');
   });

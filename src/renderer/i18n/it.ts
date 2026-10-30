@@ -291,6 +291,7 @@ export const it = {
     'local-stopped': 'Il server locale ha smesso di rispondere. Nessuno smontaggio è stato salvato.',
     'local-no-template': 'Il server llama.cpp non espone il template della chat.',
     'local-unreadable': 'Il server locale ha inviato dati illeggibili. Nessuno smontaggio è stato salvato.',
+    'local-window': 'Queste fonti sono troppo lunghe per un modello locale: la richiesta non entra nel contesto che l’app può chiedere a Ollama. Usa ChatGPT o il tuo assistente Claude, oppure riduci le fonti.',
     'sign-in-busy': 'C’è già un accesso in corso nel browser.',
     'sign-in-denied': 'Accesso non autorizzato nel browser. Nessuna credenziale è stata salvata.',
     'sign-in-other-app': 'Il browser ha restituito un’altra registrazione dell’app. Accesso interrotto.',

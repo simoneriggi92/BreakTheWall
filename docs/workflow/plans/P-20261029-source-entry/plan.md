@@ -2,10 +2,10 @@
 id: P-20261029-source-entry
 title: Understand a source without a question - the question becomes an optional focus
 version: 1
-state: implementing
+state: blocked
 current_task: E10
-last_evidence: E10.1 local checks and E10.2 integration check (32 combinations) passed; CI, a generation without a question (E10.3) and the owner trial (E10.4) pending
-next_action: Owner confirms push and pull request for CI, chooses the route for one generation without a question (E10.3), and tries their own document (E10.4)
+last_evidence: E10.1 local checks and E10.2 integration check (32 combinations) passed; E1-E9 implemented on feature/source-entry (pull request #36); a generation without a question (E10.3) and the owner trial (E10.4) pending
+next_action: Paused by the owner while P-20261029-source-limits v2 implements on top of this branch; then E10.3 on a route the owner chooses and E10.4 with the owner's document as one source
 approval: approved
 ---
 
@@ -203,3 +203,7 @@ Version 1, approved:
   3. **One generation without a question** on a public source: not run. It spends a route the owner chooses (a local model, ChatGPT or the MCP assistant).
   4. **The owner's document**: pending, on the owner's device.
 - **A wrong message found during E10.4 (2026-10-29), fixed on the owner's request.** The owner's document has 49,357 characters, over the 40,000 per source (`SOURCE_LIMITS.maxCharsPerSource`). The import refused it correctly, but the app said it weighed "0 kB" against a limit of "40.000 kB": the main process adds the file's name to every import error, and the "too-large" wording chose the file-size sentence whenever a name was present. It now chooses by the measure (kilobytes or characters), and names the file in the characters sentence too. Evidence (automated test, `tests/i18n.test.tsx`): both languages, a named file over the character limit, a file over the size limit, and a pasted text. The limit itself is unchanged: raising it changes the size of every request and is outside this plan. The owner can load the document as two sources, split at its section 11 (about 32,300 and 17,000 characters; 49,357 in all, within the 60,000 total).
+
+## State changes
+
+- 2026-10-30: `implementing` → `blocked`. Every task is implemented (E1–E9) and E10.1–E10.2 are recorded; E10.3 and E10.4 are not run. The owner chose to raise the source limits first ("v2 sopra source-entry"): P-20261029-source-limits v2 implements on a branch that starts from this one, while this plan waits, so only one plan is active. It returns to `implementing` for E10.3 and E10.4, and E10.4 can then take the owner's document whole. Pull request #36 merges first, the source-limits pull request after it.
