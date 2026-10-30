@@ -7,7 +7,7 @@ import { billOfMaterials, DisassemblyError, type Disassembly, type Part } from '
 import { readFileSync } from 'node:fs';
 import {
   acceptContent, acceptExpansion, acceptRuns, acceptStructure, acceptSuggestions, answerLengthRatio, applyShortened, givesAway, assembleDisassembly, buildContentInput, buildRunsInput,
-  buildStructureInput, buildSuggestionInput, compose, contentJsonSchema, defaultContentLanguage, LEAD_LIMIT, longTexts, restates, runsJsonSchema, structureJsonSchema,
+  buildStructureInput, buildSuggestionInput, compose, contentJsonSchema, defaultContentLanguage, formatSourceBlock, LEAD_LIMIT, longTexts, restates, runsJsonSchema, structureJsonSchema,
   type GenerationMeta,
 } from '../src/core/disassembly-generation';
 import { failure, ProviderError, type GenerationProgress } from '../src/core/provider';
@@ -90,6 +90,16 @@ describe('two-phase generation contract (D9)', () => {
     expect(listed(buildContentInput(sources, goal, language, drafts.structure, 0))).toEqual(order);
     expect(listed(buildRunsInput(sources, goal, language, drafts.structure, drafts.contents))).toEqual(order);
     expect(buildRunsInput(sources, goal, language, drafts.structure, drafts.contents)).toMatch(/^ {4}5\.1\. bounds-maturity /m);
+  });
+
+  it('sends the numbered sources with the app\'s runs request, and names them for an assistant that has them (P-20261029-source-limits S3)', async () => {
+    const { sources, goal, language, drafts } = await setupFor(mill());
+    const own = buildRunsInput(sources, goal, language, drafts.structure, drafts.contents);
+    const assistant = buildRunsInput(sources, goal, language, drafts.structure, drafts.contents, true);
+    expect(own).toContain(formatSourceBlock(sources[0]));
+    expect(assistant).not.toMatch(/^ *\d+\| /m);
+    expect(assistant).toContain(`  ${sources[0].id} «${sources[0].title}», ${sources[0].text.split('\n').length} lines`);
+    expect(assistant.split('SOURCES')[0]).toBe(own.split('SOURCES')[0]);
   });
 
   it('finds forgotten lines, joints across levels, the wrong language and bad JSON in the structure, located by path', async () => {

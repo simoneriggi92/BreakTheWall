@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { defaultSettings, parseLocalAddress, ProviderError, type LocalModel, type ProviderFailure } from '../src/core/provider';
 import type { CompletionRequest } from '../src/desktop/completion';
+import { buildStructureInput, instructionsFor } from '../src/core/disassembly-generation';
+import { importSource } from '../src/core/source';
 import { checkFormat, closeReasoning, completeLocal, detectServer, discoverServers } from '../src/desktop/local/runtimes';
 import { SettingsStore } from '../src/desktop/settings-store';
 
@@ -85,6 +87,27 @@ describe('schema-constrained requests per runtime (T5b)', () => {
     await expect(completeLocal(fetchImpl, ollama, request, new AbortController().signal, n => progress.push(n))).resolves.toBe('{"a":1}');
     expect(progress).toEqual([5, 7]);
     expect(calls[0].body).toMatchObject({ model: 'qwen', format: { type: 'object' }, stream: true, think: false, options: { num_ctx: 16_384 }, messages: [{ role: 'system', content: 'Istruzioni' }, { role: 'user', content: 'Fonte e obiettivo' }] });
+  });
+
+  // P-20261029-source-limits S2: Ollama truncates silently beyond num_ctx, so a request that needs more is refused here.
+  it('Ollama: refuses a request too long for the window it is given, before sending it', async () => {
+    const { fetchImpl, calls } = network({ 'POST http://127.0.0.1:11434/api/chat': () => ndjson([{ message: { content: '{}' } }, { done: true }]) });
+    const long = { ...request, messages: [{ role: 'user' as const, content: 'x'.repeat(200_000) }] };
+    expect(await fail(completeLocal(fetchImpl, ollama, long, new AbortController().signal, () => {}))).toMatchObject({ code: 'local-context', reason: 'local-window', action: 'local-setup' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('Ollama: fits the largest selection, numbered, in a window of at most 65,536 tokens', async () => {
+    const { fetchImpl, calls } = network({ 'POST http://127.0.0.1:11434/api/chat': () => ndjson([{ message: { content: '{}' } }, { done: true }]) });
+    // The most lines a selection can number: 5,000 lines of 23 characters and a newline make 120,000 characters.
+    for (const line of ['x'.repeat(99), 'x'.repeat(23)]) {
+      const text = Array.from({ length: Math.floor(120_000 / (line.length + 1)) }, () => line).join('\n');
+      const source = await importSource({ kind: 'paste', title: 'Long', text });
+      const goal = { outcome: '', priorKnowledge: '' };
+      const structure = { ...request, instructions: instructionsFor(goal), messages: [{ role: 'user' as const, content: buildStructureInput([source], goal, 'en') }] };
+      await expect(completeLocal(fetchImpl, ollama, structure, new AbortController().signal, () => {})).resolves.toBe('{}');
+      expect((calls.at(-1)!.body as { options: { num_ctx: number } }).options.num_ctx).toBeLessThanOrEqual(65_536);
+    }
   });
 
   it('Ollama: retries without the reasoning switch for models that reject it', async () => {

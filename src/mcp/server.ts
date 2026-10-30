@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { INCOMING_PROTOCOL, lineReader, type IncomingReply } from '../desktop/incoming';
 import type { Disassembly } from '../core/disassembly';
+import { SOURCE_LIMITS } from '../core/source';
 import { AssistantWriter, type StepReply } from './assistant';
+
+/** The limits a text must meet, read from the app's own (P-20261029-source-limits S3). */
+const LIMITS = `at most ${SOURCE_LIMITS.maxCharsPerSource.toLocaleString('en-US')} characters and ${SOURCE_LIMITS.maxLines.toLocaleString('en-US')} lines`;
 import { createMcpServer, type ClientInfo, type PromptDefinition, type ToolDefinition, type ToolResult } from './protocol';
 import prompts from './prompts.json';
 
@@ -93,7 +97,7 @@ const openArgs = z.object({
 export const TOOLS: ToolDefinition[] = [{
   name: 'open_in_break_the_wall',
   title: 'Open in Break the Wall',
-  description: 'Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates the disassembly in the app, with the app\'s own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), use start_disassembly instead. Send the text exactly as the user should study it, as plain text or Markdown (at most 40,000 characters and 1,500 lines).',
+  description: `Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates the disassembly in the app, with the app's own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), use start_disassembly instead. Send the text exactly as the user should study it, as plain text or Markdown (${LIMITS}).`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -111,7 +115,7 @@ export const TOOLS: ToolDefinition[] = [{
   inputSchema: {
     type: 'object',
     properties: {
-      text: { type: 'string', description: 'The full text to take apart, as plain text or Markdown (at most 40,000 characters and 1,500 lines).' },
+      text: { type: 'string', description: `The full text to take apart, as plain text or Markdown (${LIMITS}).` },
       title: { type: 'string', description: 'A short name for the source, shown in citations (at most 120 characters).' },
       question: { type: 'string', description: 'What the user wants to understand about the text, as a question (10 to 400 characters), only if they asked one. Without it, the whole text is taken apart.' },
       language: { type: 'string', enum: ['it', 'en'], description: 'The language to write the disassembly in; by default the question\'s, or the text\'s without a question.' },

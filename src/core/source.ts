@@ -1,14 +1,18 @@
 import { z } from 'zod';
 import { hashText, sourceSchema, type Source } from './lesson';
 
+/** All sources together: the full requests (structure, runs) carry every source, numbered (P-20261029-source-limits). */
+const MAX_TOTAL_CHARS = 120_000;
 /** Bounds applied before anything can reach a provider. One generation request carries the whole selection. */
 export const SOURCE_LIMITS = {
   maxSources: 4,
-  maxCharsPerSource: 40_000,
-  maxTotalChars: 60_000,
-  maxLines: 1_500,
+  /** One source may fill the whole selection: the total bounds every request, so a second limit would only force a split. */
+  maxCharsPerSource: MAX_TOTAL_CHARS,
+  maxTotalChars: MAX_TOTAL_CHARS,
+  maxLines: 5_000,
   maxLineChars: 4_000,
-  maxFileBytes: 160_000,
+  /** Checked before a file is read: the most characters at up to 4 bytes each. */
+  maxFileBytes: 4 * MAX_TOTAL_CHARS,
   maxTitleChars: 120,
 } as const;
 export const FILE_EXTENSIONS = ['txt', 'md', 'markdown'] as const;

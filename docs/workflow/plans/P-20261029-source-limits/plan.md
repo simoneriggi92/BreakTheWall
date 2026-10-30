@@ -1,11 +1,11 @@
 ---
 id: P-20261029-source-limits
 title: Larger sources - no per-source limit, a higher total, and an explicit check where a route cannot carry it
-version: 1
-state: blocked
-current_task: S1
-last_evidence: Not run
-next_action: Blocked while P-20261029-source-entry implements; after it is completed, implement with a separate command, starting with "implement P-20261029-source-limits v1 --phase limits"
+version: 2
+state: implementing
+current_task: S4
+last_evidence: Phases limits (S1-S2) and assistant (S3) implemented; TypeScript check, 29 test files with 460 tests and both builds pass on macOS; the bundled MCP server lists the new limits
+next_action: Implement phase verify with a separate command, "implement P-20261029-source-limits v2 --phase verify"; it needs push and a pull request for CI, a route and cost for S4.3, and the owner's document for S4.4
 approval: approved
 ---
 
@@ -28,6 +28,7 @@ The owner's document (49,357 characters) then imports whole, and so does a docum
 
 - The per-source limit of 40,000 characters is too restrictive: "è troppo limitante".
 - Limits must not be set by local models: most use is through the MCP assistant or a hosted model, and local models get their own handling when it is needed.
+- 2026-10-30: raise the limits before P-20261029-source-entry finishes its last checks, building on that plan's branch ("v2 sopra source-entry"). Version 2 changes only where this plan starts and how its pull request merges.
 
 ## Scope
 
@@ -42,7 +43,8 @@ Not included:
 
 ## Preconditions
 
-- **P-20261029-source-entry is completed** first. Only one plan implements at a time; this one starts from `main` after that plan's pull request, on a new branch `feature/source-limits`.
+- **Built on P-20261029-source-entry.** This plan starts from `feature/source-entry` (pull request #36), whose code it changes (`server.ts`, `assistant.ts`) and where this plan is recorded, on a new branch `feature/source-limits`. Its pull request targets `feature/source-entry` and merges after #36; if #36 merges first, it is retargeted to `main`.
+- **One plan active at a time.** P-20261029-source-entry is `blocked` while this plan implements: its E10.3 and E10.4 wait, and it returns to `implementing` for them after this plan is completed.
 - **No new dependency.**
 - **Stored files stay valid**: limits only rise, so every stored lesson and disassembly still validates.
 - **External actions** (push, pull request, merge, any generation that spends the owner's usage) only on the owner's confirmation when reached. The owner's document stays on the owner's device.
@@ -68,7 +70,7 @@ Acceptance (tests): the runs reply of `start_disassembly`'s session contains no 
 1. `npm run check` and `npm run build` on macOS; CI on macOS and Windows.
 2. Integration check on the built app, with a scratch data folder: a 120,000-character pasted source imports, its preview and the source pane stay usable at 5,000 lines (scrolling and selecting a citation), and Studio shows the new limits in both languages.
 3. One generation on a long public source, between 80,000 and 120,000 characters taken from this repository's documents (up to 4 sources), through a route and at a cost the owner confirms; the app's checks accept it, and the parts are judged as parts of the mechanism rather than a table of contents.
-4. The owner's own document as one source, on the owner's device.
+4. The owner's own document as one source, on the owner's device. With an empty question, the same trial also serves P-20261029-source-entry E10.4, recorded there when that plan resumes.
 
 ## Risks
 
@@ -87,11 +89,11 @@ Acceptance (tests): the runs reply of `start_disassembly`'s session contains no 
 
 ## Approval
 
-Approve with: `Approve P-20261029-source-limits v1`. Then implement with a separate command after P-20261029-source-entry is completed, for example `implement P-20261029-source-limits v1 --phase limits`.
+Approve with: `Approve P-20261029-source-limits v2`. Then implement with a separate command, for example `implement P-20261029-source-limits v2 --phase limits`.
 
 ## Approval record
 
-Version 1, approved:
+Version 1, approved (superseded by version 2, which changes the preconditions and needs its own approval):
 
 - Approver: project owner, through an explicit message in this conversation.
 - Received command: `Approve P-20261029-source-limits v1`.
@@ -102,6 +104,39 @@ Version 1, approved:
 - Digest definition: SHA-256 of the UTF-8 plan body from `# Larger sources` up to, and not including, `## Approval`.
 - Authority boundary: implementation needs a separate implement command naming v1, and waits for P-20261029-source-entry to complete. Pushing, pull requests, merges and any generation that spends the owner's usage need the owner's confirmation when reached. The owner's document stays on the owner's device. No new dependency.
 
+Version 2, approved:
+
+- Approver: project owner, through an explicit message in this conversation.
+- Received command: `Approve P-20261029-source-limits v2`.
+- Approved plan/version: `P-20261029-source-limits` / `2`.
+- Recorded at: `2026-10-30T10:46:49+01:00` (Europe/Rome).
+- Approved scope: phases `limits` (S1–S2), `assistant` (S3) and `verify` (S4), on a new branch `feature/source-limits` from `feature/source-entry`, with a pull request based on `feature/source-entry` that merges after #36.
+- Approved-content SHA-256: `bc901a712082a900cadf237ea13022d024ed2ea13fcf51674eec2826f33f0ecc`.
+- Digest definition: SHA-256 of the UTF-8 plan body from `# Larger sources` up to, and not including, `## Approval`.
+- Authority boundary: implementation needs a separate implement command naming v2. Pushing, pull requests, merges and any generation that spends the owner's usage need the owner's confirmation when reached. The owner's document stays on the owner's device. No new dependency.
+
 ## State changes
 
 - 2026-10-29: `awaiting_approval` → `approved` → `blocked`. Approval is recorded above; the plan waits for P-20261029-source-entry, as its precondition requires (one plan active at a time). It returns to `approved` when that plan completes.
+- 2026-10-30: version 2 → `awaiting_approval`. The owner asked to raise the limits now, on top of P-20261029-source-entry's branch, instead of after it is merged. Only the preconditions, S4.4's note and the approval commands change; the tasks and their acceptance are as in version 1, whose approval no longer applies.
+- 2026-10-30: version 2 `awaiting_approval` → `approved`. Approval is recorded above; P-20261029-source-entry is `blocked`, so this is the only active plan.
+- 2026-10-30: `approved` → `implementing`, on `implement P-20261029-source-limits v2 --phase limits`. Branch `feature/source-limits` from `feature/source-entry` at `7f05151`.
+
+## Progress
+
+- 2026-10-30: `implement P-20261029-source-limits v2 --phase limits`.
+- **S1, the limits (automated tests).** `SOURCE_LIMITS` in `src/core/source.ts`: total 120,000 characters, one source up to the total, 5,000 lines, 480,000 bytes for a file (4 bytes per character, checked before reading); 4,000 characters per line and 4 sources unchanged. The stored source text accepts 120,000 characters (`src/core/lesson.ts`).
+  - `tests/source.test.ts`: a paste of 120,000 characters imports and one of 120,001 is `too-large`; two sources of 60,000 pass together and 60,000 + 60,001 are over the total; a file of 480,001 bytes is refused before it is read; the constants hold the planned values.
+  - `tests/disassembly.test.ts`: a disassembly whose source has 120,000 characters validates, and one of 120,001 is refused at `sources[0].text`. Every stored fixture still validates (the existing fixture tests).
+  - Tests that pinned the old values now use the new ones: Studio's capacity line (`0 / 120.000 caratteri`), the local entry point and both MCP refusals (120,001 characters).
+- **S2, the local route checks its window (automated tests).** For Ollama, the window needed is computed as before; above `OLLAMA_MAX_CONTEXT` (65,536) the request is refused before anything is sent, as `local-context` with the new reason `local-window`, worded in both languages ("too long for a local model … use ChatGPT or your Claude assistant, or use fewer sources"). LM Studio, llama.cpp and other servers are unchanged.
+  - `tests/local.test.ts`: a 200,000-character request fails with `local-context` / `local-window` and makes no call; the largest selection, as a real structure request without a question, is sent with `num_ctx` at most 65,536.
+  - Measured with the same builder: 120,000 characters in 1,200 lines need a window of 57,344 tokens; in 5,000 lines (the most a selection can number) exactly 65,536. A request beyond that, for example with a long question, is refused rather than truncated.
+- **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run` passes with 29 files and 459 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass. CI on macOS and Windows runs with the pull request.
+- 2026-10-30: `implement P-20261029-source-limits v2 --phase assistant`.
+- **S3, the assistant gets the source twice, not three times (automated tests).** `buildRunsInput` takes `fromStepOne`: the MCP assistant's runs step names each source (id, title, line count) and asks for the line numbers of the numbered sources from step 1, instead of numbering them again; the structure and the written parts are still sent. The app's own generator, whose requests are independent, keeps sending the numbered sources. The descriptions of `open_in_break_the_wall` and of `start_disassembly`'s text read the limits from `SOURCE_LIMITS`.
+  - `tests/mcp-assistant.test.ts`: on Atlas (English) and Mill (Italian), step 1 numbers the source, the runs request has no numbered line and names the source from step 1, and both sessions still end in a saved disassembly equal to what the app's own phases assemble.
+  - `tests/disassembly-generation.test.ts`: the app's runs request contains the numbered source; the assistant's has none, names it, and is otherwise the same request.
+  - `tests/mcp-server.test.ts`: both descriptions contain "at most 120,000 characters and 5,000 lines", built from the constants.
+  - Bundled server: `dist-electron/mcp-server.cjs`, asked for `tools/list` over stdio, returns the same limits in both tools.
+- **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run` passes with 29 files and 460 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass.

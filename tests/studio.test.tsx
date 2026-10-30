@@ -150,7 +150,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(studio.getByRole('alert')).toHaveTextContent('La fonte è vuota.');
     await user.click(studio.getByRole('button', { name: /Scegli file/ }));
     expect(await studio.findByText(/a\.pdf.*non è supportato/)).toBeInTheDocument();
-    expect(studio.getByText('0/4 fonti · 0 / 60.000 caratteri')).toBeInTheDocument();
+    expect(studio.getByText('0/4 fonti · 0 / 120.000 caratteri')).toBeInTheDocument();
   });
 
   it('needs sign-in before generating, then opens the validated disassembly labelled as generated', async () => {
@@ -538,7 +538,7 @@ describe('texts handed over by an AI assistant (P-20261028-mcp-integration M2)',
     const studio = studioRegion();
     expect(await studio.findByText('Dal tuo assistente: Validazione HTTPS.')).toBeInTheDocument();
     expect(studio.getByText('Validazione HTTPS')).toBeInTheDocument();
-    const capacity = `1/4 fonti · ${https.source.text.length} / 60.000 caratteri`;
+    const capacity = `1/4 fonti · ${https.source.text.length} / 120.000 caratteri`;
     expect(studio.getByText(capacity)).toBeInTheDocument();
     act(() => hand(https));
     await waitFor(() => expect(studio.getByText(capacity)).toBeInTheDocument());

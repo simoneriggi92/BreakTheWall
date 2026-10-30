@@ -47,8 +47,21 @@ describe('source import (T4)', () => {
     const fifth = await make(5);
     expect(() => checkSelection([...four, fifth])).toThrow(/al massimo 4/);
     expect(() => checkSelection([four[0], four[0]])).toThrow(/già nella selezione/);
-    const big = await Promise.all([1, 2].map(i => make(i, SOURCE_LIMITS.maxTotalChars / 2)));
-    expect(() => checkSelection(big)).toThrow(/limite per un percorso/);
+  });
+
+  // P-20261029-source-limits S1: no limit of its own for one source, 120,000 characters for the selection.
+  it('takes one source as long as the whole selection, and bounds the total, the lines and the file size', async () => {
+    expect(SOURCE_LIMITS).toMatchObject({ maxCharsPerSource: 120_000, maxTotalChars: 120_000, maxLines: 5_000, maxFileBytes: 480_000, maxLineChars: 4_000, maxSources: 4 });
+    /** A text of exactly `size` characters, in lines of 100 (99 and a newline), ending on a letter that import keeps. */
+    const sized = (size: number, mark = 'a') => (mark.padEnd(99, '.') + '\n').repeat(Math.ceil(size / 100)).slice(0, size - 1) + 'z';
+    const paste = (i: number, size: number) => importSource({ kind: 'paste', title: `s${i}`, text: sized(size, String(i)) });
+    expect((await paste(1, 120_000)).text).toHaveLength(120_000);
+    expect(await code({ kind: 'paste', title: 'x', text: sized(120_001) })).toBe('too-large');
+    const halves = await Promise.all([1, 2].map(i => paste(i, 60_000)));
+    expect(() => checkSelection(halves)).not.toThrow();
+    const over = await Promise.all([paste(1, 60_000), paste(2, 60_001)]);
+    expect(() => checkSelection(over)).toThrow(/limite per un percorso è 120\.000/);
+    expect(await code({ kind: 'file', name: 'big.md', bytes: new Uint8Array(480_001).fill(97) })).toBe('too-large');
   });
 
   it('has the host re-verify renderer-supplied sources: edited text, prepared origin and bounds are refused', async () => {
