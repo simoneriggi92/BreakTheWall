@@ -3,9 +3,9 @@ id: P-20261029-source-limits
 title: Larger sources - no per-source limit, a higher total, and an explicit check where a route cannot carry it
 version: 2
 state: implementing
-current_task: S3
-last_evidence: Phase limits (S1-S2) implemented; TypeScript check, 29 test files with 459 tests and both builds pass on macOS
-next_action: Implement phase assistant with a separate command, "implement P-20261029-source-limits v2 --phase assistant"; until S3, the MCP tool descriptions still state the old limits
+current_task: S4
+last_evidence: Phases limits (S1-S2) and assistant (S3) implemented; TypeScript check, 29 test files with 460 tests and both builds pass on macOS; the bundled MCP server lists the new limits
+next_action: Implement phase verify with a separate command, "implement P-20261029-source-limits v2 --phase verify"; it needs push and a pull request for CI, a route and cost for S4.3, and the owner's document for S4.4
 approval: approved
 ---
 
@@ -133,3 +133,10 @@ Version 2, approved:
   - `tests/local.test.ts`: a 200,000-character request fails with `local-context` / `local-window` and makes no call; the largest selection, as a real structure request without a question, is sent with `num_ctx` at most 65,536.
   - Measured with the same builder: 120,000 characters in 1,200 lines need a window of 57,344 tokens; in 5,000 lines (the most a selection can number) exactly 65,536. A request beyond that, for example with a long question, is refused rather than truncated.
 - **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run` passes with 29 files and 459 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass. CI on macOS and Windows runs with the pull request.
+- 2026-10-30: `implement P-20261029-source-limits v2 --phase assistant`.
+- **S3, the assistant gets the source twice, not three times (automated tests).** `buildRunsInput` takes `fromStepOne`: the MCP assistant's runs step names each source (id, title, line count) and asks for the line numbers of the numbered sources from step 1, instead of numbering them again; the structure and the written parts are still sent. The app's own generator, whose requests are independent, keeps sending the numbered sources. The descriptions of `open_in_break_the_wall` and of `start_disassembly`'s text read the limits from `SOURCE_LIMITS`.
+  - `tests/mcp-assistant.test.ts`: on Atlas (English) and Mill (Italian), step 1 numbers the source, the runs request has no numbered line and names the source from step 1, and both sessions still end in a saved disassembly equal to what the app's own phases assemble.
+  - `tests/disassembly-generation.test.ts`: the app's runs request contains the numbered source; the assistant's has none, names it, and is otherwise the same request.
+  - `tests/mcp-server.test.ts`: both descriptions contain "at most 120,000 characters and 5,000 lines", built from the constants.
+  - Bundled server: `dist-electron/mcp-server.cjs`, asked for `tools/list` over stdio, returns the same limits in both tools.
+- **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run` passes with 29 files and 460 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass.

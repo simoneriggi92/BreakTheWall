@@ -64,12 +64,19 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     const total = drafts.structure.parts.length + 2;
     const structure = await call(server, 'submit_structure', { json: JSON.stringify(drafts.structure) });
     expect(textOf(structure)).toContain(`STEP 2 of ${total}: the content of part 0`);
+    let runsRequest = '';
     for (const [index, content] of drafts.contents.entries()) {
       // A model may pass the JSON as an object rather than a string; both are accepted.
       const reply = await call(server, 'submit_part', { index, json: index % 2 ? content : JSON.stringify(content) });
       expect(reply.result.isError).toBeUndefined();
       expect(textOf(reply)).toContain(index + 1 < drafts.contents.length ? `STEP ${index + 3} of ${total}` : `STEP ${total} of ${total}: the runs`);
+      runsRequest = textOf(reply);
     }
+    // P-20261029-source-limits S3: the sources are numbered once, in step 1; the runs step names them instead.
+    const numbered = /^ *\d+\| /m;
+    expect(textOf(started)).toMatch(numbered);
+    expect(runsRequest).not.toMatch(numbered);
+    expect(runsRequest).toContain(`Cite the line numbers of the numbered sources from step 1:\n  ${source.id} «${source.title}», ${source.text.split('\n').length} lines`);
     const done = await call(server, 'submit_runs', { json: JSON.stringify(drafts.runs) });
     expect(done.result.isError).toBeUndefined();
     expect(textOf(done)).toContain('It is saved in the user\'s Break the Wall library and open there.');

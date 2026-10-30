@@ -69,7 +69,7 @@ export class AssistantWriter {
       if (step.index + 1 < s.structure!.parts.length) { s.step = { phase: 'part', index: step.index + 1 }; return this.partRequest(s, done); }
       s.step = { phase: 'runs' };
       return { text: [done, `STEP ${this.total(s)} of ${this.total(s)}: the runs and the reassembly. Write them as JSON and call submit_runs with it.`,
-        this.request(RUNS_INSTRUCTIONS, runsJsonSchema(s.sources, s.structure!), buildRunsInput(s.sources, s.goal, s.language, s.structure!, s.contents))].join('\n\n') };
+        this.request(RUNS_INSTRUCTIONS, runsJsonSchema(s.sources, s.structure!), buildRunsInput(s.sources, s.goal, s.language, s.structure!, s.contents, true))].join('\n\n') };
     });
   }
 

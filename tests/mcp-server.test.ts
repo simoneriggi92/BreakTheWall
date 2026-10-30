@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { importSource } from '../src/core/source';
 import { IncomingServer, incomingAddress, type IncomingHandlers } from '../src/desktop/incoming';
 import { createMcpServer, PROTOCOL_VERSIONS, renderPrompt, serveStdio } from '../src/mcp/protocol';
+import { SOURCE_LIMITS } from '../src/core/source';
 import { createBreakTheWallServer, PROMPTS, refusalText, TOOLS } from '../src/mcp/server';
 
 const request = (id: number, method: string, params?: object) => JSON.stringify({ jsonrpc: '2.0', id, method, ...(params ? { params } : {}) });
@@ -90,6 +91,11 @@ describe('the open_in_break_the_wall tool against the app\'s entry point (M3)', 
     expect(TOOLS[0].description).toContain('WITHOUT taking it apart');
     expect(TOOLS[0].description).toContain('use start_disassembly instead');
     expect(TOOLS[1].description).toMatch(/^Take a text apart with Break the Wall/);
+    // P-20261029-source-limits S3: the limits are the app's own, not numbers written into the descriptions.
+    const limits = `at most ${SOURCE_LIMITS.maxCharsPerSource.toLocaleString('en-US')} characters and ${SOURCE_LIMITS.maxLines.toLocaleString('en-US')} lines`;
+    expect(limits).toBe('at most 120,000 characters and 5,000 lines');
+    expect(TOOLS[0].description).toContain(limits);
+    expect((TOOLS[1].inputSchema as { properties: { text: { description: string } } }).properties.text.description).toContain(limits);
   });
 
   it('opens a text in the running app and says that nothing was generated yet', async () => {
