@@ -117,11 +117,11 @@ jobs:
             echo "Break the Wall $TAG" > "$RUNNER_TEMP/title.txt"
             cp "$RUNNER_TEMP/section.md" "$RUNNER_TEMP/notes.md"
           fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: break-the-wall-dmg
           path: release
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: break-the-wall-windows-setup
           path: release
