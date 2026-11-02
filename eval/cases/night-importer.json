@@ -1,0 +1,15 @@
+{
+  "id": "night-importer",
+  "title": "The Larkspur importer at night (mechanism, original, English, whole source without a question)",
+  "goal": {
+    "outcome": "",
+    "priorKnowledge": ""
+  },
+  "language": "en",
+  "sources": [
+    {
+      "path": "sources/night-importer.md",
+      "title": "night-importer.md"
+    }
+  ]
+}

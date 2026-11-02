@@ -16,11 +16,12 @@ import type { CompletionRequest } from '../src/desktop/completion';
 import { DisassemblyStore } from '../src/desktop/disassembly-store';
 import { Generator } from '../src/desktop/generator';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
-import { CONTENT_INSTRUCTIONS, EXPANSION_INSTRUCTIONS, STRUCTURE_INSTRUCTIONS } from '../src/core/disassembly-generation';
+import { buildExpansionInput, CONTENT_INSTRUCTIONS, EXPANSION_INSTRUCTIONS, expansionInstructions, instructionsFor, STRUCTURE_INSTRUCTIONS, structureInstructions } from '../src/core/disassembly-generation';
+import { goalSchema } from '../src/core/source';
 import { deepDisassembly, draftsFrom, generatedFrom, pastedSource, scriptedAnswer, splitAnswer } from './disassembly-drafts';
 
 const meta: GenerationMeta = { id: 'g-test', createdAt: '2026-10-26T10:00:00.000Z', provider: 'chatgpt', model: 'model-a' };
-const goalOf = (d: Disassembly) => ({ outcome: d.question, priorKnowledge: '' });
+const goalOf = (d: Disassembly) => ({ outcome: d.question ?? '', priorKnowledge: '' });
 async function setupFor(d: Disassembly) {
   const source = await pastedSource(d);
   return { d, source, sources: [source], goal: goalOf(d), language: d.language, drafts: draftsFrom(d, source.id) };
@@ -46,7 +47,10 @@ describe('two-phase generation contract (D9)', () => {
     // Slots follow the parts' order; the hand-made files sometimes list them differently.
     const slotSet = (x: Disassembly) => x.reassemble.slots.map(s => JSON.stringify([s.label, s.accepts])).sort();
     expect(slotSet(rebuilt)).toEqual(slotSet(d));
-    expect(rebuilt).toMatchObject({ kind: 'generated', revision: 'v1', language: d.language, question: d.question, generation: { provider: 'chatgpt', model: 'model-a' } });
+    expect(rebuilt).toMatchObject({ kind: 'generated', revision: 'v1', language: d.language, generation: { provider: 'chatgpt', model: 'model-a' } });
+    // A whole-source fixture has no question and a start; generation keeps both as they are.
+    expect(rebuilt.question).toBe(d.question);
+    expect(rebuilt.start).toEqual(d.start);
   });
 
   it('sends strict schemas: closed lists of sources, parts and sub-parts, and every field required', async () => {
@@ -160,6 +164,64 @@ describe('two-phase generation contract (D9)', () => {
     expect(defaultContentLanguage('How did the market end up on the quay?', 'it')).toBe('en');
     expect(defaultContentLanguage('Secondo Mill, quando la società può costringere un individuo?', 'en')).toBe('it');
     expect(defaultContentLanguage('TCP?', 'en')).toBe('en');
+  });
+});
+
+describe('generation without a question (P-20261029-source-entry E4)', () => {
+  const whole = { outcome: '', priorKnowledge: '' };
+  /** Mill as a whole-source structure: no question, every sub-assembly open, a place to start. */
+  const millWhole = () => { const x = mill(); delete x.question; x.parts.forEach((p: any) => { delete p.relevant; }); x.start = { part: 'claim', why: 'The rest of the essay supports or limits it.' }; return x; };
+
+  it('accepts an empty goal, and keeps a given question at 10 to 400 characters', () => {
+    expect(goalSchema.safeParse(whole).success).toBe(true);
+    expect(goalSchema.safeParse({ outcome: '   ', priorKnowledge: '' }).data?.outcome).toBe('');
+    expect(goalSchema.safeParse({ outcome: 'Why?', priorKnowledge: '' }).success).toBe(false);
+    expect(goalSchema.safeParse({ outcome: 'Why does the release stop?', priorKnowledge: '' }).success).toBe(true);
+  });
+  it('asks for the whole source, with no question and nothing outside it', async () => {
+    const { sources, language } = await setupFor(story());
+    const input = buildStructureInput(sources, whole, language);
+    expect(input).not.toContain('QUESTION:');
+    expect(input.split('\n')[0]).toBe('FOCUS: none. The learner wants to understand the whole source.');
+    const instructions = instructionsFor(whole);
+    expect(instructions).not.toContain('outside-question');
+    expect(instructions).toContain('relevant: always true');
+    expect(instructions).toMatch(/start: the top-level part a learner new to the source should begin with.*Never null/);
+    expect(expansionInstructions(false)).not.toContain('outside-question');
+  });
+  it('leaves the question-led request as it was, apart from the start line', async () => {
+    const { sources, goal, language } = await setupFor(story());
+    expect(buildStructureInput(sources, goal, language).split('\n')[0]).toBe(`QUESTION: ${goal.outcome}`);
+    expect(instructionsFor(goal)).toBe(STRUCTURE_INSTRUCTIONS);
+    expect(STRUCTURE_INSTRUCTIONS).toBe(structureInstructions(true));
+    expect(STRUCTURE_INSTRUCTIONS).toContain('outside-question');
+    expect(STRUCTURE_INSTRUCTIONS).toContain('or null when the question already says where to begin');
+    expect(EXPANSION_INSTRUCTIONS).toBe(expansionInstructions(true));
+  });
+  it('rejects a whole-source structure without a start, with a closed sub-assembly or with lines outside a question', async () => {
+    const atlasCase = await setupFor(atlas());
+    const base = { sources: atlasCase.sources, goal: whole, language: atlasCase.language, meta };
+    // The schema itself offers no "outside the question" reason without a question.
+    expect(findings(() => acceptStructure(JSON.stringify(atlasCase.drafts.structure), base)).map(f => f.path)).toContain('excluded[3].reason');
+    const excluded = atlasCase.drafts.structure.excluded.map(x => x.reason === 'outside-question' ? { ...x, reason: 'detail' as const } : x);
+    const found = findings(() => acceptStructure(JSON.stringify({ ...atlasCase.drafts.structure, excluded, start: null }), base)).map(f => f.path);
+    expect(found).toEqual(expect.arrayContaining(['start', 'parts[1].relevant']));
+  });
+  it('takes the whole source apart through the three phases', async () => {
+    const { sources, language, drafts } = await setupFor(millWhole());
+    const base = { sources, goal: whole, language, meta };
+    const structure = acceptStructure(JSON.stringify(drafts.structure), base);
+    const contents = drafts.contents.map((c, i) => acceptContent(JSON.stringify(c), structure, i, language));
+    const runs = acceptRuns(JSON.stringify(drafts.runs), { ...base, structure, contents });
+    const d = await assembleDisassembly({ ...base, structure, contents, runs });
+    expect(d.question).toBeUndefined();
+    expect(d.start).toEqual({ part: 'claim', why: 'The rest of the essay supports or limits it.' });
+    expect(buildExpansionInput({ ...d, kind: 'generated' }, 'bounds').split('\n')[0]).toBe('FOCUS: none. The learner wants to understand the whole source.');
+  });
+  it('writes in the interface language when there is no question, whatever the sources (owner, 2026-10-29)', () => {
+    expect(defaultContentLanguage('', 'it')).toBe('it');
+    expect(defaultContentLanguage('', 'en')).toBe('en');
+    expect(defaultContentLanguage('Secondo Mill, quando la società può costringere un individuo?', 'en')).toBe('it');
   });
 });
 

@@ -1,7 +1,7 @@
 import { DisassemblyError, type Disassembly } from '../core/disassembly';
 import {
   acceptContent, acceptRuns, acceptStructure, assembleDisassembly, buildContentInput, buildRepairRequest, buildRunsInput, buildStructureInput,
-  CONTENT_INSTRUCTIONS, contentJsonSchema, defaultContentLanguage, generatedDisassemblyId, RUNS_INSTRUCTIONS, runsJsonSchema, STRUCTURE_INSTRUCTIONS,
+  CONTENT_INSTRUCTIONS, contentJsonSchema, defaultContentLanguage, generatedDisassemblyId, instructionsFor, RUNS_INSTRUCTIONS, runsJsonSchema,
   structureJsonSchema, type ContentDraft, type ContentLanguage, type GenerationMeta, type StructureDraft,
 } from '../core/disassembly-generation';
 import { goalSchema, importSource, SourceImportError, type LearningGoal, type UserSource } from '../core/source';
@@ -26,12 +26,13 @@ export class AssistantWriter {
   constructor(private now = () => new Date()) {}
 
   /** The client's own name and version, recorded as the disassembly's model (the model itself is not reliably known). */
-  async start(input: { text: string; title?: string; question: string; language?: string }, client: string): Promise<StepReply> {
+  async start(input: { text: string; title?: string; question?: string; language?: string }, client: string): Promise<StepReply> {
     let source: UserSource;
     try { source = await importSource({ kind: 'paste', title: input.title?.trim() || 'From your assistant', text: input.text }); }
     catch (error) { if (error instanceof SourceImportError) return { text: `Break the Wall refused the text (${error.code}). ${importAdvice(error)}`, isError: true }; throw error; }
-    const goal = goalSchema.safeParse({ outcome: input.question.trim(), priorKnowledge: '' });
-    if (!goal.success) return { text: 'The question must be 10 to 400 characters: say what the user wants to understand about the text.', isError: true };
+    // Without a question the whole text is taken apart (P-20261029-source-entry); a question, when given, is checked as in Studio.
+    const goal = goalSchema.safeParse({ outcome: (input.question ?? '').trim(), priorKnowledge: '' });
+    if (!goal.success) return { text: 'A question, when given, must be 10 to 400 characters: say what the user wants to understand about the text, or leave it out to take apart the whole text.', isError: true };
     const language: ContentLanguage = input.language === 'it' || input.language === 'en' ? input.language : defaultContentLanguage(goal.data.outcome, 'en');
     const createdAt = this.now();
     this.session = {
@@ -41,8 +42,9 @@ export class AssistantWriter {
     return { text: [
       `Break the Wall disassembly started: "${source.title}", ${source.text.split('\n').length} lines, written in ${language === 'it' ? 'Italian' : 'English'}.`,
       'There are three phases: the structure, then the content of each top-level part, then the runs. Each answer is checked by the app; fix what it reports and submit again.',
+      ...(goal.data.outcome ? [] : ['No question was given: take apart the whole text, and say in start which part to begin with.']),
       `STEP 1: the structure. Write it as JSON and call submit_structure with it.`,
-      this.request(STRUCTURE_INSTRUCTIONS, structureJsonSchema(this.session.sources), buildStructureInput(this.session.sources, this.session.goal, language)),
+      this.request(instructionsFor(goal.data), structureJsonSchema(this.session.sources, this.session.goal), buildStructureInput(this.session.sources, this.session.goal, language)),
     ].join('\n\n') };
   }
 

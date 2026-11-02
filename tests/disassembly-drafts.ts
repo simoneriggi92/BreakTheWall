@@ -14,7 +14,7 @@ export function draftsFrom(d: Disassembly, sourceId: string): { structure: Struc
   const joint = (j: Joint) => ({ from: j.from, to: j.to, type: j.type, label: j.label, cites: cites(j.cites) });
   const fit = (p: Part): StructureDraft['parts'][number]['run'] => d.runs.some(r => r.type === 'load' && r.target === p.id) ? 'load' : d.runs.some(r => r.type === 'scenario' && r.steps.some(s => s.effect?.[p.id])) ? 'scenario' : 'none';
   const structure: StructureDraft = {
-    title: d.title, whole: { ...d.whole, cites: cites(d.whole.cites) },
+    title: d.title, whole: { ...d.whole, cites: cites(d.whole.cites) }, start: d.start ?? null,
     parts: d.parts.map(p => ({
       id: p.id, name: p.name, kind: p.kind, icon: p.icon, role: p.role, cites: cites(p.cites), relevant: p.relevant ?? true, run: fit(p),
       parts: p.parts ? p.parts.map(s => ({ id: s.id, name: s.name, kind: s.kind, icon: s.icon, role: s.role, cites: cites(s.cites) })) : null,

@@ -11,7 +11,7 @@ import type { Messages } from './i18n/it';
 import { failureText, usePreferences } from './preferences';
 
 /**
- * `language` is set only when the learner chose one; until then it follows the question. Suggested break-downs are
+ * `language` is set only when the learner chose one; until then it follows the question, or the interface without one. Suggested break-downs are
  * kept for the selection they were asked for, keyed by its sources' hashes, and never stored with a disassembly.
  */
 export interface StudioDraft { sources: UserSource[]; outcome: string; prior: string; language?: ContentLanguage; suggestions?: KeptSuggestions }
@@ -25,7 +25,7 @@ function importText(t: Messages, n: (x: number) => string, error: Pick<PickError
   return word ? word(error.params ?? {}, n) : error.message;
 }
 
-/** Source workspace → question → account and generation. Nothing leaves the device before "Genera lo smontaggio". */
+/** Source workspace → optional question → account and generation. Nothing leaves the device before "Genera lo smontaggio". */
 export function Studio({ studio, draft, setDraft, onCreated, onBusyChange, incoming = [], onIncomingTaken }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (disassembly: Disassembly) => void; onBusyChange?: (busy: boolean) => void; incoming?: IncomingSource[]; onIncomingTaken?: (count: number) => void }) {
   const { t, n: fmt, language: interfaceLanguage } = usePreferences();
   const language = draft.language ?? defaultContentLanguage(draft.outcome, interfaceLanguage);
@@ -113,7 +113,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange, incom
         <span className="step-label"><Icon name="target" size={18}/>{t.studio.goalLabel}</span>
         <p className="step-hint">{t.studio.goalHint(draft.sources.length)}</p>
         {studio?.suggest && <Suggestions studio={studio} draft={draft} setDraft={setDraft} language={language} route={routes.setup?.content}/>}
-        <label>{t.studio.outcome}<textarea rows={4} maxLength={400} value={draft.outcome} placeholder={t.studio.outcomePlaceholder} onChange={e => setDraft(d => ({ ...d, outcome: e.target.value }))}/></label>
+        <label><span>{t.studio.outcome} <span className="optional">{t.common.optional}</span></span><textarea rows={4} maxLength={400} value={draft.outcome} placeholder={t.studio.outcomePlaceholder} onChange={e => setDraft(d => ({ ...d, outcome: e.target.value }))}/></label>
         <label><span>{t.studio.prior} <span className="optional">{t.common.optional}</span></span><input maxLength={200} value={draft.prior} placeholder={t.studio.priorPlaceholder} onChange={e => setDraft(d => ({ ...d, prior: e.target.value }))}/></label>
         {draft.outcome && !goal.success && <p className="field-error">{goalText(t, goal.error.issues[0])}</p>}
         <label>{t.studio.contentLanguage}<select value={language} onChange={e => setDraft(d => ({ ...d, language: e.target.value as ContentLanguage }))}>{(['it', 'en'] as const).map(x => <option key={x} value={x}>{t.languageNames[x]}</option>)}</select></label>
@@ -121,7 +121,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange, incom
         {languageClash && <p className="field-error">{t.studio.questionLanguage(t.languageNames[asked])}</p>}
         <div className="creation-controls"><button className="subtle" onClick={() => setStep(0)}><ArrowLeft size={16}/>{t.studio.material}</button><button className="primary" disabled={!goal.success} onClick={() => setStep(2)}>{t.studio.toGeneration}<ArrowRight size={16}/></button></div>
       </div>
-      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{t.studio.sourcesCount(draft.sources.length)}</span><p>{draft.outcome}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>{t.studio.editGoal}</button></div><Generate studio={studio} routes={routes} sources={draft.sources} goal={goal.success ? goal.data : undefined} language={language} languageClash={languageClash} onCreated={onCreated} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
+      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{t.studio.sourcesCount(draft.sources.length)}</span><p>{draft.outcome.trim() || t.studio.wholeSource}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>{t.studio.editGoal}</button></div><Generate studio={studio} routes={routes} sources={draft.sources} goal={goal.success ? goal.data : undefined} language={language} languageClash={languageClash} onCreated={onCreated} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
     </div>
   </section>;
 }

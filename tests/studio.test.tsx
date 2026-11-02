@@ -74,8 +74,8 @@ function suggestionsFor(request: SuggestionRequest) {
   return [0, 1, 2].map(k => ({ question: it ? `Domanda suggerita ${n + k + 1}: come evapora l’acqua?` : `Suggested question ${n + k + 1}: how does water evaporate?`, kind: (['mechanism', 'argument', 'story'] as const)[k], parts: [`Parte ${k}A`, `Parte ${k}B`, `Parte ${k}C`], cites }));
 }
 const LABELS = {
-  it: { create: 'Smonta una tua fonte', paste: /Incolla testo/, name: 'Nome della fonte', text: 'Testo', add: 'Aggiungi fonte', toGoal: 'Continua con la domanda', outcome: /cosa vuoi capire/i },
-  en: { create: 'Take apart a source', paste: /Paste text/, name: 'Source name', text: 'Text', add: 'Add source', toGoal: 'Continue to the question', outcome: /What do you want to understand/i },
+  it: { create: 'Smonta una tua fonte', paste: /Incolla testo/, name: 'Nome della fonte', text: 'Testo', add: 'Aggiungi fonte', toGoal: 'Continua', outcome: /cosa vuoi capire/i },
+  en: { create: 'Take apart a source', paste: /Paste text/, name: 'Source name', text: 'Text', add: 'Add source', toGoal: 'Continue', outcome: /What do you want to understand/i },
 };
 const local = { version: 1 as const, provider: 'local' as const, local: { runtime: 'llamacpp' as const, baseUrl: 'http://127.0.0.1:8080', model: 'qwen.gguf', check: { enforced: true, detail: 'ok', checkedAt: '2026-10-22T10:00:00.000Z' } } };
 
@@ -108,7 +108,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     const preview = within(item).getByLabelText('Anteprima di Appunti sul ciclo');
     expect(preview.querySelectorAll('.source-line')).toHaveLength(7);
     expect(preview.textContent).toContain('4In quota il vapore si raffredda e condensa in nuvole.');
-    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Continua' }));
     await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     await user.click(studio.getByText('Cosa verrà inviato'));
     const sent = studio.getByText(/^QUESTION:/);
@@ -116,6 +116,24 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(sent.textContent).toBe(buildStructureInput([source], { outcome: goal, priorKnowledge: '' }, 'it'));
     expect(studio.getByText(/Poi una richiesta per pezzo, con le sole righe di quel pezzo/)).toBeInTheDocument();
     expect(studio.getByText(/Circa 5–9 richieste/)).toBeInTheDocument();
+    expect(fake.generate).not.toHaveBeenCalled();
+  });
+
+  it('reaches generation with no question and sends the whole source (P-20261029-source-entry E5)', async () => {
+    const { bridge, studio: fake } = desktop();
+    const { user, studio } = await prepare(bridge, '');
+    expect(studio.getByText(/Senza domanda, l’app la smonta tutta/)).toBeInTheDocument();
+    await user.type(studio.getByLabelText(/cosa vuoi capire/i), 'Perché?');
+    expect(studio.getByText('Scrivi la domanda in almeno 10 caratteri.')).toBeInTheDocument();
+    expect(studio.getByRole('button', { name: 'Continua alla generazione' })).toBeDisabled();
+    await user.clear(studio.getByLabelText(/cosa vuoi capire/i));
+    await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
+    expect(studio.getByText('Tutta la fonte, senza domanda')).toBeInTheDocument();
+    await user.click(studio.getByText('Cosa verrà inviato'));
+    const sent = studio.getByText(/^FOCUS: none/);
+    expect(sent.textContent).not.toContain('QUESTION:');
+    const source = await import('../src/core/source').then(m => m.importSource({ kind: 'paste', title: 'Appunti sul ciclo', text: SOURCE_TEXT }));
+    expect(sent.textContent).toBe(buildStructureInput([source], { outcome: '', priorKnowledge: '' }, 'it'));
     expect(fake.generate).not.toHaveBeenCalled();
   });
 
@@ -163,7 +181,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(alert).toHaveTextContent('limite di utilizzo');
     await user.click(within(alert).getByRole('button', { name: /Apri le impostazioni di ChatGPT/ }));
     expect(fake.openUsageSettings).toHaveBeenCalled();
-    await user.click(studio.getByRole('button', { name: 'Modifica la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Modifica il focus' }));
     expect(studio.getByLabelText(/cosa vuoi capire/i)).toHaveValue(goal);
     await user.click(studio.getByRole('button', { name: 'Materiale' }));
     expect(studio.getByText('Appunti sul ciclo')).toBeInTheDocument();
@@ -184,7 +202,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     const { user, studio } = await prepare(browser);
     await user.click(studio.getByRole('button', { name: 'Materiale' }));
     expect(studioRegion().getByRole('button', { name: /Scegli file/ })).toBeDisabled();
-    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Continua' }));
     expect(studio.queryByRole('button', { name: /Suggerisci scomposizioni/ })).not.toBeInTheDocument();
     await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     expect(studioRegion().getByText(/Accesso e generazione sono disponibili nell’app desktop/)).toBeInTheDocument();
@@ -198,7 +216,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(screen.queryByRole('region', { name: /Rompi il muro/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Continua la bozza' }));
     expect(studioRegion().getByText('Appunti sul ciclo')).toBeInTheDocument();
-    await user.click(studioRegion().getByRole('button', { name: 'Continua con la domanda' }));
+    await user.click(studioRegion().getByRole('button', { name: 'Continua' }));
     expect(studioRegion().getByLabelText(/cosa vuoi capire/i)).toHaveValue(goal);
     expect(fake.generate).not.toHaveBeenCalled();
   });
@@ -300,7 +318,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     await waitFor(() => expect(studio.getByLabelText('Modello')).toHaveValue('model-a'));
     expect(studio.getByRole('button', { name: /Genera lo smontaggio/ })).toBeDisabled();
     expect(studio.getByText(/una lingua del contenuto uguale a quella della domanda/)).toBeInTheDocument();
-    await user.click(studio.getByRole('button', { name: 'Modifica la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Modifica il focus' }));
     await user.selectOptions(studio.getByLabelText('Lingua del contenuto'), 'en');
     await user.click(studio.getByRole('button', { name: 'Continua alla generazione' }));
     await waitFor(() => expect(studio.getByRole('button', { name: /Genera lo smontaggio/ })).toBeEnabled());
@@ -356,7 +374,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(field).toHaveValue('Domanda suggerita 2: come evapora l’acqua? E poi?');
     // Back and forth between steps: the same suggestions, no new request.
     await user.click(studio.getByRole('button', { name: 'Materiale' }));
-    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Continua' }));
     expect(within(studio.getByRole('list', { name: 'Scomposizioni suggerite' })).getAllByRole('listitem')).toHaveLength(3);
     expect(fake.suggest).toHaveBeenCalledTimes(1);
     await user.click(studio.getByRole('button', { name: /Altri suggerimenti/ }));
@@ -370,7 +388,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     await user.click(studio.getByLabelText('Testo'));
     await user.paste('Un’altra fonte sul ciclo dell’acqua, con due righe.\nLa seconda riga.');
     await user.click(studio.getByRole('button', { name: 'Aggiungi fonte' }));
-    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Continua' }));
     expect(studio.queryByRole('list', { name: 'Scomposizioni suggerite' })).not.toBeInTheDocument();
     expect(studio.getByRole('button', { name: /Suggerisci scomposizioni/ })).toBeEnabled();
   });
@@ -455,7 +473,7 @@ describe('source workspace and disassembly generation in the renderer (T4–T6, 
     expect(studio.getByRole('button', { name: 'Resume' })).toBeInTheDocument();
     await user.click(studio.getByRole('button', { name: 'Start over' }));
     expect(host.studio.generate).toHaveBeenLastCalledWith(expect.not.objectContaining({ resume: true }));
-    await user.click(studio.getByRole('button', { name: /Edit the question/ }));
+    await user.click(studio.getByRole('button', { name: /Edit the focus/ }));
     await user.type(studio.getByLabelText(/What do you want to understand/i), ' And back?');
     await user.click(studio.getByRole('button', { name: 'Continue to generation' }));
     expect(studio.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
@@ -525,7 +543,7 @@ describe('texts handed over by an AI assistant (P-20261028-mcp-integration M2)',
     act(() => hand(https));
     await waitFor(() => expect(studio.getByText(capacity)).toBeInTheDocument());
     expect(studio.queryByRole('alert')).toBeNull();
-    await user.click(studio.getByRole('button', { name: 'Continua con la domanda' }));
+    await user.click(studio.getByRole('button', { name: 'Continua' }));
     expect(studio.getByLabelText(/cosa vuoi capire/i)).toHaveValue('Come verifica il browser un certificato?');
   });
 

@@ -45,6 +45,14 @@ describe('interface catalogs', () => {
     expect(enLeaves.map(x => x[0])).toEqual(it.map(x => x[0]));
     expect([...it, ...enLeaves].filter(([, text]) => !text.trim()).map(([path]) => path)).toEqual([]);
   });
+  it('words a source over the character limit as characters, even when it came from a file', () => {
+    const n = (x: number) => x.toLocaleString('it-IT');
+    // A picked file gains its name on the way back from the main process; the measure, not the name, picks the wording.
+    expect(italian.importErrors['too-large']({ name: 'details.md', chars: 49_357, limit: 40_000 }, n)).toBe('«details.md» ha 49.357 caratteri; il limite è 40.000. Seleziona la parte che vuoi studiare.');
+    expect(en.importErrors['too-large']({ name: 'details.md', chars: 49_357, limit: 40_000 }, x => x.toLocaleString('en-US'))).toBe('"details.md" has 49,357 characters; the limit is 40,000. Select the part you want to study.');
+    expect(italian.importErrors['too-large']({ name: 'big.txt', kb: 161, limit: 160 }, n)).toBe('«big.txt» pesa 161 kB; il limite è 160 kB.');
+    expect(italian.importErrors['too-large']({ chars: 40_001, limit: 40_000 }, n)).toBe('La fonte ha 40.001 caratteri; il limite è 40.000. Seleziona la parte che vuoi studiare.');
+  });
   it('resolves the system language from the locale', () => {
     expect(resolveLanguage('system', 'it-IT')).toBe('it');
     expect(resolveLanguage(undefined, 'en-GB')).toBe('en');

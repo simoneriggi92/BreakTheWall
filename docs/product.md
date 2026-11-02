@@ -22,6 +22,8 @@ The idea comes from reverse engineering: tools such as [REA](https://github.com/
 - **Reassemble.** The learner puts the parts back in place. It is optional, and it is the real test.
 - **Parts store.** Every part understood goes into a personal atlas that grows across disassemblies. The learner decides whether and when to come back to it.
 
+**No question needed** (owner, 2026-10-29). Wanting to understand a source is reason enough. By default the learner gives the source and the app takes the whole of it apart: what it is for, how it holds together, and where to start. The learner does not have to know what to ask first; finding that out is part of what the app supports. A question stays available, before generation, as an optional focus.
+
 **⚠ Where the metaphor stops.** Taking software apart has an objective answer: the binary is what it is. Taking a topic apart involves interpretation, and the model can be wrong. This is why every part stays attached to its source and why model inferences must stay distinguishable from quoted content. Evidence is this product's equivalent of reverse engineering's proof.
 
 ### One disassembly, three kinds of joint
@@ -102,8 +104,8 @@ The 3–7 parts rule applies **per level**, not per disassembly. Each screen sta
    └─ Rollback         ← open
 ```
 
-- **The learner's question decides what opens.** Relevant parts are taken apart in depth; the others stay closed sub-assemblies, visible with their function and source, openable on demand.
-- **Nothing disappears silently: the bill of materials.** Every section of the source is either assigned to a part or listed as **not taken apart**, with a reason (outside the question, repetition, context). The host checks it as it checks citations: a line range neither assigned nor excluded is a finding.
+- **What opens.** Without a question, the whole source is taken apart and no sub-assembly is closed; deeper levels open on request. When the learner gives a question, it decides what opens: relevant parts are taken apart in depth, and the others stay closed sub-assemblies, visible with their function and source, openable on demand (the example above).
+- **Nothing disappears silently: the bill of materials.** Every section of the source is either assigned to a part or listed as **not taken apart**, with a reason (repetition, context, or outside the question when the learner gave one). The host checks it as it checks citations: a line range neither assigned nor excluded is a finding.
 
 | Approach | What happens to what is left out |
 |---|---|
@@ -149,7 +151,7 @@ The owner reported that the prototype helped them understand a repository. Use t
 
 ## The disassembly loop
 
-1. **Choose what to take apart.** The learner's question is the goal ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
+1. **Choose what to take apart.** The learner gives the source; by default the whole of it is taken apart. A question is an optional focus ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
 2. **See the exploded view.** The whole, what it does and why it matters, then its 3–7 parts with named joints of the right kind ("sends to", "supports", "leads to").
 3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), and the source lines beside it. The explanation is 2–4 short points, not prose. A point may carry a meaning mark: → a step or consequence, = what stays unchanged, ⚠ a warning. There are no decorative icons per point, because those would not work for narrative or argumentative material.
 4. **Run.** Put a joint under load: predict what happens, step through a sequence or scenario, remove a premise, apply the part to a new case. Not every part needs an activity.
@@ -212,7 +214,7 @@ Later, after the alpha core:
 - **Simulated reassembly.** After each placed part, the mechanism runs with the current assembly. The learner sees what breaks when a part is in the wrong place, and why: a part placed before its input arrives is missing what its incoming joint carries.
 - The cross-disassembly parts store, AI-assisted web discovery, further document formats, contextual regeneration, and richer feedback.
 
-These are direction, not completed features. Analysis of a whole repository without a question, arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
+These are direction, not completed features. Analysis of a whole repository without a question (a text or a document is taken apart whole by default; a repository is larger than one request), arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
 
 ## Learn from use
 

@@ -79,7 +79,7 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     expect(saved).toHaveLength(1);
     const [stored] = saved;
     expect(stored.generation).toMatchObject({ provider: 'assistant', model: 'claude-code 2.1.303' });
-    const base = { sources: [source], goal: { outcome: d.question, priorKnowledge: '' }, language: d.language, meta: { id: stored.id, createdAt: stored.generation!.createdAt, provider: 'assistant' as const, model: 'claude-code 2.1.303' } };
+    const base = { sources: [source], goal: { outcome: d.question ?? '', priorKnowledge: '' }, language: d.language, meta: { id: stored.id, createdAt: stored.generation!.createdAt, provider: 'assistant' as const, model: 'claude-code 2.1.303' } };
     const s = acceptStructure(JSON.stringify(drafts.structure), base);
     const contents = drafts.contents.map((c, i) => acceptContent(JSON.stringify(c), s, i, d.language));
     const runs = acceptRuns(JSON.stringify(drafts.runs), { ...base, structure: s, contents });
@@ -113,6 +113,23 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     expect(textOf(await call(server, 'submit_runs', { json: JSON.stringify(drafts.runs) }))).toContain('is complete: 6 parts');
   });
 
+  it('takes the whole text apart when no question is given (P-20261029-source-entry E6)', async () => {
+    const d = mill() as Disassembly;
+    const server = createBreakTheWallServer({ address: (await running()).address, launch: async () => false }, '0.3.0');
+    await initialize(server);
+    const whole = await call(server, 'start_disassembly', { text: d.sources[0].text, title: d.sources[0].title });
+    expect(whole.result.isError).toBeUndefined();
+    expect(textOf(whole)).toContain('No question was given: take apart the whole text');
+    expect(textOf(whole)).toContain('FOCUS: none. The learner wants to understand the whole source.');
+    expect(textOf(whole)).not.toContain('QUESTION:');
+    expect(textOf(whole)).not.toContain('outside-question');
+    // Without a question or a language, the assistant's default applies: English.
+    expect(textOf(whole)).toContain('written in English');
+    const asked = await call(server, 'start_disassembly', { text: d.sources[0].text, title: d.sources[0].title, question: d.question });
+    expect(textOf(asked)).toContain(`QUESTION: ${d.question}`);
+    expect(textOf(asked)).not.toContain('No question was given');
+  });
+
   it('refuses steps out of order, a short question and an oversized text; a new start replaces an unfinished session', async () => {
     const d = mill() as Disassembly;
     const server = createBreakTheWallServer({ address: 'unused', launch: async () => false }, '0.3.0');
@@ -126,7 +143,7 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     const drafts = draftsFrom(d, (await pastedSource(d)).id);
     await call(server, 'submit_structure', { json: JSON.stringify(drafts.structure) });
     expect(textOf(await call(server, 'submit_part', { index: 1, json: JSON.stringify(drafts.contents[1]) }))).toContain('Submit part 0 next (index 0');
-    expect(textOf(await call(server, 'start_disassembly', {}))).toContain('needs "text" and "question"');
+    expect(textOf(await call(server, 'start_disassembly', {}))).toContain('needs "text" as a string');
   });
 
   it('keeps a finished disassembly when the app cannot be reached, and saves it on the next call', async () => {
