@@ -8,7 +8,9 @@ import { acceptContent, acceptRuns, acceptStructure, assembleDisassembly } from 
 import { saveFromAssistant } from '../src/desktop/assistants';
 import { DisassemblyStore } from '../src/desktop/disassembly-store';
 import { answer, IncomingServer, incomingAddress, type IncomingHandlers } from '../src/desktop/incoming';
-import { MAX_ATTEMPTS } from '../src/mcp/assistant';
+import { formatSourceBlock } from '../src/core/disassembly-generation';
+import { hashText } from '../src/core/lesson';
+import { MAX_ATTEMPTS, PAGE_CHARS, REPLY_CHARS } from '../src/mcp/assistant';
 import { createBreakTheWallServer } from '../src/mcp/server';
 import { atlas, mill } from './disassemblies';
 import { draftsFrom, pastedSource } from './disassembly-drafts';
@@ -64,12 +66,19 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     const total = drafts.structure.parts.length + 2;
     const structure = await call(server, 'submit_structure', { json: JSON.stringify(drafts.structure) });
     expect(textOf(structure)).toContain(`STEP 2 of ${total}: the content of part 0`);
+    let runsRequest = '';
     for (const [index, content] of drafts.contents.entries()) {
       // A model may pass the JSON as an object rather than a string; both are accepted.
       const reply = await call(server, 'submit_part', { index, json: index % 2 ? content : JSON.stringify(content) });
       expect(reply.result.isError).toBeUndefined();
       expect(textOf(reply)).toContain(index + 1 < drafts.contents.length ? `STEP ${index + 3} of ${total}` : `STEP ${total} of ${total}: the runs`);
+      runsRequest = textOf(reply);
     }
+    // P-20261029-source-limits S3: the sources are numbered once, in step 1; the runs step names them instead.
+    const numbered = /^ *\d+\| /m;
+    expect(textOf(started)).toMatch(numbered);
+    expect(runsRequest).not.toMatch(numbered);
+    expect(runsRequest).toContain(`Cite the line numbers of the numbered sources from step 1:\n  ${source.id} «${source.title}», ${source.text.split('\n').length} lines`);
     const done = await call(server, 'submit_runs', { json: JSON.stringify(drafts.runs) });
     expect(done.result.isError).toBeUndefined();
     expect(textOf(done)).toContain('It is saved in the user\'s Break the Wall library and open there.');
@@ -85,6 +94,79 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     const runs = acceptRuns(JSON.stringify(drafts.runs), { ...base, structure: s, contents });
     expect(stored).toEqual(await assembleDisassembly({ ...base, structure: s, contents, runs }));
     expect(app.opened.map(x => x.id)).toEqual([stored.id]);
+  });
+
+  // P-20261029-source-limits S5, S6: Claude Code passes a tool result to the model only up to a limit, so a long source comes in pages.
+  async function longAtlas() {
+    const d = atlas() as Disassembly;
+    const original = d.sources[0].text.split('\n').length;
+    // 5,000 lines and 120,000 characters, the added lines cited by "start", a part without sub-parts.
+    const added = 5_000 - original; const width = Math.floor((120_000 - d.sources[0].text.length - added) / added);
+    const filler = Array.from({ length: added }, (_, i) => `Added line ${original + i + 1}. `.padEnd(width, '·'));
+    d.sources[0].text = `${d.sources[0].text}\n${filler.join('\n')}`;
+    d.sources[0].text += '·'.repeat(120_000 - d.sources[0].text.length);
+    d.sources[0].sha256 = await hashText(d.sources[0].text);
+    expect(d.sources[0].text).toHaveLength(120_000);
+    d.parts.find(p => p.id === 'start')!.cites.push({ source: d.sources[0].id, from: original + 1, to: 5_000 });
+    return d;
+  }
+
+  it('sends a long source in pages, holds the structure until every page is read, and names the pages for a long part', async () => {
+    const d = await longAtlas();
+    const server = createBreakTheWallServer({ address: 'unused', launch: async () => false }, '0.3.0');
+    expect(textOf(await call(server, 'read_source', { page: 1 }))).toBe('No disassembly is in progress: call start_disassembly first.');
+    const source = await pastedSource(d);
+    const drafts = draftsFrom(d, source.id);
+
+    // Page 1 gets what the instructions and the schema leave in the first reply; the later pages are larger (S6).
+    const started = textOf(await call(server, 'start_disassembly', { text: source.text, title: source.title, question: d.question }));
+    expect(started.length).toBeLessThanOrEqual(REPLY_CHARS);
+    expect(started).toContain('The numbered source is in 5 pages; page 1 is at the end of this reply. Call read_source with page 2, 3, 4 and 5 before submit_structure.');
+    expect(started).toContain('PAGE 1 of 5 (');
+    for (const page of [0, 6, 1.5]) expect(textOf(await call(server, 'read_source', { page }))).toBe('There are 5 pages: call read_source with a page from 1 to 5.');
+
+    // Not counted: after the pages, a wrong structure is the first attempt.
+    const early = await call(server, 'submit_structure', { json: JSON.stringify(drafts.structure) });
+    expect(early.result.isError).toBe(true);
+    expect(textOf(early)).toBe('Read page 2, 3, 4 and 5 of the numbered source first, with read_source, then submit the structure again. This does not count as an attempt.');
+    const pages = [started.slice(started.indexOf('PAGE 1 of 5'))];
+    const left: Record<number, string> = { 2: '3, 4 and 5', 3: '4 and 5', 4: '5' };
+    for (const page of [2, 3, 4, 5]) {
+      const reply = textOf(await call(server, 'read_source', { page }));
+      expect(reply.length).toBeLessThanOrEqual(REPLY_CHARS);
+      expect(reply.startsWith(`PAGE ${page} of 5 (`)).toBe(true);
+      expect(reply).toContain(page < 5 ? `Still to read: page ${left[page]}.` : 'Every page is read: write the structure and call submit_structure.');
+      pages.push(reply);
+    }
+    // Every later page within its size (its own line aside), and together exactly the numbered source, line by line.
+    const rows = (text: string) => text.split('\n').filter(l => /^ *\d+\| /.test(l));
+    for (const page of pages.slice(1)) expect(page.split('\n\n')[0].replace(/^PAGE .*\n/, '').length).toBeLessThanOrEqual(PAGE_CHARS);
+    expect(pages.flatMap(rows)).toEqual(rows(formatSourceBlock(source)));
+    const wrong = structuredClone(drafts.structure); wrong.parts[0].role = 'x'.repeat(300);
+    expect(textOf(await call(server, 'submit_structure', { json: JSON.stringify(wrong) }))).toMatch(new RegExp(`^Not accepted \\(attempt 1 of ${MAX_ATTEMPTS} for the structure\\)`));
+
+    // "start" cites more lines than one reply holds: its request names them and their pages instead.
+    const structure = textOf(await call(server, 'submit_structure', { json: JSON.stringify(drafts.structure) }));
+    expect(structure.length).toBeLessThanOrEqual(REPLY_CHARS);
+    expect(structure).toMatch(/ITS LINES: .*, in page 1, 2, 3, 4 and 5 of the numbered source\. Read them again with read_source if you need them\./);
+    for (const [index, content] of drafts.contents.entries()) {
+      const reply = textOf(await call(server, 'submit_part', { index, json: JSON.stringify(content) }));
+      expect(reply.length).toBeLessThanOrEqual(REPLY_CHARS);
+      if (index + 1 === drafts.contents.length) expect(reply).toContain('The numbered source was in 5 pages; read_source returns any of them again.');
+    }
+    expect(textOf(await call(server, 'submit_runs', { json: JSON.stringify(drafts.runs) }))).toContain('is complete: 6 parts');
+  });
+
+  it('keeps the first reply within its size with the longest question and title, by making page 1 smaller (S6)', async () => {
+    const d = await longAtlas();
+    const server = createBreakTheWallServer({ address: 'unused', launch: async () => false }, '0.3.0');
+    const question = `What does the atlas show ${'and why '.repeat(60)}`.slice(0, 400).trim().padEnd(400, '?');
+    const started = textOf(await call(server, 'start_disassembly', { text: d.sources[0].text, title: 'T'.repeat(120), question }));
+    expect(started).toContain(question);
+    expect(started.length).toBeLessThanOrEqual(REPLY_CHARS);
+    const short = textOf(await call(server, 'start_disassembly', { text: d.sources[0].text, title: 'T', question: 'What does the atlas show?' }));
+    const lastLine = (text: string) => Number(/PAGE 1 of \d+ \(\S+ lines 1–(\d+)\)/.exec(text)![1]);
+    expect(lastLine(started)).toBeLessThan(lastLine(short));
   });
 
   it('returns the app\'s findings, counts attempts, and after the limit keeps the work and waits for the user (M6a)', async () => {
@@ -135,7 +217,7 @@ describe('level B: the assistant writes a disassembly the app checks (M6–M7)',
     const server = createBreakTheWallServer({ address: 'unused', launch: async () => false }, '0.3.0');
     expect(textOf(await call(server, 'submit_structure', { json: '{}' }))).toBe('No disassembly is in progress: call start_disassembly first.');
     expect(textOf(await call(server, 'start_disassembly', { text: 'one line', question: 'Why?' }))).toContain('10 to 400 characters');
-    expect(textOf(await call(server, 'start_disassembly', { text: 'x'.repeat(40_001), question: 'What does this text say?' }))).toContain('at most 40000');
+    expect(textOf(await call(server, 'start_disassembly', { text: 'x'.repeat(120_001), question: 'What does this text say?' }))).toContain('at most 120000');
     expect((await call(server, 'start_disassembly', { text: 'a\nb', question: 'What does this text say?' })).result.isError).toBeUndefined();
     expect(textOf(await call(server, 'submit_runs', { json: '{}' }))).toBe('That step is not the current one. Next: submit_structure.');
     // The real session: Mill, from the start again.

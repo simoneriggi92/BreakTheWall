@@ -18,7 +18,7 @@ export type RecoveryAction = 'sign-in' | 'enable-plan' | 'retry' | 'usage-settin
 export type FailureReason = 'local-not-a-server' | 'local-timeout' | 'local-stopped' | 'local-no-template' | 'local-unreadable'
   | 'sign-in-busy' | 'sign-in-denied' | 'sign-in-other-app' | 'sign-in-no-code' | 'sign-in-no-identity' | 'sign-in-other-account'
   | 'session-rejected' | 'models-format' | 'stream-unreadable' | 'sign-in-port' | 'sign-in-timeout' | 'sign-in-cancelled'
-  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified' | 'question-language' | 'part-not-divisible' | 'draft-changed';
+  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified' | 'question-language' | 'part-not-divisible' | 'draft-changed' | 'local-window';
 /** `message` stays Italian for logs and tests; the interface words the failure from `reason` or `code`. */
 export interface ProviderFailure { code: FailureCode; reason?: FailureReason; message: string; action?: RecoveryAction; issues?: string[]; requestId?: string }
 

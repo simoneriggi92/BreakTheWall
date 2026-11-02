@@ -2,10 +2,10 @@
 id: P-20261029-source-entry
 title: Understand a source without a question - the question becomes an optional focus
 version: 1
-state: implementing
-current_task: E10
-last_evidence: E10.1 local checks and E10.2 integration check (32 combinations) passed; CI, a generation without a question (E10.3) and the owner trial (E10.4) pending
-next_action: Owner confirms push and pull request for CI, chooses the route for one generation without a question (E10.3), and tries their own document (E10.4)
+state: completed
+current_task: none
+last_evidence: E1-E10 verified - CI on macOS and Windows; three public generations without a question accepted; the owner's document taken apart whole and judged to follow the mechanism, with an overview and drawing that orient
+next_action: None; #36 merges, then #39 retargeted to main. Sub-assemblies in long whole-source disassemblies would be a new plan
 approval: approved
 ---
 
@@ -203,3 +203,18 @@ Version 1, approved:
   3. **One generation without a question** on a public source: not run. It spends a route the owner chooses (a local model, ChatGPT or the MCP assistant).
   4. **The owner's document**: pending, on the owner's device.
 - **A wrong message found during E10.4 (2026-10-29), fixed on the owner's request.** The owner's document has 49,357 characters, over the 40,000 per source (`SOURCE_LIMITS.maxCharsPerSource`). The import refused it correctly, but the app said it weighed "0 kB" against a limit of "40.000 kB": the main process adds the file's name to every import error, and the "too-large" wording chose the file-size sentence whenever a name was present. It now chooses by the measure (kilobytes or characters), and names the file in the characters sentence too. Evidence (automated test, `tests/i18n.test.tsx`): both languages, a named file over the character limit, a file over the size limit, and a pasted text. The limit itself is unchanged: raising it changes the size of every request and is outside this plan. The owner can load the document as two sources, split at its section 11 (about 32,300 and 17,000 characters; 49,357 in all, within the 60,000 total).
+
+- 2026-11-02: resumed after P-20261029-source-limits completed (owner: "Yes, resume"). The runs below took place on `feature/source-limits`, which holds this plan's code (E1–E9) and raises the source limits on top of it.
+- **E10.1, CI.** On pull request #36 (head `7f05151`): "Types, tests and build" on macOS, "Windows: types, tests and build" and GitGuardian passed. The same checks passed on pull request #39 at `2af1e84`.
+- **E10.3, one generation without a question on a public source: passed.** The route the owner chose and confirmed is Claude via MCP (Claude Code 2.1.303, `claude -p --model sonnet`, only the branch's bundled MCP server). The source was 90,096 characters in 915 lines from this repository's documents, with no question. It ran three times, recorded in P-20261029-source-limits S4.3 (2026-10-30 and 2026-11-02), and each time the app's checks accepted the result and saved it with a `start`.
+  - Whole-source mode: each request carried no question, and each result named the part to begin with (`start` on the product, idea and identity parts).
+  - Outline risk (this plan's Risks): in the last run, after the source reached the model in full pages, all seven parts gathered three to seven sections from two to four documents, so the parts follow the mechanism, not the table of contents. No part opened into sub-assemblies. The first run, where the model saw only headings, had three parts of six of that kind.
+  - Token use: Claude Code reported 45,669, 54,152 and 53,044 output tokens ($1.35, $1.69, $1.66). The app reports no tokens for the MCP route.
+- **E10.4, the owner's document (2026-11-02, on the owner's device): run, judgement pending.** The app was started from `feature/source-limits` with the owner's own library. Claude Code 2.1.316 with Sonnet 5.5, using only the branch's MCP server, took the document apart whole: one source of 49,357 characters in 956 lines, with no question. The app saved and opened it with 7 parts, 3 runs and a `start`. The owner's first word was "mi sembra corretto". The plan asks whether the overview and the drawing orient the owner and whether the parts follow the mechanism or the outline; that answer is still to come. The content stays on the owner's device; this record names no part of it.
+- **E10.4, the owner's judgement (2026-11-02): passed.** Asked whether the overview and the drawing orient them and whether the parts follow the mechanism or the outline, the owner answered "Yes, mechanism". No version 2 is needed for the instructions.
+
+## State changes
+
+- 2026-10-30: `implementing` → `blocked`. Every task is implemented (E1–E9) and E10.1–E10.2 are recorded; E10.3 and E10.4 are not run. The owner chose to raise the source limits first ("v2 sopra source-entry"): P-20261029-source-limits v2 implements on a branch that starts from this one, while this plan waits, so only one plan is active. It returns to `implementing` for E10.3 and E10.4, and E10.4 can then take the owner's document whole. Pull request #36 merges first, the source-limits pull request after it.
+- 2026-11-02: `blocked` → `implementing`. P-20261029-source-limits is completed, so this is the only active plan; E10.3 is recorded and E10.4 waits for the owner's judgement.
+- 2026-11-02: `implementing` → `completed`. E1–E10 are verified, with the evidence above.

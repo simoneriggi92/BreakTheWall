@@ -4,6 +4,8 @@ import type { Completer, CompletionRequest } from '../completion';
 type Fetch = typeof fetch;
 const DETECT_MS = 1_500;
 const IDLE_MS = 180_000;
+/** The largest window the app asks Ollama for; other local servers report their own. */
+export const OLLAMA_MAX_CONTEXT = 65_536;
 
 async function getJson(fetchImpl: Fetch, url: string): Promise<unknown> {
   try {
@@ -98,9 +100,12 @@ export async function completeLocal(fetchImpl: Fetch, target: LocalModel, reques
   const add = (piece: unknown) => { if (typeof piece === 'string' && piece) { text += piece; onProgress(text.length); } };
   try {
     if (target.runtime === 'ollama') {
-      // Ollama truncates prompts silently beyond num_ctx, so the window is sized from the request.
+      // Ollama truncates prompts silently beyond num_ctx, so the window is sized from the request, and a request that
+      // would need more than the app asks for is refused here, before anything is sent (P-20261029-source-limits S2).
       const chars = messages.reduce((sum, m) => sum + m.content.length, 0);
-      const numCtx = Math.min(65_536, Math.max(16_384, Math.ceil((chars / 3 + 12_000) / 4_096) * 4_096));
+      const needed = Math.ceil((chars / 3 + 12_000) / 4_096) * 4_096;
+      if (needed > OLLAMA_MAX_CONTEXT) throw new ProviderError(failure('local-context', { reason: 'local-window', message: `La richiesta richiede circa ${needed} token di contesto; Ollama ne riceve al massimo ${OLLAMA_MAX_CONTEXT}.` }));
+      const numCtx = Math.max(16_384, needed);
       const body = { model: target.model, messages, format: request.schema, stream: true, think: false, keep_alive: '15m', options: { num_ctx: numCtx, ...(request.maxTokens ? { num_predict: request.maxTokens } : {}) } };
       let res: Response;
       try { res = await post(fetchImpl, `${baseUrl}/api/chat`, body, signal); }

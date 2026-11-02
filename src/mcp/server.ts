@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { INCOMING_PROTOCOL, lineReader, type IncomingReply } from '../desktop/incoming';
 import type { Disassembly } from '../core/disassembly';
+import { SOURCE_LIMITS } from '../core/source';
 import { AssistantWriter, type StepReply } from './assistant';
+
+/** The limits a text must meet, read from the app's own (P-20261029-source-limits S3). */
+const LIMITS = `at most ${SOURCE_LIMITS.maxCharsPerSource.toLocaleString('en-US')} characters and ${SOURCE_LIMITS.maxLines.toLocaleString('en-US')} lines`;
 import { createMcpServer, type ClientInfo, type PromptDefinition, type ToolDefinition, type ToolResult } from './protocol';
 import prompts from './prompts.json';
 
@@ -93,7 +97,7 @@ const openArgs = z.object({
 export const TOOLS: ToolDefinition[] = [{
   name: 'open_in_break_the_wall',
   title: 'Open in Break the Wall',
-  description: 'Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates the disassembly in the app, with the app\'s own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), use start_disassembly instead. Send the text exactly as the user should study it, as plain text or Markdown (at most 40,000 characters and 1,500 lines).',
+  description: `Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates the disassembly in the app, with the app's own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), use start_disassembly instead. Send the text exactly as the user should study it, as plain text or Markdown (${LIMITS}).`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -107,11 +111,11 @@ export const TOOLS: ToolDefinition[] = [{
 }, {
   name: 'start_disassembly',
   title: 'Write a Break the Wall disassembly',
-  description: 'Take a text apart with Break the Wall: you write the disassembly yourself, and Break the Wall checks it. This is the tool to use when the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), including an answer you just wrote. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the numbered source and the JSON schema for the first phase.',
+  description: 'Take a text apart with Break the Wall: you write the disassembly yourself, and Break the Wall checks it. This is the tool to use when the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), including an answer you just wrote. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the JSON schema for the first phase and the numbered source; a long source comes in pages, the rest read with read_source.',
   inputSchema: {
     type: 'object',
     properties: {
-      text: { type: 'string', description: 'The full text to take apart, as plain text or Markdown (at most 40,000 characters and 1,500 lines).' },
+      text: { type: 'string', description: `The full text to take apart, as plain text or Markdown (${LIMITS}).` },
       title: { type: 'string', description: 'A short name for the source, shown in citations (at most 120 characters).' },
       question: { type: 'string', description: 'What the user wants to understand about the text, as a question (10 to 400 characters), only if they asked one. Without it, the whole text is taken apart.' },
       language: { type: 'string', enum: ['it', 'en'], description: 'The language to write the disassembly in; by default the question\'s, or the text\'s without a question.' },
@@ -119,6 +123,11 @@ export const TOOLS: ToolDefinition[] = [{
     required: ['text'],
     additionalProperties: false,
   },
+}, {
+  name: 'read_source',
+  title: 'Read a page of the source',
+  description: 'Read one page of the numbered source of the disassembly started with start_disassembly. A long source comes in pages so that each reply stays readable; start_disassembly says how many there are and returns page 1. Read every page before submit_structure, and any page again later to check line numbers.',
+  inputSchema: { type: 'object', properties: { page: { type: 'integer', minimum: 1, description: 'The page to read, from 1 to the number start_disassembly gave.' } }, required: ['page'], additionalProperties: false },
 }, {
   name: 'submit_structure',
   title: 'Submit the structure',
@@ -167,6 +176,7 @@ export function createBreakTheWallServer(link: AppLink, version: string, writer 
         if (!input.success) return { content: [{ type: 'text', text: 'start_disassembly needs "text" as a string, and optionally "title", "question" and "language" ("it" or "en").' }], isError: true };
         return asResult(await writer.start(input.data, clientName(client)));
       }
+      if (name === 'read_source') return asResult(writer.readSource(args.page));
       if (name === 'submit_structure') return asResult(writer.submitStructure(args.json));
       if (name === 'submit_part') return asResult(writer.submitPart(args.index, args.json));
       if (name === 'submit_runs') {

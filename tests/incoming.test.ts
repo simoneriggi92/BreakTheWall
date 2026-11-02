@@ -92,7 +92,7 @@ describe('answers', () => {
 
   it('passes on the import limits a paste meets, and hides other failures', async () => {
     expect(await answer('{"v":1,"type":"open","text":"   "}', handlers())).toMatchObject({ ok: false, code: 'empty' });
-    expect(await answer(JSON.stringify({ v: 1, type: 'open', text: 'x'.repeat(40_001) }), handlers())).toMatchObject({ ok: false, code: 'too-large', params: { chars: 40_001, limit: 40_000 } });
+    expect(await answer(JSON.stringify({ v: 1, type: 'open', text: 'x'.repeat(120_001) }), handlers())).toMatchObject({ ok: false, code: 'too-large', params: { chars: 120_001, limit: 120_000 } });
     const broken: IncomingHandlers = { version: '1', open: async () => { throw new Error('/Users/me/secret path'); } };
     expect(await answer('{"v":1,"type":"open","text":"x"}', broken)).toEqual({ ok: false, code: 'unavailable', message: 'The app could not open the text.' });
   });

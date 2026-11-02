@@ -60,6 +60,24 @@ describe('disassembly fixtures', () => {
     const d = await validateDisassembly(story());
     expect(citedLines(d, d.parts[0].cites[0])).toEqual(d.sources[0].text.split('\n').slice(4, 6));
   });
+
+  it('stores a source as long as an import allows, and no longer (P-20261029-source-limits S1)', async () => {
+    const d = story(); const source = d.sources[0];
+    const lines = source.text.split('\n').length;
+    const lengthen = async (size: number) => {
+      const filler = 'x'.repeat(99) + '\n';
+      const rest = size - source.text.length - 1;
+      source.text = `${story().sources[0].text}\n${filler.repeat(Math.ceil(rest / 100)).slice(0, rest)}`;
+      source.sha256 = await hashText(source.text);
+      d.bom.excluded = [...story().bom.excluded, { source: source.id, from: lines + 1, to: source.text.split('\n').length, reason: 'detail' }];
+    };
+    await lengthen(120_000);
+    expect(source.text).toHaveLength(120_000);
+    await expect(validateDisassembly(d)).resolves.toMatchObject({ id: d.id });
+    source.text = story().sources[0].text;
+    await lengthen(120_001);
+    expect(await findings(d)).toContainEqual(expect.objectContaining({ path: 'sources[0].text' }));
+  });
 });
 
 describe('located findings', () => {
