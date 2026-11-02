@@ -49,6 +49,10 @@ export function JointPath({ joint, points, label, muted = false, flowing = false
 export interface SheetProps {
   layout: LevelLayout; parts: Part[]; joints: Joint[]; title: string; subtitle: string; language: string;
   selected?: string; onSelect?: (id: string) => void; onEnter?: (id: string) => void;
+  /** A detail keeps the canonical drawing's numbers rather than renumbering its visible subset. */
+  numbering?: ReadonlyMap<string, number>;
+  /** A source-linked detail keeps the plates and frame, without repeating the whole sheet's title block. */
+  detail?: boolean;
   /** Run decorations: scenario states, the joints that carry the current step, a removed brick and the target's verdict. */
   states?: Record<string, string>; flow?: [string, string][]; bricks?: string[]; removed?: string; target?: { id: string; verdict: 'falls' | 'weakens' | 'holds' };
   /**
@@ -61,7 +65,7 @@ export interface SheetProps {
 const TITLE_BLOCK = 64;
 
 /** The exploded view: one level drawn from the automatic layout, as a technical sheet with a title block. */
-export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1 }: SheetProps) {
+export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1, numbering, detail = false }: SheetProps) {
   const { t } = usePreferences();
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -81,7 +85,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
     const observer = new ResizeObserver(bringIntoView); observer.observe(svg);
     return () => observer.disconnect();
   }, [selected, layout, fit, zoom]);
-  const width = Math.max(layout.width, 560); const height = layout.height + TITLE_BLOCK;
+  const width = detail ? layout.width : Math.max(layout.width, 560); const height = layout.height + (detail ? 0 : TITLE_BLOCK);
   // Zoom scales the fitted size, so the sheet grows from what the learner saw and leaves no blank paper around it.
   const [room, setRoom] = useState<{ w: number; h: number }>();
   useEffect(() => {
@@ -97,7 +101,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
   const flowing = (j: Joint) => flow.some(([a, b]) => (a === j.from && b === j.to) || (a === j.to && b === j.from));
   const asides = useMemo(() => layout.joints.map((_, i) => labelBeside(layout, i)), [layout]);
   // Numbers follow the reading order, and plates are drawn in it, so the Tab key follows the numbers too.
-  const numbers = useMemo(() => readingNumbers(layout), [layout]);
+  const numbers = useMemo(() => numbering ?? readingNumbers(layout), [layout, numbering]);
   const plates = useMemo(() => [...layout.plates].sort((a, b) => numbers.get(a.id)! - numbers.get(b.id)!), [layout, numbers]);
   // Only the drawing scrolls sideways when it is wider than the room; the panels around it never do.
   return <div ref={scroll} className="sheet-scroll"><svg className={`sheet${fit ? ` fit-${fit}` : ''}`} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={t.d.sheetLabel(title)}
@@ -133,11 +137,11 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
       </g>;
     })}
     {/* In the title block's band, at the left: the plates never reach it, and the balloons sit above their plates. */}
-    <text className="tb-text reading-note" x={24} y={height - 24}>{t.d.readingOrder}</text>
+    {!detail && <><text className="tb-text reading-note" x={24} y={height - 24}>{t.d.readingOrder}</text>
     <g className="title-block" transform={`translate(${width - 13 - 320} ${height - 13 - 50})`}>
       <rect className="frame-inner" width={320} height={50}/><line className="tb-line" x1={0} y1={28} x2={320} y2={28}/>
       <text className="tb-title" x={10} y={19} lang={language}>{title.length > 40 ? title.slice(0, 39) + '…' : title}</text>
       <text className="tb-text" x={10} y={43}>{subtitle}</text>
-    </g>
+    </g></>}
   </svg></div>;
 }

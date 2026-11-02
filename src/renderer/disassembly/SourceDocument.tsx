@@ -12,9 +12,11 @@ type Source = Disassembly['sources'][number];
  * A prose source read as a document (D18). Citations still work: the innermost blocks whose source lines meet the
  * focused citation are highlighted and scrolled into view inside this pane, and the open part's blocks are shaded.
  */
-export function SourceDocument({ source, focus, cited, className = '', active = true }: { source: Source; focus?: Cite; cited: Cite[]; className?: string; active?: boolean }) {
+export function SourceDocument({ source, focus, cited, className = '', active = true, passage }: { source: Source; focus?: Cite; cited: Cite[]; className?: string; active?: boolean; passage?: Cite }) {
   const { t, theme } = usePreferences();
-  const rendered = useMemo(() => renderMarkdown(source.text), [source.text]);
+  const rendered = useMemo(() => passage
+    ? renderMarkdown(source.text.split('\n').slice(passage.from - 1, passage.to).join('\n'), passage.from)
+    : renderMarkdown(source.text), [source.text, passage]);
   const host = useRef<HTMLDivElement>(null);
 
   // Diagrams are drawn after the text, each in its own figure; one that does not parse keeps its code, with a note.
