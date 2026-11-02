@@ -1,11 +1,11 @@
 ---
 id: P-20261029-source-limits
 title: Larger sources - no per-source limit, a higher total, and an explicit check where a route cannot carry it
-version: 2
+version: 3
 state: implementing
 current_task: S4
-last_evidence: Phases limits (S1-S2) and assistant (S3) implemented; TypeScript check, 29 test files with 460 tests and both builds pass on macOS; the bundled MCP server lists the new limits
-next_action: Implement phase verify with a separate command, "implement P-20261029-source-limits v2 --phase verify"; it needs push and a pull request for CI, a route and cost for S4.3, and the owner's document for S4.4
+last_evidence: S1-S3 and S5 implemented; TypeScript check, 29 test files with 462 tests and both builds pass on macOS; the bundled MCP server lists read_source; S4.1 and S4.2 passed; S4.3 to repeat after S5; S4.4 pending
+next_action: Repeat S4.3 through Claude Code on the same text, at a cost the owner confirms (about $1.35 the first time); the owner tries their document as one source (S4.4)
 approval: approved
 ---
 
@@ -16,7 +16,7 @@ approval: approved
 A learner can take apart a long document as one source:
 - **No per-source limit of its own.** One source may be as long as the whole selection allows.
 - **A higher total: 120,000 characters** (today 60,000), with the line, file-size and stored-source limits raised to match.
-- **Each route says when it cannot carry a request**, before sending it, instead of failing later: the local route checks the window it can give the model; the MCP assistant receives the source twice instead of three times.
+- **Each route says when it cannot carry a request**, before sending it, instead of failing later: the local route checks the window it can give the model; the MCP assistant receives the source twice instead of three times, and a long source in pages, each within what an assistant app passes to its model.
 
 The owner's document (49,357 characters) then imports whole, and so does a document about twice as long.
 
@@ -29,10 +29,11 @@ The owner's document (49,357 characters) then imports whole, and so does a docum
 - The per-source limit of 40,000 characters is too restrictive: "è troppo limitante".
 - Limits must not be set by local models: most use is through the MCP assistant or a hosted model, and local models get their own handling when it is needed.
 - 2026-10-30: raise the limits before P-20261029-source-entry finishes its last checks, building on that plan's branch ("v2 sopra source-entry"). Version 2 changes only where this plan starts and how its pull request merges.
+- 2026-10-30, after S4.3: send a long source to the assistant in pages ("v3 con fonte a pagine") rather than lowering the limit for the MCP route, the route the owner uses most.
 
 ## Scope
 
-Included: `SOURCE_LIMITS` and the stored source schema; the local route's request (Ollama); the MCP assistant's runs step and the tool's description; Studio's wording where it repeats a limit; tests.
+Included: `SOURCE_LIMITS` and the stored source schema; the local route's request (Ollama); the MCP assistant's first step (the source in pages), its runs step and the tools' descriptions; Studio's wording where it repeats a limit; tests.
 
 Not included:
 - more than 4 sources, or longer lines (a citation must still point at a readable line);
@@ -64,15 +65,36 @@ Acceptance (tests): a request estimated above the window fails with `local-conte
 **S3. The assistant gets the source twice, not three times.** The MCP runs step asks the assistant to cite the numbered sources it received in step 1 instead of repeating them; it still carries the structure and the written parts. The app's own generator, whose requests are independent, keeps sending them. The description of `start_disassembly` states the limits from `SOURCE_LIMITS` instead of fixed numbers (today "at most 40,000 characters and 1,500 lines").
 Acceptance (tests): the runs reply of `start_disassembly`'s session contains no numbered source line and names step 1; a full session on Atlas and Mill still ends in a saved disassembly; the tool's description contains "120,000" and "5,000", taken from the constants.
 
+### Phase `paging`
+
+**S5. A long source reaches the assistant in pages.** Claude Code passes a tool result to the model only up to its limit and writes a longer one to a file, so the model saw the instructions, the schema and 37 numbered lines of a 915-line source (S4.3). The MCP assistant keeps every reply within 60,000 characters, about 20,000 tokens:
+- The numbered source (`formatSourceBlock`) is split on line boundaries into pages of at most 45,000 characters; each page says which source and lines it holds, and that it is page *k* of *n*.
+- `start_disassembly` returns the header, the instructions, the schema, the request's focus and language, and page 1. With more than one page, it says how many and asks the assistant to call `read_source` for each before `submit_structure`.
+- A new tool, `read_source` with `page`, returns that page of the current session's source. It works in every phase, so the assistant can read a page again.
+- `submit_structure` before every page was read is refused without counting an attempt, naming the pages still to read.
+- A part request whose cited lines do not fit in one page names the pages that hold them instead of sending the lines; the runs step (S3) names the pages of step 1.
+- A source that fits in one page (Atlas, Mill, the importer) gives the same replies as today, apart from the line saying it is page 1 of 1.
+
+Acceptance (tests):
+- a source of 120,000 characters in 5,000 lines gives a first reply under 60,000 characters and four pages, each under 45,000 characters; the pages put together are exactly the numbered source;
+- `read_source` before a session, or with a page outside 1–*n*, is refused with the valid range;
+- `submit_structure` before the last page is refused, names the missing pages and does not count as an attempt; after reading them, the same answer is accepted;
+- a part whose lines do not fit in one page gets the pages named, and its reply stays under 60,000 characters;
+- full sessions on Atlas and Mill still end in a saved disassembly;
+- the tool list (and the bundled server's `tools/list`) includes `read_source` with its description.
+
 ### Phase `verify`
 
 **S4. Checked and witnessed.**
 1. `npm run check` and `npm run build` on macOS; CI on macOS and Windows.
 2. Integration check on the built app, with a scratch data folder: a 120,000-character pasted source imports, its preview and the source pane stay usable at 5,000 lines (scrolling and selecting a citation), and Studio shows the new limits in both languages.
-3. One generation on a long public source, between 80,000 and 120,000 characters taken from this repository's documents (up to 4 sources), through a route and at a cost the owner confirms; the app's checks accept it, and the parts are judged as parts of the mechanism rather than a table of contents.
+3. One generation on a long public source, between 80,000 and 120,000 characters taken from this repository's documents (up to 4 sources), through a route and at a cost the owner confirms; the app's checks accept it, and the parts are judged as parts of the mechanism rather than a table of contents. Done once on version 2 (see Progress); repeated after S5 on the same text through the same route, at a cost the owner confirms: every page is read, and no tool result is written to a file.
 4. The owner's own document as one source, on the owner's device. With an empty question, the same trial also serves P-20261029-source-entry E10.4, recorded there when that plan resumes.
 
 ## Risks
+
+- **The assistant app's limit is assumed, not measured.** Claude Code's limit for a tool result is taken as its documented default, about 25,000 tokens; Claude Desktop's is not known. Pages keep every reply within 60,000 characters, about 20,000 tokens at 3 characters a token. S4.3, repeated, checks it in Claude Code only.
+- **An assistant may skip pages.** `submit_structure` refuses until every page was read, but a model could read a page without using it. The app's checks on citations and on the bill of materials still apply.
 
 - **The parts may become an outline.** 3–7 parts on 120,000 characters rely on sub-assemblies and on taking parts apart later. S4.3 shows it; if it happens, a version 2 changes the instructions or adds a level, not the limits.
 - **ChatGPT's window is assumed, not checked.** About 45,000 tokens per full request. S4.3 is the check when that route is chosen; a refusal from the provider stays a recoverable failure.
@@ -89,7 +111,7 @@ Acceptance (tests): the runs reply of `start_disassembly`'s session contains no 
 
 ## Approval
 
-Approve with: `Approve P-20261029-source-limits v2`. Then implement with a separate command, for example `implement P-20261029-source-limits v2 --phase limits`.
+Approve with: `Approve P-20261029-source-limits v3`. Then implement with a separate command, for example `implement P-20261029-source-limits v3 --phase paging`. S1–S3 are implemented under version 2 and stay as they are.
 
 ## Approval record
 
@@ -104,7 +126,7 @@ Version 1, approved (superseded by version 2, which changes the preconditions an
 - Digest definition: SHA-256 of the UTF-8 plan body from `# Larger sources` up to, and not including, `## Approval`.
 - Authority boundary: implementation needs a separate implement command naming v1, and waits for P-20261029-source-entry to complete. Pushing, pull requests, merges and any generation that spends the owner's usage need the owner's confirmation when reached. The owner's document stays on the owner's device. No new dependency.
 
-Version 2, approved:
+Version 2, approved (superseded by version 3, which adds S5 and repeats S4.3 after it; it needs its own approval):
 
 - Approver: project owner, through an explicit message in this conversation.
 - Received command: `Approve P-20261029-source-limits v2`.
@@ -114,6 +136,17 @@ Version 2, approved:
 - Approved-content SHA-256: `bc901a712082a900cadf237ea13022d024ed2ea13fcf51674eec2826f33f0ecc`.
 - Digest definition: SHA-256 of the UTF-8 plan body from `# Larger sources` up to, and not including, `## Approval`.
 - Authority boundary: implementation needs a separate implement command naming v2. Pushing, pull requests, merges and any generation that spends the owner's usage need the owner's confirmation when reached. The owner's document stays on the owner's device. No new dependency.
+
+Version 3, approved:
+
+- Approver: project owner, through an explicit message in this conversation.
+- Received command: `Approve P-20261029-source-limits v3`.
+- Approved plan/version: `P-20261029-source-limits` / `3`.
+- Recorded at: `2026-10-30T13:59:42+01:00` (Europe/Rome).
+- Approved scope: phase `paging` (S5) and the rest of phase `verify` (S4.3 repeated after S5, S4.4), on `feature/source-limits` (pull request #39, based on `feature/source-entry`). S1–S3 stay as implemented under version 2.
+- Approved-content SHA-256: `1d74ebdbdb9abbb238b2760a25e237289e5fdc3d92012d8bd186ca13937322ec`.
+- Digest definition: SHA-256 of the UTF-8 plan body from `# Larger sources` up to, and not including, `## Approval`.
+- Authority boundary: implementation needs a separate implement command naming v3. Pushing, pull requests, merges and any generation that spends the owner's usage, including the repeat of S4.3, need the owner's confirmation when reached. The owner's document stays on the owner's device. No new dependency.
 
 ## State changes
 
@@ -140,3 +173,23 @@ Version 2, approved:
   - `tests/mcp-server.test.ts`: both descriptions contain "at most 120,000 characters and 5,000 lines", built from the constants.
   - Bundled server: `dist-electron/mcp-server.cjs`, asked for `tools/list` over stdio, returns the same limits in both tools.
 - **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run` passes with 29 files and 460 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass.
+- 2026-10-30: `implement P-20261029-source-limits v2 --phase verify`.
+- **S4.1, CI (automated).** On pull request #39 (head `a26d76f`): "Types, tests and build" on macOS and "Windows: types, tests and build" passed.
+- **S4.2, integration on the built app** (DevTools protocol, empty scratch data folder; scripts in `.local/checks/s4`).
+  - Studio, English: "Up to 4 sources and 120,000 characters"; a pasted text of 120,000 characters is added ("1,200 lines · 120,000 characters"; capacity 120,000 / 120,000); one of 120,001 is refused with "The source has 120,001 characters; the limit is 120,000. Select the part you want to study."
+  - Studio, Italian: "Fino a 4 fonti e 120.000 caratteri", "0/4 fonti · 0 / 120.000 caratteri", and the refusal "La fonte ha 120.001 caratteri; il limite è 120.000. Seleziona la parte che vuoi studiare."
+  - A disassembly whose source has 5,000 lines and 120,000 characters (Atlas, lengthened with lines excluded as detail) opens in about 0.1 s and draws all 5,000 lines; a scroll step lays out in about 0.1 ms; the last line can be reached; selecting parts 4, 6 and 2 from the bottom of the source brings their first cited lines (30, 130, 28) into view, highlighted.
+  - Testing note: while the app window is hidden behind others, Chromium does not run animation frames and the source pane did not move; with the window brought to the front, every check above passed. This is the test setup, not the app.
+- **S4.3, one generation on a long public source** (route and cost confirmed by the owner: Claude via MCP). Claude Code 2.1.303, `claude -p --model sonnet`, with only the bundled MCP server of this branch, on one text of 90,096 characters and 915 lines: `README.md`, `docs/product.md`, `docs/architecture.md`, `docs/development.md` and `R-20261029-run-variety.md`, with no question.
+  - Result: accepted and saved, "Written by your assistant", 6 parts, 7 joints, 3 runs (scenario, load test, case), `start` on the product part. 16 turns, 267 s, $1.35 reported by Claude Code (45,669 output tokens). Two parts needed one repair each (points over 130 characters); the structure and the runs passed first time.
+  - **Finding: the first reply is too large for Claude Code.** `start_disassembly` returned 103,993 characters (instructions, schema and the numbered source). Claude Code did not pass it to the model: it saved it to a file and told the model to read it in pieces. The model read the instructions, the schema and the first 37 lines, then listed the source's headings with their line numbers, and wrote the structure from those and from the unnumbered text it had sent itself. The app's checks still held (every line cited or excluded), but the route did not carry the request as the plan intends. S3 removed the third copy; the first copy alone is above the limit at this size.
+  - **Judgement of the parts.** Three of six parts gather sections from four to six places across the documents (generation; architecture, contracts and privacy; install, package and release): parts of the mechanism, not of the outline. Two follow one section or one document each (the player is the README's Features; the run research is its own document), and no part opens into sub-assemblies, so 915 lines rest on six closed parts and joints are general ("causes · defines the loop"). The outline risk is partly realised; the missing numbered source in step 1 likely contributed.
+- **S4.4, the owner's document as one source:** pending, on the owner's device.
+- 2026-10-30: version 3 → `awaiting_approval`. S4.3 showed that Claude Code does not pass the first reply of a 90,000-character source to the model. Version 3 adds S5 (the source in pages) and repeats S4.3 after it; S1–S3, their acceptance and the evidence above are unchanged.
+- 2026-10-30: version 3 `awaiting_approval` → `approved`. Approval is recorded above; P-20261029-source-entry is still `blocked`, so this is the only active plan.
+- 2026-11-02: `approved` → `implementing`, on `implement P-20261029-source-limits v3 --phase paging`.
+- **S5, the source in pages (automated tests).** `sourcePages` in `src/core/disassembly-generation.ts` splits the numbered sources on line boundaries into pages of at most `PAGE_CHARS` (45,000) characters, each block under its source's header. The MCP assistant (`src/mcp/assistant.ts`) keeps every reply within `REPLY_CHARS` (60,000): `start_disassembly` sends the header, instructions, schema and page 1, and says how many pages to read; the new tool `read_source` returns any page in any phase; `submit_structure` is refused, without counting an attempt, until every page was read; a part whose lines do not fit in one reply names its line ranges and their pages; the runs step says the source was in pages.
+  - `tests/mcp-assistant.test.ts`: Atlas lengthened to 5,000 lines and 120,000 characters, the added lines cited by "start": the first reply is under 60,000 characters and announces 4 pages; `read_source` before a session, and with pages 0, 5 and 1.5, is refused with the valid range; `submit_structure` before pages 2–4 is refused and not counted (a wrong structure afterwards is attempt 1); each page is within its size, and the pages' numbered lines are exactly the source's; the request for "start" names its lines in pages 1–4; every reply is under 60,000 characters; the session ends complete. Atlas and Mill at their own size still end in saved disassemblies.
+  - `tests/disassembly-generation.test.ts`: two sources split at 4,000 characters keep every line once, in order, under their own headers, with contiguous ranges; a source that fits gives one page equal to its numbered block.
+  - `tests/mcp-server.test.ts`: the tool list is `open_in_break_the_wall`, `start_disassembly`, `read_source`, `submit_structure`, `submit_part`, `submit_runs`, and `read_source` needs `page`. The bundled `dist-electron/mcp-server.cjs` lists the same six tools over stdio.
+- **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run --dir tests` passes with 29 files and 462 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass. A plain `npx vitest run` in this checkout also collects the tests of a Codex worktree under `.local/worktrees/` (created on 2026-11-01, another branch), which fail there; they are not part of this repository's suite, and CI does not have `.local`.

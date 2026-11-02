@@ -27,3 +27,19 @@ Date: 2026-10-30. Reviewer: Claude (self-review of the change in preconditions, 
 | 5 | The tasks are unchanged, but the approval of version 1 named a starting point that no longer holds. | Resolved: version 2 needs its own approval; the version 1 record stays as history. |
 
 No open findings.
+
+## Version 3
+
+Date: 2026-10-30. Reviewer: Claude (self-review of S5 against `src/mcp/assistant.ts` and `src/mcp/server.ts` at `a26d76f`, and the S4.3 transcript).
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | The first reply of a 90,096-character source was 103,993 characters; Claude Code wrote it to a file, and the model wrote the structure from headings. | Resolved by S5: every reply stays within 60,000 characters, with the source in pages of at most 45,000. |
+| 2 | The limit of each assistant app is not documented in the repository and not measured; Claude Desktop's is unknown. | Accepted as a residual risk, stated under Risks. The page size leaves room under the documented default of Claude Code; S4.3 is repeated in Claude Code. |
+| 3 | A model may submit the structure without reading every page. | Resolved in part: `submit_structure` is refused until every page was read, without counting an attempt. Reading is not using; the app's checks on citations and the bill of materials remain the backstop. |
+| 4 | A part's own lines can also exceed a page (a part may cite most of a long source). | Resolved: such a part request names the pages instead of sending the lines. |
+| 5 | Sources that fit in one page must not change behaviour. | Resolved: the acceptance keeps the Atlas and Mill sessions, and their replies differ only by the line naming page 1 of 1. |
+| 6 | Repeating S4.3 spends the owner's usage again. | Resolved: the repeat waits for the owner's confirmation of route and cost, as the plan requires for every generation. |
+| 7 | S1–S3 were implemented under version 2. | Resolved: version 3 keeps their text, acceptance and evidence; the approval of version 2 stays as history, superseded. |
+
+No open findings.

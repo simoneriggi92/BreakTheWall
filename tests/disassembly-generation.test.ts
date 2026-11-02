@@ -7,7 +7,7 @@ import { billOfMaterials, DisassemblyError, type Disassembly, type Part } from '
 import { readFileSync } from 'node:fs';
 import {
   acceptContent, acceptExpansion, acceptRuns, acceptStructure, acceptSuggestions, answerLengthRatio, applyShortened, givesAway, assembleDisassembly, buildContentInput, buildRunsInput,
-  buildStructureInput, buildSuggestionInput, compose, contentJsonSchema, defaultContentLanguage, formatSourceBlock, LEAD_LIMIT, longTexts, restates, runsJsonSchema, structureJsonSchema,
+  buildStructureInput, buildSuggestionInput, compose, contentJsonSchema, defaultContentLanguage, formatSourceBlock, LEAD_LIMIT, sourcePages, longTexts, restates, runsJsonSchema, structureJsonSchema,
   type GenerationMeta,
 } from '../src/core/disassembly-generation';
 import { failure, ProviderError, type GenerationProgress } from '../src/core/provider';
@@ -90,6 +90,23 @@ describe('two-phase generation contract (D9)', () => {
     expect(listed(buildContentInput(sources, goal, language, drafts.structure, 0))).toEqual(order);
     expect(listed(buildRunsInput(sources, goal, language, drafts.structure, drafts.contents))).toEqual(order);
     expect(buildRunsInput(sources, goal, language, drafts.structure, drafts.contents)).toMatch(/^ {4}5\.1\. bounds-maturity /m);
+  });
+
+  it('splits numbered sources into pages on line boundaries, each within its size (P-20261029-source-limits S5)', async () => {
+    const { sources: [a] } = await setupFor(mill());
+    const b = { ...a, id: 'src-second', title: 'Second', text: Array.from({ length: 300 }, (_, i) => `Line ${i + 1} of the second source.`).join('\n') };
+    const pages = sourcePages([a, b], 4_000);
+    const rows = (text: string) => text.split('\n').filter(l => /^ *\d+\| /.test(l));
+    for (const page of pages) expect(page.text.length).toBeLessThanOrEqual(4_000);
+    expect(pages.flatMap(p => rows(p.text))).toEqual([...rows(formatSourceBlock(a)), ...rows(formatSourceBlock(b))]);
+    // Every block keeps its source's header, and the ranges say what each page holds, without gaps or overlaps.
+    for (const page of pages) for (const r of page.ranges) expect(page.text).toContain(`<<<SOURCE id="${r.source}"`);
+    for (const id of [a.id, b.id]) {
+      const own = pages.flatMap(p => p.ranges).filter(r => r.source === id);
+      expect(own[0].from).toBe(1);
+      own.slice(1).forEach((r, i) => expect(r.from).toBe(own[i].to + 1));
+    }
+    expect(sourcePages([a], 1_000_000)).toEqual([{ text: formatSourceBlock(a), ranges: [{ source: a.id, from: 1, to: a.text.split('\n').length }] }]);
   });
 
   it('sends the numbered sources with the app\'s runs request, and names them for an assistant that has them (P-20261029-source-limits S3)', async () => {

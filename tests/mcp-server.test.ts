@@ -85,7 +85,9 @@ describe('the open_in_break_the_wall tool against the app\'s entry point (M3)', 
   const call = (server: ReturnType<typeof createBreakTheWallServer>, args: object) => server.handle(request(2, 'tools/call', { name: 'open_in_break_the_wall', arguments: args }));
 
   it('lists the open tool, whose schema needs only the text, before the level B tools', async () => {
-    expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall', 'start_disassembly', 'submit_structure', 'submit_part', 'submit_runs']);
+    expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall', 'start_disassembly', 'read_source', 'submit_structure', 'submit_part', 'submit_runs']);
+    expect(TOOLS[2]).toMatchObject({ inputSchema: { required: ['page'] } });
+    expect(TOOLS[2].description).toContain('Read every page before submit_structure');
     expect(TOOLS[0].inputSchema).toMatchObject({ required: ['text'] });
     // "Take apart" belongs to level B: in Claude Desktop, "smonta questo testo" once picked the open tool (M9).
     expect(TOOLS[0].description).toContain('WITHOUT taking it apart');
