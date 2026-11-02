@@ -2,10 +2,10 @@
 id: P-20261029-source-limits
 title: Larger sources - no per-source limit, a higher total, and an explicit check where a route cannot carry it
 version: 4
-state: implementing
-current_task: S4
-last_evidence: S6 implemented; replies within 40,000 characters, page 1 sized by the first reply; TypeScript check, 29 test files with 463 tests and both builds pass on macOS; on the S4.3 text the first reply is 39,573 characters and pages 2-3 are 37,729 and 27,212
-next_action: Repeat S4.3 through Claude Code on the same text, at a cost the owner confirms (about $1.70 last time); CI on the pushed branch; the owner tries their document as one source (S4.4)
+state: completed
+current_task: none
+last_evidence: S1-S6 verified - S4.3 after S6 passed with every reply under 40,000 characters; the owner's document (956 lines) taken apart whole as one source in two pages through Claude Code 2.1.316, nothing written to a file, judged correct by the owner
+next_action: None; P-20261029-source-entry resumes for E10.3 and E10.4, then #36 merges and #39 after it. Sub-assemblies in long sources and Claude Desktop's limit would be new plans
 approval: approved
 ---
 
@@ -233,3 +233,10 @@ Version 4, approved:
   - The S4.3 text (90,096 characters, 915 lines; measured locally, no model call): the first reply is 39,573 characters with lines 1–331; page 2 is 37,729 characters (lines 332–701) and page 3 27,212 (lines 702–915). Still three pages.
   - Bundled server: `dist-electron/mcp-server.cjs` lists the same six tools over stdio and carries the new sizes.
 - **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run --dir tests` passes with 29 files and 463 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass.
+- **S4.1, CI after S5 and S6 (automated).** On pull request #39 (head `2af1e84`): "Types, tests and build" on macOS, "Windows: types, tests and build" and GitGuardian passed.
+- **S4.3 repeated after S6 (2026-11-02, Claude via MCP, cost confirmed by the owner): passed.** Same text and setup as the two earlier runs (Claude Code 2.1.303, `claude -p --model sonnet`, only this branch's bundled MCP server, an empty scratch data folder; scripts and transcript in `.local/checks/s4c`): 90,096 characters in 915 lines, no question.
+  - Result: accepted and saved, 7 parts, 7 joints, 2 runs (scenario, case), `start` on the identity part. 18 turns, 312 s, $1.66 reported by Claude Code (53,044 output tokens). The structure passed on its second attempt (one finding on a part); three parts needed one repair each (points over 130 characters).
+  - **Pages.** The source made 3 pages: the first reply (header, instructions, schema and page 1, lines 1–330) was 39,365 characters; `read_source` returned page 2 (lines 331–701) in 38,023 and page 3 (lines 702–915) in 27,241. Every tool result reached the model directly: no reply was written to a file, and the model made no Read call. The largest part reply was 25,417 characters. Both criteria of S4.3 are met.
+  - **Judgement of the parts.** All seven parts gather three to seven sections from two to four documents (for example "Joints and Run" joins the README, the product definition and the run research; "Generation and validation" joins seven sections of README, product, architecture and development), against six of seven in the second run and three of six in the first. No part opens into sub-assemblies, so 915 lines still rest on seven closed parts; this is the residual outline risk, for a later plan rather than for the limits. Joints name what passes ("typed joints drawn", "supplies the model", "packages the host").
+- **S4.4, the owner's document as one source (2026-11-02, on the owner's device): passed.** The app was started from this branch (`npm start`, the owner's own library); Claude Code 2.1.316 with Sonnet 5.5 used only this branch's bundled MCP server (`--strict-mcp-config`), with no question. The document (956 lines; 49,357 characters, refused before S1) imported as one source and made 2 pages: the first reply was 39,552 characters and `read_source` returned page 2 (lines 544–956) in 24,250. No tool result was written to a file; the two Read calls were the assistant reading the document itself. The structure passed on its second attempt and two parts needed one repair each. The disassembly was saved and opened in the owner's library: 7 parts, 3 runs, in about 4.5 minutes. The owner's judgement: "mi sembra corretto". Its content stays on the owner's device; this record names no part of it.
+- 2026-11-02: `implementing` → `completed`. S1–S6 are verified, with the evidence above. P-20261029-source-entry can return to `implementing` for E10.3 and E10.4.
