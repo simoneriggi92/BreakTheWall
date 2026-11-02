@@ -179,10 +179,12 @@ export interface SourcePage { text: string; ranges: { source: string; from: numb
 /**
  * Splits the numbered sources into pages of at most `maxChars` characters, on line boundaries (P-20261029-source-limits
  * S5): an assistant app passes a tool result to its model only up to a limit, so a long source travels in pages.
+ * The first page may be smaller, `firstChars`, when it shares a reply with the instructions (S6).
  */
-export function sourcePages(sources: Pick<UserSource, 'id' | 'title' | 'text' | 'language'>[], maxChars: number): SourcePage[] {
+export function sourcePages(sources: Pick<UserSource, 'id' | 'title' | 'text' | 'language'>[], maxChars: number, firstChars = maxChars): SourcePage[] {
   const pages: SourcePage[] = [];
   let ranges: SourcePage['ranges'] = []; let used = 0;
+  const limit = () => pages.length ? maxChars : firstChars;
   const close = () => { if (ranges.length) pages.push({ text: ranges.map(r => formatSourceBlock(sources.find(s => s.id === r.source)!, [r])).join('\n'), ranges }); ranges = []; used = 0; };
   for (const source of sources) {
     const lines = source.text.split('\n');
@@ -191,9 +193,9 @@ export function sourcePages(sources: Pick<UserSource, 'id' | 'title' | 'text' | 
     const frame = formatSourceBlock(source, []).length + 1; // the header and end lines around a block
     let from = 1;
     while (from <= lines.length) {
-      if (ranges.length && used + frame + row(from) > maxChars) close();
+      if (ranges.length && used + frame + row(from) > limit()) close();
       let to = from; let size = frame + row(from);
-      while (to < lines.length && used + size + row(to + 1) <= maxChars) size += row(++to);
+      while (to < lines.length && used + size + row(to + 1) <= limit()) size += row(++to);
       ranges.push({ source: source.id, from, to }); used += size;
       from = to + 1;
       if (from <= lines.length) close();

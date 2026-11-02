@@ -43,3 +43,19 @@ Date: 2026-10-30. Reviewer: Claude (self-review of S5 against `src/mcp/assistant
 | 7 | S1–S3 were implemented under version 2. | Resolved: version 3 keeps their text, acceptance and evidence; the approval of version 2 stays as history, superseded. |
 
 No open findings.
+
+## Version 4
+
+Date: 2026-11-02. Reviewer: Claude (self-review of S6 against `src/mcp/assistant.ts` at `032e346` and the transcript of S4.3 repeated).
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | S5 assumed a limit of 60,000 characters. Claude Code wrote the 56,040-character first reply to a file, and the model reached page 1 only because `claude -p` let it use Read. | Resolved by S6: every reply stays within 40,000 characters, under the 44,921 that passed. |
+| 2 | A fixed page size cannot fit the first reply, because its instructions and schema take about 11,200 characters and the question and title vary. | Resolved: page 1 gets what the first reply leaves. S6's acceptance includes a 400-character question and a 120-character title. |
+| 3 | A `read_source` reply adds a page line and the pages still to read to the page. | Resolved: later pages hold at most 38,000 characters, and the acceptance checks each reply, not only each page. |
+| 4 | Part and runs replies could pass 40,000. | Checked: in S4.3 the largest part reply was 21,789 characters and the runs reply 12,421. A part above the limit names its pages (S5). The runs reply carries no source, so with many long parts it could grow; S6's acceptance checks every reply of the 120,000-character session. |
+| 5 | The limit is measured once, in one version of Claude Code, and may count tokens. | Accepted as a residual risk, stated under Risks. |
+| 6 | One more S4.3 spends the owner's usage again (about $1.70 last time). | Resolved: it waits for the owner's confirmation of route and cost. |
+| 7 | S5 is implemented under version 3 and its acceptance names 60,000. | Resolved: S5's text and evidence stay as history, and S6 sets the new sizes. Version 4 needs its own approval. |
+
+No open findings.

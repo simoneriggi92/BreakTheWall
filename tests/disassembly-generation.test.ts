@@ -107,6 +107,12 @@ describe('two-phase generation contract (D9)', () => {
       own.slice(1).forEach((r, i) => expect(r.from).toBe(own[i].to + 1));
     }
     expect(sourcePages([a], 1_000_000)).toEqual([{ text: formatSourceBlock(a), ranges: [{ source: a.id, from: 1, to: a.text.split('\n').length }] }]);
+    // A smaller first page (S6): page 1 within its own size, the others within the page size, the same lines in order.
+    const smaller = sourcePages([a, b], 4_000, 1_500);
+    expect(smaller[0].text.length).toBeLessThanOrEqual(1_500);
+    expect(smaller[0].text.length).toBeGreaterThan(1_000);
+    for (const page of smaller.slice(1)) expect(page.text.length).toBeLessThanOrEqual(4_000);
+    expect(smaller.flatMap(p => rows(p.text))).toEqual(pages.flatMap(p => rows(p.text)));
   });
 
   it('sends the numbered sources with the app\'s runs request, and names them for an assistant that has them (P-20261029-source-limits S3)', async () => {

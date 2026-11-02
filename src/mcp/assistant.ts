@@ -14,11 +14,14 @@ import { goalSchema, importSource, SourceImportError, type LearningGoal, type Us
 export const MAX_ATTEMPTS = 3;
 /**
  * An assistant app passes a tool result to its model only up to a limit (Claude Code wrote a 104,000-character reply
- * to a file instead, P-20261029-source-limits S4.3). Every reply stays within REPLY_CHARS, about 20,000 tokens, and a
- * long source travels in pages of at most PAGE_CHARS (S5).
+ * to a file instead, P-20261029-source-limits S4.3). Every reply stays within REPLY_CHARS, about 13,000 tokens: Claude
+ * Code passed 44,921 characters and wrote 56,040 to a file (S4.3 repeated). A long source travels in pages of at most
+ * PAGE_CHARS, so that a read_source reply stays within it too; page 1 gets what the first reply leaves (S5, S6).
  */
-export const REPLY_CHARS = 60_000;
-export const PAGE_CHARS = 45_000;
+export const REPLY_CHARS = 40_000;
+export const PAGE_CHARS = 38_000;
+/** Room in the first reply for page 1's own line and a page count that differs from the provisional one. */
+const FIRST_PAGE_MARGIN = 400;
 
 type Step = { phase: 'structure' } | { phase: 'part'; index: number } | { phase: 'runs' } | { phase: 'done'; disassembly: Disassembly };
 interface Session { sources: UserSource[]; goal: LearningGoal; language: ContentLanguage; meta: GenerationMeta; structure?: StructureDraft; contents: ContentDraft[]; step: Step; attempts: number; pages: SourcePage[]; read: Set<number> }
@@ -42,19 +45,27 @@ export class AssistantWriter {
     if (!goal.success) return { text: 'A question, when given, must be 10 to 400 characters: say what the user wants to understand about the text, or leave it out to take apart the whole text.', isError: true };
     const language: ContentLanguage = input.language === 'it' || input.language === 'en' ? input.language : defaultContentLanguage(goal.data.outcome, 'en');
     const createdAt = this.now();
-    this.session = {
+    const s: Session = this.session = {
       sources: [source], goal: goal.data, language, contents: [], step: { phase: 'structure' }, attempts: 0, pages: sourcePages([source], PAGE_CHARS), read: new Set([1]),
       meta: { id: generatedDisassemblyId(createdAt), createdAt: createdAt.toISOString(), provider: 'assistant', model: (client || 'assistant').slice(0, 200) },
     };
-    return { text: [
-      `Break the Wall disassembly started: "${source.title}", ${source.text.split('\n').length} lines, written in ${language === 'it' ? 'Italian' : 'English'}.`,
+    // Page 1 shares the first reply with the instructions and the schema: it gets what they leave (S6).
+    const frame = this.startReply({ ...s, pages: s.pages.map((p, i) => i ? p : { ...p, text: '' }) }).length;
+    s.pages = sourcePages([source], PAGE_CHARS, REPLY_CHARS - frame - FIRST_PAGE_MARGIN);
+    return { text: this.startReply(s) };
+  }
+
+  private startReply(s: Session) {
+    const [source] = s.sources;
+    return [
+      `Break the Wall disassembly started: "${source.title}", ${source.text.split('\n').length} lines, written in ${s.language === 'it' ? 'Italian' : 'English'}.`,
       'There are three phases: the structure, then the content of each top-level part, then the runs. Each answer is checked by the app; fix what it reports and submit again.',
-      ...(goal.data.outcome ? [] : ['No question was given: take apart the whole text, and say in start which part to begin with.']),
+      ...(s.goal.outcome ? [] : ['No question was given: take apart the whole text, and say in start which part to begin with.']),
       `STEP 1: the structure. Write it as JSON and call submit_structure with it.`,
-      ...(this.session.pages.length > 1 ? [`The numbered source is in ${this.session.pages.length} pages; page 1 is at the end of this reply. Call read_source with page ${this.pageList(this.session, [...Array(this.session.pages.length - 1).keys()].map(i => i + 2))} before submit_structure.`] : []),
+      ...(s.pages.length > 1 ? [`The numbered source is in ${s.pages.length} pages; page 1 is at the end of this reply. Call read_source with page ${this.pageList(s, [...Array(s.pages.length - 1).keys()].map(i => i + 2))} before submit_structure.`] : []),
       // The input's header and sources label, then page 1 of the numbered source.
-      this.request(instructionsFor(goal.data), structureJsonSchema(this.session.sources, this.session.goal), `${buildStructureInput([], this.session.goal, language)}\n${this.page(this.session, 1)}`),
-    ].join('\n\n') };
+      this.request(instructionsFor(s.goal), structureJsonSchema(s.sources, s.goal), `${buildStructureInput([], s.goal, s.language)}\n${this.page(s, 1)}`),
+    ].join('\n\n');
   }
 
   /** One page of the current session's numbered source, in any phase, so that a page can be read again. */
