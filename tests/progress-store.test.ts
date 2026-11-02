@@ -66,7 +66,8 @@ describe('desktop progress store', () => {
   it('keeps disassembly progress apart and round-trips it', async () => {
     const { root, store: s } = await store();
     const d = disassemblies[0];
-    const state = { ...initialDisassemblyState(d), path: ['image'], runs: { 'failed-smoke': { step: 1, choices: { 0: 1 }, tried: [] } }, notes: { deploy: 'Solo il digest cambia' } };
+    const state = { ...initialDisassemblyState(d), path: ['image'], runs: { 'failed-smoke': { step: 1, choices: { 0: 1 }, tried: [] } }, notes: { deploy: 'Solo il digest cambia' },
+      reading: { source: d.sources[0].id, from: 20, view: 'guided' as const } };
     await s.save(state);
     expect(await readdir(root)).toEqual(['_disassemblies']);
     expect(await readdir(join(root, '_disassemblies', d.id))).toEqual([`${d.revision}.json`]);
