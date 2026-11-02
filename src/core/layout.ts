@@ -37,12 +37,13 @@ type Routed = { joint: number; up: string; down: string; dummies: Item[]; revers
  * their target; parts without joints go to a side column. Long joints pass through reserved lanes, so a line
  * never crosses a plate.
  */
-export function layoutLevel(parts: Pick<Part, 'id'>[], joints: Pick<Joint, 'from' | 'to' | 'type' | 'label'>[]): LevelLayout {
+/** `orientation` forces a direction, for a narrow place such as the guided reading's drawing; by default the joints choose it. */
+export function layoutLevel(parts: Pick<Part, 'id'>[], joints: Pick<Joint, 'from' | 'to' | 'type' | 'label'>[], force?: Orientation): LevelLayout {
   const ids = parts.map(p => p.id);
   const touched = new Set(joints.flatMap(j => [j.from, j.to]));
   const loose = ids.filter(id => !touched.has(id));
   const argument = joints.filter(j => JOINT_FAMILY[j.type] === 'argument').length;
-  const orientation: Orientation = joints.length && argument * 2 > joints.length ? 'stack' : 'flow';
+  const orientation: Orientation = force ?? (joints.length && argument * 2 > joints.length ? 'stack' : 'flow');
   if (!joints.length) return finish(orientation, [], [], loose, []);
 
   // Side parts: every joint they have attacks or limits one host. At most two fit beside a host.

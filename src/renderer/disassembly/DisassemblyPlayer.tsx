@@ -246,7 +246,10 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
         {other && openVersion && <div className="notice version-notice" role="status"><span>{t.d.otherVersion(t.languageNames[other.language])}</span><button onClick={() => openVersion(other.id)}>{t.d.openVersion}</button></div>}
         {notice && <div className="notice" role="status">{restoreText(t, notice, 'disassembly')}<button aria-label={t.common.closeNotice} onClick={() => setNotice(undefined)}><X size={15}/></button></div>}
         {saveStatus === 'failed' && <div className="error-banner" role="alert">{t.player.unsaved} <button onClick={() => setRetry(x => x + 1)}>{t.player.retrySave}</button></div>}
-        {guided ? <GuidedReading d={d} position={state.reading} onPosition={p => setState(s => locateReading(d, s, p))} onExplore={exploreFromReading}/>
+        {guided ? <GuidedReading d={d} position={state.reading} onPosition={p => setState(s => locateReading(d, s, p))} onExplore={exploreFromReading}
+            takeApart={d.kind === 'generated' && studio?.expandPart ? p => <TakeApart d={d} part={p} route={expandRoute}
+              progress={expanding?.part === p.id ? expanding.progress : undefined} problem={expandProblem?.part === p.id ? expandProblem.failure : undefined}
+              onRun={() => void takeApart(p.id)} onCancel={() => void studio.cancelGeneration()}/> : undefined}/>
           : mode === 'reassemble'
           ? <Reassemble d={d} layout={rootLayout} state={state} feedback={feedback} workbench
               place={(slot, p) => { setFeedback(undefined); setState(s => place(d, s, slot, p)); }}

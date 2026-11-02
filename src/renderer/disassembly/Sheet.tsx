@@ -61,11 +61,17 @@ export interface SheetProps {
    */
   /** `contain` fits the sheet to its area; `zoom` scales that fit by `zoom` and lets the area scroll. */
   fit?: 'contain' | 'zoom'; zoom?: number;
+  /**
+   * Guided reading (P-20261102-guided-reading G3), apart from the run decorations: a part not read yet is an outline
+   * with no name or number, the current passage marks what it adds or deepens, and joints appear from their passage.
+   */
+  reading?: ReadingMarks;
 }
+export interface ReadingMarks { plates: Record<string, 'unread' | 'added' | 'deepened' | 'cited'>; hidden?: ReadonlySet<number>; current?: ReadonlySet<number> }
 const TITLE_BLOCK = 64;
 
 /** The exploded view: one level drawn from the automatic layout, as a technical sheet with a title block. */
-export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1, numbering, detail = false }: SheetProps) {
+export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1, numbering, detail = false, reading }: SheetProps) {
   const { t } = usePreferences();
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -109,18 +115,23 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
     <defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" className="hatch-line"/></pattern></defs>
     <rect className="frame" x={8} y={8} width={width - 16} height={height - 16}/>
     <rect className="frame-inner" x={13} y={13} width={width - 26} height={height - 26}/>
-    {layout.joints.map((j, i) => <JointPath key={i} joint={joints[i]} points={j.points} label={j.label} flowing={flowing(joints[i])} aside={asides[i]} broken={removed === j.from} muted={!!removed && removed !== j.from && removed !== j.to}/>)}
+    {layout.joints.map((j, i) => reading?.hidden?.has(i) ? null : <g key={i} className={reading?.current?.has(i) ? 'reading-current' : undefined}>
+      <JointPath joint={joints[i]} points={j.points} label={j.label} flowing={flowing(joints[i])} aside={asides[i]} broken={removed === j.from} muted={!!removed && removed !== j.from && removed !== j.to}/></g>)}
     {plates.map(({ id, rect }) => {
       const part = parts.find(p => p.id === id)!; const number = numbers.get(id)!;
+      const mark = reading?.plates[id];
+      // Not read yet: only its place in the whole, so the drawing never runs ahead of the text.
+      if (mark === 'unread') return <g key={id} className="plate unread" data-id={id} transform={`translate(${rect.x} ${rect.y})`} aria-hidden="true">
+        <rect className="body" width={rect.w} height={rect.h} rx={3}/></g>;
       const state = target?.id === id ? (target.verdict === 'falls' ? 'failed' : target.verdict === 'weakens' ? 'active' : 'ok') : states[id];
       const cls = ['plate', part.parts && 'assembly', part.parts && part.relevant === false && 'closed', selected === id && 'selected', state && `state-${state}`,
-        bricks.includes(id) && 'brick', removed === id && 'removed'].filter(Boolean).join(' ');
+        bricks.includes(id) && 'brick', removed === id && 'removed', mark && `read-${mark}`].filter(Boolean).join(' ');
       const lines = wrap(part.name, 17);
       // The name is centred in the band below the kind label, so three lines never touch it.
       const band = 22; const top = band + (rect.h - band - lines.length * 15) / 2 + 11;
       const tilt = target?.id === id && target.verdict !== 'holds' ? `rotate(${target.verdict === 'falls' ? 3 : 1.2} ${rect.w / 2} ${rect.h})` : undefined;
       return <g key={id} className={cls} data-id={id} transform={`translate(${rect.x} ${rect.y})`} role="button" tabIndex={0}
-        aria-pressed={selected === id} aria-label={`${number}. ${part.name} · ${t.d.kinds[part.kind]}${state ? ` · ${t.d.states[state as keyof typeof t.d.states]}` : ''}`}
+        aria-pressed={selected === id} aria-label={`${number}. ${part.name} · ${t.d.kinds[part.kind]}${state ? ` · ${t.d.states[state as keyof typeof t.d.states]}` : ''}${mark ? ` · ${t.d.guided.marks[mark]}` : ''}`}
         onClick={() => onSelect?.(id)} onDoubleClick={() => part.parts && onEnter?.(id)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}>
         {part.parts && <rect className="outer" x={-4} y={-4} width={rect.w + 8} height={rect.h + 8} rx={4}/>}
@@ -133,6 +144,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
         </g>
         <g className="balloon" aria-hidden="true"><line x1={-9} y1={-9} x2={6} y2={6}/><circle cx={-15} cy={-15} r={10}/><text x={-15} y={-11} textAnchor="middle">{number}</text></g>
         {target?.id === id && <text className={`verdict v-${target.verdict}`} x={rect.w / 2} y={-10} textAnchor="middle">{t.d.run.verdicts[target.verdict]}</text>}
+        {mark && <g className={`reading-mark m-${mark}`} aria-hidden="true"><circle cx={rect.w} cy={0} r={10}/><text x={rect.w} y={4} textAnchor="middle">{{ added: '+', deepened: '↺', cited: '•' }[mark]}</text></g>}
         {state && target?.id !== id && <g className={`state-mark s-${state}`} aria-hidden="true"><circle cx={rect.w} cy={0} r={10}/><text x={rect.w} y={4} textAnchor="middle">{{ ok: '✓', failed: '✕', active: '…', restored: '↺' }[state]}</text></g>}
       </g>;
     })}
