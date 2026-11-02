@@ -3,9 +3,9 @@ id: P-20261102-guided-reading
 title: Guided reading - the drawing follows the source, passage by passage, with depth and a margin
 version: 1
 state: implementing
-current_task: G3
-last_evidence: Phase route implemented - Codex's guided reading on main (G1) and what each passage does (G2); TypeScript, 31 test files with 485 tests and both builds pass on macOS
-next_action: Implement phase player with a separate command, "implement P-20261102-guided-reading v1 --phase player"
+current_task: G8
+last_evidence: Phases route, player and object implemented (G1-G7); the prototype draws the importer and Mill, every line between parts is a fixture joint, and suspending Mill's supports leaves the claim in place as not derived here
+next_action: Phase verify (G8): CI on the pushed branch, and the owner reads one of their own generated disassemblies in the guided view; the draft pull request is still to be opened (the GitHub connector refused its token)
 approval: approved
 ---
 
@@ -225,3 +225,67 @@ Version 1, approved:
     - each exclusion is in the margin of exactly the passages it overlaps.
   - A joint whose citations are removed is related once, at the passage that adds its later end.
 - **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run --dir tests` passes with 31 files and 485 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass; `git diff --check` passes.
+- 2026-11-02: `implement P-20261102-guided-reading v1 --phase player`.
+- **G3, the drawing follows the reading (automated tests and integration).**
+  - `Sheet` takes a reading decoration, `reading`, separate from the run decorations:
+    - a part not read yet is a dashed outline, with no name, number or button;
+    - a part the passage adds or returns to is marked, by colour and by a badge (`+`, `↺`);
+    - a joint is drawn from the passage that relates it, and the passage's own joints are thicker.
+  - `GuidedReading` draws the whole level beside the reading, replacing Codex's one-joint detail. Under the drawing, "What this passage does" shows:
+    - the frame (the whole's `does` and `why`);
+    - each added part, with its role and, where it has one, its analogy and where the analogy stops working;
+    - each part it returns to, with its points;
+    - each joint, as "A — label → B". A joint to a part not yet read says at which passage it comes.
+  - **Layout of the drawing.** In the narrow column beside the reading, the overview's left-to-right layout shrank plates until they were unreadable (seen on the built app). The drawing now uses the existing top-to-bottom layout, `stack`, through a new optional `force` argument of `layoutLevel` (no other caller changes). It keeps the overview's numbers. Plates stay at their own size, the drawing scrolls, and the marked plate is brought into view.
+  - ← and → move between passages when the focus is on the passage or the drawing, not in the source pane, a splitter or a field.
+  - A first opening starts in the guided view (Codex's behaviour); saved progress keeps its view.
+  - Tests (`tests/guided-reading.test.tsx`, on `importer-signals-en`):
+    - at the first passage all 7 parts are outlines and no plate or joint can be selected;
+    - at "One round, step by step" the round is marked as added, 6 parts are still outlines, and its 2 joints are drawn and current; the passage says it adds a part and relates two, and names a later passage;
+    - at "Why the job succeeded is not enough" the outcome log is marked as returned to;
+    - → and ← from the passage move one passage each way.
+  - Run and the overview are unchanged: the whole player suite passes.
+- **G4, depth (automated tests).** From the guided view, "Open its N parts" (or a double click on an assembly) draws the sub-assembly in place and marks the sub-parts the passage cites. Escape, Alt+↑ or "Back to the whole" returns to the top level at the same passage. A selected part with no sub-assembly shows the overview's own "Take this part apart" (`TakeApart`, with its route, cost, progress and errors) on a generated disassembly; otherwise it says it has no sub-assembly.
+  - On the importer, at "One round, step by step", opening the round shows its 5 parts, all marked, and "This passage cites 5 of its 5 parts.". Escape returns to the 7 parts at the same passage.
+  - Selecting the heartbeat stamp, a prepared part with no sub-assembly, says so and offers no request.
+- **G5, the margin (automated tests).** A "Margin" control with the number of notes, labelled "Margin: N notes for this passage", replaces Codex's "Outside the disassembly" box. It also shows part exclusions. The Z key toggles it outside fields and dialogs. It lists line ranges (which focus the source), reasons and notes, and never adds a mark or line to the drawing.
+  - On the importer: the first passage shows its context note, with the drawing unchanged; Z closes and reopens it; "What the importer does" says there is nothing in the margin; the glossary shows its repetition note.
+  - Codex's test of a passage outside the question now checks the margin ("fuori dalla domanda") and, at the last passage, every part read and none marked.
+- **G6, languages, themes, keyboard and saving.**
+  - The new strings are in `en.ts` and `it.ts` (`t.d.guided`); the unused `excluded` string is removed. Every action has a button.
+  - **Integration on the built app** (DevTools protocol, a scratch data folder per run; scripts in the scratchpad):
+    - four runs: English paper 1440×900, English blueprint 1280×800, Italian paper 1280×800 and Italian blueprint 1440×900;
+    - each run opens Atlas, Mill and the importer for the first time;
+    - each example starts in the guided view. The drawing, the passage and the source are within the window at the first, second and last passage, and the page never scrolls sideways.
+    - Counts, identical in all four runs (outlines / plates / marks / joints at passages 1, 2 and last):
+
+      | Example | Passage 1 | Passage 2 | Last passage |
+      |---|---|---|---|
+      | Atlas | 6/6/0/0 | 5/6/1/0 | 0/6/0/6 |
+      | Mill | 5/7/2/1 | 4/7/1/2 | 0/7/1/5 |
+      | Importer | 7/7/0/0 | 7/7/0/0 | 0/7/0/8 |
+
+    - Screenshots of the importer at "The night board" (1440×900) and "One round" (1280×800), and of Mill in blueprint, show readable plates, current joints and the marked plate in view.
+  - Observation for the owner's judgement (G8.3): a part is added at the first passage that cites any of its lines. On Atlas, "Rollback" is added at "1. What a release is", because one line there mentions keeping the previous digest. This follows the citations; whether it reads well is the owner's call.
+- **Checks (automated, macOS).** `npx tsc --noEmit -p .local/tsconfig.check.json` passes; `npx vitest run --dir tests` passes with 31 files and 488 tests; `npx vite build` and `node scripts/build-desktop.mjs` pass; `git diff --check` passes. Nothing of this phase is committed yet.
+- 2026-11-02: `implement P-20261102-guided-reading v1 --phase object`.
+- **G7, the object prototype extended to an argument (integration).** `prototypes/guided-reading/`, outside the product bundles:
+  - **Data.** `build-data.mjs` writes `data.js` from `importer-signals.json` and `mill-harm.json`. A switch in the header changes fixture (`#importer`, `#mill`).
+  - **Passages.** Mill's source has only its title as a heading, so a source with fewer than three headings is also cut at blank lines past about 1,500 characters, never inside a paragraph. Mill gives 5 passages; the importer keeps its 16.
+  - **Joints without citations.** Mill's "ne segue" and "restringe ed estende" have no citations. They come with their later end, as `readingRoles` does in the app. Before this fix the prototype never drew them.
+  - **Argument shapes.** A load-bearing frame: beam (claim), pillar (premise), foundation (ground), clamp (limit), wedge (objection), field (consequence), crossed block (set aside). Joints are drawn by kind: a strut for supports, a red wedge for attacks, a bar for limits, an arrow for sends-to and a dotted arrow for depends-on.
+  - **Suspending a premise.** A part that supports another can be suspended as a test:
+    - its struts break, labelled "sostegno sospeso", and it is marked "sospesa (prova)";
+    - the part it held up stays in place, marked "non derivata qui" when every support is suspended and "sostegno ridotto: n di m" otherwise;
+    - nothing is removed.
+
+    The contract does not say whether two supports hold jointly or one at a time, so one suspended support of two only reduces. The effect is not carried down "ne segue" to the consequence. Both points are stated in the README and are findings for the owner.
+  - **README.** `prototypes/guided-reading/README.md` says how to open the prototype, which parts are computed (passages, roles, margin, appearance of parts and joints) and which are drawn by hand (positions and shapes, `CONFIG`), the shape and joint vocabulary for both families, and the limits.
+  - **Checked in the in-app browser** (served from the repository root on port 4321, at 1440×900, no console errors):
+    - `window.__check()` lists every line drawn between parts, at the current level, and any that is not a joint of the fixture. None is unknown at any point checked:
+      - importer, last passage: 8 of 8 top-level joints;
+      - importer, the round opened: its 4 internal joints;
+      - Mill, last passage: 5 of 5 joints;
+      - Mill, the limits opened: 3 sub-parts and no joints.
+    - Mill's route: passage 1 adds and relates sovereignty → claim; 2 bounds → claim; 3 utility → claim; 4 objection → claim and claim → region.
+    - Suspending sovereignty gives "sostegno ridotto: 1 di 2 sospesi" on the claim. Suspending sovereignty and utility gives "non derivata qui".

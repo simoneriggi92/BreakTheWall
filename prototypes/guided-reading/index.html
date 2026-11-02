@@ -4,13 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lettura guidata · prototipo</title>
-<!--
-  Prototype for research R-20261102-guided-reading. Open this file directly in a browser: no server, no dependencies.
-  data.js is generated from the public fixture src/fixtures/disassemblies/importer-signals.json:
-    node -e "const d=require('./src/fixtures/disassemblies/importer-signals.json');require('fs').writeFileSync('prototypes/guided-reading/data.js','// Generated from src/fixtures/disassemblies/importer-signals.json (public fixture).\nwindow.DISASSEMBLY = '+JSON.stringify(d)+';\n')"
-  Everything the reading route shows (passages, what each one does, joints, margin) is computed from the disassembly.
-  Only the drawing is prepared by hand: the position and the functional shape of each part (PLACES, SHAPES below).
--->
+<!-- Prototype for research R-20261102-guided-reading and plan P-20261102-guided-reading G7. See README.md. -->
 <style>
 :root {
   --bg: #f4efe6; --paper: #fbf8f2; --ink: #1f2a33; --muted: #6b737a; --line: #d8cfbf;
@@ -117,6 +111,10 @@ header .grow { flex: 1; }
   <header>
     <b>Break the Wall</b><span class="sub">Lettura guidata · prototipo</span>
     <span class="grow"></span>
+    <span class="seg" role="group" aria-label="Fonte">
+      <button data-fixture="importer">Importatore · meccanismo</button>
+      <button data-fixture="mill">Mill · argomento</button>
+    </span>
     <span class="seg" role="group" aria-label="Disegno">
       <button id="modeShapes" aria-pressed="true">Oggetto · forme funzionali</button>
       <button id="modeTiles" aria-pressed="false">Tessere · come oggi</button>
@@ -134,7 +132,8 @@ header .grow { flex: 1; }
         <span><i class="dot" style="background:var(--deepen)"></i>approfondisce</span>
         <span><i class="dot" style="background:var(--relate)"></i>collega</span>
         <span><i class="dot" style="background:var(--context)"></i>a margine</span>
-        <span>· tratteggio = pezzo non ancora letto · freccia = giunto citato dalla fonte</span>
+        <span>· tratteggio = pezzo non ancora letto · ogni linea tra due pezzi è un giunto della fonte</span>
+        <span id="jointLegend"></span>
       </div>
       <button class="marginBtn" id="marginBtn" aria-pressed="false">Margine (z)<span class="count" id="marginCount">0</span></button>
       <aside class="margin" id="margin" hidden></aside>
@@ -150,7 +149,10 @@ header .grow { flex: 1; }
 <script src="data.js"></script>
 <script>
 'use strict';
-const D = window.DISASSEMBLY;
+const KEY = Object.hasOwn(window.DISASSEMBLIES, location.hash.slice(1)) ? location.hash.slice(1) : 'importer';
+const D = window.DISASSEMBLIES[KEY];
+const FAMILY = { 'sends-to': 'mechanism', causes: 'mechanism', 'depends-on': 'mechanism', supports: 'argument', attacks: 'argument', limits: 'argument', 'leads-to': 'story', because: 'story' };
+const ARGUMENT = D.joints.filter(j => FAMILY[j.type] === 'argument').length * 2 > D.joints.length;
 const src = D.sources[0];
 const LINES = src.text.split('\n');
 const $ = id => document.getElementById(id);
@@ -174,7 +176,13 @@ const exclusions = [...D.bom.excluded, ...D.parts.flatMap(p => p.excluded || [])
 
 // Passages: one per heading section (Codex's route would cut long sections further, never inside a block).
 const heads = LINES.map((l, i) => /^#{1,3} /.test(l) ? i + 1 : 0).filter(Boolean);
-const bounds = (heads[0] > 1 ? [[1, heads[0] - 1]] : []).concat(heads.map((h, k) => [h, (heads[k + 1] || LINES.length + 1) - 1]));
+let bounds = (heads[0] > 1 ? [[1, heads[0] - 1]] : []).concat(heads.map((h, k) => [h, (heads[k + 1] || LINES.length + 1) - 1]));
+// A source with almost no headings (Mill) is cut at blank lines past about 1,500 characters, never inside a paragraph.
+if (heads.length < 3) bounds = bounds.flatMap(([from, to]) => {
+  const out = []; let start = from, size = 0;
+  for (let n = from; n <= to; n++) { size += LINES[n - 1].length + 1; if (!LINES[n - 1].trim() && size > 1500 && n < to) { out.push([start, n]); start = n + 1; size = 0; } }
+  return [...out, [start, to]];
+});
 const seen = new Set(), drawnJoints = new Set();
 const STEPS = bounds.map(([from, to]) => {
   const ns = []; for (let n = from; n <= to; n++) if (LINES[n - 1].trim()) ns.push(n);
@@ -185,19 +193,36 @@ const STEPS = bounds.map(([from, to]) => {
   const margin = exclusions.filter(x => x.to >= from && x.from <= to);
   tops.forEach(t => seen.add(t));
   const cats = [frame && 'frame', add.length && 'add', deepen.length && 'deepen', relate.length && 'relate', margin.length && !tops.length && !frame && 'context'].filter(Boolean);
-  const title = LINES[from - 1].replace(/^#+\s*/, '').replace(/^\d+(\.\d+)*\.?\s*/, '') || 'Inizio';
+  const first = LINES.slice(from - 1, to).find(l => l.trim()) || '';
+  const title = /^#/.test(LINES[from - 1]) ? LINES[from - 1].replace(/^#+\s*/, '').replace(/^\d+(\.\d+)*\.?\s*/, '') : first.length > 46 ? first.slice(0, 45).trim() + '…' : first || 'Inizio';
   return { from, to, title, add, deepen, relate, frame, margin, cats, subs: [...new Set(ns.flatMap(n => subOwner.get(n) || []))] };
 });
 const firstAdd = id => STEPS.findIndex(s => s.add.includes(id));
+// A joint without citations has no passage of its own: it comes with its later end, as readingRoles does in the app.
+STEPS.forEach((s, i) => s.relate.push(...D.joints.filter(j => !j.cites?.length && Math.max(firstAdd(j.from), firstAdd(j.to)) === i && firstAdd(j.from) >= 0 && firstAdd(j.to) >= 0)));
+STEPS.forEach(s => { if (s.relate.length && !s.cats.includes('relate')) s.cats.push('relate'); });
 const firstRelate = j => STEPS.findIndex(s => s.relate.includes(j));
 const firstFrame = STEPS.findIndex(s => s.frame || s.add.length);
 
 // ---- What is prepared by hand: where each part sits and which functional shape it takes. ----
-const PLACES = { pause: [40, 24, 86, 64, 26], round: [56, 166, 176, 176, 30], heartbeat: [296, 30, 104, 72, 28], finished: [296, 166, 104, 72, 28],
-  outcomes: [296, 300, 112, 92, 28], restart: [478, 24, 104, 84, 34], board: [476, 196, 140, 150, 40] };
-const SHAPES = { round: 'cycle', heartbeat: 'register', finished: 'register', outcomes: 'tape', pause: 'switch', restart: 'comparator', board: 'gauge' };
-const SHAPE_WORD = { cycle: 'ciclo', register: 'registro', tape: 'nastro', switch: 'interruttore', comparator: 'comparatore', gauge: 'quadrante' };
-const SUB_SHAPES = { 'round-stamp': 'register', 'round-switch': 'switch', 'round-fetch': 'tape', 'round-hand': 'cycle', 'round-close': 'register' };
+const CONFIG = {
+  importer: {
+    places: { pause: [40, 24, 86, 64, 26], round: [56, 166, 176, 176, 30], heartbeat: [296, 30, 104, 72, 28], finished: [296, 166, 104, 72, 28],
+      outcomes: [296, 300, 112, 92, 28], restart: [478, 24, 104, 84, 34], board: [476, 196, 140, 150, 40] },
+    shapes: { round: 'cycle', heartbeat: 'register', finished: 'register', outcomes: 'tape', pause: 'switch', restart: 'comparator', board: 'gauge' },
+    subShapes: { 'round-stamp': 'register', 'round-switch': 'switch', 'round-fetch': 'tape', 'round-hand': 'cycle', 'round-close': 'register' },
+  },
+  // An argument as a load-bearing frame: the claim is a beam, premises and grounds hold it up, a limit clamps it, an objection is a wedge.
+  mill: {
+    places: { 'abstract-right': [30, 30, 96, 66, 16], objection: [250, 24, 110, 76, 30], claim: [240, 166, 170, 86, 52], bounds: [470, 176, 96, 92, 30],
+      sovereignty: [110, 316, 92, 80, 34], utility: [280, 330, 150, 84, 14], region: [486, 330, 140, 96, 12] },
+    shapes: { claim: 'beam', sovereignty: 'pillar', utility: 'foundation', 'abstract-right': 'aside', bounds: 'clamp', objection: 'wedge', region: 'field' },
+    subShapes: { 'bounds-maturity': 'clamp', 'bounds-colonial': 'clamp', 'bounds-duties': 'clamp', 'region-conscience': 'field', 'region-pursuits': 'field', 'region-association': 'field' },
+  },
+};
+const { places: PLACES, shapes: SHAPES, subShapes: SUB_SHAPES } = CONFIG[KEY];
+const SHAPE_WORD = { cycle: 'ciclo', register: 'registro', tape: 'nastro', switch: 'interruttore', comparator: 'comparatore', gauge: 'quadrante',
+  beam: 'trave', pillar: 'pilastro', foundation: 'fondamenta', aside: 'scarto', clamp: 'morsetto', wedge: 'cuneo', field: 'campo' };
 
 // ---- Isometric drawing helpers (2.5D). ----
 const BOARD = [0, 0, 650, 440, 12];
@@ -252,12 +277,40 @@ function shape(kind, [x, y, w, d, h], c, sel) {
       ['#3c9a63', '#d9a13b', '#c8553d'].forEach((col, i) => { s += ell(x + w - 22, y + 24 + i * 34, h + 1, 7, col); });
       return s;
     }
+    // The argument family: what holds up, what limits, what pushes against, what is set aside.
+    case 'beam': return box(x, y, 0, w, d, h, c) + box(x - 8, y + d * .2, h, w + 16, d * .6, 10, { top: c.accent, front: 'var(--front)', side: 'var(--side)' });
+    case 'pillar': return box(x, y, 0, w, d, 8, c) + cylinder(cx, cy, 8, Math.min(w, d) / 2 - 12, h + 26, c) + ell(cx, cy, h + 34, Math.min(w, d) / 2 - 12, c.accent);
+    case 'foundation': {
+      let s = box(x, y, 0, w, d, h, c);
+      for (let i = 1; i < 4; i++) s += `<path d="M${pt(x + i * w / 4, y, h)} L${pt(x + i * w / 4, y + d, h)}" stroke="#9c9384" stroke-width="1"/>`;
+      return s + `<path d="M${pt(x, cy, h)} L${pt(x + w, cy, h)}" stroke="#9c9384" stroke-width="1"/>`;
+    }
+    case 'aside': return box(x, y, 0, w, d, h, { top: '#e7e2d9', front: '#d9d3c8', side: '#cfc8bb' })
+      + `<path d="M${pt(x + 18, y + 14, h)} L${pt(x + w - 18, y + d - 14, h)} M${pt(x + w - 18, y + 14, h)} L${pt(x + 18, y + d - 14, h)}" stroke="#8a8f94" stroke-width="2.4"/>`;
+    case 'clamp': return box(x, y, 0, w, d, 10, c) + box(x + 10, y + 10, 10, 14, d - 20, h + 18, c) + box(x + w - 24, y + 10, 10, 14, d - 20, h + 18, c)
+      + box(x + 10, y + 10, h + 28, w - 20, d - 20, 8, { top: c.accent });
+    case 'wedge': {
+      const a = P(x, y + d, 0), b = P(x + w, y + d, 0), e = P(x + w, y, 0), f = P(x, y, 0), top1 = P(x, y + d / 2, h + 14), top2 = P(x + w, y + d / 2, h + 14);
+      return poly([a, b, top2, top1], 'var(--front)') + poly([b, e, top2], 'var(--side)') + poly([f, e, top2, top1], c.accent === '#a39a8a' ? 'var(--top)' : c.top) + `<path d="M${top1} L${top2}" stroke="${c.accent}" stroke-width="2.4"/>`;
+    }
+    case 'field': {
+      let s = box(x, y, 0, w, d, h, { ...c, top: '#e3ecd9' });
+      [[.25, .3], [.6, .25], [.45, .7]].forEach(([u, v]) => { s += cylinder(x + w * u, y + d * v, h, 7, 12, c) + ell(x + w * u, y + d * v, h + 12, 7, c.accent); });
+      return s;
+    }
     default: return box(x, y, 0, w, d, h, c);
   }
 }
 
 // ---- State. ----
-const S = { step: 0, mode: 'shapes', open: null, sel: null, margin: false, lastStep: -1 };
+const S = { step: 0, mode: 'shapes', open: null, sel: null, margin: false, lastStep: -1, suspended: new Set() };
+// What a suspended premise does to the frame: its supports break; a part held up only by suspended supports is "not derived here".
+// The contract does not say whether supports hold jointly or one at a time, so one suspended support out of two only reduces.
+function support(id) {
+  const into = D.joints.filter(j => j.to === id && j.type === 'supports');
+  const off = into.filter(j => S.suspended.has(j.from)).length;
+  return !into.length || !off ? null : off === into.length ? 'none' : `${off} di ${into.length}`;
+}
 
 function tile([x, y, w, d, h], c) { return box(x, y, 0, w, d, Math.min(h, 14), c); }
 function ghost([x, y, w, d]) { return poly([P(x, y, BOARD[4]), P(x + w, y, BOARD[4]), P(x + w, y + d, BOARD[4]), P(x, y + d, BOARD[4])], 'none', 'stroke-dasharray="5 4" stroke="#9c9384" stroke-width="1.2"'); }
@@ -267,11 +320,25 @@ const clip = ([x, y, w, d], a, b) => { // where the segment a→b leaves the rec
   return [a[0] + dx * t, a[1] + dy * t];
 };
 const center = ([x, y, w, d]) => [x + w / 2, y + d / 2];
-function pipe(fromRect, toRect, label, color, fresh, z = BOARD[4]) {
+// Every line between two parts is a joint, drawn by its kind: an arrow sends, a strut holds up, a wedge pushes against, a bar limits.
+function pipe(fromRect, toRect, label, color, fresh, type = 'sends-to', key = '', broken = false, z = BOARD[4]) {
   const a0 = center(fromRect), b0 = center(toRect), a = clip(fromRect, b0, a0), b = clip(toRect, a0, b0);
   const [X1, Y1] = pt(...a, z), [X2, Y2] = pt(...b, z), mx = (X1 + X2) / 2, my = (Y1 + Y2) / 2;
-  return `<g><path d="M${X1},${Y1} L${X2},${Y2}" class="pipe ${fresh ? 'draw' : ''}" stroke="${color}" stroke-width="${fresh ? 3.2 : 2}" marker-end="url(#arrow-${fresh ? 'on' : 'off'})"/>`
-    + `<text x="${mx}" y="${my - 5}" text-anchor="middle" class="lbl jl" style="fill:${color}">${esc(label)}</text></g>`;
+  const len = Math.hypot(X2 - X1, Y2 - Y1) || 1, nx = -(Y2 - Y1) / len, ny = (X2 - X1) / len;
+  const w = fresh ? 3.2 : 2, cls = `pipe ${fresh ? 'draw' : ''}`;
+  let s;
+  if (type === 'supports') {
+    const seg = (o, f0, f1) => `<path d="M${X1 + (X2 - X1) * f0 + nx * o},${Y1 + (Y2 - Y1) * f0 + ny * o} L${X1 + (X2 - X1) * f1 + nx * o},${Y1 + (Y2 - Y1) * f1 + ny * o}" class="${cls}" stroke="${broken ? '#b3261e' : color}" stroke-width="${w}"/>`;
+    s = broken ? seg(3, 0, .38) + seg(-3, 0, .38) + seg(3, .62, 1) + seg(-3, .62, 1) : seg(3, 0, 1) + seg(-3, 0, 1);
+    s += `<path d="M${X2 + nx * 7},${Y2 + ny * 7} L${X2 - nx * 7},${Y2 - ny * 7}" stroke="${broken ? '#b3261e' : color}" stroke-width="3"/>`;
+  } else if (type === 'attacks') {
+    s = `<path d="M${X1},${Y1} L${X2},${Y2}" class="${cls}" stroke="#b3261e" stroke-width="${w}" stroke-dasharray="7 5" marker-end="url(#wedge)"/>`;
+  } else if (type === 'limits') {
+    s = `<path d="M${X1},${Y1} L${X2},${Y2}" class="${cls}" stroke="${color}" stroke-width="${w}" stroke-dasharray="2 4"/><path d="M${X2 + nx * 9},${Y2 + ny * 9} L${X2 - nx * 9},${Y2 - ny * 9}" stroke="${color}" stroke-width="3.4"/>`;
+  } else {
+    s = `<path d="M${X1},${Y1} L${X2},${Y2}" class="${cls}" stroke="${color}" stroke-width="${w}" ${type === 'depends-on' ? 'stroke-dasharray="3 4"' : ''} marker-end="url(#arrow-${fresh ? 'on' : 'off'})"/>`;
+  }
+  return `<g data-joint="${esc(key)}">${s}<text x="${mx}" y="${my - 6}" text-anchor="middle" class="lbl jl" style="fill:${broken ? '#b3261e' : type === 'attacks' ? '#b3261e' : color}">${esc(broken ? 'sostegno sospeso' : label)}</text></g>`;
 }
 
 function render() {
@@ -292,7 +359,8 @@ function render() {
   const svg = [`<defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--add)"/></marker>
     <marker id="arrow-on" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--relate)"/></marker>
-    <marker id="arrow-off" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7d8a86"/></marker></defs>`];
+    <marker id="arrow-off" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7d8a86"/></marker>
+    <marker id="wedge" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="9" markerHeight="9" orient="auto"><path d="M0,0 L12,6 L0,12 L4,6 z" fill="#b3261e"/></marker></defs>`];
   const framed = k >= firstFrame;
   svg.push(`<g class="${framed ? '' : 'ghost'}">${box(...BOARD.slice(0, 2), 0, BOARD[2], BOARD[3], BOARD[4], { top: framed ? 'var(--board)' : 'none', front: 'var(--board-side)', side: 'var(--board-side)', topExtra: st.frame ? 'stroke="var(--frame)" stroke-width="3"' : '' })}</g>`);
   const [wx, wy] = pt(0, 0, BOARD[4]);
@@ -302,7 +370,7 @@ function render() {
     // Joints first, on the board: parts cover their ends.
     D.joints.forEach(j => {
       const at = firstRelate(j); if (at < 0 || at > k) return;
-      svg.push(pipe(PLACES[j.from], PLACES[j.to], j.label, at === k ? 'var(--relate)' : '#7d8a86', at === k));
+      svg.push(pipe(PLACES[j.from], PLACES[j.to], j.label, at === k ? 'var(--relate)' : '#7d8a86', at === k, j.type, `${j.from}>${j.to}`, j.type === 'supports' && S.suspended.has(j.from)));
     });
     const order = Object.keys(PLACES).sort((a, b) => (PLACES[a][0] + PLACES[a][1]) - (PLACES[b][0] + PLACES[b][1]));
     order.forEach(id => {
@@ -317,6 +385,8 @@ function render() {
       const fresh = at === k && S.lastStep !== k;
       svg.push(`<g class="part ${fresh ? 'enter' : ''} ${now === 'deepen' ? 'pulse' : ''}" data-part="${id}" tabindex="0" role="button" aria-label="${esc(p.name)}">${sel}<g transform="translate(0,-${BOARD[4]})">${body}</g>
         <text x="${lx}" y="${ly}" text-anchor="middle" class="lbl">${esc(p.name)}</text>
+        ${support(id) ? `<text x="${lx}" y="${ly + 15}" text-anchor="middle" class="lbl" style="fill:#b3261e">${support(id) === 'none' ? 'non derivata qui' : `sostegno ridotto: ${support(id)} sospesi`}</text>` : ''}
+        ${S.suspended.has(id) ? `<text x="${lx}" y="${ly + 15}" text-anchor="middle" class="lbl" style="fill:#b3261e">sospesa (prova)</text>` : ''}
         ${S.mode === 'tiles' ? `<text x="${lx}" y="${ly + 14}" text-anchor="middle" class="lbl dim" style="font-size:10px">${esc(p.icon)}</text>` : ''}</g>`);
     });
   } else {
@@ -325,7 +395,7 @@ function render() {
     const cx = 325, cy = 220;
     svg.push(`<g opacity=".25" transform="translate(0,-60)">${S.mode === 'shapes' ? shape(SHAPES[openPart.id], [cx - 70, cy - 70, 140, 140, 24], { accent: '#a39a8a' }) : tile([cx - 70, cy - 70, 140, 140, 14], {})}</g>`);
     const rects = Object.fromEntries(subs.map((s, i) => { const a = -Math.PI * .8 + i * (Math.PI * 1.6) / Math.max(1, subs.length - 1); return [s.id, [cx + Math.cos(a) * 230 - 42, cy + Math.sin(a) * 160 - 32, 84, 64, 22]]; }));
-    (openPart.joints || []).forEach(j => svg.push(pipe(rects[j.from], rects[j.to], j.label, 'var(--relate)', false)));
+    (openPart.joints || []).forEach(j => svg.push(pipe(rects[j.from], rects[j.to], j.label, 'var(--relate)', false, j.type, `${j.from}>${j.to}`)));
     subs.forEach(s => {
       const r = rects[s.id], hit = st.subs.includes(s.id);
       const c = { accent: hit ? 'var(--add)' : '#a39a8a', top: hit ? '#fbe5dc' : 'var(--top)' };
@@ -351,12 +421,21 @@ function render() {
   st.deepen.forEach(id => { const p = part(id); cards.push(`<div class="card"><div class="kind" style="color:var(--deepen)">Torna su un pezzo già letto</div><h3>${esc(p.name)}</h3><ul>${p.points.map(x => `<li>${MARK[x.mark] || '·'} ${esc(x.text)}</li>`).join('')}</ul></div>`); });
   if (st.relate.length) cards.push(`<div class="card"><div class="kind" style="color:var(--relate)">Collega</div>${st.relate.map(joint).join('')}</div>`);
   if (!cards.length) cards.push(`<div class="card"><div class="kind" style="color:var(--context)">A margine</div><p>Questo passaggio non aggiunge nulla all'oggetto. Le sue note sono nel margine (<kbd>Z</kbd>).</p></div>`);
+  const holds = id => D.joints.some(j => j.from === id && j.type === 'supports') && firstAdd(id) <= k;
+  const candidate = [S.sel, ...st.add, ...st.deepen].find(id => id && holds(id));
+  if (ARGUMENT && candidate) {
+    const p = part(candidate), on = S.suspended.has(candidate);
+    cards.push(`<div class="card"><div class="kind" style="color:#b3261e">Metti alla prova il telaio</div><p>${on ? 'Sospesa' : 'Sospendi'} «${esc(p.name)}»: ciò che regge resta al suo posto, senza questo sostegno.</p>
+      <button id="suspend" style="border:1px solid #b3261e;background:${on ? '#b3261e' : 'white'};color:${on ? 'white' : '#b3261e'};border-radius:6px;padding:5px 10px">${on ? 'Rimetti il sostegno' : 'Sospendi questo sostegno'}</button>
+      <p class="hint">Sospendere non dimostra che la tesi sia falsa: dice solo che qui non deriva più da questo sostegno. La fonte non dice se i sostegni valgono insieme o uno alla volta: con uno su due sospeso il sostegno è «ridotto», non caduto.</p></div>`);
+  }
   if (S.sel && !st.add.includes(S.sel) && !st.deepen.includes(S.sel)) { const p = part(S.sel); cards.push(`<div class="card"><div class="kind" style="color:var(--muted)">Selezionato</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p>${analogy(p)}</div>`); }
   $('panel').innerHTML = `<p class="where">Passo ${k + 1} di ${STEPS.length} · righe ${st.from}–${st.to}</p><h1>${esc(st.title)}</h1>
     <div class="chips">${st.cats.map(c => `<span class="chip" style="background:${COLOR[c]}">${WORD[c]}</span>`).join('')}</div>${cards.join('')}
     <div class="nav"><button id="prev" ${k === 0 ? 'disabled' : ''}>← Indietro</button><button class="primary" id="next" ${k === STEPS.length - 1 ? 'disabled' : ''}>Avanti →</button></div>
     <p class="hint">Il disegno cambia solo con ciò che il passaggio fa. Un pezzo tratteggiato non è ancora stato letto.</p>`;
   $('prev').onclick = () => go(k - 1); $('next').onclick = () => go(k + 1);
+  const suspend = $('suspend'); if (suspend) suspend.onclick = () => { const id = candidate; S.suspended.has(id) ? S.suspended.delete(id) : S.suspended.add(id); render(); };
 
   // Margin (z)
   const notes = st.margin;
@@ -390,6 +469,17 @@ $('marginBtn').onclick = () => { S.margin = !S.margin; render(); };
 const setMode = m => { S.mode = m; $('modeShapes').setAttribute('aria-pressed', m === 'shapes'); $('modeTiles').setAttribute('aria-pressed', m === 'tiles'); render(); };
 $('modeShapes').onclick = () => setMode('shapes'); $('modeTiles').onclick = () => setMode('tiles');
 $('bandH').oninput = e => document.getElementById('app').style.setProperty('--band', e.target.value + 'vh');
+document.querySelectorAll('[data-fixture]').forEach(b => {
+  b.setAttribute('aria-pressed', b.dataset.fixture === KEY);
+  b.onclick = () => { location.hash = b.dataset.fixture; location.reload(); };
+});
+$('jointLegend').textContent = ARGUMENT ? '· puntone = sostiene · cuneo rosso = attacca · barra = limita' : '· freccia = invia · puntini = dipende da';
+/** For checks: every line drawn between parts, against the joints of the fixture at the level shown. */
+window.__check = () => {
+  const level = S.open ? D.parts.find(p => p.id === S.open).joints || [] : D.joints;
+  const drawn = [...document.querySelectorAll('#svg [data-joint]')].map(g => g.dataset.joint), known = new Set(level.map(j => `${j.from}>${j.to}`));
+  return { fixture: KEY, step: S.step + 1, steps: STEPS.length, drawn, unknown: drawn.filter(x => !known.has(x)) };
+};
 go(0);
 </script>
 </body>
