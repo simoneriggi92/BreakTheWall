@@ -66,12 +66,14 @@ export interface SheetProps {
    * with no name or number, the current passage marks what it adds or deepens, and joints appear from their passage.
    */
   reading?: ReadingMarks;
+  /** The minimap (G11): nothing to press or focus. */
+  inert?: boolean;
 }
 export interface ReadingMarks { plates: Record<string, 'unread' | 'added' | 'deepened' | 'cited'>; hidden?: ReadonlySet<number>; current?: ReadonlySet<number> }
 const TITLE_BLOCK = 64;
 
 /** The exploded view: one level drawn from the automatic layout, as a technical sheet with a title block. */
-export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1, numbering, detail = false, reading }: SheetProps) {
+export function Sheet({ layout, parts, joints, title, subtitle, language, selected, onSelect, onEnter, states = {}, flow = [], bricks = [], removed, target, fit, zoom = 1, numbering, detail = false, reading, inert = false }: SheetProps) {
   const { t } = usePreferences();
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -130,8 +132,8 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
       // The name is centred in the band below the kind label, so three lines never touch it.
       const band = 22; const top = band + (rect.h - band - lines.length * 15) / 2 + 11;
       const tilt = target?.id === id && target.verdict !== 'holds' ? `rotate(${target.verdict === 'falls' ? 3 : 1.2} ${rect.w / 2} ${rect.h})` : undefined;
-      return <g key={id} className={cls} data-id={id} transform={`translate(${rect.x} ${rect.y})`} role="button" tabIndex={0}
-        aria-pressed={selected === id} aria-label={`${number}. ${part.name} · ${t.d.kinds[part.kind]}${state ? ` · ${t.d.states[state as keyof typeof t.d.states]}` : ''}${mark ? ` · ${t.d.guided.marks[mark]}` : ''}`}
+      return <g key={id} className={cls} data-id={id} transform={`translate(${rect.x} ${rect.y})`} role={inert ? undefined : 'button'} tabIndex={inert ? undefined : 0}
+        aria-pressed={inert ? undefined : selected === id} aria-label={`${number}. ${part.name} · ${t.d.kinds[part.kind]}${state ? ` · ${t.d.states[state as keyof typeof t.d.states]}` : ''}${mark ? ` · ${t.d.guided.marks[mark]}` : ''}`}
         onClick={() => onSelect?.(id)} onDoubleClick={() => part.parts && onEnter?.(id)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}>
         {part.parts && <rect className="outer" x={-4} y={-4} width={rect.w + 8} height={rect.h + 8} rx={4}/>}

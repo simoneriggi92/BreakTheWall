@@ -4,7 +4,26 @@
 .reading-view-options { display: inline-flex; gap: 3px; }
 .reading-view-options button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; background: transparent; color: var(--muted); font-size: 12px; border-radius: 5px; }
 .reading-view-options button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); }
-.guided-reading { display: grid; grid-template-columns: minmax(130px, 17%) minmax(0, 1fr) 14px minmax(240px, calc(var(--guided-drawing) * 100%)); flex: 1; min-height: 0; }
+/* The prototype's structure (P-20261102-guided-reading G9): route | drawing | panel above, the source once in a band below. */
+.guided-reading { display: grid; grid-template-columns: minmax(150px, 15%) minmax(0, 1fr) 14px minmax(260px, calc(var(--guided-panel) * 100%));
+  grid-template-rows: minmax(0, calc(var(--guided-top) * 100%)) 12px minmax(0, 1fr); flex: 1; min-height: 0; }
+.guided-navigation { grid-column: 1; grid-row: 1; }
+.guided-stage { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 5px;
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px), linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+  background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px; }
+.guided-stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.guided-reading > .splitter-vertical { grid-column: 3; grid-row: 1; }
+.guided-context { grid-column: 4; grid-row: 1; }
+.guided-reading > .splitter-horizontal { grid-column: 1 / -1; grid-row: 2; }
+.guided-proof { grid-column: 1 / -1; grid-row: 3; }
+.guided-source-wide .guided-proof { grid-row: 1 / -1; }
+.guided-where { margin: 0 0 2px; }
+.guided-title { margin: 0 0 10px; font-size: 18px; line-height: 1.3; }
+.guided-does-marks { display: flex; gap: 4px; margin-top: 4px; }
+.does-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.does-mark.d-frame { background: var(--argument); } .does-mark.d-add { background: var(--active); } .does-mark.d-deepen { background: var(--story); }
+.does-mark.d-relate { background: var(--mechanism); } .does-mark.d-margin { background: transparent; border: 1px solid var(--muted); }
 .guided-reading [hidden] { display: none !important; }
 .guided-navigation { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); padding-right: 12px; margin-right: 20px; }
 .guided-navigation h2 { margin: 0 0 14px 7px; font-size: 14px; font-weight: 600; }
@@ -16,15 +35,6 @@
 .guided-number { display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; border-radius: 4px; flex: none; font-family: var(--f-mono); font-size: 11px; }
 .guided-navigation [aria-current="step"] .guided-number { background: var(--accent); color: var(--bg); }
 .guided-source-name { display: block; margin: 14px 6px 6px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-.guided-center { display: grid; grid-template-rows: minmax(0, calc(var(--guided-reading) * 100%)) 12px minmax(0, 1fr); min-height: 0; min-width: 0; }
-.guided-passage { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 5px; overflow: auto; }
-.guided-passage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.guided-passage .source-document { padding: 23px 25px 28px; }
-.guided-passage .source-document > :first-child { margin-top: 0; }
-.guided-code { overflow: auto; margin: 0; padding: 22px; font: 13px/1.8 var(--f-mono); color: var(--code-ink); }
-.guided-exclusions { flex: none; border-top: 1px solid var(--line); padding: 12px 18px; color: var(--muted); font-size: 12px; }
-.guided-exclusions summary { cursor: pointer; }
-.guided-exclusions ul { padding-left: 18px; }
 .guided-proof { min-height: 0; min-width: 0; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
 .guided-proof .source-head { flex-wrap: wrap; padding: 8px 11px; gap: 6px; }
 .guided-proof .source-head .box-label { display: block; font-size: 12px; }
@@ -33,14 +43,10 @@
 .guided-proof .source-tools .icon-button { width: 27px; height: 27px; }
 .guided-proof .source-text { font-size: 12px; padding-top: 9px; }
 .guided-context { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.guided-drafting { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 20px; overflow: auto; border: 1px solid var(--line); border-radius: 5px;
-  background-color: var(--bg);
-  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px), linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
-  background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px; }
-.guided-detail-drawing { flex: none; height: clamp(280px, 50dvh, 520px); min-height: 0; }
-.guided-detail-drawing { overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
-.guided-detail-drawing .sheet-scroll { overflow: visible; }
-.guided-detail-drawing .sheet { display: block; margin: 0 auto; }
+.guided-drafting { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 16px 18px; overflow: auto; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
+.guided-detail-drawing { flex: 1; min-height: 0; display: flex; }
+.guided-detail-drawing .sheet-scroll { flex: 1; min-height: 0; display: flex; }
+.guided-detail-drawing .sheet { width: 100%; height: 100%; }
 .guided-part-detail { font-size: 14px; line-height: 1.8; margin-top: 18px; }
 .guided-part-detail > summary { display: flex; align-items: center; gap: 7px; cursor: pointer; list-style: none; font-weight: 600; }
 .guided-part-detail > summary::-webkit-details-marker { display: none; }
@@ -49,12 +55,8 @@
 .guided-context-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
 .guided-context-actions button, .guided-source-context button { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .guided-source-context { display: flex; flex-direction: column; align-items: flex-start; gap: 18px; font-size: 14px; line-height: 1.8; color: var(--muted); }
-.guided-controls { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 8px; padding-top: 14px; }
-.guided-controls button { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
-.guided-controls .primary { padding: 10px 13px; }
 .guided-position { font: 12px var(--f-mono); color: var(--muted); white-space: nowrap; }
-.guided-source-wide .guided-center { grid-column: 2 / -1; grid-template-rows: minmax(0, 1fr); }
-.guided-wide-controls { grid-column: 2 / -1; }
+.guided-wide-controls { grid-column: 1 / -1; }
 /* The drawing follows the reading (P-20261102-guided-reading): outlines for parts not read yet, marks for this passage. */
 .sheet .plate.unread .body { fill: none; stroke: var(--muted); stroke-width: 1.1; stroke-dasharray: 5 4; opacity: .7; }
 .sheet .plate.read-added .body { stroke: var(--active); stroke-width: 2.6; }
@@ -86,17 +88,16 @@
 .guided-analogy { padding: 6px 9px; border-radius: 5px; background: var(--sunk); font-size: 13px; }
 .guided-analogy span { display: block; margin-top: 3px; color: var(--muted); }
 .guided-selected { border-top: 2px solid var(--accent); }
-@media (min-width: 961px) and (max-height: 800px) { .guided-drafting { padding: 14px; } .guided-detail-drawing { height: 330px; } }
-@media (min-width: 961px) and (max-width: 1150px) { .guided-reading { grid-template-columns: 135px minmax(0, 1fr) 14px minmax(240px, calc(var(--guided-drawing) * 100%)); } .guided-navigation { margin-right: 13px; } .guided-passage .source-document { padding: 18px; } .guided-navigation button { font-size: 11px; } }
+@media (min-width: 961px) and (max-height: 800px) { .guided-drafting { padding: 12px 14px; } .guided-stage { padding: 8px 10px; } }
+@media (min-width: 961px) and (max-width: 1150px) { .guided-reading { grid-template-columns: 135px minmax(0, 1fr) 14px minmax(240px, calc(var(--guided-panel) * 100%)); } .guided-navigation { margin-right: 13px; } .guided-navigation button { font-size: 11px; } }
 @media (max-width: 960px) {
   .study-workbench.guided-view { height: auto; overflow: visible; min-height: calc(100dvh - 90px); }
-  .guided-reading { flex: none; grid-template-columns: 135px minmax(0, 1fr); gap: 18px; }
-  .guided-navigation { grid-row: 1 / span 2; position: sticky; top: 12px; align-self: start; height: calc(100dvh - 24px); }
-  .guided-navigation { margin-right: 0; }
-  .guided-center { grid-column: 2; grid-row: 1; height: max(420px, calc(100dvh - 160px)); }
-  .guided-passage { min-height: 0; }
-  .guided-context { grid-column: 2; grid-row: 2; min-height: 430px; }
-  .guided-source-wide .guided-center { grid-column: 2; }
+  .guided-reading { flex: none; grid-template-columns: 135px minmax(0, 1fr); grid-template-rows: auto; gap: 18px; }
+  .guided-navigation { grid-column: 1; grid-row: 1 / span 3; position: sticky; top: 12px; align-self: start; height: calc(100dvh - 24px); margin-right: 0; }
+  .guided-stage { grid-column: 2; grid-row: 1; height: max(380px, 55dvh); }
+  .guided-context { grid-column: 2; grid-row: 2; min-height: 360px; }
+  .guided-proof { grid-column: 2; grid-row: 3; height: max(320px, 45dvh); }
+  .guided-source-wide .guided-proof { grid-row: 1 / span 3; }
 }
 @media (max-width: 600px) {
   .guided-reading { grid-template-columns: 42px minmax(0, 1fr); gap: 10px; }
@@ -104,11 +105,94 @@
   .guided-navigation h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .guided-navigation button { padding: 5px 0; justify-content: center; min-height: 42px; }
   .guided-navigation button > span:last-child, .guided-source-name { display: none; }
-  .guided-passage .source-document { padding: 16px 13px; font-size: 15px; }
   .guided-drafting { padding: 13px; }
   .guided-proof .source-head > .micro { display: none; }
   .guided-proof .source-head .box-label { font-size: 11px; }
   .guided-proof .source-tools { gap: 2px; }
-  .guided-controls { flex-wrap: wrap; }
-  .guided-controls .primary { padding: 10px; }
+  .guided-deck { flex-wrap: wrap; }
+  .guided-minimap { width: 100%; }
+}
+
+/* The object (P-20261102-guided-reading G10): a 2.5D board in the theme's own colours. */
+.guided-detail-drawing { position: relative; }
+.object-sheet { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  --obj-top: var(--surface); --obj-top-marked: var(--amber-soft); --obj-front: var(--sunk); --obj-side: var(--line); --obj-edge: var(--muted);
+  --obj-board: var(--bg); --obj-board-side: var(--sunk); --obj-dark: #27323b; --obj-accent: var(--muted); --obj-field: var(--good-soft); }
+:root[data-theme="blueprint"] .object-sheet { --obj-dark: #08182b; --obj-board: #11335a; }
+.object-sheet polygon, .object-sheet path, .object-sheet ellipse { stroke: var(--obj-edge); stroke-width: .6; stroke-linejoin: round; }
+.object-sheet .object-detail { stroke: var(--obj-dark); stroke-linecap: round; }
+:root[data-theme="blueprint"] .object-sheet .object-detail { stroke: var(--ink); }
+.object-sheet .object-flow { stroke: var(--obj-accent); }
+.object-sheet .object-edge-accent { stroke: var(--fail); }
+.object-sheet .object-head { stroke: var(--obj-edge); }
+.object-sheet .object-outline { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; opacity: .7; }
+.object-sheet .object-assembly { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.object-sheet .object-selected { fill: none; stroke: var(--accent); stroke-width: 2.6; }
+.object-sheet .plate { cursor: pointer; }
+.object-sheet .plate:focus-visible { outline: none; }
+.object-sheet .plate:focus-visible .object-name { text-decoration: underline; }
+.object-sheet .object-name { font-size: var(--name, 13px); font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+.object-sheet .object-sub, .object-sheet .object-title { font-size: var(--small, 11px); fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+.object-sheet .object-title { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.object-sheet .object-joint-line { stroke: var(--obj-accent); stroke-width: 2; fill: none; }
+.object-sheet .object-joint-line.thin { stroke-width: 1.2; }
+.object-sheet .object-joint-head { fill: var(--obj-accent); stroke: none; }
+.object-sheet .attack { stroke: var(--fail); } .object-sheet .object-joint-head.attack { fill: var(--fail); }
+.object-sheet .reading-current .object-joint-line { stroke: var(--mechanism); stroke-width: 3; }
+.object-sheet .reading-current .object-joint-head { fill: var(--mechanism); }
+.object-sheet .object-joint-label { font-size: var(--small, 10.5px); font-family: var(--f-mono); fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+.object-sheet .reading-current .object-joint-label { fill: var(--mechanism); }
+.guided-drawing-style { display: inline-flex; gap: 2px; margin-left: auto; margin-right: 10px; }
+.guided-drawing-style button { padding: 3px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 12px; }
+.guided-drawing-style button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); }
+
+/* Orientation (P-20261102-guided-reading G11–G14): the deck under the drawing, the minimap, the axes, and motion. */
+/* The stack (G17): the whole on top, each open level below the part it comes from; the sheet scrolls down. */
+.guided-detail-drawing.guided-stack { flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+/* Upper levels are context: compact, so the level in focus and the ones above it fit together; the focus takes the rest. */
+.guided-stack .guided-level { position: relative; display: flex; }
+.guided-stack .guided-level.upper { flex: 0 0 clamp(110px, 30%, 200px); }
+.guided-stack .guided-level.focus { flex: 1 0 220px; }
+.guided-stack.single .guided-level { flex: 1 1 auto; }
+.guided-level.upper { opacity: .38; cursor: pointer; transition: opacity .2s; }
+.guided-level.upper:hover { opacity: .6; }
+.guided-stack-link { flex: none; display: flex; flex-direction: column; align-items: center; padding: 2px 0 4px; color: var(--accent); font-size: 11px; }
+.guided-stack-link::before { content: ""; width: 2px; height: 18px; background: var(--accent); opacity: .6; }
+.guided-legend { list-style: none; margin: -6px 0 12px 7px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--muted); }
+.guided-legend li { display: inline-flex; align-items: center; gap: 4px; }
+.guided-deck { flex: none; display: flex; align-items: stretch; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.guided-minimap { flex: none; display: flex; flex-direction: column; gap: 3px; width: 170px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); text-align: left; color: var(--muted); font-size: 11px; }
+.guided-minimap:disabled { cursor: default; opacity: 1; }
+.guided-minimap.inside { border-color: var(--accent); }
+.guided-minimap.inside:hover { background: var(--sunk); }
+.guided-minimap-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.guided-minimap-path b { color: var(--accent); }
+.guided-minimap-drawing { position: relative; display: flex; height: 64px; }
+.guided-minimap-drawing .sheet-scroll { flex: 1; display: flex; }
+.guided-minimap-drawing .sheet { width: 100%; height: 100%; }
+.guided-minimap text, .guided-backdrop text { display: none; }
+.object-sheet .object-here { fill: none; stroke: var(--accent); stroke-width: 6; }
+.guided-axes { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; min-width: 0; }
+.guided-axis { display: inline-flex; align-items: center; gap: 6px; }
+.guided-axis button { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.guided-axis .primary { padding: 8px 12px; }
+.guided-axis-name { font: 600 11px var(--f-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.guided-map-toggle { font-size: 11px; color: var(--muted); }
+
+/* Motion says one thing at a time, in 300–500 ms, and never blocks a click. */
+.guided-level.entering { animation: guided-descend .45s cubic-bezier(.2, .8, .2, 1) both; }
+.guided-level.entering .object-sheet:not(.mini) .plate { animation: guided-explode .45s cubic-bezier(.2, .8, .2, 1) var(--delay, 0ms) both; transform-box: fill-box; transform-origin: center; }
+.guided-detail-drawing.returning .guided-level.focus { animation: guided-fade-in .35s ease-out both; }
+.object-sheet:not(.mini) .plate.read-added { animation: guided-rise .45s cubic-bezier(.2, .8, .2, 1) both; transform-box: fill-box; }
+.object-sheet .reading-current .object-joint-line.solid { stroke-dasharray: 1; animation: guided-draw .5s ease-out both; }
+.object-sheet .reading-current .joint { animation: guided-fade-in .4s ease-out both; }
+.reading-mark.m-deepened circle { animation: guided-pulse .8s ease-in-out 1; transform-box: fill-box; transform-origin: center; }
+@keyframes guided-descend { from { transform: translateY(-28px); opacity: 0; } }
+@keyframes guided-explode { from { transform: translate(var(--dx, 0), var(--dy, 0)) scale(.35); opacity: 0; } }
+@keyframes guided-fade-in { from { opacity: 0; } }
+@keyframes guided-rise { from { transform: translateY(-18px); opacity: 0; } }
+@keyframes guided-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes guided-pulse { 50% { transform: scale(1.5); } }
+@media (prefers-reduced-motion: reduce) {
+  .guided-reading *, .guided-reading *::before, .guided-reading *::after { animation: none !important; transition: none !important; }
 }

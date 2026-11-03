@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateDisassembly } from '../src/core/disassembly';
 import { initialDisassemblyState, locateReading, restoreDisassemblyState } from '../src/core/disassembly-state';
-import { readingContext, readingIndex, readingRoles, sourceReadingRoute, type ReadingPassage } from '../src/core/source-reading';
+import { readingContext, readingIndex, readingRoles, readingSteps, sourceReadingRoute, type ReadingPassage } from '../src/core/source-reading';
 import { readingBlocks, renderMarkdown } from '../src/renderer/markdown';
 import { atlas, fixture, PUBLIC_FIXTURES } from './disassemblies';
 
@@ -130,5 +130,36 @@ describe('what each passage does', () => {
     const at = roles.findIndex(r => r.relate.some(j => j.from === 'heartbeat' && j.to === 'restart'));
     expect(roles[at].add).toContain('restart');
     expect(roles.filter(r => r.relate.some(j => j.from === 'heartbeat' && j.to === 'restart'))).toHaveLength(1);
+  });
+});
+
+// P-20261102-guided-reading G13: one step where the drawing changes.
+describe('steps of the guided reading', () => {
+  const realRoute = (d: any) => sourceReadingRoute(d.sources, Object.fromEntries(d.sources.map((s: any) => [s.id, readingBlocks(s.text)])));
+  it.each([['atlas-release-en', 14, 9], ['mill-harm-en', 5, 4], ['importer-signals-en', 15, 10]])('groups %s from %i passages into %i steps', async (name, passages, count) => {
+    const d = await validateDisassembly(fixture(`src/fixtures/disassemblies/${name}.json`));
+    const route = realRoute(d), roles = readingRoles(d, route), steps = readingSteps(route, roles);
+    expect(route).toHaveLength(passages);
+    expect(steps).toHaveLength(count);
+    expect(steps.length).toBeLessThanOrEqual(1 + d.parts.length + d.joints.length);
+  });
+  it.each(PUBLIC_FIXTURES)('keeps every line in one step and every step a change of the drawing (%s)', async path => {
+    const d = await validateDisassembly(fixture(path));
+    const route = realRoute(d), roles = readingRoles(d, route), steps = readingSteps(route, roles);
+    for (const s of d.sources) {
+      const own = steps.filter(x => x.source === s.id);
+      expect(own[0].from).toBe(1);
+      expect(own.at(-1)!.to).toBe(s.text.split('\n').length);
+      own.slice(1).forEach((x, i) => expect(x.from).toBe(own[i].to + 1));
+    }
+    steps.slice(1).forEach((x, i) => { if (x.source === steps[i].source) expect(x.role.frame || x.role.add.length > 0 || x.role.relate.length > 0).toBe(true); });
+    // G2's invariants hold on steps.
+    expect(steps.flatMap(x => x.role.add).sort()).toEqual(d.parts.map(p => p.id).sort());
+    for (const j of d.joints) expect(steps.some(x => x.role.relate.includes(j))).toBe(true);
+    const exclusions = [...d.bom.excluded, ...d.parts.flatMap(function all(p: any): any[] { return [...(p.excluded ?? []), ...(p.parts ?? []).flatMap(all)]; })];
+    for (const e of exclusions) steps.forEach(x => {
+      const overlaps = x.source === e.source && x.from <= e.to && x.to >= e.from;
+      expect(x.role.margin.some(m => m.source === e.source && m.from === e.from && m.to === e.to)).toBe(overlaps);
+    });
   });
 });

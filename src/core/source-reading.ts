@@ -92,3 +92,27 @@ export function readingRoles(d: Disassembly, route: ReadingPassage[]): ReadingRo
   });
   return roles;
 }
+
+/** A step of the guided reading: consecutive passages of one source, from one change of the drawing to the next. */
+export interface ReadingStep extends Cite { title?: string; passages: number[]; role: ReadingRole }
+/**
+ * Groups a route into steps (P-20261102-guided-reading G13): a step starts where the drawing changes (the frame, a part
+ * added, a joint related) or a new source begins; the passages in between join it, with their returns and margin notes.
+ * So the steps are at most 1 + parts + top-level joints (+ one per further source).
+ */
+export function readingSteps(route: ReadingPassage[], roles: ReadingRole[]): ReadingStep[] {
+  const steps: ReadingStep[] = [];
+  route.forEach((p, i) => {
+    const r = roles[i], last = steps.at(-1);
+    if (!last || last.source !== p.source || r.frame || r.add.length || r.relate.length) {
+      steps.push({ source: p.source, from: p.from, to: p.to, title: p.title, passages: [i], role: { ...r, add: [...r.add], deepen: [...r.deepen], relate: [...r.relate], subParts: [...r.subParts], margin: [...r.margin] } });
+      return;
+    }
+    const s = last.role;
+    last.to = p.to; last.passages.push(i);
+    r.deepen.forEach(id => { if (!s.add.includes(id) && !s.deepen.includes(id)) s.deepen.push(id); });
+    r.subParts.forEach(id => { if (!s.subParts.includes(id)) s.subParts.push(id); });
+    r.margin.forEach(m => { if (!s.margin.includes(m)) s.margin.push(m); });
+  });
+  return steps;
+}
