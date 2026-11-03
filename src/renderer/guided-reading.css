@@ -27,7 +27,7 @@
 .guided-reading [hidden] { display: none !important; }
 .guided-navigation { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); padding-right: 12px; margin-right: 20px; }
 .guided-navigation h2 { margin: 0 0 14px 7px; font-size: 14px; font-weight: 600; }
-.guided-navigation ol { margin: 0; padding: 0 4px 0 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; list-style: none; }
+.guided-navigation ol { margin: 0; padding: 0 4px 0 0; overflow: auto; position: relative; overscroll-behavior: contain; scrollbar-width: thin; list-style: none; }
 .guided-navigation li { margin-bottom: 4px; }
 .guided-navigation button { display: flex; align-items: flex-start; gap: 9px; width: 100%; min-height: 44px; padding: 8px 6px; text-align: left; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
 .guided-navigation button:hover { background: var(--sunk); color: var(--ink); }
@@ -43,7 +43,8 @@
 .guided-proof .source-tools .icon-button { width: 27px; height: 27px; }
 .guided-proof .source-text { font-size: 12px; padding-top: 9px; }
 .guided-context { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.guided-drafting { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 16px 18px; overflow: auto; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
+/* the card and the steps list scroll inside themselves: each is the positioned ancestor of its hidden labels, so they never stretch the page */
+.guided-drafting { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 16px 18px; overflow: auto; position: relative; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
 .guided-detail-drawing { flex: 1; min-height: 0; display: flex; }
 .guided-detail-drawing .sheet-scroll { flex: 1; min-height: 0; display: flex; }
 .guided-detail-drawing .sheet { width: 100%; height: 100%; }
@@ -113,51 +114,9 @@
   .guided-minimap { width: 100%; }
 }
 
-/* The object (P-20261102-guided-reading G10): a 2.5D board in the theme's own colours. */
-.guided-detail-drawing { position: relative; }
-.object-sheet { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
-  --obj-top: var(--surface); --obj-top-marked: var(--amber-soft); --obj-front: var(--sunk); --obj-side: var(--line); --obj-edge: var(--muted);
-  --obj-board: var(--bg); --obj-board-side: var(--sunk); --obj-dark: #27323b; --obj-accent: var(--muted); --obj-field: var(--good-soft); }
-:root[data-theme="blueprint"] .object-sheet { --obj-dark: #08182b; --obj-board: #11335a; }
-.object-sheet polygon, .object-sheet path, .object-sheet ellipse { stroke: var(--obj-edge); stroke-width: .6; stroke-linejoin: round; }
-.object-sheet .object-detail { stroke: var(--obj-dark); stroke-linecap: round; }
-:root[data-theme="blueprint"] .object-sheet .object-detail { stroke: var(--ink); }
-.object-sheet .object-flow { stroke: var(--obj-accent); }
-.object-sheet .object-edge-accent { stroke: var(--fail); }
-.object-sheet .object-head { stroke: var(--obj-edge); }
-.object-sheet .object-outline { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; opacity: .7; }
-.object-sheet .object-assembly { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
-.object-sheet .object-selected { fill: none; stroke: var(--accent); stroke-width: 2.6; }
-.object-sheet .plate { cursor: pointer; }
-.object-sheet .plate:focus-visible { outline: none; }
-.object-sheet .plate:focus-visible .object-name { text-decoration: underline; }
-.object-sheet .object-name { font-size: var(--name, 13px); font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
-.object-sheet .object-sub, .object-sheet .object-title { font-size: var(--small, 11px); fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
-.object-sheet .object-title { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
-.object-sheet .object-joint-line { stroke: var(--obj-accent); stroke-width: 2; fill: none; }
-.object-sheet .object-joint-line.thin { stroke-width: 1.2; }
-.object-sheet .object-joint-head { fill: var(--obj-accent); stroke: none; }
-.object-sheet .attack { stroke: var(--fail); } .object-sheet .object-joint-head.attack { fill: var(--fail); }
-.object-sheet .reading-current .object-joint-line { stroke: var(--mechanism); stroke-width: 3; }
-.object-sheet .reading-current .object-joint-head { fill: var(--mechanism); }
-.object-sheet .object-joint-label { font-size: var(--small, 10.5px); font-family: var(--f-mono); fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
-.object-sheet .reading-current .object-joint-label { fill: var(--mechanism); }
-.guided-drawing-style { display: inline-flex; gap: 2px; margin-left: auto; margin-right: 10px; }
-.guided-drawing-style button { padding: 3px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 12px; }
-.guided-drawing-style button[aria-pressed="true"] { background: var(--sunk); color: var(--ink); }
-
 /* Orientation (P-20261102-guided-reading G11–G14): the deck under the drawing, the minimap, the axes, and motion. */
-/* The stack (G17): the whole on top, each open level below the part it comes from; the sheet scrolls down. */
-.guided-detail-drawing.guided-stack { flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
-/* Upper levels are context: compact, so the level in focus and the ones above it fit together; the focus takes the rest. */
-.guided-stack .guided-level { position: relative; display: flex; }
-.guided-stack .guided-level.upper { flex: 0 0 clamp(110px, 30%, 200px); }
-.guided-stack .guided-level.focus { flex: 1 0 220px; }
-.guided-stack.single .guided-level { flex: 1 1 auto; }
 .guided-level.upper { opacity: .38; cursor: pointer; transition: opacity .2s; }
 .guided-level.upper:hover { opacity: .6; }
-.guided-stack-link { flex: none; display: flex; flex-direction: column; align-items: center; padding: 2px 0 4px; color: var(--accent); font-size: 11px; }
-.guided-stack-link::before { content: ""; width: 2px; height: 18px; background: var(--accent); opacity: .6; }
 .guided-legend { list-style: none; margin: -6px 0 12px 7px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--muted); }
 .guided-legend li { display: inline-flex; align-items: center; gap: 4px; }
 .guided-deck { flex: none; display: flex; align-items: stretch; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
@@ -171,7 +130,6 @@
 .guided-minimap-drawing .sheet-scroll { flex: 1; display: flex; }
 .guided-minimap-drawing .sheet { width: 100%; height: 100%; }
 .guided-minimap text, .guided-backdrop text { display: none; }
-.object-sheet .object-here { fill: none; stroke: var(--accent); stroke-width: 6; }
 .guided-axes { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; min-width: 0; }
 .guided-axis { display: inline-flex; align-items: center; gap: 6px; }
 .guided-axis button { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
@@ -180,18 +138,8 @@
 .guided-map-toggle { font-size: 11px; color: var(--muted); }
 
 /* Motion says one thing at a time, in 300–500 ms, and never blocks a click. */
-.guided-level.entering { animation: guided-descend .45s cubic-bezier(.2, .8, .2, 1) both; }
-.guided-level.entering .object-sheet:not(.mini) .plate { animation: guided-explode .45s cubic-bezier(.2, .8, .2, 1) var(--delay, 0ms) both; transform-box: fill-box; transform-origin: center; }
-.guided-detail-drawing.returning .guided-level.focus { animation: guided-fade-in .35s ease-out both; }
-.object-sheet:not(.mini) .plate.read-added { animation: guided-rise .45s cubic-bezier(.2, .8, .2, 1) both; transform-box: fill-box; }
-.object-sheet .reading-current .object-joint-line.solid { stroke-dasharray: 1; animation: guided-draw .5s ease-out both; }
-.object-sheet .reading-current .joint { animation: guided-fade-in .4s ease-out both; }
 .reading-mark.m-deepened circle { animation: guided-pulse .8s ease-in-out 1; transform-box: fill-box; transform-origin: center; }
-@keyframes guided-descend { from { transform: translateY(-28px); opacity: 0; } }
-@keyframes guided-explode { from { transform: translate(var(--dx, 0), var(--dy, 0)) scale(.35); opacity: 0; } }
 @keyframes guided-fade-in { from { opacity: 0; } }
-@keyframes guided-rise { from { transform: translateY(-18px); opacity: 0; } }
-@keyframes guided-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes guided-pulse { 50% { transform: scale(1.5); } }
 @media (prefers-reduced-motion: reduce) {
   .guided-reading *, .guided-reading *::before, .guided-reading *::after { animation: none !important; transition: none !important; }

@@ -2,10 +2,10 @@
 id: P-20261103-lab-mode
 title: The lab - one representation per source, an object or an atlas, chosen by a metaphor test
 version: 1
-state: implementing
-current_task: L5
-last_evidence: Phase core implemented (L1-L4) - the metaphor test, faces from a part's own lines, the bench layout with folding and the atlas layout, in src/core; 15 new tests; tsc, 33 test files with 535 tests and both builds pass
-next_action: Implement phase drawing (L5-L7) on a separate command
+state: verification_pending
+current_task: L13
+last_evidence: Phase verify - npm run check and npm run build pass in a clean copy; the built app driven in four runs (English and Italian, paper and blueprint, 1280x800) on the three public examples, with no console error and no page overflow, after seven integration fixes; CI and the owner's look are pending
+next_action: The owner's look on their device (L13.3); CI on macOS and Windows once the owner confirms a push (L13.1)
 approval: approved
 ---
 
@@ -323,6 +323,7 @@ Version 1, approved:
 - 2026-11-03: version 1 revised before approval, after the owner tried the prototype: L12 (the run in the representation's language) added, the verdict's wording fixed, verify renumbered L13. The preconditions on P-20261102-guided-reading are met: closed as `superseded`, G9–G17 committed as `2e920ee`, branch `feature/lab-mode` created.
 - 2026-11-03: `awaiting_approval` → `approved`. No other plan is active.
 - 2026-11-03: `approved` → `implementing`, on `implement P-20261103-lab-mode v1 --phase core`.
+- 2026-11-03: `implementing` → `verification_pending`, on `implement P-20261103-lab-mode v1 --phase verify`: L13.2 passes; L13.1 waits for CI, which needs a push; L13.3 is the owner's.
 
 ## Progress
 
@@ -367,3 +368,128 @@ Version 1, approved:
   - `git diff --check`.
 
   Nothing is drawn yet, so no integration check applies. Not committed.
+- 2026-11-03: `implement P-20261103-lab-mode v1 --phase drawing`.
+- **L5, primitives and the bench (component tests).**
+  - `src/renderer/lab/cabinet.tsx`:
+    - the cabinet projection, boxes, plateaus, cables and outlines;
+    - labels sized in screen pixels (`useScreenScale`);
+    - pill labels that move apart from each other and from the parts' names;
+    - one `pressable` behaviour for every button in a drawing.
+  - `src/renderer/lab/Bench.tsx`:
+    - each part stands as the component the metaphor test gave it;
+    - drawn in full: the round track (one numbered post per station, the first in the accent colour), the clock register, the tape printer, the key switch, the relay with a dial, and the control panel (one light per incoming joint, named by that joint);
+    - every other component is a library module with the part's icon and its sub-parts on the lid;
+    - clarifications (⚠ points) are pinned to their component and counted in its label;
+    - a part not yet built is a dashed footprint, and an opened part leaves its place outlined;
+    - cables follow `flowOf`.
+  - `src/renderer/lab.css`: materials and joints in the theme's variables, with a blueprint variant. Texts are in `it.ts` and `en.ts` under `d.lab`, including the 23 components' names.
+  - Tests, on the importer:
+    - 7 parts as buttons, named with their component (for example "Il giro · passo · giostra a stazioni");
+    - 8 cables with their labels, 5 stations, 3 lights with "luce Gira" among them;
+    - every part with ⚠ points counts them in its label;
+    - a part not yet built is an outline with no joints, and an opened part leaves an outline with its cables hidden.
+- **L6, the atlas (component tests).** `src/renderer/lab/Atlas.tsx`:
+  - regions are plateaus on irregular outlines, with sub-regions inside, named up to three and counted above that;
+  - arrows run from perimeter to perimeter, drawn by type (attacks dashed amber, limits and dependencies dotted);
+  - a part with no joint is marked "nessun legame esplicito".
+  - Test on Mill: 7 regions, 6 sub-regions, 5 arrows with their labels, and the rejected part's label.
+- **L7, opened levels (component tests).** `src/renderer/lab/Opened.tsx`:
+  - **`OpenedBench`** draws each sub-part as the component of its face:
+    - a cabinet, rack or file box with one band per item;
+    - an upright panel for dials, warnings, legends, sockets, lenses, knobs and checks;
+    - a turntable of stations, a screen of code lines, or a card index;
+    - a plain module when there is no face.
+  - Every face element is a button that hands over its item and lines.
+  - Joints that leave the level run from the sub-part citing the same lines, along the tray's front lip.
+  - **`OpenedRegion`** draws the perimeter with sub-regions inside, in one row or two, and outer relations leaving towards the region they reach.
+  - Tests:
+    - every opened part of the release chain shows the face `faceOf` gives it, or a plain module;
+    - Mill's two regions open into three sub-regions each;
+    - pressing a drawer hands over its item, with `source`, `from` and `to`.
+- **Seen at the lifted canvas size (764×460)** in a private harness (`.local/harness/`, never committed): the importer's and the release's benches, Mill's atlas, two opened release parts and Mill's opened limits. No console error on the final load (a 500 seen earlier came from a syntax error already fixed). Three findings, fixed on the way:
+  - The first fold placed the second band at the front left, so the board and the restart rule stood far from the registers that feed them. Bands now run back like a snake, starting in front of where the band behind ended; a test checks it.
+  - The round track read as a flat bar. Its stations became numbered posts.
+  - Joint labels covered part names, and on upright panels the names covered the panel. Names now sit above the back edge, and labels keep clear of them.
+- **Checks (automated, macOS).** All pass:
+  - `npx tsc --noEmit -p .local/tsconfig.check.json`;
+  - `npx vitest run --dir tests` (34 files, 542 tests);
+  - `npx vite build` and `node scripts/build-desktop.mjs`;
+  - `git diff --check`.
+
+  The drawings are not in the app until L8. Not committed.
+- 2026-11-03: `implement P-20261103-lab-mode v1 --phase reading`.
+- **L8, the chosen representation (component tests).** `GuidedReading.tsx` calls `chooseRepresentation` and draws the bench or the atlas through `src/renderer/lab/Stage.tsx`; the view keeps the orchestration only.
+  - The minimap draws the same representation, small, with the opened part marked `here`.
+  - Progressive building: a part not yet read is an outline (`data-unread`); a joint is drawn from the step that relates it, even to a part still outlined, where it lands on the footprint. The step's marks (added, returned to, cited in an opened level) are classes on the parts, and the step's joints are marked as current.
+  - Retired: `ObjectSheet.tsx`, `shapes.ts` and its tests, the G10 board and G17 stack styles, and the object/plates switch with its texts. A stored switch value is ignored.
+  - Tests: the three public examples, at three steps each, draw the bench (release, importer) or the atlas (Mill), with exactly the outlines, marks and joints the reading roles give; the stored "plates" value draws the bench and shows no switch. The existing route, step, ↑, margin and keyboard tests pass, rewritten for the lab's elements; "take apart" is offered where it was.
+- **L9, lifting a part (component tests).** Opening a part puts its level in focus and sinks the level it belongs to into a strip below, with the part's place outlined and a beam from the opened tray to the place.
+  - The level plays from the place to its own box (FLIP, with the Web Animations API); returning plays the whole up from the strip. Under "reduce motion" nothing is animated.
+  - At any depth the strip shows the level the opened part belongs to; the path above the drawing leads back up, level by level; the strip's parts stay pressable.
+  - Returning to the whole restores the step, the selection (the part that was open) and the source position from before the opening.
+  - Tests: the strip below the level, the place outlined, the beam; return restores the step, the selection and the focused source lines after the source moved inside; two animations with motion and none under "reduce motion"; depth 3 on the deep fixture, with the strip at depth 2, pressing a strip part, and the path back up.
+- **L10, exploring ≠ reading (component tests).** Selecting a part, a face element or a joint whose lines lie outside the step shows "Esplori «X» · r. a–b · stai leggendo il passo N" and moves the source to its lines.
+  - "Torna al passo N" closes the exploration and puts the source back on the step; "Leggi da qui (passo M)" moves the reading to the first step citing it and keeps the selection.
+  - The route marks the steps that cite what is explored.
+  - A joint's card shows its parts, verb, label and lines; a face element's card shows its row and lines.
+  - Tests: on the importer, the round explored from the night board's step, back to the step with the source restored, read from the round's first step; a joint and a release face element each open their card.
+- **L11, why and where the analogy ends (component tests).** `src/renderer/lab/Why.tsx`, on the whole's card:
+  - the verdict in one sentence: the bench holds, or "among the available metaphors, none represents this source without forcing", with the number of breaks;
+  - the failures, then the correspondences part by part and joint by joint, each component with what it does and where it ends (the texts of the prototype's library, in both languages);
+  - "Annotazioni": the parts' ⚠ counts, the parts kept as annotations, and the context lines taken from the reading's margin.
+  - A part's card holds "Nell'oggetto" or "Nella mappa".
+  - Tests: the importer's panel with 7 part rows and 8 joint rows and no failures, its annotations and the round's "In the object"; Mill's panel in English and Italian with the verdict and one failure per break, and never "no object holds".
+- **L12, the run in the representation's language (component tests).** `src/renderer/lab/Suspend.tsx`, used by Run and by the lab's card:
+  - "Sospendi «X»"; the learner answers which supporters of the target stay explicit, or none; the answer comes from the `supports` joints and their lines;
+  - the outcome ("Perde un sostegno", "Nessun sostegno esplicito", "Sostegni intatti"), then, apart, what the disassembly adds without its opening verdict sentence, the inference marked, and the closing note on explicit justifications;
+  - the summary groups the bricks into supports in the excerpt and the others;
+  - in Run, the target's label on the plates says the support tag and does not tilt; in the guided atlas, the suspended region is an outline and the target carries the tag.
+  - **Deviation, recorded:** the supports run applies only when the atlas's target has `supports` joints. The story fixture's load run (an atlas whose joints are `leads-to` and `because`) would otherwise answer "supports intact" to every brick, which is false; it keeps today's run, as objects do.
+  - Tests (Run, in Italian, on Mill): suspending the utility gives "Perde un sostegno" and names sovereignty with r. 14–21, the answer checked; the abstract right gives "Sostegni intatti"; sovereignty shows the inference apart; no text of the run holds the weight metaphor's words; the English story run is unchanged. In the guided view: the suspended region and the target's tag.
+- **Seen in the browser** (the web build on 127.0.0.1:5174, 1280×800, light theme, English): the importer built step by step, the round lifted over the strip, Mill's atlas with the utility suspended and the card's panels. Four findings, fixed on the way:
+  - label sizes were measured on the bounding box, which includes the lift's transform, so the first frame fixed huge labels; they are now measured on the layout box;
+  - sub-part names overlapped at this size; names now wrap to the width their module has on screen;
+  - the beam left from the whole level's width; it now leaves from the opened tray;
+  - the support tag sat on the claim's name, then under a pill; it stands above the back edge, and the tag and the name are one obstacle for the pills.
+- **Residual, for L13.** At the default split the drawing area is about 708×294 at 1280×800: the bench reads small (its modules take little of the slab), the strip is small, and one pill still touches the tag on Mill. Both themes, both languages and the built app are L13's.
+- **Checks (automated, macOS).** All pass:
+  - `npx tsc --noEmit -p .local/tsconfig.check.json`;
+  - `npx vitest run --dir tests` (33 files, 540 tests: the shape tests left with the board);
+  - `npx vite build` and `node scripts/build-desktop.mjs`;
+  - `git diff --check`.
+
+  Not committed.
+- 2026-11-03: `implement P-20261103-lab-mode v1 --phase verify`.
+- **L13.1, project checks.**
+  - **Passed (targeted build and automated tests, macOS), in a clean copy of the working tree** (tracked and new files, the untracked Finder duplicates `… 2.ts(x)` left out, `node_modules` linked): `npm run check` (34 files, 531 tests) and `npm run build`.
+  - In this working copy `npm run check` fails before testing: `tsc` also reads the untracked duplicates (for example `tests/split-pane.test 2.tsx`), which are outside the repository. The same checks pass with `npx tsc --noEmit -p .local/tsconfig.check.json` and `npx vitest run --dir tests` (34 files, 543 tests). The 12 extra tests are the private fixtures in the ignored `.local/`, skipped by design when absent.
+  - **Not run: CI on macOS and Windows.** It needs `feature/lab-mode` pushed, which waits for the owner's confirmation.
+- **L13.2, integration on the built app (passed).** `vite build` and `scripts/build-desktop.mjs`, then Electron started from the repository with `BTW_USER_DATA_DIR` set to a fresh scratch folder per run, its `settings.json` written with the run's theme and language, and driven over the DevTools protocol at 1280×800 (script and screenshots in the session scratchpad, not committed).
+  - Four runs: English paper, English blueprint, Italian paper, Italian blueprint. Each opens the release chain, Mill and the importer from the library. Results identical in all four, except the texts' language:
+
+    | Example | Drawn as | Outlines / parts / joints at the first, middle and last step | Opened at the last step |
+    |---|---|---|---|
+    | Release chain | bench | 6/0/0 · 1/5/2 · 0/6/6 | "check": 4 sub-parts, strip, place outlined, beam |
+    | Mill | atlas | 5/2/1 · 2/5/3 · 0/7/5 | "The region of liberty": 3 sub-regions, strip, place outlined, beam |
+    | Importer | bench | 7/0/0 · 4/3/2 · 0/7/8 | "The round": 5 sub-parts, strip, place outlined, beam |
+
+  - Every example starts in the guided view. At each checked step the drawing and the source are within the window, and the page scrolls in neither direction. Names stand at 14–15 screen pixels.
+  - **Return:** Escape closes the opened level, the opened part stays selected, and the step does not change.
+  - **"Esplori":** at the last step, a part read earlier shows the bar (for example "Esplori «Preparazione e avvio» · r. 35–58 · stai leggendo il passo 9"). "Torna al passo 9" closes it; "Leggi da qui (passo 4)" moves the reading there and keeps the part selected.
+  - **Why:** "Il banco regge…" with 6 + 6 and 7 + 8 correspondence rows and no failures for the two benches; "Tra le metafore disponibili, nessuna rappresenta questa fonte senza forzature…" with 9 failures for Mill. Annotations: 8, 7 and 11.
+  - **Mill's load run:** in the card, suspending the utility outlines its region and tags the claim "Perde un sostegno" / "Loses a support", with no pill on the tag or on a name. In Run, the same run answers `support-lost`, the plates' target shows the tag, and no weight-metaphor word appears.
+  - No console error or uncaught exception in any run.
+  - **"Building on and off"** is not checkable: the app has no switch for it, and L8 asked for none (the prototype had one). Building is checked by stepping, as above. Whether a switch is wanted is the owner's call.
+- **Seven findings of the integration, fixed and covered:**
+  1. In the atlas, the opened region's place had no id, so the strip found no place and drew no beam. Fixed, with a test lifting Mill's region.
+  2. Hidden labels (`sr-only`) in the card's marked points stretched the page by 600 px: their positioned ancestor was the body, outside the card's scroll. The card is now their positioned ancestor. This predates the plan.
+  3. The same for the route's new "cites what you are exploring" label; the steps list is now its positioned ancestor.
+  4. Names in the strip piled up: the strip is now drawn without names or joint labels (they stay in the parts' accessible names).
+  5. A pill could end on Mill's support tag, bouncing between two names. A last pass now moves a pill off any name or tag to the nearest free height within six half-heights, and the tag and the "no explicit joint" note are obstacles.
+  6. A word longer than the module's width was broken ("l'interrutt ore"); a word is now kept whole. A unit test covers it (`tests/lab-words.test.ts`).
+  7. A part opened outside the step left the source on its lines with no bar. The opened part now counts as explored, and "Torna al passo N" also closes the level. Covered by a component test.
+- **Residual, for the owner's look:** at the default split the drawing area is about 708×294, so the benches read small and the strip is a thumbnail; the last outer stub label of the opened round touches the drawing's lower edge; Mill's atlas is dense at this size (sub-region names close to their region's name).
+- **L13.3, the owner's look: pending.** On the owner's device, on their own generated disassemblies: does the choice of representation fit each source, and is a component missing from the library?
+- **Checks (automated, macOS), after the fixes.** All pass: `npx tsc --noEmit -p .local/tsconfig.check.json`; `npx vitest run --dir tests` (34 files, 543 tests); `npx vite build` and `node scripts/build-desktop.mjs`; `git diff --check`; `npm run check` and `npm run build` in the clean copy.
+
+  Not committed.

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge } from '../src/core/bridge';
 import { validateDisassembly } from '../src/core/disassembly';
 import { initialDisassemblyState, type DisassemblyState } from '../src/core/disassembly-state';
@@ -11,6 +11,8 @@ import { PreferencesProvider } from '../src/renderer/preferences';
 import { atlas, fixture } from './disassemblies';
 import { deepDisassembly } from './disassembly-drafts';
 import { readingRoles, readingSteps, sourceReadingRoute } from '../src/core/source-reading';
+import { chooseRepresentation } from '../src/core/representation';
+import { faceOf } from '../src/core/faces';
 import { isProse, readingBlocks } from '../src/renderer/markdown';
 
 function store(initial: unknown = null, locale = 'it-IT') {
@@ -130,8 +132,8 @@ describe('guided source reading in the player', () => {
     await user.click(screen.getByRole('button', { name: /^Margine: \d+ (nota|note) per questo passo$/ }));
     expect(document.querySelector('.guided-margin')).toHaveTextContent('fuori dalla domanda');
     // By the last passage every part has been read, and none is marked: this passage takes no part apart.
-    expect(document.querySelectorAll('.guided-detail-drawing .plate')).toHaveLength(d.parts.length);
-    expect(document.querySelectorAll('.guided-detail-drawing .plate.unread, .guided-detail-drawing .reading-mark')).toHaveLength(0);
+    expect(document.querySelectorAll('.guided-detail-drawing .lab-part')).toHaveLength(d.parts.length);
+    expect(document.querySelectorAll('.guided-detail-drawing :is([data-unread], .read-added, .read-deepened)')).toHaveLength(0);
     expect(document.querySelectorAll('.guided-proof .source-text .focus')).toHaveLength(3);
   });
 });
@@ -149,14 +151,14 @@ describe('the drawing follows the reading', () => {
     const d = await importer(), user = userEvent.setup();
     mount(d, store(null, 'en-GB').bridge);
     await screen.findByRole('navigation', { name: 'Contents' });
-    expect(drawing().querySelectorAll('.plate.unread')).toHaveLength(7);
-    expect(drawing().querySelectorAll('.plate[role="button"], .joint')).toHaveLength(0);
+    expect(drawing().querySelectorAll('[data-unread]')).toHaveLength(7);
+    expect(drawing().querySelectorAll('.lab-part[role="button"], .lab-cable')).toHaveLength(0);
 
     await open(user, /One round, step by step/);
-    expect(drawing().querySelector('.plate.read-added[data-id="round"]')).not.toBeNull();
-    expect(drawing().querySelectorAll('.plate.unread')).toHaveLength(6);
-    expect(drawing().querySelectorAll('.joint')).toHaveLength(2);
-    expect(drawing().querySelectorAll('.reading-current .joint')).toHaveLength(2);
+    expect(drawing().querySelector('.lab-part.read-added[data-id="round"]')).not.toBeNull();
+    expect(drawing().querySelectorAll('[data-unread]')).toHaveLength(6);
+    expect(drawing().querySelectorAll('.lab-cable')).toHaveLength(2);
+    expect(drawing().querySelectorAll('.lab-cable.reading-current')).toHaveLength(2);
     const does = screen.getByRole('region', { name: 'What this step does' });
     expect(within(does).getByText('Adds a part')).toBeInTheDocument();
     expect(within(does).getByRole('heading', { name: 'The round' })).toBeInTheDocument();
@@ -166,8 +168,8 @@ describe('the drawing follows the reading', () => {
     // The passages that only return to parts join the step before (G13): "9. The night board" adds the board and,
     // through "11. One night" and "12. Things this design does not catch", returns to the restart rule.
     await open(user, /9\. The night board/);
-    expect(drawing().querySelector('.plate.read-added[data-id="board"]')).not.toBeNull();
-    expect(drawing().querySelector('.plate.read-deepened[data-id="restart"]')).not.toBeNull();
+    expect(drawing().querySelector('.lab-part.read-added[data-id="board"]')).not.toBeNull();
+    expect(drawing().querySelector('.lab-part.read-deepened[data-id="restart"]')).not.toBeNull();
     expect(within(screen.getByRole('region', { name: 'What this step does' })).getAllByText('Returns to a part')).toHaveLength(3);
 
     // ← and → move between passages from the passage; the run and the overview are untouched.
@@ -188,11 +190,11 @@ describe('the drawing follows the reading', () => {
     const nav = screen.getByRole('navigation', { name: 'Contents' });
     const here = within(nav).getAllByRole('button').findIndex(b => b.getAttribute('aria-current') === 'step');
     await user.click(screen.getByRole('button', { name: 'Open its 5 parts' }));
-    expect(drawing().querySelectorAll('.plate')).toHaveLength(5);
-    expect(drawing().querySelectorAll('.plate.read-cited')).toHaveLength(5);
+    expect(drawing().querySelectorAll('.lab-part')).toHaveLength(5);
+    expect(drawing().querySelectorAll('.lab-part.read-cited')).toHaveLength(5);
     expect(screen.getByText('This step cites 5 of its 5 parts.')).toBeInTheDocument();
     await user.keyboard('{Escape}');
-    expect(drawing().querySelectorAll('.plate')).toHaveLength(7);
+    expect(drawing().querySelectorAll('.lab-part, [data-unread]')).toHaveLength(7);
     expect(within(nav).getAllByRole('button')[here]).toHaveAttribute('aria-current', 'step');
 
     // A part with no sub-assembly says so; a prepared disassembly never offers a request.
@@ -206,11 +208,11 @@ describe('the drawing follows the reading', () => {
     const d = await importer(), user = userEvent.setup();
     mount(d, store(null, 'en-GB').bridge);
     await screen.findByRole('navigation', { name: 'Contents' });
-    const plates = drawing().querySelectorAll('.plate, .joint').length;
+    const plates = drawing().querySelectorAll('.lab-part, [data-unread], .lab-cable').length;
     await user.click(screen.getByRole('button', { name: 'Margin: 1 note for this step' }));
     expect(document.querySelector('.guided-margin')).toHaveTextContent('context');
     expect(document.querySelector('.guided-margin')).toHaveTextContent(d.bom.excluded[0].note!);
-    expect(drawing().querySelectorAll('.plate, .joint')).toHaveLength(plates);
+    expect(drawing().querySelectorAll('.lab-part, [data-unread], .lab-cable')).toHaveLength(plates);
     await user.keyboard('z');
     expect(document.querySelector('.guided-margin')).toBeNull();
     await user.keyboard('z');
@@ -245,11 +247,10 @@ describe('the guided view takes the prototype\'s structure', () => {
   });
 });
 
-// P-20261102-guided-reading G10: the object follows the same reading, draws only joints between parts, and can step back to plates.
-describe('the object in the guided view', () => {
-  const examples = ['src/fixtures/disassemblies/atlas-release-en.json', 'src/fixtures/disassemblies/mill-harm-en.json', 'src/fixtures/disassemblies/importer-signals-en.json'];
-  it.each(examples)('draws every line between parts as a joint of the level, with outlines and marks from the reading (%s)', async path => {
-    localStorage.removeItem('btw:guided-drawing:v1');
+// P-20261103-lab-mode L8: the guided view draws the representation the metaphor test chose, built along the reading.
+describe('the chosen representation in the guided view', () => {
+  const examples = [['src/fixtures/disassemblies/atlas-release-en.json', 'lab-bench'], ['src/fixtures/disassemblies/mill-harm-en.json', 'lab-atlas'], ['src/fixtures/disassemblies/importer-signals-en.json', 'lab-bench']];
+  it.each(examples)('draws %s as its representation, with outlines, marks and joints from the reading', async (path, drawn) => {
     const d = await validateDisassembly(fixture(path)), user = userEvent.setup();
     mount(d, store(null, 'en-GB').bridge);
     const nav = await screen.findByRole('navigation', { name: 'Contents' });
@@ -258,33 +259,26 @@ describe('the object in the guided view', () => {
     const known = new Set(d.joints.map(j => `${j.from}>${j.to}`));
     for (const i of [0, Math.floor(route.length / 2), route.length - 1]) {
       await user.click(within(nav).getAllByRole('button')[i]);
-      const sheet = document.querySelector('.guided-detail-drawing .object-sheet')!;
-      expect(sheet).not.toBeNull();
-      const drawn = [...sheet.querySelectorAll('[data-joint]')].map(g => (g as HTMLElement).dataset.joint!);
-      expect(drawn.every(j => known.has(j))).toBe(true);
-      const related = new Set(roles.slice(0, i + 1).flatMap(r => r.relate.map(j => `${j.from}>${j.to}`)));
-      expect(new Set(drawn)).toEqual(related);
+      const sheet = document.querySelector('.guided-detail-drawing .guided-level.focus .lab-sheet')!;
+      expect(sheet).toHaveClass(drawn);
+      const joints = [...sheet.querySelectorAll(':is(.lab-cable, .lab-arrow)[data-joint]')].map(g => (g as HTMLElement).dataset.joint!);
+      expect(joints.every(j => known.has(j))).toBe(true);
+      expect(new Set(joints)).toEqual(new Set(roles.slice(0, i + 1).flatMap(r => r.relate.map(j => `${j.from}>${j.to}`))));
       const added = new Set(roles.slice(0, i + 1).flatMap(r => r.add));
-      expect([...sheet.querySelectorAll('.plate.unread')].map(p => (p as HTMLElement).dataset.id).sort()).toEqual(d.parts.map(p => p.id).filter(id => !added.has(id)).sort());
-      expect([...sheet.querySelectorAll('.plate.read-added')].map(p => (p as HTMLElement).dataset.id).sort()).toEqual([...roles[i].add].sort());
-      expect([...sheet.querySelectorAll('.plate.read-deepened')].map(p => (p as HTMLElement).dataset.id).sort()).toEqual([...roles[i].deepen].sort());
+      expect([...sheet.querySelectorAll('[data-unread]')].map(p => (p as HTMLElement).dataset.id).sort()).toEqual(d.parts.map(p => p.id).filter(id => !added.has(id)).sort());
+      expect([...sheet.querySelectorAll('.read-added')].map(p => (p as HTMLElement).dataset.id).sort()).toEqual([...roles[i].add].sort());
+      expect([...sheet.querySelectorAll('.read-deepened')].map(p => (p as HTMLElement).dataset.id).sort()).toEqual([...roles[i].deepen].sort());
     }
   });
 
-  it('switches to today\'s plates and remembers it', async () => {
-    localStorage.removeItem('btw:guided-drawing:v1');
-    const d = await validateDisassembly(fixture('src/fixtures/disassemblies/importer-signals-en.json')), saved = store(null, 'en-GB'), user = userEvent.setup();
-    const view = mount(d, saved.bridge);
+  it('retires the object/plates switch and ignores its stored value', async () => {
+    localStorage.setItem('btw:guided-drawing:v1', 'plates');
+    const d = await validateDisassembly(fixture('src/fixtures/disassemblies/importer-signals-en.json'));
+    mount(d, store(null, 'en-GB').bridge);
     await screen.findByRole('navigation', { name: 'Contents' });
-    expect(document.querySelector('.guided-detail-drawing .object-sheet')).not.toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Plates' }));
-    expect(document.querySelector('.guided-detail-drawing .object-sheet')).toBeNull();
-    expect(document.querySelector('.guided-detail-drawing .sheet')).not.toBeNull();
-    view.unmount(); mount(d, saved.bridge);
-    await screen.findByRole('navigation', { name: 'Contents' });
-    expect(screen.getByRole('button', { name: 'Plates' })).toHaveAttribute('aria-pressed', 'true');
-    await user.click(screen.getByRole('button', { name: 'Object' }));
-    expect(document.querySelector('.guided-detail-drawing .object-sheet')).not.toBeNull();
+    expect(document.querySelector('.guided-detail-drawing .lab-bench')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Plates' })).toBeNull();
+    expect(document.querySelector('.guided-detail-drawing .sheet, .guided-detail-drawing .object-sheet')).toBeNull();
     localStorage.removeItem('btw:guided-drawing:v1');
   });
 });
@@ -307,13 +301,13 @@ describe('orientation in the guided view', () => {
     expect(within(bar).getByRole('button', { name: 'Margin: 1 note for this step' })).toHaveAttribute('title', 'Key: Z');
     await toStep(user, /One round, step by step/);
     await user.click(within(bar).getByRole('button', { name: 'Open The round' }));
-    expect(level().querySelectorAll('.plate')).toHaveLength(5);
+    expect(level().querySelectorAll('.lab-part')).toHaveLength(5);
     await user.click(within(bar).getByRole('button', { name: 'Back to the whole' }));
-    expect(level().querySelectorAll('.plate')).toHaveLength(7);
+    expect(level().querySelectorAll('.lab-part, [data-unread]')).toHaveLength(7);
     // ↓ opens what the control would open.
     (document.querySelector('.guided-stage') as HTMLElement).focus();
     await user.keyboard('{ArrowDown}');
-    expect(level().querySelectorAll('.plate')).toHaveLength(5);
+    expect(level().querySelectorAll('.lab-part')).toHaveLength(5);
     await user.keyboard('{Escape}');
     await toStep(user, /4\. The heartbeat stamp/);
     expect(within(bar).getByRole('button', { name: 'Open a part' })).toBeDisabled();
@@ -328,14 +322,14 @@ describe('orientation in the guided view', () => {
     // The minimap is in the deck, never over the drawing.
     expect(map().closest('.guided-detail-drawing')).toBeNull();
     expect(map()).toBeDisabled();
-    expect(map().querySelectorAll('.plate.unread')).toHaveLength(7);
+    expect(map().querySelectorAll('[data-unread]')).toHaveLength(7);
     await toStep(user, /One round, step by step/);
     await user.click(screen.getByRole('button', { name: 'Open The round' }));
     expect(map()).toHaveAccessibleName('You are here: Night importer › The round. Back to the whole');
-    expect(map().querySelector('.plate.here[data-id="round"]')).not.toBeNull();
+    expect(map().querySelector('.lab-part.read-here[data-id="round"]')).not.toBeNull();
     const here = within(screen.getByRole('navigation', { name: 'Contents' })).getAllByRole('button').findIndex(b => b.getAttribute('aria-current') === 'step');
     await user.click(map());
-    expect(level().querySelectorAll('.plate')).toHaveLength(7);
+    expect(level().querySelectorAll('.lab-part, [data-unread]')).toHaveLength(7);
     expect(within(screen.getByRole('navigation', { name: 'Contents' })).getAllByRole('button')[here]).toHaveAttribute('aria-current', 'step');
     await user.click(screen.getByRole('button', { name: 'Hide map' }));
     expect(map()).toBeNull();
@@ -347,18 +341,71 @@ describe('orientation in the guided view', () => {
     localStorage.removeItem('btw:guided-minimap:v1');
   });
 
-  it('marks the opening and the return as movements, the new level descending below the whole (G14, G17)', async () => {
+  it('lifts the part out of the whole: the whole sinks to a strip with its place outlined, and returns (L9)', async () => {
     const d = await importer(), user = userEvent.setup();
     mount(d, store(null, 'en-GB').bridge);
     await screen.findByRole('navigation', { name: 'Contents' });
     await toStep(user, /One round, step by step/);
     await user.click(screen.getByRole('button', { name: 'Open The round' }));
     expect(document.querySelector('.guided-detail-drawing')).toHaveClass('opening');
-    expect(document.querySelector('.guided-level.focus')).toHaveClass('entering');
-    expect(document.querySelector('.guided-level.upper [data-id="round"]')).not.toBeNull();
+    const [lifted, strip] = [...document.querySelectorAll('.guided-detail-drawing .guided-level')];
+    expect(lifted).toHaveClass('focus');
+    expect(lifted.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(strip).toHaveClass('upper', 'lab-strip');
+    expect(strip.querySelector('.lab-bench .lab-socket[data-id="round"]')).not.toBeNull();
+    expect(document.querySelector('.lab-stage .lab-beam')).not.toBeNull();
     await user.keyboard('{Escape}');
     expect(document.querySelector('.guided-detail-drawing')).toHaveClass('returning');
     expect(document.querySelector('.guided-level.upper')).toBeNull();
+  });
+
+  it('lifts a region out of the atlas too, its place outlined in the strip (L9)', async () => {
+    const d = await validateDisassembly(fixture('src/fixtures/disassemblies/mill-harm-en.json')), user = userEvent.setup();
+    mount(d, store(null, 'en-GB').bridge);
+    const nav = await screen.findByRole('navigation', { name: 'Contents' });
+    await user.click(within(nav).getAllByRole('button').at(-1)!);
+    await user.click(screen.getByRole('button', { name: 'Open The region of liberty' }));
+    const strip = document.querySelector('.guided-level.upper.lab-strip')!;
+    expect(strip.querySelector('.lab-atlas [data-id="region"] .lab-socket')).not.toBeNull();
+    expect(level().querySelectorAll('.lab-part')).toHaveLength(3);
+  });
+
+  it('returns to the step, the selection and the source position it was opened from (L9)', async () => {
+    const d = await importer(), user = userEvent.setup();
+    mount(d, store(null, 'en-GB').bridge);
+    const nav = await screen.findByRole('navigation', { name: 'Contents' });
+    await toStep(user, /One round, step by step/);
+    const here = within(nav).getAllByRole('button').findIndex(b => b.getAttribute('aria-current') === 'step');
+    const focused = () => [...document.querySelectorAll<HTMLElement>('.guided-proof .source-text .focus')].map(l => Number(l.dataset.line));
+    const before = focused();
+    await user.click(within(level() as HTMLElement).getByRole('button', { name: /^The round ·/ }));
+    await user.click(within(screen.getByRole('complementary', { name: 'What this step does' })).getAllByRole('button', { name: 'Open its 5 parts' })[0]);
+    // inside, the source moves to another note of the margin
+    await user.keyboard('z');
+    await user.click(document.querySelector<HTMLElement>('.guided-margin .cite')!);
+    expect(focused()).not.toEqual(before);
+    await user.keyboard('{Escape}');
+    expect(focused()).toEqual(before);
+    expect(within(nav).getAllByRole('button')[here]).toHaveAttribute('aria-current', 'step');
+    expect(level().querySelector('.lab-part.sel[data-id="round"]')).not.toBeNull();
+  });
+
+  it('plays the lift, and nothing moves under "reduce motion" (L9)', async () => {
+    const animate = vi.fn(), media = window.matchMedia, original = Element.prototype.animate;
+    Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+    try {
+      for (const reduce of [false, true]) {
+        animate.mockClear();
+        window.matchMedia = ((query: string) => ({ matches: reduce && query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+        const d = await importer(), user = userEvent.setup(), view = mount(d, store(null, 'en-GB').bridge);
+        await screen.findByRole('navigation', { name: 'Contents' });
+        await toStep(user, /One round, step by step/);
+        await user.click(screen.getByRole('button', { name: 'Open The round' }));
+        await user.keyboard('{Escape}');
+        expect(animate).toHaveBeenCalledTimes(reduce ? 0 : 2);
+        view.unmount();
+      }
+    } finally { Element.prototype.animate = original; window.matchMedia = media; }
   });
 
   it('defines every animation it uses and stops all of them under "reduce motion" (G14)', () => {
@@ -408,43 +455,170 @@ describe('levels stacked down the sheet', () => {
     expect(new Set(names).size).toBe(4);
   });
 
-  it('stacks the open path below the whole, with the upper levels pressable (G17)', async () => {
+  it('keeps the strip pressable: away from its parts it gives the whole the focus back (L9)', async () => {
     const d = await importer(), user = userEvent.setup();
     mount(d, store(null, 'en-GB').bridge);
     await screen.findByRole('navigation', { name: 'Contents' });
     await toStep(user, /One round, step by step/);
     await user.click(screen.getByRole('button', { name: 'Open The round' }));
-    const [whole, round] = levels();
+    const [round, whole] = levels();
     expect(whole).toHaveClass('upper');
-    expect(whole.querySelectorAll('.plate')).toHaveLength(7);
-    expect(whole.querySelector('[data-id="round"] .object-here')).not.toBeNull();
+    expect(whole).toHaveAttribute('data-depth', '0');
+    expect(whole.querySelectorAll('.lab-part, [data-unread], .lab-socket')).toHaveLength(7);
     expect(round).toHaveClass('focus');
-    expect(round.querySelectorAll('.plate')).toHaveLength(5);
-    // Pressing the whole, away from its parts, gives it the focus back.
+    expect(round.querySelectorAll('.lab-part')).toHaveLength(5);
     await user.click(whole);
     expect(levels()).toHaveLength(1);
     expect(levels()[0]).toHaveClass('focus');
   });
 
-  it('stacks any depth in order, and pressing an upper level closes what is below it', async () => {
+  it('opens at any depth: the strip shows the level the part belongs to, and the path leads back up', async () => {
     const d = await validateDisassembly(await deepDisassembly(5)), user = userEvent.setup();
     mount(d, store(null, 'en-GB').bridge);
     await screen.findByRole('navigation', { name: 'Contents' });
     await user.click(screen.getByRole('button', { name: 'Open Piece p1' }));
     for (const id of ['p1-1', 'p1-1-1']) {
-      await user.click(within(levels().at(-1) as HTMLElement).getByRole('button', { name: new RegExp(`Piece ${id} ·`) }));
+      await user.click(within(levels()[0] as HTMLElement).getByRole('button', { name: new RegExp(`^Piece ${id} ·`) }));
       await user.click(screen.getByRole('button', { name: `Open Piece ${id}` }));
     }
-    expect(levels().map(l => (l as HTMLElement).dataset.depth)).toEqual(['0', '1', '2', '3']);
-    expect(levels().map(l => l.classList.contains('focus'))).toEqual([false, false, false, true]);
-    expect(levels()[3].querySelectorAll('.plate')).toHaveLength(3);
-    // The second level's opened part: the two levels below it close, and it opens again in place.
-    await user.click(within(levels()[1] as HTMLElement).getByRole('button', { name: /Piece p1-1 ·/ }));
-    expect(levels()).toHaveLength(3);
-    // One of its parts without a sub-assembly: what was below closes, and that level takes the focus with the part selected.
-    await user.click(within(levels()[1] as HTMLElement).getByRole('button', { name: /Piece p1-2 ·/ }));
-    expect(levels()).toHaveLength(2);
-    expect(levels()[1]).toHaveClass('focus');
-    expect(levels()[1].querySelector('[data-id="p1-2"]')).toHaveClass('selected');
+    expect(levels().map(l => (l as HTMLElement).dataset.depth)).toEqual(['3', '2']);
+    expect(levels()[0].querySelectorAll('.lab-part')).toHaveLength(3);
+    expect(levels()[1].querySelector('.lab-socket[data-id="p1-1-1"]')).not.toBeNull();
+    expect(document.querySelector('.guided-path')).toHaveTextContent('The mechanism › Piece p1 › Piece p1-1 › Piece p1-1-1');
+    // A part of the strip without a sub-assembly: what was open closes, and its level takes the focus with the part selected.
+    await user.click(within(levels()[1] as HTMLElement).getByRole('button', { name: /^Piece p1-1-2 ·/ }));
+    expect(levels().map(l => (l as HTMLElement).dataset.depth)).toEqual(['2', '1']);
+    expect(levels()[0].querySelector('[data-id="p1-1-2"]')).toHaveClass('sel');
+    // The path goes up: to the first level, with the part it came from selected, then to the whole.
+    await user.click(within(document.querySelector('.guided-path') as HTMLElement).getByRole('button', { name: 'Piece p1' }));
+    expect(levels().map(l => (l as HTMLElement).dataset.depth)).toEqual(['1', '0']);
+    expect(levels()[0].querySelector('[data-id="p1-1"]')).toHaveClass('sel');
+    await user.click(within(document.querySelector('.guided-path') as HTMLElement).getByRole('button', { name: 'The mechanism' }));
+    expect(levels()).toHaveLength(1);
+  });
+});
+
+// P-20261103-lab-mode L10–L12: what is explored ≠ the step being read; why this representation; the atlas's run.
+describe('the lab in the guided view', () => {
+  const load = (path: string) => validateDisassembly(fixture(path));
+  const level = () => document.querySelector('.guided-detail-drawing .guided-level.focus') as HTMLElement;
+  const nav = () => screen.getByRole('navigation', { name: 'Contents' });
+  const current = () => within(nav()).getAllByRole('button').findIndex(b => b.getAttribute('aria-current') === 'step');
+  const focused = () => [...document.querySelectorAll<HTMLElement>('.guided-proof .source-text .focus')].map(l => Number(l.dataset.line));
+  const toStep = async (user: ReturnType<typeof userEvent.setup>, title: RegExp) => user.click(within(nav()).getAllByRole('button', { name: title })[0]);
+
+  it('says what is explored outside the step, goes back to the step, or reads from the explored part (L10)', async () => {
+    const d = await load('src/fixtures/disassemblies/importer-signals-en.json'), user = userEvent.setup();
+    mount(d, store(null, 'en-GB').bridge);
+    await screen.findByRole('navigation', { name: 'Contents' });
+    await toStep(user, /9\. The night board/);
+    const here = current(), step = focused(), round = d.parts.find(p => p.id === 'round')!;
+    expect(document.querySelector('.lab-explore')).toBeNull();
+    // the round was read earlier: selecting it here explores it, and the source shows its lines
+    await user.click(within(level()).getByRole('button', { name: /^The round ·/ }));
+    const bar = document.querySelector('.lab-explore')!;
+    expect(bar).toHaveTextContent(`Exploring “The round” · ll. ${round.cites[0].from}–${round.cites[0].to} · you are reading step ${here + 1}`);
+    expect(focused()[0]).toBe(round.cites[0].from);
+    const citing = within(nav()).getAllByRole('button').flatMap((b, i) => b.dataset.explored ? [i] : []);
+    expect(citing.length).toBeGreaterThan(0);
+    expect(citing).not.toContain(here);
+    // back to the step: the exploration closes and the source returns to the step's lines
+    await user.click(within(bar as HTMLElement).getByRole('button', { name: `Back to step ${here + 1}` }));
+    expect(document.querySelector('.lab-explore')).toBeNull();
+    expect(focused()).toEqual(step);
+    expect(current()).toBe(here);
+    // read from here: the reading moves to the first step citing it, and the part stays selected
+    await user.click(within(level()).getByRole('button', { name: /^The round ·/ }));
+    await user.click(screen.getByRole('button', { name: `Read from here (step ${citing[0] + 1})` }));
+    expect(current()).toBe(citing[0]);
+    expect(document.querySelector('.lab-explore')).toBeNull();
+    expect(level().querySelector('.lab-part.sel[data-id="round"]')).not.toBeNull();
+  });
+
+  it('counts a part opened outside the step as explored, and going back to the step closes it (L10)', async () => {
+    const d = await load('src/fixtures/disassemblies/importer-signals-en.json'), user = userEvent.setup();
+    mount(d, store(null, 'en-GB').bridge);
+    await screen.findByRole('navigation', { name: 'Contents' });
+    await user.click(within(nav()).getAllByRole('button').at(-1)!);
+    const here = current(), step = focused();
+    await user.click(within(level()).getByRole('button', { name: /^The round ·/ }));
+    await user.click(within(screen.getByRole('complementary', { name: 'What this step does' })).getAllByRole('button', { name: 'Open its 5 parts' })[0]);
+    expect(document.querySelector('.lab-explore')).toHaveTextContent('Exploring “The round”');
+    await user.click(screen.getByRole('button', { name: `Back to step ${here + 1}` }));
+    expect(document.querySelector('.guided-level.upper')).toBeNull();
+    expect(document.querySelector('.lab-explore')).toBeNull();
+    expect(focused()).toEqual(step);
+  });
+
+  it('explores a joint and a face element too, each with its own lines (L10)', async () => {
+    const d = await load('src/fixtures/disassemblies/importer-signals-en.json'), user = userEvent.setup();
+    const view = mount(d, store(null, 'en-GB').bridge);
+    await screen.findByRole('navigation', { name: 'Contents' });
+    await user.click(within(nav()).getAllByRole('button').at(-1)!);
+    const pill = level().querySelector<SVGGElement>('.lab-pill')!;
+    await user.click(pill);
+    expect(document.querySelector('.lab-joint-card')).toHaveTextContent(d.joints.find(j => `${j.from}>${j.to}` === pill.dataset.joint)!.label);
+    view.unmount();
+    // the release chain: a part whose sub-parts have faces, opened from the last step, where every part is read
+    const r = await load('src/fixtures/disassemblies/atlas-release-en.json');
+    const part = r.parts.find(p => p.parts?.some(q => faceOf(r, q)))!;
+    mount(r, store(null, 'en-GB').bridge);
+    await screen.findByRole('navigation', { name: 'Contents' });
+    await user.click(within(nav()).getAllByRole('button').at(-1)!);
+    await user.click(within(level()).getByRole('button', { name: new RegExp(`^${part.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ·`) }));
+    await user.click(within(screen.getByRole('complementary', { name: 'What this step does' })).getAllByRole('button', { name: `Open its ${part.parts!.length} parts` })[0]);
+    const element = level().querySelector<SVGElement>('[data-face]')!;
+    await user.click(element);
+    const card = document.querySelector('.lab-face-card')!;
+    expect(card).toHaveTextContent(element.getAttribute('aria-label')!);
+    expect(within(card as HTMLElement).getAllByRole('button').length).toBeGreaterThan(0);
+    expect(element).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('says why the importer is a bench, with every correspondence and where each analogy ends (L11)', async () => {
+    const d = await load('src/fixtures/disassemblies/importer-signals-en.json'), user = userEvent.setup();
+    mount(d, store(null, 'en-GB').bridge);
+    await screen.findByRole('navigation', { name: 'Contents' });
+    const why = document.querySelector('.lab-why')!;
+    expect(why).toHaveTextContent('The bench holds: every part has a component');
+    expect(why.querySelectorAll('tr[data-row="part"]')).toHaveLength(7);
+    expect(why.querySelectorAll('tr[data-row="joint"]')).toHaveLength(8);
+    expect(why.querySelector('.lab-failures')).toBeNull();
+    // the annotations hold the parts' clarifications and the context lines of the margin
+    const notes = document.querySelector('.lab-annotations')!;
+    expect(notes).toHaveTextContent('clarification');
+    expect(notes).toHaveTextContent(d.bom.excluded.find(e => e.reason === 'context')!.note!);
+    // a part's card says what it is in the object, and where that stops being true
+    await toStep(user, /One round, step by step/);
+    await user.click(within(level()).getByRole('button', { name: /^The round ·/ }));
+    const inObject = document.querySelector('.lab-in')!;
+    expect(inObject).toHaveTextContent('In the object');
+    expect(inObject).toHaveTextContent('Round track with stations: repeats a round, one station per step.');
+    expect(inObject).toHaveTextContent('⚠ A round track never stops');
+  });
+
+  it('says why Mill is an atlas, speaking of the metaphors available, with its failures (L11)', async () => {
+    for (const [path, locale, verdict] of [['src/fixtures/disassemblies/mill-harm-en.json', 'en-GB', 'Among the available metaphors, none represents this source without forcing.'],
+      ['src/fixtures/disassemblies/mill-harm.json', 'it-IT', 'Tra le metafore disponibili, nessuna rappresenta questa fonte senza forzature.']]) {
+      const d = await load(path), view = mount(d, store(null, locale).bridge);
+      await screen.findByRole('navigation');
+      const why = document.querySelector('.lab-why')!;
+      expect(why).toHaveTextContent(verdict);
+      expect(why.textContent).not.toMatch(/no object holds|nessun oggetto regge/i);
+      expect(why.querySelectorAll('.lab-failures li')).toHaveLength(chooseRepresentation(d).failures);
+      view.unmount();
+    }
+  });
+
+  it('suspends a support in Mill’s atlas: the region is outlined and the claim loses a support (L12)', async () => {
+    const d = await load('src/fixtures/disassemblies/mill-harm-en.json'), user = userEvent.setup();
+    mount(d, store(null, 'en-GB').bridge);
+    await screen.findByRole('navigation', { name: 'Contents' });
+    await user.click(within(nav()).getAllByRole('button').at(-1)!);
+    const run = document.querySelector('.lab-run') as HTMLElement;
+    await user.click(within(run).getByRole('button', { name: 'Suspend “Utility, in the widest sense”' }));
+    expect(level().querySelector('.lab-region.suspended[data-id="utility"]')).not.toBeNull();
+    expect(level().querySelector('.lab-tag')).toHaveTextContent('Loses a support');
+    expect(run.textContent).not.toMatch(/FALLS|HOLDS|WEAKENS|It falls|It holds|Load-bearing/);
   });
 });

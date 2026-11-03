@@ -99,6 +99,9 @@ describe('the bench layout (L3)', () => {
     const { modules } = benchLayout(chain, links);
     expect(new Set(Object.values(modules).map(m => m.y)).size).toBe(3);   // 7 columns in bands of 3
     expect(modules.p0.y).toBeGreaterThan(modules.p3.y);                    // the first band stands at the back
+    // the second band runs back the other way, starting in front of where the first ended
+    expect(modules.p3.x).toBe(modules.p2.x);
+    expect(modules.p4.x).toBeLessThan(modules.p3.x);
   });
   it('lays an opened level in one row up to five parts, and in two rows above, the back row raised', () => {
     const ids = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}` }));

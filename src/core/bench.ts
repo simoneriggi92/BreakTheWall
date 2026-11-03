@@ -44,14 +44,19 @@ export function benchLayout(parts: Pick<Part, 'id' | 'parts'>[], joints: J[]): B
   const bands = Math.ceil(columns.length / BENCH.perBand), deepest = Math.max(...columns.map(c => c.length));
   const bandDepth = (deepest - 1) * BENCH.rowGap + BENCH.depth + BENCH.bandGap;
   const modules: Record<string, Module> = {};
+  // The first band stands at the back, so the flow reads from the top of the screen down. Further bands run back
+  // the other way, like a snake: each starts in front of where the band behind it ended, so the flow stays short.
+  let end = 0;
   for (let b = 0; b < bands; b++) {
-    // the first band stands at the back, so the flow reads from the top of the screen down
-    let x = 0; const y0 = (bands - 1 - b) * bandDepth;
-    for (const col of columns.slice(b * BENCH.perBand, (b + 1) * BENCH.perBand)) {
+    const y0 = (bands - 1 - b) * bandDepth, cols = columns.slice(b * BENCH.perBand, (b + 1) * BENCH.perBand), back = b % 2 === 1;
+    let x = back ? end : 0;
+    for (const col of cols) {
       const w = Math.max(...col.map(i => width[i]));
+      if (back) x -= w;
       col.forEach((i, r) => { modules[i] = { id: i, x: x + (w - width[i]) / 2, y: y0 + (col.length - 1 - r) * BENCH.rowGap, w: width[i], d: BENCH.depth }; });
-      x += w + BENCH.colGap;
+      if (back) x -= BENCH.colGap; else x += w + BENCH.colGap;
     }
+    end = back ? x + BENCH.colGap : x - BENCH.colGap;
   }
   const all = Object.values(modules), m = BENCH.margin;
   const x0 = Math.min(...all.map(o => o.x)), y0 = Math.min(...all.map(o => o.y));

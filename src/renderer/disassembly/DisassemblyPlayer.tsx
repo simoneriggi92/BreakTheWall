@@ -20,6 +20,8 @@ import { ReadingColumn } from './ReadingColumn';
 import { Splitter, usePaneSizes } from './SplitPane';
 import { workbenchLayout } from './workbench-layout';
 import { GuidedReading } from './GuidedReading';
+import { chooseRepresentation } from '../../core/representation';
+import { runsOnSupports, suspension } from '../lab/Suspend';
 
 type Mode = 'explode' | 'run' | 'reassemble' | 'bom';
 const MODES: Mode[] = ['explode', 'run', 'reassemble', 'bom'];
@@ -34,6 +36,7 @@ const stepDelay = () => typeof window.matchMedia === 'function' && !window.match
 
 export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersion, onExpanded }: { d: Disassembly; bridge: DesktopBridge; goHome: () => void; versions?: Disassembly[]; openVersion?: (id: string) => void; onExpanded?: (next: Disassembly) => void }) {
   const { t, language, settings } = usePreferences();
+  const representation = useMemo(() => chooseRepresentation(d), [d]);
   const [expanding, setExpanding] = useState<{ part: string; progress: GenerationProgress }>();
   const [expandProblem, setExpandProblem] = useState<{ part: string; failure: ProviderFailure }>();
   const [state, setState] = useState<DisassemblyState>(() => initialDisassemblyState(d));
@@ -165,7 +168,9 @@ export function DisassemblyPlayer({ d, bridge, goHome, versions = [], openVersio
   })()
     : mode === 'run' && run.type === 'load' ? (() => {
       const removed = state.runs[run.id]?.tried.at(-1); const brick = run.bricks.find(b => b.part === removed);
-      return { bricks: run.bricks.map(b => b.part), removed, target: brick ? { id: run.target, verdict: brick.verdict } : undefined };
+      // in an atlas the target says what happens to its supports, and nothing falls (L12)
+      const tag = brick && runsOnSupports(d, representation.view, run) ? t.d.lab.suspend.tags[suspension(d, run, brick.part).tag] : undefined;
+      return { bricks: run.bricks.map(b => b.part), removed, target: brick ? { id: run.target, verdict: brick.verdict, tag } : undefined };
     })() : {};
   // A run keeps its own column width, wider by default: there the learner answers rather than reads (U5).
   const widthPane = mode === 'run' ? 'activity' : 'source';

@@ -1,0 +1,123 @@
+/* The lab (P-20261103-lab-mode): the bench and the atlas, in the theme's own colours. */
+.lab-sheet { display: block; width: 100%; height: 100%;
+  --lab-edge: color-mix(in srgb, var(--ink) 45%, transparent);
+  --lab-steel: #c9cfd5; --lab-steel-f: #aab2ba; --lab-steel-s: #949da6;
+  --lab-ivory: #fbfaf6; --lab-ivory-f: #ebe8e1; --lab-ivory-s: #d8d7d2;
+  --lab-alu: #e8ebee; --lab-alu-f: #d4d9de; --lab-alu-s: #b3bac1;
+  --lab-dark: #4d5966; --lab-dark-f: #36424e; --lab-dark-s: #2a343e;
+  --lab-glass: rgba(222, 236, 246, .9); --lab-glass-f: rgba(196, 220, 238, .9); --lab-glass-s: rgba(176, 204, 226, .9);
+  --lab-amber: #f6d9ab; --lab-amber-f: #efc285; --lab-amber-s: #e2ac68;
+  --lab-coral: #f6b4a5; --lab-coral-f: var(--accent); --lab-coral-s: #c9442f;
+  --lab-region: var(--surface); --lab-region-f: var(--sunk); --lab-kid: var(--bg); --lab-kid-f: var(--line);
+  --lab-wire: #1f97cf; --lab-cause: #3d6fb0; --lab-dep: #7a8591; --lab-arg: var(--accent); --lab-attack: #d08a22; }
+:root[data-theme="blueprint"] .lab-sheet {
+  --lab-steel: #3c5f86; --lab-steel-f: #2f4f73; --lab-steel-s: #284563; --lab-ivory: #4a6d94; --lab-ivory-f: #3b5c80; --lab-ivory-s: #324f6f;
+  --lab-alu: #557aa2; --lab-alu-f: #46698f; --lab-alu-s: #3a5a7c; --lab-dark: #12283f; --lab-dark-f: #0c1d30; --lab-dark-s: #081626;
+  --lab-glass: rgba(140, 190, 230, .5); --lab-glass-f: rgba(120, 170, 215, .5); --lab-glass-s: rgba(100, 150, 200, .5); --lab-wire: #7fd1ff; --lab-dep: #a9bccf; }
+.lab-sheet polygon, .lab-sheet ellipse, .lab-sheet circle, .lab-sheet path { stroke-linejoin: round; }
+.lab-box polygon, .lab-plateau polygon { stroke: var(--lab-edge); stroke-width: .7; }
+.lab-box.m-steel .lab-t { fill: var(--lab-steel); } .lab-box.m-steel .lab-f { fill: var(--lab-steel-f); } .lab-box.m-steel .lab-s { fill: var(--lab-steel-s); }
+.lab-box.m-ivory .lab-t { fill: var(--lab-ivory); } .lab-box.m-ivory .lab-f { fill: var(--lab-ivory-f); } .lab-box.m-ivory .lab-s { fill: var(--lab-ivory-s); }
+.lab-box.m-alu .lab-t { fill: var(--lab-alu); } .lab-box.m-alu .lab-f { fill: var(--lab-alu-f); } .lab-box.m-alu .lab-s { fill: var(--lab-alu-s); }
+.lab-box.m-dark .lab-t { fill: var(--lab-dark); } .lab-box.m-dark .lab-f { fill: var(--lab-dark-f); } .lab-box.m-dark .lab-s { fill: var(--lab-dark-s); }
+.lab-box.m-glass .lab-t { fill: var(--lab-glass); } .lab-box.m-glass .lab-f { fill: var(--lab-glass-f); } .lab-box.m-glass .lab-s { fill: var(--lab-glass-s); }
+.lab-box.m-amber .lab-t { fill: var(--lab-amber); } .lab-box.m-amber .lab-f { fill: var(--lab-amber-f); } .lab-box.m-amber .lab-s { fill: var(--lab-amber-s); }
+.lab-box.m-coral .lab-t { fill: var(--lab-coral); } .lab-box.m-coral .lab-f { fill: var(--lab-coral-f); } .lab-box.m-coral .lab-s { fill: var(--lab-coral-s); }
+.lab-plateau .lab-t { fill: var(--lab-region); } .lab-plateau .lab-f { fill: var(--lab-region-f); }
+.lab-plateau.kid .lab-t { fill: var(--lab-kid); } .lab-plateau.kid .lab-f { fill: var(--lab-kid-f); }
+/* a selected part takes the accent on every face it has */
+.lab-part { cursor: pointer; outline: none; }
+.lab-part.sel .lab-t { fill: #f8b9ab; } .lab-part.sel .lab-f { fill: #ef8b77; } .lab-part.sel .lab-s { fill: #d96a55; }
+.lab-part.sel .lab-box polygon, .lab-part.sel .lab-plateau polygon { stroke: #9e3423; }
+.lab-part:hover, .lab-part:focus-visible { filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--accent) 80%, transparent)); }
+.lab-part.apart .lab-plateau .lab-t { fill: var(--sunk); }
+.lab-ghost { fill: color-mix(in srgb, var(--surface) 40%, transparent); stroke: var(--muted); stroke-width: 1.1; stroke-dasharray: 4 4; }
+.lab-socket { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 6 4; }
+.lab-name { font-weight: 650; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.lab-kid-name { font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; pointer-events: none; }
+.lab-sub { fill: var(--muted); letter-spacing: .03em; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; pointer-events: none; }
+/* joints: colour is never the only sign; the line's form says the kind too */
+.lab-cable .under { fill: none; stroke: rgba(20, 30, 40, .2); stroke-width: 6; }
+.lab-cable .wire, .lab-arrow .wire { fill: none; stroke-linecap: round; stroke: var(--lab-wire); stroke-width: 2.6; }
+.lab-cable.t-causes .wire { stroke: var(--lab-cause); stroke-width: 3; }
+.lab-cable.t-depends-on .wire, .lab-arrow.t-depends-on .wire { stroke: var(--lab-dep); stroke-dasharray: 2 5; }
+.lab-arrow.t-supports .wire { stroke: var(--lab-arg); } .lab-arrow.t-attacks .wire { stroke: var(--lab-attack); stroke-dasharray: 7 5; }
+.lab-arrow.t-limits .wire { stroke: var(--lab-dep); stroke-dasharray: 2 4; }
+.lab-cable.outer .wire, .lab-arrow.outer .wire { stroke-dasharray: 5 4; }
+.lab-cable.sel .wire, .lab-arrow.sel .wire { stroke: var(--accent); }
+.lab-head { fill: var(--lab-wire); } .lab-head.t-causes { fill: var(--lab-cause); } .lab-head.t-depends-on, .lab-head.t-limits { fill: var(--lab-dep); }
+.lab-head.t-supports { fill: var(--lab-arg); } .lab-head.t-attacks { fill: var(--lab-attack); }
+.lab-plug { fill: var(--lab-dark); }
+.lab-pill { cursor: pointer; } .lab-pill rect { fill: var(--surface); stroke: color-mix(in srgb, var(--lab-wire) 55%, transparent); }
+.lab-pill text { fill: var(--ink); font-weight: 600; } .lab-pill.t-depends-on rect, .lab-pill.t-limits rect { stroke: var(--line); }
+.lab-pill.sel rect { stroke: var(--accent); stroke-width: 2; }
+.lab-note rect { fill: var(--amber-soft); stroke: #d08a22; } .lab-note text { fill: #8a4f12; font-weight: 700; }
+/* details that belong to a component, never to a relation */
+.lab-dark { fill: var(--lab-dark-f); } .lab-screen { fill: #1f2a35; } .lab-track { fill: var(--lab-alu); stroke: var(--lab-dark); stroke-width: 1.4; } .lab-track-inner { fill: var(--lab-steel); stroke: var(--lab-edge); }
+.lab-station { fill: var(--lab-ivory); stroke: #1b232b; stroke-width: .8; } .lab-station.first { fill: var(--accent); } .lab-station.sel { stroke: var(--accent); stroke-width: 2; }
+.lab-station-n { font-size: 10px; font-weight: 800; fill: #1d2630; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+.lab-clock { fill: none; stroke: #8fe0a6; stroke-width: 1.6; } .lab-ink { stroke: #9aa1a9; stroke-width: 1.4; }
+.lab-knob { fill: #c9cfd5; stroke: #1b232b; } .lab-key { fill: var(--accent); }
+.lab-dial { fill: #fbfaf6; stroke: #56616c; } .lab-threshold { fill: color-mix(in srgb, var(--accent) 25%, transparent); } .lab-needle { stroke: #1d2630; stroke-width: 1.6; stroke-linecap: round; }
+.lab-light { fill: #cfd5da; stroke: #1b232b; stroke-width: .7; } .lab-glyph { color: #eef2f6; }
+.lab-face-text { font-size: 8.6px; font-weight: 600; fill: #1d2630; } .lab-face-text .warn { fill: #a2601a; } .lab-face-text .strong { font-weight: 800; }
+.lab-face-more { font-size: 8px; fill: #56616c; }
+.lab-face-item { cursor: pointer; outline: none; } .lab-face-band { fill: rgba(255, 255, 255, .55); stroke: rgba(60, 70, 80, .35); }
+.lab-face-item:hover .lab-face-band, .lab-face-item:focus-visible .lab-face-band { stroke: var(--accent); stroke-width: 1.4; }
+.lab-face-item.sel .lab-face-band { fill: #f8b9ab; stroke: #9e3423; stroke-width: 1.4; }
+.lab-handle { fill: #8d949b; } .lab-peg { fill: #3b4754; stroke: #1b232b; stroke-width: .6; } .lab-peg.empty { fill: none; stroke: #b5651d; stroke-dasharray: 1.6 1.4; }
+.lab-sheet-mark { fill: #fff; stroke: #56616c; stroke-width: .7; } .lab-pin { fill: var(--accent); stroke: #1b232b; stroke-width: .6; } .lab-pin.warn { fill: #f2a33a; }
+.lab-warn { fill: #f2a33a; stroke: #7a4a10; stroke-width: .6; } .lab-hole { fill: #c9cfd5; } .lab-lens { fill: none; stroke: #1b232b; }
+.lab-check { fill: #fff; stroke: #56616c; stroke-width: .9; } .lab-check.warn { stroke: #b5651d; }
+.lab-code { fill: #8fe0a6; opacity: .85; } .lab-code.warn { fill: #f2a33a; }
+.lab-tray { cursor: pointer; } .lab-tray-edge { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; }
+/* reading marks (G2): what this step adds or returns to, what it cites in an opened level, and "you are here" on the minimap */
+.lab-part.read-added { filter: drop-shadow(0 0 3px var(--mechanism)); }
+.lab-part.read-deepened { filter: drop-shadow(0 0 2px var(--accent)); }
+.lab-part.read-cited .lab-name { fill: var(--mechanism); }
+.lab-part.read-here .lab-t, .lab-part.read-here .lab-f { fill: var(--accent); }
+.lab-cable.reading-current .wire, .lab-arrow.reading-current .wire { stroke-width: 3.6; }
+.lab-part.read-added:not(.sel) { animation: lab-rise .4s cubic-bezier(.2, .8, .2, 1) both; transform-box: fill-box; }
+/* L12: a suspended region is an outline; its relations fade; the target says what happens to its supports */
+.lab-region.suspended .lab-plateau polygon { fill-opacity: .2; stroke: var(--accent); stroke-dasharray: 5 4; }
+.lab-region.suspended .lab-kid-name, .lab-region.suspended .lab-name { opacity: .6; }
+.lab-arrow.suspended { opacity: .3; }
+.lab-tag { font-weight: 750; fill: var(--accent); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; pointer-events: none; }
+@keyframes lab-rise { from { transform: translateY(-12px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .lab-sheet * { transition: none !important; animation: none !important; } }
+
+/* The stage (L9): one level in focus; when a part is lifted, the level it came from sinks to a strip below, its place outlined. */
+.guided-detail-drawing { position: relative; }
+.lab-stage { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.lab-stage .guided-level { position: relative; display: flex; min-height: 0; transform-origin: 0 0; }
+.lab-stage .guided-level.focus { flex: 1 1 auto; }
+.lab-stage .lab-strip { flex: 0 0 clamp(80px, 24%, 150px); margin-top: 12px; padding-top: 4px; border-top: 1px dashed var(--line); opacity: .6; }
+.lab-stage .lab-strip:hover { opacity: .85; }
+.lab-beam { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.lab-beam polygon { fill: color-mix(in srgb, var(--accent) 7%, transparent); stroke: color-mix(in srgb, var(--accent) 35%, transparent); stroke-width: 1; stroke-dasharray: 4 4; }
+.guided-minimap-drawing .lab-sheet { width: 100%; height: 100%; }
+.guided-path .link, .lab-annotations .link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.guided-path b { color: var(--ink); }
+
+/* L10: what is explored, apart from the step being read */
+.lab-explore { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 8px; padding: 5px 10px; border: 1px solid var(--accent); border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface)); font-size: 12px; }
+.lab-explore button { font-size: 12px; }
+.guided-navigation button[data-explored] .guided-number { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* L11–L12: the card's lab sections */
+.lab-why summary, .lab-in summary, .lab-annotations summary, .lab-correspondences summary { cursor: pointer; font-weight: 650; font-size: 12.5px; }
+.lab-why p, .lab-in li, .lab-annotations li { font-size: 12.5px; }
+.lab-failures, .lab-in ul, .lab-annotations ul { margin: 4px 0; padding-left: 16px; }
+.lab-in ul, .lab-annotations ul { list-style: none; padding-left: 0; }
+.lab-in li, .lab-annotations li { margin: 3px 0; }
+.lab-corr { width: 100%; border-collapse: collapse; font-size: 12px; }
+.lab-corr td { padding: 3px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+.lab-corr tr.ok td:first-child { color: var(--ok); } .lab-corr tr.no td:first-child { color: var(--fail); }
+.lab-whole-card { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.lab-suspend h3 { margin: 0 0 2px; font-size: 13px; }
+.lab-keep { display: flex; flex-direction: column; gap: 4px; }
+.lab-keep .primary { align-self: flex-start; margin-top: 4px; }
+.run-feedback.support-lost { border-color: var(--accent); } .run-feedback.support-none { border-color: var(--fail); } .run-feedback.support-intact { border-color: var(--ok); }
+.lab-adds { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.sheet .verdict.v-support { fill: var(--accent); }

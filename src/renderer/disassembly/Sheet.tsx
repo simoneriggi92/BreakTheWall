@@ -54,7 +54,7 @@ export interface SheetProps {
   /** A source-linked detail keeps the plates and frame, without repeating the whole sheet's title block. */
   detail?: boolean;
   /** Run decorations: scenario states, the joints that carry the current step, a removed brick and the target's verdict. */
-  states?: Record<string, string>; flow?: [string, string][]; bricks?: string[]; removed?: string; target?: { id: string; verdict: 'falls' | 'weakens' | 'holds' };
+  states?: Record<string, string>; flow?: [string, string][]; bricks?: string[]; removed?: string; target?: { id: string; verdict: 'falls' | 'weakens' | 'holds'; tag?: string };
   /**
    * Inside a resizable pane (D17): `contain` shows the whole sheet, shrinking plates when the sheet is wide;
    * `height` follows a height the learner set, so dragging the pane down draws bigger plates and a wide sheet scrolls.
@@ -125,13 +125,13 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
       // Not read yet: only its place in the whole, so the drawing never runs ahead of the text.
       if (mark === 'unread') return <g key={id} className="plate unread" data-id={id} transform={`translate(${rect.x} ${rect.y})`} aria-hidden="true">
         <rect className="body" width={rect.w} height={rect.h} rx={3}/></g>;
-      const state = target?.id === id ? (target.verdict === 'falls' ? 'failed' : target.verdict === 'weakens' ? 'active' : 'ok') : states[id];
+      const state = target?.id === id ? (target.tag ? undefined : target.verdict === 'falls' ? 'failed' : target.verdict === 'weakens' ? 'active' : 'ok') : states[id];
       const cls = ['plate', part.parts && 'assembly', part.parts && part.relevant === false && 'closed', selected === id && 'selected', state && `state-${state}`,
         bricks.includes(id) && 'brick', removed === id && 'removed', mark && `read-${mark}`].filter(Boolean).join(' ');
       const lines = wrap(part.name, 17);
       // The name is centred in the band below the kind label, so three lines never touch it.
       const band = 22; const top = band + (rect.h - band - lines.length * 15) / 2 + 11;
-      const tilt = target?.id === id && target.verdict !== 'holds' ? `rotate(${target.verdict === 'falls' ? 3 : 1.2} ${rect.w / 2} ${rect.h})` : undefined;
+      const tilt = target?.id === id && !target.tag && target.verdict !== 'holds' ? `rotate(${target.verdict === 'falls' ? 3 : 1.2} ${rect.w / 2} ${rect.h})` : undefined;
       return <g key={id} className={cls} data-id={id} transform={`translate(${rect.x} ${rect.y})`} role={inert ? undefined : 'button'} tabIndex={inert ? undefined : 0}
         aria-pressed={inert ? undefined : selected === id} aria-label={`${number}. ${part.name} · ${t.d.kinds[part.kind]}${state ? ` · ${t.d.states[state as keyof typeof t.d.states]}` : ''}${mark ? ` · ${t.d.guided.marks[mark]}` : ''}`}
         onClick={() => onSelect?.(id)} onDoubleClick={() => part.parts && onEnter?.(id)}
@@ -145,7 +145,7 @@ export function Sheet({ layout, parts, joints, title, subtitle, language, select
           <text className="name" lang={language}>{lines.map((line, i) => <tspan key={i} x={40} y={top + i * 15}>{line}</tspan>)}</text>
         </g>
         <g className="balloon" aria-hidden="true"><line x1={-9} y1={-9} x2={6} y2={6}/><circle cx={-15} cy={-15} r={10}/><text x={-15} y={-11} textAnchor="middle">{number}</text></g>
-        {target?.id === id && <text className={`verdict v-${target.verdict}`} x={rect.w / 2} y={-10} textAnchor="middle">{t.d.run.verdicts[target.verdict]}</text>}
+        {target?.id === id && <text className={target.tag ? 'verdict v-support' : `verdict v-${target.verdict}`} x={rect.w / 2} y={-10} textAnchor="middle">{target.tag ?? t.d.run.verdicts[target.verdict]}</text>}
         {mark && <g className={`reading-mark m-${mark}`} aria-hidden="true"><circle cx={rect.w} cy={0} r={10}/><text x={rect.w} y={4} textAnchor="middle">{{ added: '+', deepened: '↺', cited: '•' }[mark]}</text></g>}
         {state && target?.id !== id && <g className={`state-mark s-${state}`} aria-hidden="true"><circle cx={rect.w} cy={0} r={10}/><text x={rect.w} y={4} textAnchor="middle">{{ ok: '✓', failed: '✕', active: '…', restored: '↺' }[state]}</text></g>}
       </g>;
