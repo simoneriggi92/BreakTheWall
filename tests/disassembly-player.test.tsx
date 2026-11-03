@@ -29,6 +29,7 @@ function memoryBridge(locale = 'it-IT') {
 async function play(d: Disassembly, bridge = memoryBridge().bridge) {
   const view = render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
   await screen.findByRole('group', { name: /Cosa fare con lo smontaggio|What to do/ });
+  await userEvent.click(screen.getByRole('button', { name: /^(Insieme|Overview)$/ }));
   return view;
 }
 const user = () => userEvent.setup();
@@ -268,19 +269,40 @@ describe('run', () => {
     expect(within(side().getByRole('table')).getByText('digest A')).toBeInTheDocument();
     expect(plate(/^6\. Rollback · passo · fatto/)).toBeInTheDocument();
   });
-  it('removes every brick of the Mill load test and names each verdict, with the inference labelled', async () => {
+  // P-20261103-lab-mode L12: Mill is drawn as an atlas, so its load run suspends supports instead of pulling bricks.
+  it('suspends each part of Mill’s load test and answers from the supports joints, never with the weight metaphor', async () => {
     const d = await validateDisassembly(mill()); await play(d);
     await user().click(screen.getByRole('button', { name: 'Fai girare' }));
     const run = d.runs[0]; if (run.type !== 'load') throw new Error('fixture');
-    for (const brick of run.bricks) {
-      await user().click(side().getByRole('button', { name: new RegExp(`Togli «${d.parts.find(p => p.id === brick.part)!.name}»`) }));
-      const feedback = document.querySelector('.run-feedback')!;
-      expect(feedback).toHaveClass(`verdict-${brick.verdict}`);
-      expect(feedback.textContent).toContain(brick.explain);
-      expect(!!feedback.querySelector('.inference-note')).toBe(!!brick.inference);
-    }
-    expect(side().getByText('Portanti')).toBeInTheDocument();
-    expect(side().getByText('Non portanti')).toBeInTheDocument();
+    const name = (id: string) => d.parts.find(p => p.id === id)!.name;
+    const suspend = async (id: string, keep: string[]) => {
+      await user().click(side().getByRole('button', { name: `Sospendi «${name(id)}»` }));
+      expect(document.querySelector('.lab-keep legend')).toHaveTextContent(`Sospeso «${name(id)}». Quali giustificazioni di «${name(run.target)}» restano esplicite nell’estratto?`);
+      for (const k of keep) await user().click(side().getByRole('checkbox', { name: new RegExp(`^${name(k).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }));
+      await user().click(side().getByRole('button', { name: 'Verifica' }));
+      return document.querySelector('.run-feedback')!;
+    };
+    // utility: the claim loses a support; sovereignty stays explicit, with its lines
+    let feedback = await suspend('utility', ['sovereignty']);
+    expect(feedback).toHaveClass('support-lost');
+    expect(feedback).toHaveTextContent('Perde un sostegno');
+    expect(feedback).toHaveTextContent(`Restano espliciti: «${name('sovereignty')}»`);
+    expect(feedback).toHaveTextContent('r. 14–21');
+    expect(feedback).toHaveTextContent('La tua risposta coincide.');
+    expect(document.querySelector('.sheet .verdict')).toHaveTextContent('Perde un sostegno');
+    expect(document.querySelector('.sheet .verdict.v-falls')).toBeNull();
+    // the abstract right supports nothing: the supports stay intact
+    feedback = await suspend('abstract-right', ['utility', 'sovereignty']);
+    expect(feedback).toHaveClass('support-intact');
+    expect(feedback).toHaveTextContent('Sostegni intatti');
+    // sovereignty: what the disassembly adds is apart, and marked as an interpretation
+    feedback = await suspend('sovereignty', ['utility']);
+    expect(feedback.querySelector('.lab-adds .inference-note')).not.toBeNull();
+    expect(feedback).toHaveTextContent('La prova riguarda le giustificazioni esplicite nell’estratto');
+    await suspend('region', ['utility', 'sovereignty']);
+    // no verdict of the weight metaphor anywhere in the run
+    expect(side().getByText('Sostegni nell’estratto')).toBeInTheDocument();
+    expect(document.querySelector('.run-panel')!.textContent).not.toMatch(/Crolla|Regge|CROLLA|REGGE|SI INDEBOLISCE|Portanti|Togli «/);
   });
   it('answers a new case, labelled as constructed, with feedback for the chosen option', async () => {
     const d = await validateDisassembly(mill()); await play(d);
@@ -397,6 +419,7 @@ describe('content language and interface language', () => {
     await user().click(screen.getByRole('checkbox', { name: /Also show the examples in Italian/ }));
     await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
     await screen.findByRole('button', { name: 'Exploded view' });
+    await user().click(screen.getByRole('button', { name: 'Overview' }));
     expect(screen.getByText(it.question!)).toHaveAttribute('lang', 'it');
     expect(document.documentElement.lang).toBe('en');
     await user().click(plate(/^4\. deploy-staging · step/));
@@ -410,6 +433,7 @@ describe('content language and interface language', () => {
     await user().click(screen.getByRole('button', { name: /Rilascio di Atlas Reader/ }));
     expect(await screen.findByText(/This disassembly also exists in English/)).toBeInTheDocument();
     await user().click(screen.getByRole('button', { name: 'Open that version' }));
+    await user().click(await screen.findByRole('button', { name: 'Overview' }));
     expect(await screen.findByText('How do you release a new version of the web client to staging, and how do you go back if something goes wrong?')).toBeInTheDocument();
     expect(screen.queryByText(/also exists in/)).not.toBeInTheDocument();
   });
@@ -471,6 +495,7 @@ describe('taking a part apart on demand (D14)', () => {
     render(<App bridge={bridge} prepared={[]} disassemblies={[]}/>);
     await user().click(await screen.findByRole('button', { name: (name: string) => name.includes(d.title) }));
     await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
+    await user().click(screen.getByRole('button', { name: 'Insieme' }));
     await user().click(plate(new RegExp(`^\\d+\\. ${small.name} · `)));
     expect(side().getByText(new RegExp(`Questo pezzo non si smonta oltre: cita ${linesOf(d, small.cites).size} righe, ne servono almeno 6`))).toBeInTheDocument();
     await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));

@@ -93,6 +93,7 @@ describe('the source pane with its document view and reader (D18)', () => {
   const play = async (d: any) => {
     render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
     await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Insieme' }));
   };
   it('switches a prose source between lines and document, and a citation highlights its blocks', async () => {
     await play(await validateDisassembly(atlas()));
@@ -148,6 +149,7 @@ it('keeps the full-window outline reachable in a narrow window and returns focus
     const d = await validateDisassembly(atlas());
     render(<PreferencesProvider bridge={bridge}><DisassemblyPlayer d={d} bridge={bridge} goHome={() => {}}/></PreferencesProvider>);
     await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Insieme' }));
     const open = screen.getByRole('button', { name: 'Leggi a tutta finestra' });
     await userEvent.click(open);
     const reader = screen.getByRole('dialog');

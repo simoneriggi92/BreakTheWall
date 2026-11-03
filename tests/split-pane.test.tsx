@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PANES, readPaneSizes, Splitter } from '../src/renderer/disassembly/SplitPane';
 
 const KEY = 'btw:panes:v1';
-const DEFAULTS = { source: 0.34, activity: 0.5, reading: 0.55 };
+const DEFAULTS = { source: 0.34, activity: 0.5, reading: 0.55, guided: 0.7, panel: 0.25 };
 afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
 function Harness() {

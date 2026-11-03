@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Play, RotateCcw, TriangleAlert, X } from 'lucide-react';
 import type { Cite, Disassembly, Run } from '../../core/disassembly';
 import { scenarioView, type DisassemblyState } from '../../core/disassembly-state';
+import { chooseRepresentation } from '../../core/representation';
+import { runsOnSupports, SuspendRun } from '../lab/Suspend';
 import { usePreferences } from '../preferences';
 import { Cites } from './PartCard';
 
@@ -77,6 +79,11 @@ function PredictionResult({ option, language }: { option: { correct: boolean; wh
 function LoadRun({ d, run, state, focus, actions }: { d: Disassembly; run: Load; state: DisassemblyState; focus?: Cite; actions: RunActions }) {
   const { t } = usePreferences();
   const tried = state.runs[run.id]?.tried ?? [];
+  // A source drawn as an atlas runs in terms of supports, not weight (P-20261103-lab-mode L12); an object keeps this run.
+  const atlas = useMemo(() => runsOnSupports(d, chooseRepresentation(d).view, run), [d, run]);
+  const [suspended, setSuspended] = useState(tried.at(-1));
+  if (atlas) return <SuspendRun d={d} run={run} current={suspended} tried={tried} focus={focus} onFocus={actions.focus}
+    onSuspend={part => { setSuspended(part); if (part) actions.remove(part); }}/>;
   const current = run.bricks.find(b => b.part === tried.at(-1));
   const name = (id: string) => d.parts.find(p => p.id === id)?.name ?? id;
   return <div className="run-reading">

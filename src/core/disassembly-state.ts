@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ReadingPosition } from './source-reading';
 import { allParts, isExpansionOf, type Disassembly, type Part } from './disassembly';
 
 const key = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
@@ -17,6 +18,8 @@ export const disassemblyStateSchema = z.strictObject({
   })),
   reassembly: z.strictObject({ placements: z.record(key, key), locked: z.array(key).max(12) }),
   notes: z.record(key, z.string().max(4000)),
+  /** Location, not completion. Older progress files remain valid without this field. */
+  reading: z.strictObject({ source: key, from: z.number().int().positive(), view: z.enum(['guided', 'overview']) }).optional(),
 });
 export type DisassemblyState = z.infer<typeof disassemblyStateSchema>;
 /** Codes, not sentences: the interface words them in the learner's language. */
@@ -59,7 +62,9 @@ function referencesHold(d: Disassembly, state: DisassemblyState): boolean {
     && Object.entries(state.reassembly.placements).every(([slot, part]) => slots.has(slot) && d.reassemble.slots.some(s => accepts(s).includes(part)))
     && state.reassembly.locked.every(slot => slots.has(slot) && accepts(slots.get(slot)!).includes(state.reassembly.placements[slot]));
   const parts = new Set(allParts(d).map(x => x.part.id));
-  return runs && reassembly && Object.keys(state.notes).every(id => parts.has(id));
+  const readingSource = state.reading && d.sources.find(s => s.id === state.reading!.source);
+  const reading = !state.reading || !!readingSource && state.reading.from <= readingSource.text.split('\n').length;
+  return runs && reassembly && reading && Object.keys(state.notes).every(id => parts.has(id));
 }
 
 export type RestoredDisassemblyState = { state: DisassemblyState; notice?: StateNotice };
@@ -186,4 +191,12 @@ export function trayOrder(d: Disassembly): string[] {
   const score = (id: string) => [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9973, 7);
   const order = [...solution].sort((a, b) => score(a) - score(b) || a.localeCompare(b));
   return order.every((x, i) => x === solution[i]) ? [...order.slice(1), order[0]] : order;
+}
+
+/** Navigation preserves the rest of the loop and never accepts an out-of-source position. */
+export function locateReading(d: Disassembly, state: DisassemblyState, reading: ReadingPosition): DisassemblyState {
+  const source = d.sources.find(s => s.id === reading.source);
+  if (!source || !Number.isInteger(reading.from) || reading.from < 1 || reading.from > source.text.split('\n').length) return state;
+  if (state.reading?.source === reading.source && state.reading.from === reading.from && state.reading.view === reading.view) return state;
+  return { ...state, reading };
 }
