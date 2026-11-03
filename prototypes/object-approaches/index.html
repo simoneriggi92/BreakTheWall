@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oggetto: tre approcci</title>
+<style>
+:root {
+  --bg: #f4f1ea; --card: #fffdf8; --ink: #1f2328; --muted: #6b6f76; --line: #ddd6c7;
+  --accent: #e5533d; --accent-soft: #fde4de; --blue: #2b7bb9; --ok: #2f9e5b; --warn: #d99a1e; --bad: #d0453a; --grey: #9aa1a9;
+  --invent: #e8892b;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; display: grid; grid-template-rows: auto 1fr 190px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px 18px; background: #1f2a36; color: #f2f4f7; }
+header strong { font-size: 15px; margin-right: 6px; }
+.seg { display: inline-flex; background: #2d3a48; border-radius: 9px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: #c9d2dc; padding: 6px 11px; border-radius: 7px; font: inherit; cursor: pointer; }
+.seg button.on { background: #f4f1ea; color: #1f2328; font-weight: 600; }
+header .spacer { flex: 1; }
+.btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 6px 12px; border-radius: 8px; font: inherit; cursor: pointer; }
+.btn:hover { border-color: #b9b1a0; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+.btn.ghost { background: transparent; }
+header .btn { background: #f4f1ea; border: 0; }
+main { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+#stage { position: relative; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
+#stagebar { display: flex; align-items: center; gap: 10px; padding: 10px 16px 0; flex-wrap: wrap; }
+#crumb { color: var(--muted); font-size: 13px; }
+#crumb b { color: var(--ink); }
+.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #dcecf7; color: #1c5f8f; font-size: 12.5px; }
+.chip.warn { background: #fdebd6; color: #8a4b0c; }
+#svgwrap { flex: 1; min-height: 0; position: relative; }
+#svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#controls { padding: 8px 16px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-top: 1px solid var(--line); background: #f8f5ee; min-height: 54px; }
+#controls .label { color: var(--muted); font-size: 12.5px; }
+#controls .say { flex-basis: 100%; font-size: 13.5px; }
+#controls .say em { color: var(--muted); font-style: normal; }
+.opt { display: block; text-align: left; margin: 4px 0; }
+.opt.right { border-color: var(--ok); background: #e5f4ea; }
+.opt.wrong { border-color: var(--bad); background: #fbe5e2; }
+aside { overflow: auto; padding: 16px 18px; background: var(--card); }
+aside h2 { font-size: 19px; margin: 2px 0 6px; line-height: 1.25; }
+aside h3 { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; }
+aside .kind { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+aside ul { padding-left: 18px; margin: 4px 0; }
+aside li { margin: 3px 0; }
+.meta { background: #f3efe6; border-radius: 8px; padding: 9px 11px; margin-top: 10px; }
+.meta .lim { color: var(--muted); margin-top: 6px; }
+.note { border-left: 3px solid var(--line); padding-left: 10px; color: #3d4248; }
+.cite { font: 12px ui-monospace, Menlo, monospace; background: #eef3f8; color: #1c5f8f; border: 0; border-radius: 5px; padding: 2px 7px; margin: 2px 4px 2px 0; cursor: pointer; }
+.verdict { padding: 8px 11px; border-radius: 8px; margin-top: 8px; }
+.verdict.falls { background: #fbe5e2; } .verdict.holds { background: #e5f4ea; }
+#source { overflow: auto; border-top: 1px solid var(--line); background: #fbf9f4; padding: 8px 0; font: 12.5px/1.55 ui-monospace, Menlo, monospace; }
+#source .head { font: 600 12px -apple-system, sans-serif; color: var(--muted); padding: 0 16px 6px; }
+#source .ln { display: grid; grid-template-columns: 52px 1fr; white-space: pre-wrap; padding: 0 16px 0 0; }
+#source .ln span:first-child { color: #a39c8d; text-align: right; padding-right: 12px; }
+#source .ln.hit { background: #fde4de; }
+#source .gap { color: #b3ab9b; padding-left: 64px; }
+/* svg */
+svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.box polygon, .cyl path, .cyl ellipse { stroke: #5b6470; stroke-width: .7; stroke-linejoin: round; }
+.part { cursor: pointer; }
+.part:hover .ft { filter: brightness(1.04); }
+.part.sel .ft { fill: #f9b6a8 !important; } .part.sel .fl { fill: #ee8b78 !important; } .part.sel .fr { fill: #df6e59 !important; }
+.part.sel .box polygon, .part.sel .cyl path, .part.sel .cyl ellipse { stroke: #9b2f1f; }
+.faded { opacity: .2; pointer-events: none; }
+.callout line { stroke: #3d4651; stroke-width: .8; }
+.callout text { font-size: 12.5px; font-weight: 600; fill: #1f2328; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+.callout.sel text { fill: var(--accent); }
+.callout { cursor: pointer; }
+.pill rect { fill: #e3f0fa; stroke: #a7cbe6; }
+.pill text { font-size: 11px; fill: #1c5f8f; }
+.pill.inv rect { fill: #fdebd6; stroke: var(--invent); } .pill.inv text { fill: #8a4b0c; }
+.pill.red rect { fill: #fbe5e2; stroke: #e8a59b; } .pill.red text { fill: #9b2f1f; }
+.wire { fill: none; stroke: #3a8fd0; stroke-width: 2.2; stroke-linejoin: round; }
+.wire.t-depends-on { stroke-dasharray: 2 4; stroke: #6c7a89; }
+.wire.flow { stroke: var(--accent); stroke-width: 3.2; stroke-dasharray: 7 6; animation: flow .8s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -26; } }
+.led { stroke: #3d4651; stroke-width: .6; fill: #c9ced4; }
+.s-active .led { fill: var(--warn); } .s-ok .led, .s-restored .led { fill: var(--ok); } .s-failed .led { fill: var(--bad); }
+.s-active .ft { animation: pulse 1.2s ease-in-out infinite; }
+.s-failed .ft { fill: #f2c7c0 !important; }
+@keyframes pulse { 50% { filter: brightness(1.12) drop-shadow(0 0 4px #f5b041); } }
+.lcd { fill: #24323f; stroke: #11181f; stroke-width: .6; }
+.lcdt { fill: #8ef0b4; font: 600 10.5px ui-monospace, Menlo, monospace; }
+.lamp { stroke: #3d4651; stroke-width: .6; }
+.paneltext { font-size: 8.5px; fill: #1f2328; }
+.plate-title { font: 700 11px -apple-system, sans-serif; letter-spacing: .12em; fill: #46505b; }
+.lid polygon { fill: rgba(190, 214, 232, .16) !important; stroke: #8aa3b8; stroke-width: .8; }
+.guide { stroke: #8aa3b8; stroke-dasharray: 3 4; stroke-width: .8; fill: none; }
+.station-dot { fill: #fff; stroke: #5b6470; stroke-width: .8; }
+.station-n { font: 700 8px -apple-system, sans-serif; fill: #1f2328; }
+.crack { fill: none; stroke: var(--bad); stroke-width: 2; }
+.removed { opacity: .12; }
+.tilt { transition: transform .6s ease; }
+/* 2D scenes */
+.wall { fill: #efe9dc; stroke: #8f8676; stroke-width: 1.2; }
+.floor { stroke: #8f8676; stroke-width: 2; }
+.inv { stroke: var(--invent) !important; }
+.hatch-inv { fill: url(#hatch); }
+.tag rect { fill: #fff; stroke: #c7bfae; } .tag text { font-size: 12px; fill: #3d4248; }
+.tag.part rect { cursor: pointer; }
+.metatext { font-size: 13px; fill: #3d4248; }
+.limittext { font-size: 13px; fill: #8a4b0c; }
+.station rect.body { fill: #e7eaee; stroke: #5b6470; stroke-width: 1; }
+.station.sel rect.body { fill: #f9b6a8; stroke: #9b2f1f; }
+.track { stroke: #5b6470; stroke-width: 4; fill: none; }
+.track2 { stroke: #a7afb8; stroke-width: 2; stroke-dasharray: 6 6; fill: none; }
+.shuttle { transition: transform .35s ease; }
+.reg rect.body { fill: #f4f6f8; stroke: #5b6470; }
+.reg.sel rect.body { fill: #f9b6a8; stroke: #9b2f1f; }
+.small { font-size: 11.5px; fill: #5b6470; }
+.mid { font-size: 13px; fill: #1f2328; }
+.big { font-size: 15px; font-weight: 650; fill: #1f2328; }
+.mono { font-family: ui-monospace, Menlo, monospace; }
+.wire2 { fill: none; stroke: #3a8fd0; stroke-width: 2; }
+.wire2.dash { stroke-dasharray: 5 5; }
+.wire2.dot { stroke-dasharray: 2 4; stroke: #6c7a89; }
+#overlay { position: fixed; inset: 0; background: rgba(20, 26, 33, .55); display: grid; place-items: center; z-index: 10; }
+#overlay[hidden] { display: none; }
+#overlay .card { background: var(--card); border-radius: 14px; padding: 22px 24px; width: min(520px, 92vw); }
+#overlay textarea { width: 100%; min-height: 64px; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.peek #panel, .peek #source, .peek #controls { visibility: hidden; }
+.count { position: absolute; top: 12px; right: 16px; font: 700 34px -apple-system, sans-serif; color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <strong>Break the Wall · prova dell'oggetto</strong>
+  <span class="seg" id="fx"><button data-fx="importer">Importatore (meccanismo)</button><button data-fx="mill">Mill (argomento)</button></span>
+  <span class="seg" id="ap"><button data-ap="A">A · Moduli in un corpo</button><button data-ap="B">B · La linea del giro</button><button data-ap="C">C · Scena dalla metafora</button></span>
+  <span class="spacer"></span>
+  <button class="btn" id="test">Prova dei 10 secondi</button>
+</header>
+<main>
+  <section id="stage">
+    <div id="stagebar"><span id="crumb"></span><span id="chips"></span></div>
+    <div id="svgwrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div id="controls"></div>
+  </section>
+  <aside id="panel"></aside>
+</main>
+<section id="source"></section>
+<div id="overlay" hidden></div>
+<script src="../guided-reading/data.js"></script>
+<script>
+'use strict';
+const DATA = window.DISASSEMBLIES;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const state = { fx: 'importer', ap: 'A', sel: null, open: null, step: -1, answered: {}, ext: false, brick: null, sim: null };
+
+// ---------- the disassembly, indexed
+function index(d) {
+  const parts = {}, parent = {}, joints = [];
+  const walk = (ps, par) => { for (const p of ps) { parts[p.id] = p; parent[p.id] = par; if (p.parts) walk(p.parts, p.id); for (const j of p.joints || []) joints.push({ ...j, level: p.id }); } };
+  walk(d.parts, null);
+  for (const j of d.joints || []) joints.push({ ...j, level: null });
+  return { parts, parent, joints };
+}
+let D, I;
+const levelJoints = level => I.joints.filter(j => j.level === level);
+
+// ---------- isometric geometry (approach A)
+const C = 0.866, S = 0.5;
+let BB;
+const resetBB = () => { BB = [1e9, 1e9, -1e9, -1e9]; LBL = []; LBL_FADED = false; };
+const grow = (x, y) => { BB[0] = Math.min(BB[0], x); BB[1] = Math.min(BB[1], y); BB[2] = Math.max(BB[2], x); BB[3] = Math.max(BB[3], y); };
+const P = (x, y, z = 0) => { const p = [(x - y) * C, (x + y) * S - z]; grow(p[0], p[1]); return p; };
+const f1 = n => Math.round(n * 10) / 10;
+const pts = a => a.map(p => f1(p[0]) + ',' + f1(p[1])).join(' ');
+const M = (a, b, c, d, [e, f]) => `matrix(${a},${b},${c},${d},${f1(e)},${f1(f)})`;
+const onTop = (x, y, z) => M(C, S, -C, S, P(x, y, z));     // u along +x, v along +y
+const onLeft = (x, y, z) => M(C, S, 0, 1, P(x, y, z));     // face y = const: u along +x, v down
+function box(x, y, z, w, d, h, pal, extra = '') {
+  const t = [P(x, y, z + h), P(x + w, y, z + h), P(x + w, y + d, z + h), P(x, y + d, z + h)];
+  const l = [P(x, y + d, z + h), P(x + w, y + d, z + h), P(x + w, y + d, z), P(x, y + d, z)];
+  const r = [P(x + w, y, z + h), P(x + w, y + d, z + h), P(x + w, y + d, z), P(x + w, y, z)];
+  return `<g class="box ${extra}"><polygon class="fl" fill="${pal[1]}" points="${pts(l)}"/><polygon class="fr" fill="${pal[2]}" points="${pts(r)}"/><polygon class="ft" fill="${pal[0]}" points="${pts(t)}"/></g>`;
+}
+function cyl(cx, cy, z, r, h, pal) {
+  const [X, Y0] = P(cx, cy, z), [, Y1] = P(cx, cy, z + h); const rx = r * 1.2247, ry = r * 0.7071;
+  grow(X - rx, Y0 + ry); grow(X + rx, Y1 - ry);
+  return `<g class="cyl"><path class="fl" fill="${pal[1]}" d="M${f1(X - rx)},${f1(Y1)} L${f1(X - rx)},${f1(Y0)} A${f1(rx)},${f1(ry)} 0 0 0 ${f1(X + rx)},${f1(Y0)} L${f1(X + rx)},${f1(Y1)} Z"/><ellipse class="ft" fill="${pal[0]}" cx="${f1(X)}" cy="${f1(Y1)}" rx="${f1(rx)}" ry="${f1(ry)}"/></g>`;
+}
+// Labels are collected while drawing and placed at the end, pushed apart where they overlap.
+let LBL = [], LBL_FADED = false;
+function pill(x, y, text, cls = '') { LBL.push({ kind: 'pill', x, y, text, cls, faded: LBL_FADED }); return ''; }
+function callout(cx, cy, ztop, name, id, rise = 36, dx = 0) {
+  const [a, b] = P(cx, cy, ztop + 2), [c, d] = P(cx, cy, ztop + rise);
+  LBL.push({ kind: 'call', id, ax: a, ay: b, x: c + dx, y: d - 8, text: name, faded: LBL_FADED }); return '';
+}
+function flushLabels() {
+  const L = LBL.splice(0);
+  for (const l of L) { l.w = l.text.length * (l.kind === 'call' ? 7.1 : 6.1) + 14; l.h = l.kind === 'call' ? 17 : 19; }
+  for (let it = 0; it < 80; it++) {
+    let moved = false;
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+      const a = L[i], b = L[j];
+      const ox = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2);
+      const oy = Math.min(a.y + a.h / 2, b.y + b.h / 2) - Math.max(a.y - a.h / 2, b.y - b.h / 2);
+      if (ox > 0 && oy > 0) { const up = a.y <= b.y ? a : b, dn = up === a ? b : a; up.y -= oy / 2 + 1; dn.y += oy / 2 + 1; moved = true; }
+    }
+    if (!moved) break;
+  }
+  return L.map(l => {
+    grow(l.x - l.w / 2, l.y - l.h / 2); grow(l.x + l.w / 2, l.y + l.h / 2);
+    const fade = l.faded ? ' faded' : '';
+    if (l.kind === 'pill') return `<g class="pill ${l.cls}${fade}" transform="translate(${f1(l.x)},${f1(l.y)})"><rect x="${f1(-l.w / 2)}" y="-9" width="${f1(l.w)}" height="18" rx="9"/><text y="4" text-anchor="middle">${esc(l.text)}</text></g>`;
+    return `<g class="callout ${state.sel === l.id ? 'sel' : ''}${fade}" data-id="${l.id}"><line x1="${f1(l.ax)}" y1="${f1(l.ay)}" x2="${f1(l.x)}" y2="${f1(l.y + l.h / 2)}"/><text x="${f1(l.x)}" y="${f1(l.y + 5)}" text-anchor="middle">${esc(l.text)}</text></g>`;
+  }).join('');
+}
+const METAL = ['#eef0f3', '#ccd1d7', '#b3bac3'], TRAY = ['#e2e5e9', '#bcc3cb', '#a6aeb8'], DARK = ['#8d97a3', '#6f7884', '#5e6672'];
+const PAPER = ['#ffffff', '#ebe7df', '#dcd6cb'];
+
+// Which run variable a part shows: a word of four letters or more shared by the variable's name and the part's name.
+function varFor(part, vars) {
+  const words = s => s.toLowerCase().normalize('NFD').replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length >= 4);
+  const mine = new Set(words(part.name));
+  return Object.keys(vars || {}).find(k => words(k).some(w => mine.has(w)));
+}
+function runVars() {
+  const r = D.runs.find(r => r.type === 'scenario'); if (!r) return {};
+  const v = { ...r.vars }; for (let i = 0; i <= state.step; i++) Object.assign(v, r.steps[i].vars || {}); return v;
+}
+function runEffects() {
+  const r = D.runs.find(r => r.type === 'scenario'); const e = {}; if (!r) return e;
+  for (let i = 0; i <= state.step; i++) Object.assign(e, r.steps[i].effect || {}); return e;
+}
+function runFlow() {
+  const r = D.runs.find(r => r.type === 'scenario'); if (!r || state.step < 0) return [];
+  return (r.steps[state.step].flow || []).map(([a, b]) => a + '>' + b);
+}
+
+// ---------- A: mechanism modules, one illustrated component per icon
+function moduleA(p, x, y, z, w, d, st, vars, incoming) {
+  const cx = x + w / 2, cy = y + d / 2; let s = '', top = 22;
+  const led = h => { const [a, b] = P(x + w - 10, y + d - 10, z + h); return `<circle class="led" cx="${f1(a)}" cy="${f1(b)}" r="3.6"/>`; };
+  const varKey = varFor(p, vars);
+  switch (p.icon) {
+    case 'repeat': {                       // a drum with one station per sub-part, and an arm that turns
+      s += box(x, y, z, w, d, 10, METAL);
+      const r = Math.min(w, d) * 0.4; s += cyl(cx, cy, z + 10, r, 16, METAL);
+      const subs = p.parts || [];
+      subs.forEach((q, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / subs.length; const [X, Y] = P(cx + Math.cos(a) * r * 0.76, cy + Math.sin(a) * r * 0.76, z + 26);
+        s += `<circle class="station-dot" cx="${f1(X)}" cy="${f1(Y)}" r="5.2"/><text class="station-n" x="${f1(X)}" y="${f1(Y + 2.8)}" text-anchor="middle">${i + 1}</text>`; });
+      s += `<g transform="${onTop(cx, cy, z + 26)}"><g>${st === 'failed' ? '' : '<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="6s" repeatCount="indefinite"/>'}<line x1="0" y1="0" x2="${f1(r * 0.55)}" y2="0" stroke="#3d4651" stroke-width="3" stroke-linecap="round"/><circle r="4" fill="#3d4651"/></g></g>`;
+      top = 26; s += led(10); break;
+    }
+    case 'timer': case 'flag': {           // a register: a display on the front, a stamp on top
+      s += box(x, y, z, w, d, 26, METAL);
+      const val = varKey ? vars[varKey] : '—';
+      s += `<g transform="${onLeft(x + 12, y + d, z + 21)}"><rect class="lcd" width="${w - 24}" height="15" rx="2"/><text class="lcdt" x="${(w - 24) / 2}" y="11.4" text-anchor="middle">${esc(val)}</text></g>`;
+      if (varKey) s += `<g transform="${onLeft(x + 12, y + d, z + 4)}"><text class="paneltext" x="0" y="0">${esc(varKey)}</text></g>`;
+      if (p.icon === 'timer') s += cyl(x + w * 0.35, y + d * 0.35, z + 26, 9, 7, DARK);
+      else { const [a, b] = P(x + w * 0.35, y + d * 0.35, z + 26); s += `<line x1="${f1(a)}" y1="${f1(b)}" x2="${f1(a)}" y2="${f1(b - 30)}" stroke="#3d4651" stroke-width="1.6"/><path d="M${f1(a)},${f1(b - 30)} l16,4 l-16,6 z" fill="#3d4651"/>`; grow(a + 16, b - 32); }
+      top = 26; s += led(26); break;
+    }
+    case 'file-text': {                    // a tape printer: a roll at the back, the paper on top and over the front edge
+      s += box(x, y, z, w, d, 20, METAL);
+      s += box(x + 12, y + 6, z + 20, w - 24, 16, 12, PAPER);
+      s += `<g transform="${onTop(x + 14, y + 26, z + 20)}"><rect width="${w - 28}" height="${d - 26}" fill="#fff" stroke="#9aa1a9" stroke-width=".6"/>${[8, 16, 24, 32, 40].map(v => `<line x1="5" x2="${w - 36}" y1="${v}" y2="${v}" stroke="#b9c0c8" stroke-width="1.2"/>`).join('')}</g>`;
+      s += `<g transform="${onLeft(x + 14, y + d, z + 20)}"><rect width="${w - 28}" height="14" fill="#fff" stroke="#9aa1a9" stroke-width=".6"/><line x1="5" x2="${w - 36}" y1="5" y2="5" stroke="#b9c0c8"/><line x1="5" x2="${w - 46}" y1="10" y2="10" stroke="#b9c0c8"/></g>`;
+      top = 32; s += led(20); break;
+    }
+    case 'settings': {                     // a toggle with a lever
+      s += box(x, y, z, w, d, 18, METAL);
+      s += `<g transform="${onTop(x, y, z + 18)}"><rect x="${w / 2 - 20}" y="${d / 2 - 8}" width="40" height="16" rx="3" fill="#3d4651"/></g>`;
+      const [a, b] = P(cx, cy, z + 18); s += `<line x1="${f1(a)}" y1="${f1(b)}" x2="${f1(a - 13)}" y2="${f1(b - 30)}" stroke="#5b6470" stroke-width="4" stroke-linecap="round"/><circle cx="${f1(a - 13)}" cy="${f1(b - 30)}" r="6.5" fill="${'#e5533d'}" stroke="#9b2f1f"/>`; grow(a - 20, b - 37);
+      s += `<g transform="${onLeft(x + 10, y + d, z + 12)}"><text class="paneltext" x="0" y="0" font-weight="700">ACCESO</text></g>`;
+      top = 30; s += led(18); break;
+    }
+    case 'rotate-ccw': {                   // a relay with a dial
+      s += box(x, y, z, w, d, 22, METAL);
+      s += `<g transform="${onTop(cx, cy, z + 22)}"><circle r="${f1(d * 0.36)}" fill="#fbfbfc" stroke="#5b6470" stroke-width=".8"/>${Array.from({ length: 12 }, (_, i) => { const a = i * Math.PI / 6, r = d * 0.36; return `<line x1="${f1(Math.cos(a) * r * 0.8)}" y1="${f1(Math.sin(a) * r * 0.8)}" x2="${f1(Math.cos(a) * r)}" y2="${f1(Math.sin(a) * r)}" stroke="#5b6470"/>`; }).join('')}<path d="M -14 -14 A 20 20 0 1 0 14 -14" fill="none" stroke="#e5533d" stroke-width="2.2"/><path d="M 14 -14 l -1 8 l -6 -6 z" fill="#e5533d"/><line x1="0" y1="0" x2="${f1(d * 0.26)}" y2="-6" stroke="#1f2328" stroke-width="2"/></g>`;
+      top = 22; s += led(22); break;
+    }
+    case 'gauge': {                        // an upright board, one lamp per incoming joint
+      s += box(x, y, z, w, d, 8, METAL);
+      const ph = 22 + incoming.length * 15;
+      s += box(x, y + d - 16, z + 8, w, 14, ph, METAL);
+      s += `<g transform="${onLeft(x, y + d - 2, z + 8 + ph)}">` + incoming.map((j, k) => {
+        const v = vars[j.label]; const col = v === undefined ? '#c9ced4' : /verde/.test(v) ? '#2f9e5b' : /ross/.test(v) ? '#d0453a' : /grig/.test(v) ? '#9aa1a9' : '#d99a1e';
+        return `<circle class="lamp" cx="11" cy="${13 + k * 15}" r="5" fill="${col}"/><text class="paneltext" x="21" y="${16 + k * 15}">${esc(j.label)}</text>`;
+      }).join('') + `</g>`;
+      top = 8 + ph; break;
+    }
+    default: s += box(x, y, z, w, d, 22, METAL); s += led(22);
+  }
+  return { svg: s, top };
+}
+const SUBGLYPH = {
+  play: '<path d="M -7 -9 L 10 0 L -7 9 Z" fill="#3d4651"/>',
+  filter: '<path d="M -12 -10 L 12 -10 L 3 2 L 3 11 L -3 11 L -3 2 Z" fill="#3d4651"/>',
+  download: '<path d="M -4 -12 L 4 -12 L 4 0 L 10 0 L 0 11 L -10 0 L -4 0 Z" fill="#3d4651"/>',
+  send: '<path d="M -12 -4 L 0 -4 L 0 -10 L 12 0 L 0 10 L 0 4 L -12 4 Z" fill="#3d4651"/>',
+  flag: '<path d="M -8 12 L -8 -12 L 10 -6 L -6 0" fill="#3d4651" stroke="#3d4651" stroke-width="2"/>',
+};
+
+// Layers from the joints: a part sits one column after what feeds it. A dependency feeds the part that depends on it.
+function layers(ids, joints) {
+  const E = joints.filter(j => ids.includes(j.from) && ids.includes(j.to)).map(j => j.type === 'depends-on' ? [j.to, j.from] : [j.from, j.to]);
+  const L = Object.fromEntries(ids.map(i => [i, 0]));
+  for (let k = 0; k < ids.length; k++) for (const [u, v] of E) if (L[v] < L[u] + 1) L[v] = L[u] + 1;
+  return L;
+}
+function placeLevel(ids, joints, GX, GY, ox = 0, oy = 0) {
+  const L = layers(ids, joints), groups = {}, pos = {};
+  ids.forEach(id => (groups[L[id]] ??= []).push(id));
+  for (const [l, arr] of Object.entries(groups)) arr.forEach((id, i) => { pos[id] = { cx: ox + l * GX, cy: oy + (i - (arr.length - 1) / 2) * GY }; });
+  return { L, pos };
+}
+function wiresA(joints, pos, L, W, D2, z, flows) {
+  const outN = {}, inN = {}, outK = {}, inK = {}, gapK = {};
+  const dir = j => j.type === 'depends-on' ? [j.to, j.from] : [j.from, j.to];
+  joints.forEach(j => { const [u, v] = dir(j); outN[u] = (outN[u] || 0) + 1; inN[v] = (inN[v] || 0) + 1; });
+  let lines = '', labels = '';
+  for (const j of joints) {
+    const [u, v] = dir(j), a = pos[u], b = pos[v]; if (!a || !b) continue;
+    const ko = outK[u] = (outK[u] ?? -1) + 1, ki = inK[v] = (inK[v] ?? -1) + 1, kg = gapK[L[u]] = (gapK[L[u]] ?? -1) + 1;
+    const sy = a.cy + (ko - (outN[u] - 1) / 2) * 14, ty = b.cy + (ki - (inN[v] - 1) / 2) * 14;
+    const sx = a.cx + W / 2, ex = b.cx - W / 2, mx = sx + 10 + kg * 12;
+    const path = [P(sx, sy, z), P(mx, sy, z), P(mx, ty, z), P(ex - 2, ty, z)];
+    const on = flows.includes(j.from + '>' + j.to);
+    lines += `<polyline class="wire t-${j.type} ${on ? 'flow' : ''}" marker-end="url(#arr)" data-joint="${j.from}>${j.to}" points="${pts(path)}"/>`;
+    const [lx, ly] = Math.abs(sy - ty) < 1 ? P((sx + ex) / 2, sy, z) : P(mx, (sy + ty) / 2, z);
+    if (j.label) labels += pill(lx, ly, j.label, on ? 'red' : '');
+  }
+  return { lines, labels };
+}
+function renderMechA() {
+  resetBB();
+  const W = 100, DD = 84, T = 14, GX = 158, GY = 112;
+  const ids = D.parts.map(p => p.id), top = levelJoints(null);
+  const { L, pos } = placeLevel(ids, top, GX, GY);
+  const xs = ids.map(i => pos[i].cx), ys = ids.map(i => pos[i].cy);
+  const x0 = Math.min(...xs) - W / 2 - 34, x1 = Math.max(...xs) + W / 2 + 26, y0 = Math.min(...ys) - DD / 2 - 40, y1 = Math.max(...ys) + DD / 2 + 26;
+  const eff = runEffects(), vars = runVars(), flows = runFlow();
+  let s = '';
+  const opened = state.open && I.parts[state.open];
+  LBL_FADED = !!opened;
+  s += `<g class="${opened ? 'faded' : ''}">`;
+  s += box(x0, y0, 0, x1 - x0, y1 - y0, T, TRAY) + '<!--rim-->';
+  s += `<g transform="${onLeft(x0 + 22, y1, T - 3)}"><text class="plate-title" x="0" y="0">${esc(D.whole.name.toUpperCase())}</text></g>`;
+  const w = wiresA(top, pos, L, W, DD, T + 1, flows); s += w.lines;
+  const order = [...ids].sort((a, b) => (pos[a].cx + pos[a].cy) - (pos[b].cx + pos[b].cy));
+  let calls = '';
+  for (const id of order) {
+    const p = I.parts[id], { cx, cy } = pos[id], incoming = top.filter(j => j.to === id);
+    const m = moduleA(p, cx - W / 2, cy - DD / 2, T, W, DD, eff[id], vars, incoming);
+    s += `<g class="part s-${eff[id] || 'idle'} ${state.sel === id ? 'sel' : ''}" data-id="${id}">${m.svg}</g>`;
+    calls += callout(cx, cy, T + m.top, p.name, id, p.icon === 'gauge' ? 18 : 40);
+  }
+  s += calls + w.labels;
+  // the case's rim: a low wall at the back, so the tray reads as a box that holds the modules
+  s = s.replace('<!--rim-->', box(x0, y0, T, x1 - x0, 8, 16, TRAY) + box(x0, y0 + 8, T, 8, y1 - y0 - 8, 16, TRAY));
+  s += `</g>`;
+  LBL_FADED = false;
+  if (opened) s += renderSubA(opened, pos[opened.id], T + 26);
+  return s + flushLabels();
+}
+function renderSubA(part, at, ztop) {
+  const W = 70, DD = 56, Z = ztop + 120, GX = 112;
+  const ids = part.parts.map(p => p.id), js = levelJoints(part.id);
+  const { L, pos } = placeLevel(ids, js, GX, 90, at.cx - (ids.length - 1) / 2 * GX * 0.62, at.cy + (ids.length - 1) / 2 * GX * 0.38);
+  // fold the chain onto the diagonal that runs across the screen, so five steps stay short
+  for (const id of ids) { const l = L[id]; pos[id] = { cx: at.cx + (l - (ids.length - 1) / 2) * GX * 0.62, cy: at.cy - (l - (ids.length - 1) / 2) * GX * 0.62 }; }
+  let s = '';
+  // the raised plate: a strip along that diagonal, not the square that would hold it
+  const first = pos[ids.find(i => L[i] === 0)], last = pos[ids.find(i => L[i] === ids.length - 1)] || first, E = 62, H = 58;
+  const corner = (c, du, dv) => [c.cx + du * E + dv * H, c.cy - du * E + dv * H];
+  const strip = [corner(first, -1, -1), corner(last, 1, -1), corner(last, 1, 1), corner(first, -1, 1)];
+  s += `<polygon fill="rgba(234,240,246,.92)" stroke="#8aa3b8" points="${pts(strip.map(([x, y]) => P(x, y, Z - 1)))}"/>`;
+  const r = 0.4 * 80;
+  ids.forEach((id, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / ids.length; const [X, Y] = P(at.cx + Math.cos(a) * r * 0.76, at.cy + Math.sin(a) * r * 0.76, ztop); const [c, d] = P(pos[id].cx, pos[id].cy, Z - 6); s += `<line class="guide" x1="${f1(X)}" y1="${f1(Y)}" x2="${f1(c)}" y2="${f1(d)}"/>`; });
+  // a straight track between consecutive steps
+  const flows = [];
+  let lines = '', labels = '';
+  for (const j of js) { const a = pos[j.from], b = pos[j.to]; const p1 = P(a.cx, a.cy, Z), p2 = P(b.cx, b.cy, Z); lines += `<line class="wire" marker-end="url(#arr)" x1="${f1(p1[0])}" y1="${f1(p1[1])}" x2="${f1((p1[0] + p2[0]) / 2 + (p2[0] - p1[0]) * .18)}" y2="${f1((p1[1] + p2[1]) / 2 + (p2[1] - p1[1]) * .18)}"/>`; const m = P((a.cx + b.cx) / 2, (a.cy + b.cy) / 2, Z); if (j.label) labels += pill(m[0], m[1] + 14, j.label); }
+  s += lines;
+  const order = [...ids].sort((a, b) => (pos[a].cx + pos[a].cy) - (pos[b].cx + pos[b].cy));
+  let calls = '';
+  for (const id of order) {
+    const p = I.parts[id], { cx, cy } = pos[id];
+    s += `<g class="part ${state.sel === id ? 'sel' : ''}" data-id="${id}">${box(cx - W / 2, cy - DD / 2, Z, W, DD, 16, METAL)}<g transform="${onTop(cx, cy, Z + 16)}">${SUBGLYPH[p.icon] || ''}</g></g>`;
+    calls += callout(cx, cy, Z + 16, `${ids.indexOf(id) + 1}. ${p.name}`, id, 34);
+  }
+  return s + labels + calls;
+}
+
+// ---------- A: the argument as a load-bearing frame
+const STONE = ['#e6dfd2', '#c9bfad', '#b2a793'], WOOD = ['#efd3a3', '#d6ae72', '#bf955a'], STEEL = ['#c3cad2', '#9aa4ae', '#86909b'];
+const FIELD = ['#d7ebd2', '#afd2a6', '#98c08e'], CLAMP = ['#9aa4af', '#7b8794', '#6a7581'], WEDGE = ['#f08a76', '#e5533d', '#c9432f'], BRICK = ['#ecc3b2', '#d9a38c', '#c58d76'];
+function renderArgA() {
+  resetBB();
+  const byKind = k => D.parts.filter(p => p.kind === k);
+  const claim = byKind('conclusion')[0], grounds = byKind('ground'), premises = byKind('premise'), limits = byKind('limit'), cons = byKind('consequence'), objs = byKind('objection'), rej = byKind('rejected');
+  const joint = (f, t) => levelJoints(null).find(j => j.from === f && j.to === t);
+  const removed = state.brick, fall = state.brick && brickOf(state.brick)?.verdict === 'falls';
+  const g = (id, inner, extra = '') => `<g class="part ${state.sel === id ? 'sel' : ''} ${removed === id ? 'removed' : ''} ${extra}" data-id="${id}">${inner}</g>`;
+  let s = '', calls = '', labels = '';
+  const BX0 = 20, BX1 = 400, BY = 40, BD = 44, BZ = 150, BH = 22;
+  // grounds: a foundation slab each, side by side under the left of the beam
+  grounds.forEach((p, i) => { const x = 0 + i * 160; s += g(p.id, box(x, -10, 0, 290, 130, 18, STONE)); calls += callout(x + 40, 110, 18, p.name, p.id, 10, -120); });
+  // premises: a pillar each, on its own plinth, so no premise appears to rest on a ground
+  premises.forEach((p, i) => { const x = 330 + i * 70; s += g(p.id, box(x - 10, BY - 14, 0, 60, BD + 28, 14, STONE) + box(x, BY, 14, 40, BD, BZ - 40, ['#f2ede4', '#d6cdbd', '#c2b7a4'])); calls += callout(x + 40, BY + BD, BZ - 50, p.name, p.id, 0, 150); });
+  // support joints: a steel strut from the supporter up to the beam, labelled with the joint
+  const struts = [];
+  grounds.forEach((p, i) => { const j = joint(p.id, claim.id); if (j) struts.push({ j, x: 130 + i * 160, z0: 18 }); });
+  premises.forEach((p, i) => { const j = joint(p.id, claim.id); if (j) struts.push({ j, x: 330 + i * 70 + 4, z0: BZ - 26 }); });
+  for (const st of struts) { const gone = removed === st.j.from; s += `<g class="${gone ? 'removed' : ''}">${box(st.x, BY + 6, st.z0, 32, BD - 12, BZ - st.z0, STEEL)}</g>`; const [lx, ly] = P(st.x + 16, BY + BD, (st.z0 + BZ) / 2); labels += pill(lx + 30, ly, st.j.label); }
+  // the claim: the beam
+  const beam = box(BX0, BY, BZ, BX1 - BX0, BD, BH, WOOD);
+  let crack = '';
+  if (fall) { const [a, b] = P((BX0 + BX1) / 2, BY + BD, BZ + BH); crack = `<path class="crack" d="M${f1(a)},${f1(b - 2)} l6,8 l-8,6 l7,9"/>`; }
+  const [rx, ry] = P(BX0, BY + BD, BZ);
+  s += g(claim.id, `<g class="tilt" style="transform-origin:${f1(rx)}px ${f1(ry)}px;transform:rotate(${fall ? 4 : 0}deg)">${beam}${crack}</g>`);
+  calls += callout(BX1 - 20, BY + BD / 2, BZ + BH, claim.name, claim.id, 10, 150);
+  // consequences: what rests on the claim, a deck on top
+  const open = state.open && I.parts[state.open];
+  cons.forEach((p, i) => {
+    const j = joint(claim.id, p.id), z = BZ + BH + 14;
+    let inner = box(BX0 + 30, BY - 6, z, BX1 - BX0 - 60, BD + 12, 6, FIELD);
+    if (open && open.id === p.id) p.parts.forEach((q, k) => { inner += `<g class="part ${state.sel === q.id ? 'sel' : ''}" data-id="${q.id}">${box(BX0 + 50 + k * 105, BY, z + 6, 80, BD, 22, FIELD)}</g>`; calls += callout(BX0 + 90 + k * 105, BY + BD / 2, z + 28, q.name, q.id, 22 + k * 16); });
+    else { inner += box(BX0 + 110, BY, z + 6, 160, BD, 26, FIELD); calls += callout(BX0 + 190, BY + BD / 2, z + 32, p.name, p.id, 26); }
+    s += `<g class="${removed === p.id ? 'removed' : ''}">${box(BX0 + 60, BY + 14, BZ + BH, 16, 16, 14, STEEL)}${box(BX1 - 80, BY + 14, BZ + BH, 16, 16, 14, STEEL)}</g>` + g(p.id, inner);
+    if (j) { const [lx, ly] = P(BX1 - 72, BY + BD, BZ + BH + 7); labels += pill(lx + 40, ly, j.label); }
+  });
+  // limits: clamps round the beam
+  limits.forEach(p => {
+    const j = joint(p.id, claim.id);
+    const clamp = x => box(x, BY - 8, BZ - 8, 26, 8, BH + 16, CLAMP) + box(x, BY - 8, BZ + BH, 26, BD + 16, 8, CLAMP) + box(x, BY + BD, BZ - 8, 26, 8, BH + 16, CLAMP);
+    if (open && open.id === p.id) p.parts.forEach((q, k) => { const x = BX0 + 6 + k * 150; s += `<g class="part ${state.sel === q.id ? 'sel' : ''}" data-id="${q.id}">${clamp(x)}</g>`; calls += callout(x + 13, BY + BD + 8, BZ - 8, q.name, q.id, -34 - k * 10); });
+    else { s += g(p.id, clamp(BX0 + 4)); calls += callout(BX0 + 13, BY - 8, BZ + BH + 8, p.name, p.id, 40, -110); }
+    if (j) { const [lx, ly] = P(BX0 + 17, BY + BD + 8, BZ - 18); labels += pill(lx - 40, ly + 20, j.label); }
+  });
+  // objections: a wedge driven into the front of the beam
+  objs.forEach((p, i) => {
+    const j = joint(p.id, claim.id), x = 200 + i * 60, tip = P(x, BY + BD + 2, BZ + BH / 2);
+    const a = P(x - 22, BY + BD + 100, BZ - 4), b = P(x + 22, BY + BD + 100, BZ - 4), c = P(x + 22, BY + BD + 100, BZ + BH + 4), d = P(x - 22, BY + BD + 100, BZ + BH + 4);
+    const shape = `<polygon fill="${WEDGE[1]}" stroke="#9b2f1f" points="${pts([tip, a, b])}"/><polygon fill="${WEDGE[0]}" stroke="#9b2f1f" points="${pts([tip, d, a])}"/><polygon fill="${WEDGE[2]}" stroke="#9b2f1f" points="${pts([a, b, c, d])}"/>`;
+    s += g(p.id, shape); calls += callout(x, BY + BD + 100, BZ - 4, p.name, p.id, -40, -60);
+    if (j) labels += pill(tip[0] - 70, tip[1] + 44, j.label, 'red');
+  });
+  // rejected parts: a brick set aside on the ground, joined to nothing
+  rej.forEach((p, i) => { s += g(p.id, box(470 + i * 70, 150, 0, 54, 30, 18, BRICK) + (() => { const [a, b] = P(497 + i * 70, 165, 18); return `<path d="M${f1(a - 10)},${f1(b - 6)} l20,12 M${f1(a + 10)},${f1(b - 6)} l-20,12" stroke="#9b2f1f" stroke-width="1.6"/>`; })(), 'set-aside'); calls += callout(497 + i * 70, 165, 18, p.name + ' (scartato)', p.id, 24); });
+  return s + labels + calls + flushLabels();
+}
+
+// ---------- B: the line the round travels (mechanism only)
+const B = { stations: [], regAt: {} };
+function simInit() {
+  const t = 60;
+  state.sim = { t, playing: false, paused: false, feed: 'ok', stamp: t - 9, finished: t - 5, started: t - 60, last: t - 9, phase: -1, roundAt: null, stored: 0, recent: [], log: [], restarts: 0, roundNo: 0 };
+}
+const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+function logS(text, lines) { const s = state.sim; s.log.unshift({ t: s.t, text, lines }); s.log.length = Math.min(s.log.length, 5); }
+// The rules, taken from the cited lines of the source; the contract does not hold them.
+function simTick() {
+  const s = state.sim; s.t += 1;
+  if (s.phase === 2 && s.feed === 'hang') { /* stuck inside a call that never returns (ll. 55–56) */ }
+  else if (s.phase >= 0) {
+    s.phase += 1;
+    if (s.phase === 1) { if (s.paused) { logS('legge l’interruttore: spento, annota «in pausa» e si ferma', '53–54, 141–144'); s.phase = -1; } else logS('legge l’interruttore: acceso, prosegue', '53–54'); }
+    else if (s.phase === 2) { if (s.feed === 'refuse') { logS('il feed rifiuta: errore, salta la chiusura', '67–68'); s.phase = -1; } else if (s.feed === 'hang') logS('il feed accetta la chiamata e non risponde', '55–56'); else logS('scarica i record cambiati', '55–56'); }
+    else if (s.phase === 3) { s.stored += 2; s.recent.push(s.t); logS('consegna 2 record ai worker: esiti nel registro', '57–58, 106–107'); }
+    else if (s.phase === 4) { s.finished = s.t; logS('chiude: scrive l’ora di fine giro', '59–60, 89–93'); }
+    else s.phase = -1;
+  }
+  if (s.phase === -1 && s.t - s.last >= 10) { s.phase = 0; s.last = s.t; s.stamp = s.t; s.roundNo++; logS('sveglia e timbro: scrive il timbro di battito', '51–52, 75'); }
+  // the restart rule, once a minute (ll. 156–162)
+  if (s.t - s.started >= 5 && s.t - s.stamp > 30) { s.restarts++; s.started = s.t; s.phase = -1; s.last = s.t - 10; logS('timbro più vecchio di 30 minuti: la regola riavvia l’importatore', '156–162'); }
+  s.recent = s.recent.filter(x => s.t - x < 60);
+}
+function board() {
+  const s = state.sim;
+  const run = s.t - s.stamp < 30 ? 'verde' : 'rossa';
+  const through = s.paused ? 'grigia' : (s.t - s.finished < 60 ? 'verde' : 'rossa');
+  const recs = s.recent.length ? 'record archiviati' : 'nessun record nell’ultima ora';
+  let likely;   // the table in section 10 (ll. 196–204)
+  if (run === 'rossa') likely = 'fermo o bloccato: agisce la regola di riavvio';
+  else if (through === 'grigia') likely = 'in pausa: controlla chi l’ha messo in pausa e quando';
+  else if (through === 'rossa') likely = 'un feed rifiuta le chiamate, o ogni scaricamento fallisce';
+  else if (!s.recent.length) likely = 'gli editori stanotte non hanno mandato nulla';
+  else likely = 'una notte normale';
+  return { run, through, recs, likely };
+}
+const LAMP = v => /verde/.test(v) ? '#2f9e5b' : /ross/.test(v) ? '#d0453a' : '#9aa1a9';
+function renderLineB() {
+  if (!state.sim) simInit();
+  const s = state.sim, round = I.parts.round, subs = round.parts;
+  const top = levelJoints(null);
+  const X = i => 160 + i * 168, TY = 272;
+  // where each register hangs: the station that cites the same lines as the joint; otherwise placed by hand
+  const overlaps = (a, b) => a.some(x => b.some(y => x.source === y.source && x.from <= y.to && y.from <= x.to));
+  const regs = top.filter(j => j.from === 'round' && j.type === 'sends-to').map(j => {
+    const k = subs.findIndex(q => overlaps(q.cites || [], j.cites || []));
+    return { j, part: I.parts[j.to], k: k >= 0 ? k : subs.findIndex(q => q.icon === 'send'), byHand: k < 0 };
+  });
+  let g = `<defs>${defs2d()}</defs>`;
+  g += `<text class="big" x="40" y="40">${esc(D.whole.name)}: un giro sul binario</text><text class="small" x="40" y="60">Ogni stazione è un passo del giro, nell’ordine dei giunti. Ore ${hhmm(s.t)} · giro n. ${s.roundNo}${s.restarts ? ` · riavvii: ${s.restarts}` : ''}</text>`;
+  // the track and the return
+  g += `<path class="track" d="M 90 ${TY} L ${X(4) + 90} ${TY}"/><path class="track2" d="M ${X(4) + 90} ${TY} C ${X(4) + 150} ${TY}, ${X(4) + 150} 84, ${X(4) + 60} 84 L 120 84 C 60 84, 60 ${TY}, 90 ${TY}" marker-end="url(#arr2)"/>`;
+  g += `<text class="small" x="${(X(0) + X(4)) / 2}" y="78" text-anchor="middle">dorme, e dopo dieci minuti riparte (rr. 59–60)</text>`;
+  // stations
+  subs.forEach((q, i) => {
+    const x = X(i), sel = state.sel === q.id, here = s.phase === i;
+    g += `<g class="station part ${sel ? 'sel' : ''}" data-id="${q.id}"><rect class="body" x="${x - 52}" y="${TY - 82}" width="104" height="66" rx="8" ${here ? 'stroke="#e5533d" stroke-width="2.4"' : ''}/>${stationGlyph(q.icon, x, TY - 50)}<text class="mid" x="${x}" y="${TY - 92}" text-anchor="middle" font-weight="600">${i + 1}. ${esc(q.name)}</text><rect x="${x - 6}" y="${TY - 16}" width="12" height="16" fill="#5b6470"/></g>`;
+    const j = levelJoints('round').find(j => j.from === q.id);
+    if (j && i < subs.length - 1) g += `<text class="small" x="${x + 84}" y="${TY - 6}" text-anchor="middle">${esc(j.label)}</text>`;
+  });
+  // the shuttle: the round itself
+  const at = s.phase >= 0 ? X(s.phase) : 60, stuck = s.phase === 2 && s.feed === 'hang';
+  g += `<g class="shuttle part ${state.sel === 'round' ? 'sel' : ''}" data-id="round" style="transform:translate(${at}px, ${TY}px)"><rect x="-40" y="4" width="80" height="30" rx="7" fill="${stuck ? '#f2c7c0' : '#ffd9a8'}" stroke="${stuck ? '#d0453a' : '#c47a12'}" stroke-width="1.6"/><text class="mid" y="24" text-anchor="middle" font-weight="600">${esc(round.name)}</text><circle cx="-24" cy="38" r="5" fill="#3d4651"/><circle cx="24" cy="38" r="5" fill="#3d4651"/></g>`;
+  if (stuck) g += `<text class="mid" x="${X(2)}" y="${TY + 64}" text-anchor="middle" fill="#d0453a" font-weight="600">fermo dentro la chiamata</text>`;
+  // the pause switch above station 2, read at every round
+  const pause = I.parts.pause, dep = top.find(j => j.to === 'pause');
+  const sx = X(1);
+  g += `<g class="part reg ${state.sel === 'pause' ? 'sel' : ''}" data-id="pause" data-act="pause"><rect class="body" x="${sx + 70}" y="104" width="128" height="40" rx="8"/><text class="mid" x="${sx + 134}" y="121" text-anchor="middle" font-weight="600">${esc(pause.name)}</text><rect x="${sx + 104}" y="127" width="60" height="12" rx="6" fill="${s.paused ? '#9aa1a9' : '#2f9e5b'}"/><circle cx="${s.paused ? sx + 110 : sx + 158}" cy="133" r="7" fill="#fff" stroke="#5b6470"/><text class="small" x="${sx + 134}" y="157" text-anchor="middle">${s.paused ? 'spento: in pausa' : 'acceso'} · premi per cambiare</text></g>`;
+  g += `<path class="wire2 dot" d="M ${sx + 70} 124 L ${sx + 20} 124 L ${sx + 20} ${TY - 82}" marker-end="url(#arr2)"/>${dep ? `<text class="small" x="${sx + 26}" y="${TY - 92 - 14}">${esc(dep.label)}</text>` : ''}`;
+  // the registers under the stations
+  const RY = TY + 92;
+  const regBox = (id, x, lines, w = 150) => `<g class="part reg ${state.sel === id ? 'sel' : ''}" data-id="${id}"><rect class="body" x="${x - w / 2}" y="${RY}" width="${w}" height="62" rx="8"/><text class="mid" x="${x}" y="${RY + 19}" text-anchor="middle" font-weight="600">${esc(I.parts[id].name)}</text>${lines.map((l, k) => `<text class="small mono" x="${x}" y="${RY + 37 + k * 15}" text-anchor="middle">${esc(l)}</text>`).join('')}</g>`;
+  const regPos = {};
+  for (const r of regs) {
+    let x = X(r.k); if (r.part.id === 'outcomes') x = X(r.k) + 8;
+    regPos[r.part.id] = x;
+    const vals = r.part.id === 'heartbeat' ? [`${hhmm(s.stamp)} · età ${s.t - s.stamp} min`] : r.part.id === 'finished' ? [`${hhmm(s.finished)} · età ${s.t - s.finished} min`] : [`archiviati: ${s.stored}`, `nell’ultima ora: ${s.recent.length * 2}`];
+    g += `<path class="wire2 ${r.byHand ? 'dash' : ''}" d="M ${X(r.k)} ${TY + 40} L ${x} ${RY}" marker-end="url(#arr2)"/><text class="small" x="${X(r.k) + 8}" y="${TY + 62}">${esc(r.j.label)}${r.byHand ? ' · posto a mano' : ''}</text>`;
+    g += regBox(r.part.id, x, vals);
+  }
+  // the restart rule and the night board, which read the registers
+  const b = board(), BY2 = RY + 110;
+  const rr = I.parts.restart, bd = I.parts.board;
+  g += `<g class="part reg ${state.sel === 'restart' ? 'sel' : ''}" data-id="restart"><rect class="body" x="${regPos.heartbeat - 75}" y="${BY2}" width="190" height="62" rx="8"/><text class="mid" x="${regPos.heartbeat + 20}" y="${BY2 + 19}" text-anchor="middle" font-weight="600">${esc(rr.name)}</text><text class="small mono" x="${regPos.heartbeat + 20}" y="${BY2 + 38}" text-anchor="middle">età del timbro ${s.t - s.stamp} / 30 min</text><text class="small" x="${regPos.heartbeat + 20}" y="${BY2 + 53}" text-anchor="middle">${s.t - s.started < 5 ? 'primi 5 minuti: non tocca nulla' : (s.t - s.stamp > 30 ? 'riavvia' : 'lascia stare')}</text></g>`;
+  const hb = top.find(j => j.from === 'heartbeat' && j.to === 'restart');
+  g += `<path class="wire2" d="M ${regPos.heartbeat - 30} ${RY + 62} L ${regPos.heartbeat - 30} ${BY2}" marker-end="url(#arr2)"/><text class="small" x="${regPos.heartbeat - 24}" y="${RY + 84}">${esc(hb?.label || '')}</text>`;
+  const bx = X(2) - 60, bw = 520;
+  g += `<g class="part reg ${state.sel === 'board' ? 'sel' : ''}" data-id="board"><rect class="body" x="${bx}" y="${BY2}" width="${bw}" height="96" rx="8" fill="#1f2a36"/><text class="mid" x="${bx + 14}" y="${BY2 + 20}" font-weight="600">${esc(bd.name)}</text>`
+    + [['Gira', b.run], ['Arriva in fondo', b.through]].map(([n, v], k) => `<circle cx="${bx + 24 + k * 170}" cy="${BY2 + 44}" r="9" fill="${LAMP(v)}" stroke="#3d4651"/><text class="mid" x="${bx + 40 + k * 170}" y="${BY2 + 49}">${n}: ${v}</text>`).join('')
+    + `<text class="mid" x="${bx + 370}" y="${BY2 + 49}">${esc(b.recs)}</text><text class="mid" x="${bx + 14}" y="${BY2 + 80}"><tspan font-weight="600">Più probabile:</tspan> ${esc(b.likely)}</text></g>`;
+  for (const [from, x] of [['heartbeat', regPos.heartbeat + 40], ['outcomes', regPos.outcomes], ['finished', regPos.finished]]) {
+    const j = top.find(j => j.from === from && j.to === 'board'); if (!j) continue;
+    g += `<path class="wire2" d="M ${x} ${RY + 62} L ${Math.min(Math.max(x, bx + 20), bx + bw - 20)} ${BY2}" marker-end="url(#arr2)"/><text class="small" x="${x + 6}" y="${RY + 84}">${esc(j.label)}</text>`;
+  }
+  g += `<g transform="translate(40, ${BY2 + 124})"><text class="small" font-weight="600">Ultimi eventi</text>${s.log.map((e, k) => `<text class="small" y="${18 + k * 16}"><tspan class="mono">${hhmm(e.t)}</tspan> ${esc(e.text.length > 46 ? e.text.slice(0, 45) + '…' : e.text)} <tspan fill="#1c5f8f">rr. ${e.lines}</tspan></text>`).join('')}</g>`;
+  return { svg: g, vb: '0 0 1060 700' };
+}
+function stationGlyph(icon, x, y) {
+  switch (icon) {
+    case 'play': return `<rect x="${x - 22}" y="${y - 14}" width="44" height="10" fill="#5b6470"/><rect x="${x - 5}" y="${y - 4}" width="10" height="16" fill="#8d97a3"/><rect x="${x - 16}" y="${y + 12}" width="32" height="6" fill="#e5533d"/>`;
+    case 'filter': return `<path d="M ${x - 26} ${y + 14} L ${x - 26} ${y - 10}" stroke="#5b6470" stroke-width="5"/><path d="M ${x - 26} ${y - 8} L ${x + 26} ${y - 2}" stroke="#e5533d" stroke-width="5" stroke-linecap="round"/><text class="small" x="${x}" y="${y + 18}" text-anchor="middle">sbarra</text>`;
+    case 'download': return `<path d="M ${x - 24} ${y - 16} L ${x + 24} ${y - 16} L ${x + 8} ${y + 8} L ${x - 8} ${y + 8} Z" fill="#b3bac3" stroke="#5b6470"/>${[-16, 0, 16].map(d => `<line x1="${x + d}" y1="${y - 34}" x2="${x + d * 0.6}" y2="${y - 16}" stroke="#2b7bb9" stroke-width="2"/>`).join('')}<text class="small" x="${x}" y="${y + 22}" text-anchor="middle">feed</text>`;
+    case 'send': return `<path d="M ${x - 24} ${y - 12} L ${x + 4} ${y - 12} L ${x + 4} ${y - 20} L ${x + 24} ${y} L ${x + 4} ${y + 20} L ${x + 4} ${y + 12} L ${x - 24} ${y + 12} Z" fill="#b3bac3" stroke="#5b6470"/>`;
+    case 'flag': return `<line x1="${x - 10}" y1="${y + 18}" x2="${x - 10}" y2="${y - 20}" stroke="#3d4651" stroke-width="2.5"/><path d="M ${x - 10} ${y - 20} L ${x + 18} ${y - 12} L ${x - 10} ${y - 4} Z" fill="#3d4651"/>`;
+    default: return '';
+  }
+}
+function defs2d() {
+  return `<marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3a8fd0"/></marker>
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#fff6ec"/><line x1="0" y1="0" x2="0" y2="8" stroke="#e8892b" stroke-width="2.2"/></pattern>`;
+}
+
+// ---------- C: a scene drawn from the disassembly's own metaphors
+function tag(id, x, y, text, cls = '') { const w = text.length * 6.6 + 20; return `<g class="tag part ${cls} ${state.sel === id ? 'sel' : ''}" data-id="${id}"><rect x="${x}" y="${y}" width="${w}" height="26" rx="6" ${state.sel === id ? 'stroke="#e5533d" stroke-width="2"' : ''}/><text x="${x + 10}" y="${y + 17}">${esc(text)}</text></g>`; }
+function inventedLabel(x, y, text) { return `<text x="${x}" y="${y}" font-size="11.5" fill="#8a4b0c" text-anchor="middle">${esc(text)} · inventato</text>`; }
+function inventedMark(x, y, n) { return `<circle cx="${x}" cy="${y}" r="9" fill="#e8892b"/><text x="${x}" y="${y + 4}" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">${n}</text>`; }
+function inventedLegend(x, y, items) {
+  return items.map((it, k) => `<g class="part" data-id="${it.id}" transform="translate(${x + (k % 2) * 420}, ${y + Math.floor(k / 2) * 22})">${inventedMark(0, -4, it.n)}<text x="16" y="0" font-size="12.5" fill="#8a4b0c">${esc(it.what)} = ${esc(I.parts[it.id].name)}</text></g>`).join('');
+}
+function sceneImporter() {
+  const round = I.parts.round, subs = round.parts, met = round.metaphor;
+  // the metaphor's clauses, matched to the steps by hand in this prototype: the contract does not say which clause is which step
+  const clauses = met.text.split(':')[1].split(',').map(s => s.trim().replace(/\.$/, ''));
+  const MATCH = { 'round-stamp': 0, 'round-switch': 1, 'round-fetch': 2, 'round-hand': 3 };
+  const GY = 470, F1 = 360, F2 = 250, RF = 150;
+  let g = `<defs>${defs2d()}</defs>`;
+  g += `<text class="big" x="40" y="38">${esc(round.name)}: ${esc(met.text.split(':')[0])}</text><text class="metatext" x="40" y="58">Dalla scomposizione: «${esc(met.text)}»</text>`;
+  // the building: a ground floor with the entrance, two floors of feeds, stairs on the right
+  g += `<rect class="wall" x="100" y="${RF}" width="640" height="${GY - RF}"/><path class="wall" d="M 90 ${RF} L 420 84 L 750 ${RF} Z"/>`;
+  for (const y of [F2, F1]) g += `<line class="floor" x1="100" y1="${y}" x2="640" y2="${y}"/>`;
+  g += `<line class="floor" x1="60" y1="${GY}" x2="1240" y2="${GY}"/>`;
+  g += `<path d="M 640 ${GY} L 740 ${F1} M 640 ${F1} L 740 ${F2} M 640 ${F2} L 740 ${RF}" stroke="#8f8676" stroke-width="2" fill="none"/>`;
+  for (const y of [RF + 24, F2 + 24]) for (let k = 0; k < (y === RF + 24 ? 4 : 3); k++) g += `<rect x="${150 + k * 120}" y="${y}" width="74" height="48" fill="#f8f4ea" stroke="#b9b1a0"/><text class="small" x="${187 + k * 120}" y="${y + 29}" text-anchor="middle">feed</text>`;
+  g += `<rect x="106" y="${GY - 72}" width="40" height="72" fill="#d7cdb8" stroke="#8f8676"/><text class="small" x="126" y="${GY + 16}" text-anchor="middle">ingresso</text>`;
+  // the stations the metaphor names
+  const spot = { 'round-stamp': [205, GY - 40], 'round-switch': [370, GY - 40], 'round-fetch': [590, F1 - 22], 'round-hand': [545, GY - 30], 'round-close': [880, GY - 26] };
+  const draw = {
+    'round-stamp': (x, y) => `<rect x="${x - 18}" y="${y - 24}" width="36" height="44" rx="4" fill="#e7eaee" stroke="#5b6470"/><circle cx="${x}" cy="${y - 8}" r="10" fill="#fff" stroke="#5b6470"/><line x1="${x}" y1="${y - 8}" x2="${x + 6}" y2="${y - 12}" stroke="#1f2328" stroke-width="1.6"/><rect x="${x - 8}" y="${y + 6}" width="16" height="8" fill="#5b6470"/>`,
+    'round-switch': (x, y) => `<rect x="${x - 34}" y="${y - 26}" width="68" height="46" fill="#c9a77a" stroke="#8f6a3d"/><rect x="${x - 26}" y="${y - 20}" width="24" height="18" fill="#fff"/><rect x="${x + 2}" y="${y - 14}" width="24" height="16" fill="#fff6c2"/>`,
+    'round-fetch': (x, y) => `<path d="M ${x - 200} ${y} q 50 -20 100 0 t 100 0 t 100 0 t 100 0" stroke="#2b7bb9" stroke-width="2" fill="none" stroke-dasharray="5 4"/>`,
+    'round-hand': (x, y) => `<rect x="${x - 30}" y="${y - 10}" width="60" height="22" fill="#d7cdb8" stroke="#8f8676"/><rect x="${x - 14}" y="${y - 20}" width="28" height="10" fill="#fff" stroke="#9aa1a9"/>`,
+  };
+  subs.forEach((q, i) => {
+    const [x, y] = spot[q.id] || [100 + i * 120, GY - 40], k = MATCH[q.id], sel = state.sel === q.id;
+    if (k === undefined) {
+      g += `<g class="part" data-id="${q.id}"><circle cx="${x}" cy="${y}" r="20" fill="#fff" stroke="${sel ? '#e5533d' : '#9aa1a9'}" stroke-width="${sel ? 2.4 : 1.4}" stroke-dasharray="4 4"/><text class="big" x="${x}" y="${y + 6}" text-anchor="middle">?</text><text class="mid" x="${x}" y="${y - 42}" text-anchor="middle" font-weight="600">${i + 1}. ${esc(q.name)}</text><text class="small" x="${x}" y="${y - 28}" text-anchor="middle">nessuna frase della metafora</text></g>`;
+    } else {
+      g += `<g class="part" data-id="${q.id}">${draw[q.id](x, y)}<rect x="${x - 60}" y="${y - 58}" width="120" height="74" fill="transparent" ${sel ? 'stroke="#e5533d" stroke-width="2" rx="8"' : ''}/><text class="mid" x="${x}" y="${y - 40}" text-anchor="middle" font-weight="600">${i + 1}. ${esc(q.name)}</text><text class="small" x="${x}" y="${y + 32}" text-anchor="middle">«${esc(clauses[k])}»</text></g>`;
+    }
+  });
+  // the guard, walking the round
+  const w = GY - 6, path = `M 126 ${w} L 205 ${w} L 370 ${w} L 640 ${w} L 740 ${F1} L 640 ${F1} L 160 ${F1} L 640 ${F1} L 740 ${F2} L 160 ${F2} L 640 ${F2} L 740 ${F1} L 640 ${F1} L 640 ${w} L 545 ${w}`;
+  g += `<path d="${path}" fill="none" stroke="#e5533d" stroke-width="1.2" stroke-dasharray="2 5" opacity=".7"/>`;
+  g += `<g class="part" data-id="round"><g><animateMotion dur="18s" repeatCount="indefinite" path="${path}"/><circle cy="-30" r="8" fill="#3d4651"/><rect x="-7" y="-22" width="14" height="22" rx="4" fill="#2b7bb9"/></g></g>`;
+  g += `<text class="limittext" x="40" y="${GY + 46}">⚠ Dove smette di funzionare: ${esc(met.limit)}</text>`;
+  // parts the metaphor does not cover
+  const others = D.parts.filter(p => p.id !== 'round');
+  if (!state.ext) {
+    g += `<text class="mid" x="820" y="${RF + 4}" font-weight="600">Fuori dalla metafora</text><text class="small" x="820" y="${RF + 22}">La scomposizione non dà loro un corrispettivo.</text>`;
+    others.forEach((p, k) => { g += tag(p.id, 820, RF + 38 + k * 34, p.name); });
+    return { svg: g, vb: '0 0 1240 540' };
+  }
+  // what we would have to invent to cover them, numbered and listed under the scene
+  const inv = [
+    { id: 'heartbeat', n: 'a', what: 'il cartellino timbrato', at: [240, GY - 64] },
+    { id: 'pause', n: 'b', what: 'un biglietto in bacheca', at: [394, GY - 74] },
+    { id: 'outcomes', n: 'c', what: 'il rapporto consegnato', at: [580, GY - 58] },
+    { id: 'finished', n: 'd', what: 'il foglio d’uscita', at: [126, GY - 92] },
+    { id: 'board', n: 'e', what: 'il monitor del sorvegliante', at: [890, 216] },
+    { id: 'restart', n: 'f', what: 'il sorvegliante che telefona', at: [1080, 216] },
+  ];
+  g += `<rect x="226" y="${GY - 76}" width="28" height="24" class="hatch-inv" stroke="#e8892b"/><rect x="380" y="${GY - 84}" width="26" height="18" class="hatch-inv" stroke="#e8892b"/><rect x="566" y="${GY - 66}" width="42" height="24" class="hatch-inv" stroke="#e8892b"/><rect x="110" y="${GY - 70}" width="32" height="20" class="hatch-inv" stroke="#e8892b"/>`;
+  g += `<rect x="800" y="${RF}" width="400" height="200" class="hatch-inv" stroke="#e8892b"/><text class="mid" x="1000" y="${RF + 24}" text-anchor="middle" font-weight="600">Ufficio del sorvegliante</text>`;
+  g += `<rect x="830" y="${RF + 50}" width="160" height="90" rx="6" fill="#1f2a36"/><circle cx="860" cy="${RF + 90}" r="9" fill="#2f9e5b"/><circle cx="900" cy="${RF + 90}" r="9" fill="#2f9e5b"/><circle cx="940" cy="${RF + 90}" r="9" fill="#9aa1a9"/>`;
+  g += `<circle cx="1080" cy="${RF + 74}" r="12" fill="#3d4651"/><rect x="1066" y="${RF + 88}" width="28" height="44" rx="6" fill="#6c7a89"/><rect x="1110" y="${RF + 98}" width="30" height="18" rx="4" fill="#3d4651"/>`;
+  for (const it of inv) g += `<g class="part" data-id="${it.id}">${inventedMark(it.at[0], it.at[1], it.n)}</g>`;
+  g += `<text class="limittext" x="40" y="${GY + 74}" font-weight="600">Tratteggio arancio = inventato: la fonte non lo dice.</text>`;
+  g += inventedLegend(48, GY + 100, inv);
+  g += `<text class="limittext" x="40" y="${GY + 180}">Il sorvegliante «telefona» alla guardia? La fonte dice che riavvia l’importatore: un’altra cosa, e la scena la tradisce.</text>`;
+  return { svg: g, vb: '0 0 1240 670' };
+}
+function sceneMill() {
+  const claim = D.parts.find(p => p.kind === 'conclusion');
+  const withMet = D.parts.filter(p => p.metaphor);
+  const brickRun = D.runs.find(r => r.type === 'load');
+  const GY = 380;
+  let g = `<defs>${defs2d()}</defs>`;
+  g += `<text class="big" x="40" y="38">${esc(D.whole.name)}: un edificio, il suo terreno, i mattoni</text><text class="metatext" x="40" y="58">La scomposizione dà una metafora a ${withMet.length} pezzi su ${D.parts.length}; la prova si chiama «${esc(brickRun?.title || '')}».</text>`;
+  g += `<rect x="0" y="${GY}" width="1240" height="300" fill="#e9e0cd"/><line class="floor" x1="0" y1="${GY}" x2="1240" y2="${GY}"/>`;
+  // the foundation: from the ground's metaphor
+  const u = D.parts.find(p => p.kind === 'ground'), su = state.sel === u.id;
+  g += `<g class="part" data-id="${u.id}"><rect x="380" y="${GY}" width="380" height="60" fill="#cfc5b2" stroke="${su ? '#e5533d' : '#8f8676'}" stroke-width="${su ? 2.4 : 1.2}"/><text class="mid" x="570" y="${GY + 26}" text-anchor="middle" font-weight="600">${esc(u.name)}</text><text class="small" x="570" y="${GY + 46}" text-anchor="middle">«${esc(u.metaphor.text)}»</text></g>`;
+  // the fence and the gate: from the premise's metaphor
+  const sv = D.parts.find(p => p.kind === 'premise'), ss = state.sel === sv.id;
+  let fence = ''; for (let x = 220; x <= 960; x += 28) if (x < 250 || x > 300) fence += `<rect x="${x}" y="${GY - 46}" width="6" height="46" fill="${ss ? '#e5533d' : '#a98b5f'}"/>`;
+  g += `<g class="part" data-id="${sv.id}">${fence}<line x1="220" y1="${GY - 36}" x2="964" y2="${GY - 36}" stroke="${ss ? '#e5533d' : '#a98b5f'}" stroke-width="4"/><path d="M 252 ${GY - 40} L 300 ${GY - 46}" stroke="#7d6440" stroke-width="5"/><text class="mid" x="860" y="${GY - 58}" text-anchor="middle" font-weight="600">${esc(sv.name)}</text><text class="small" x="40" y="78">Il recinto: «${esc(sv.metaphor.text)}»</text></g>`;
+  g += `<g><circle cx="190" cy="${GY - 56}" r="9" fill="#3d4651"/><rect x="182" y="${GY - 46}" width="16" height="46" rx="5" fill="#8d97a3"/><path d="M 120 ${GY - 96} h 76 v 22 h -10 l -10 8 v -8 h -56 z" fill="#fff" stroke="#9aa1a9"/><text class="small" x="158" y="${GY - 81}" text-anchor="middle">un consiglio</text></g>`;
+  // the bricks: from the run
+  const ar = D.parts.find(p => p.kind === 'rejected');
+  if (ar) g += `<g class="part" data-id="${ar.id}">${[0, 1, 2].map(k => `<rect x="${1040 + k * 34}" y="${GY - 18}" width="32" height="16" fill="#d9a38c" stroke="#9b5b45"/>`).join('')}<rect x="1057" y="${GY - 34}" width="32" height="16" fill="#d9a38c" stroke="#9b5b45"/><text class="mid" x="1090" y="${GY - 46}" text-anchor="middle" font-weight="600" ${state.sel === ar.id ? 'fill="#e5533d"' : ''}>${esc(ar.name)}</text><text class="small" x="1090" y="${GY + 22}" text-anchor="middle">un mattone messo da parte</text></g>`;
+  const rest = D.parts.filter(p => !p.metaphor && p.kind !== 'rejected');
+  if (!state.ext) {
+    g += `<path d="M 460 ${GY} L 460 220 L 570 150 L 680 220 L 680 ${GY}" fill="none" stroke="#b9b1a0" stroke-dasharray="6 6" stroke-width="1.6"/><text class="small" x="570" y="270" text-anchor="middle">qui andrebbe la tesi:</text><text class="small" x="570" y="286" text-anchor="middle">nessuna metafora la descrive</text>`;
+    g += `<text class="mid" x="40" y="${GY + 100}" font-weight="600">Fuori dalla metafora</text>`;
+    rest.forEach((p, k) => { g += tag(p.id, 40 + (k % 3) * 330, GY + 116 + Math.floor(k / 3) * 36, p.name); });
+    return { svg: g, vb: '0 0 1240 560' };
+  }
+  // what we would have to invent, numbered and listed under the scene
+  const region = D.parts.find(p => p.kind === 'consequence'), bounds = D.parts.find(p => p.kind === 'limit'), obj = D.parts.find(p => p.kind === 'objection');
+  g += `<g class="part" data-id="${claim.id}"><path d="M 460 ${GY} L 460 220 L 570 150 L 680 220 L 680 ${GY} Z" class="hatch-inv" stroke="#e8892b" stroke-width="1.6"/>${inventedMark(570, 200, 'a')}</g>`;
+  if (region) g += `<g class="part" data-id="${region.id}">${[0, 1, 2].map(k => `<ellipse cx="${340 + k * 50}" cy="${GY - 10}" rx="22" ry="9" class="hatch-inv" stroke="#e8892b"/>`).join('')}<ellipse cx="800" cy="${GY - 10}" rx="60" ry="11" class="hatch-inv" stroke="#e8892b"/>${inventedMark(390, GY - 30, 'b')}${inventedMark(800, GY - 30, 'b')}</g>`;
+  if (bounds) g += `<g class="part" data-id="${bounds.id}"><rect x="304" y="${GY - 116}" width="56" height="34" class="hatch-inv" stroke="#e8892b"/><line x1="332" y1="${GY - 82}" x2="332" y2="${GY - 46}" stroke="#e8892b" stroke-width="2"/>${inventedMark(332, GY - 128, 'c')}</g>`;
+  if (obj) g += `<g class="part" data-id="${obj.id}"><circle cx="990" cy="${GY - 66}" r="9" class="hatch-inv" stroke="#e8892b"/><rect x="982" y="${GY - 56}" width="16" height="56" rx="5" class="hatch-inv" stroke="#e8892b"/><path d="M 982 ${GY - 46} L 944 ${GY - 52}" stroke="#e8892b" stroke-width="3"/>${inventedMark(1012, GY - 80, 'd')}</g>`;
+  const inv = [{ id: claim.id, n: 'a', what: 'la casa' }, region && { id: region.id, n: 'b', what: 'il giardino' }, bounds && { id: bounds.id, n: 'c', what: 'il cartello al cancello' }, obj && { id: obj.id, n: 'd', what: 'il vicino che si sporge' }].filter(Boolean);
+  g += `<text class="limittext" x="40" y="${GY + 90}" font-weight="600">Tratteggio arancio = inventato: la fonte non lo dice.</text>`;
+  g += inventedLegend(48, GY + 116, inv);
+  g += `<text class="limittext" x="40" y="${GY + 172}">Due metafore della fonte (un edificio, una proprietà) qui diventano una scena sola: anche questa è una scelta nostra.</text>`;
+  return { svg: g, vb: '0 0 1240 580' };
+}
+
+// ---------- the runs
+function brickOf(id) { return D.runs.find(r => r.type === 'load')?.bricks.find(b => b.part === id); }
+let timer = null;
+function controls() {
+  const el = $('#controls'); let h = '';
+  clearInterval(timer); timer = null;
+  if (state.ap === 'A' && state.fx === 'importer') {
+    const r = D.runs.find(r => r.type === 'scenario'), i = state.step;
+    h += `<span class="label">Prova: ${esc(r.title)}</span><button class="btn" data-act="prev" ${i < 0 ? 'disabled' : ''}>←</button><span>${i + 1} / ${r.steps.length}</span><button class="btn primary" data-act="next" ${i >= r.steps.length - 1 ? 'disabled' : ''}>${i < 0 ? 'Avvia' : 'Avanti'} →</button>`;
+    if (i >= 0) { const st = r.steps[i]; h += `<div class="say"><b>${esc(st.action)}.</b> `; if (st.predict && !state.answered[i]) h += `${esc(st.predict.question)} ${st.predict.options.map((o, k) => `<button class="btn opt-in" data-opt="${k}">${esc(o.text)}</button>`).join(' ')}`; else h += `<em>${esc(st.explain || '')}</em>`; h += '</div>'; }
+    else h += `<div class="say"><em>${esc(r.setup)}</em></div>`;
+    if (I.parts[state.sel]?.parts && !state.open) h += `<button class="btn" data-act="open">↓ Apri «${esc(I.parts[state.sel].name)}»</button>`;
+    if (state.open) h += `<button class="btn" data-act="close">↑ Torna all’insieme</button>`;
+  } else if (state.ap === 'A') {
+    const r = D.runs.find(r => r.type === 'load');
+    h += `<span class="label">Prova: ${esc(r.title)}. ${esc(r.question)}</span>` + r.bricks.map(b => `<button class="btn ${state.brick === b.part ? 'primary' : ''}" data-brick="${b.part}">Togli «${esc(I.parts[b.part].name)}»</button>`).join('') + (state.brick ? `<button class="btn ghost" data-brick="">Rimetti</button>` : '');
+    const open = state.sel && I.parts[state.sel]?.parts;
+    if (open && !state.open) h += `<button class="btn" data-act="open">↓ Apri «${esc(I.parts[state.sel].name)}»</button>`;
+    if (state.open) h += `<button class="btn" data-act="close">↑ Torna all’insieme</button>`;
+  } else if (state.ap === 'B') {
+    if (state.fx !== 'importer') { h = `<span class="label">Nessuna prova: la linea non si applica a un argomento.</span>`; el.innerHTML = h; return; }
+    const s = state.sim;
+    h += `<button class="btn primary" data-act="play">${s.playing ? '⏸ Ferma' : '▶ Fai girare'}</button><button class="btn" data-act="tick">+1 min</button><button class="btn" data-act="tick10">+10 min</button>`;
+    h += `<span class="label">Interruttore:</span><button class="btn ${s.paused ? 'primary' : ''}" data-act="pause">${s.paused ? 'spento (pausa)' : 'acceso'}</button>`;
+    h += `<span class="label">Il feed:</span>` + [['ok', 'risponde'], ['hang', 'non risponde mai'], ['refuse', 'rifiuta le chiamate']].map(([k, n]) => `<button class="btn ${s.feed === k ? 'primary' : ''}" data-feed="${k}">${n}</button>`).join('');
+    h += `<button class="btn ghost" data-act="reset">Ricomincia</button>`;
+    h += `<div class="say"><em>Prevedi prima di premere: se il feed non risponde mai, quale luce cambia per prima, e dopo quanto? Le regole vengono dalle righe 51–68, 156–162 e 180–208 della fonte.</em></div>`;
+    if (s.playing) timer = setInterval(() => { simTick(); draw(false); }, 450);
+  } else if (state.ap === 'C') {
+    h += `<button class="btn ${state.ext ? 'primary' : ''}" data-act="ext">${state.ext ? 'Mostra solo ciò che viene dalla scomposizione' : 'Estendi la metafora a tutti i pezzi (inventando)'}</button><span class="label">Arancio tratteggiato = non nella fonte.</span>`;
+  }
+  el.innerHTML = h;
+}
+
+// ---------- panel and source
+const NOTES = {
+  A: { title: 'A · Moduli illustrati in un corpo', idea: 'Ogni pezzo diventa un componente disegnato davvero, preso da una biblioteca fissa (tamburo, registro con display, stampante a nastro, levetta, relè, pannello a luci), montato in un corpo che dà un nome all’insieme. Per un argomento il corpo è un telaio portante: fondazione, pilastro, trave, morsetti, cuneo.',
+    computed: ['il componente, dall’icona e dal tipo che ogni pezzo ha già', 'la disposizione, dai giunti (chi alimenta chi)', 'i fili e le loro etichette, le luci del pannello (una per giunto in ingresso), i valori sui display (dalle variabili della prova)', 'nel telaio: dove sta ogni pezzo, dal suo tipo (premessa, tesi, limite…)'],
+    hand: ['il disegno di ciascun componente: una volta sola, per tutte le fonti', 'il nome del corpo: nel prodotto lo proporrebbe il modello da una lista chiusa'],
+    ask: 'Guardando l’insieme, sai dire che cos’è? Il telaio di Mill ti fa capire l’argomento, o suggerisce una necessità che il testo non ha?' },
+  B: { title: 'B · La linea del giro', idea: 'Il meccanismo è il tempo: il giro viaggia su un binario attraverso i suoi passi e lascia segni nei registri; il pannello li legge. Lo fai girare tu: metti in pausa, blocca un feed, guarda quale luce cambia.',
+    computed: ['le stazioni: i sotto-pezzi del giro, nell’ordine dei giunti', 'quale registro pende da quale stazione, quando il giunto e la stazione citano le stesse righe (timbro, ora di fine giro)'],
+    hand: ['le regole della simulazione, dalle righe citate: il contratto non le contiene', 'la posizione del registro degli esiti: nessuna citazione lo lega a un passo (tratteggiato)'],
+    ask: 'Il movimento ti fa capire la differenza tra pausa e blocco meglio di un disegno fermo? E Mill, che non ha un tempo, dove andrebbe?' },
+  C: { title: 'C · Scena dalla metafora', idea: 'La scomposizione ha già delle metafore («il giro di una guardia notturna», «la fondazione dell’edificio», «il confine di una proprietà»). La scena le disegna: ciò che conosci risponde a «che cos’è?».',
+    computed: ['quali pezzi hanno una metafora (il campo metaphor) e il suo limite', 'ciò che resta fuori, elencato a parte'],
+    hand: ['la scena intera', 'quale frase della metafora corrisponde a quale passo'],
+    ask: 'La scena si riconosce subito. Ma quanti pezzi copre davvero? Premi «Estendi» e guarda quanto bisogna inventare.' },
+};
+function sourceOf(id) { return D.sources.find(s => s.id === id) || D.sources[0]; }
+function renderSource(cites) {
+  const el = $('#source'); if (!cites?.length) { el.innerHTML = `<div class="head">Fonte · ${esc(D.sources[0].title)}: seleziona un pezzo per vedere le sue righe.</div>`; return; }
+  const src = sourceOf(cites[0].source), lines = src.text.split('\n');
+  const hit = n => cites.some(c => n >= c.from && n <= c.to);
+  const show = new Set(); cites.forEach(c => { for (let n = Math.max(1, c.from - 1); n <= Math.min(lines.length, c.to + 1); n++) show.add(n); });
+  let h = `<div class="head">Fonte · ${esc(src.title)} · righe ${cites.map(c => c.from === c.to ? c.from : `${c.from}–${c.to}`).join(', ')}</div>`, prev = 0;
+  [...show].sort((a, b) => a - b).forEach(n => { if (prev && n > prev + 1) h += `<div class="gap">⋯</div>`; h += `<div class="ln ${hit(n) ? 'hit' : ''}"><span>${n}</span><span>${esc(lines[n - 1])}</span></div>`; prev = n; });
+  el.innerHTML = h;
+}
+const KIND = { step: 'passo', artifact: 'registro', component: 'componente', conclusion: 'tesi', premise: 'premessa', ground: 'fondamento', limit: 'limite', objection: 'obiezione', consequence: 'conseguenza', rejected: 'scartato' };
+function renderPanel() {
+  const el = $('#panel'), n = NOTES[state.ap], p = state.sel && I.parts[state.sel];
+  let h = '';
+  if (p) {
+    h += `<div class="kind">${esc(KIND[p.kind] || p.kind)}${I.parent[p.id] ? ' · dentro «' + esc(I.parts[I.parent[p.id]].name) + '»' : ''}</div><h2>${esc(p.name)}</h2><p>${esc(p.role || '')}</p>`;
+    if (p.explain) h += `<p class="note">${esc(p.explain)}</p>`;
+    if (p.points?.length) h += `<ul>${p.points.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>`;
+    if (p.metaphor) h += `<div class="meta">«${esc(p.metaphor.text)}»<div class="lim">⚠ Dove smette di funzionare: ${esc(p.metaphor.limit)}</div></div>`;
+    const js = I.joints.filter(j => j.from === p.id || j.to === p.id);
+    if (js.length) h += `<h3>Giunti</h3><ul>${js.map(j => `<li>${esc(I.parts[j.from].name)} → ${esc(I.parts[j.to].name)} <span style="color:var(--muted)">(${esc(j.label || j.type)})</span></li>`).join('')}</ul>`;
+    const b = state.brick === p.id && brickOf(p.id);
+    if (b) h += `<div class="verdict ${b.verdict}"><b>${b.verdict === 'falls' ? 'La tesi crolla' : 'La tesi regge'}.</b> ${esc(b.explain)}${b.inference ? ' <span class="chip warn">interpretazione</span>' : ''}</div>`;
+    if (p.parts && !state.open && state.ap === 'A') h += `<p><button class="btn" data-act="open">↓ Apri «${esc(p.name)}»</button></p>`;
+    h += `<p><button class="btn ghost" data-act="desel">Torna alla nota sull’approccio</button></p>`;
+  } else {
+    h += `<div class="kind">L’approccio</div><h2>${esc(n.title)}</h2><p>${esc(n.idea)}</p><h3>Calcolato dalla scomposizione</h3><ul>${n.computed.map(x => `<li>${esc(x)}</li>`).join('')}</ul><h3>Fatto a mano in questo prototipo</h3><ul>${n.hand.map(x => `<li>${esc(x)}</li>`).join('')}</ul><h3>La domanda per te</h3><p class="note">${esc(n.ask)}</p>`;
+    h += `<h3>L’insieme</h3><p><b>${esc(D.whole.name)}.</b> ${esc(D.whole.does)}</p>`;
+  }
+  const res = loadTests(); if (res.length) h += `<h3>Prove dei 10 secondi (solo in questo browser)</h3><ul>${res.slice(-6).reverse().map(r => `<li><b>${r.fx}/${r.ap}</b>: «${esc(r.what)}» · ${esc(r.partName)}: «${esc(r.does)}»</li>`).join('')}</ul><button class="btn ghost" data-act="cleartests">Cancella le prove</button>`;
+  el.innerHTML = h;
+  renderSource(p ? p.cites : D.whole.cites);
+  if (state.brick && !p) { const b = brickOf(state.brick); if (b) renderSource(b.cites); }
+}
+
+// ---------- drawing
+function draw(full = true) {
+  D = DATA[state.fx]; I = index(D);
+  document.querySelectorAll('#fx button').forEach(b => b.classList.toggle('on', b.dataset.fx === state.fx));
+  document.querySelectorAll('#ap button').forEach(b => b.classList.toggle('on', b.dataset.ap === state.ap));
+  const svg = $('#svg'); let body, vb;
+  const BODY = { importer: 'centralina', mill: 'telaio portante' };
+  if (state.ap === 'A') {
+    body = state.fx === 'importer' ? renderMechA() : renderArgA();
+    const pad = 30; vb = `${f1(BB[0] - pad)} ${f1(BB[1] - pad)} ${f1(BB[2] - BB[0] + 2 * pad)} ${f1(BB[3] - BB[1] + 2 * pad)}`;
+    body = `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3a8fd0"/></marker></defs>` + body;
+    $('#chips').innerHTML = `<span class="chip">Corpo proposto: ${BODY[state.fx]}</span>`;
+  } else if (state.ap === 'B') {
+    if (state.fx === 'importer') { const r = renderLineB(); body = r.svg; vb = r.vb; $('#chips').innerHTML = `<span class="chip">Corpo proposto: linea con binario</span>`; }
+    else { body = `<text x="40" y="60" class="big">La linea non si applica a un argomento.</text><text x="40" y="90" class="mid">Un argomento non ha un tempo che scorre: «sostiene» non è «viene dopo».</text><text x="40" y="114" class="mid">Mettere le premesse in fila sul binario direbbe che una produce l’altra, e il testo non lo dice.</text><text x="40" y="138" class="mid">Per Mill guarda A (telaio) o C (scena).</text>`; vb = '0 0 900 200'; $('#chips').innerHTML = `<span class="chip warn">Non applicabile</span>`; }
+  } else {
+    const r = state.fx === 'importer' ? sceneImporter() : sceneMill(); body = r.svg; vb = r.vb;
+    $('#chips').innerHTML = `<span class="chip">Metafora della scomposizione</span>${state.ext ? ' <span class="chip warn">Estesa: contiene invenzioni</span>' : ''}`;
+  }
+  svg.setAttribute('viewBox', vb); svg.setAttribute('preserveAspectRatio', 'xMidYMid meet'); svg.innerHTML = body;
+  const open = state.open && I.parts[state.open];
+  $('#crumb').innerHTML = `<b>${esc(D.whole.name)}</b>${open ? ` › <b>${esc(open.name)}</b>` : ''}`;
+  if (full) { controls(); renderPanel(); }
+}
+
+// ---------- the 10-second test
+function loadTests() { try { return JSON.parse(localStorage.getItem('btw:object-test:v1') || '[]'); } catch { return []; } }
+function saveTests(a) { try { localStorage.setItem('btw:object-test:v1', JSON.stringify(a)); } catch {} }
+function runTest() {
+  const ids = D.parts.map(p => p.id), pick = ids[Math.floor(Math.random() * ids.length)];
+  state.sel = pick; state.open = null; draw();
+  document.body.classList.add('peek');
+  const c = document.createElement('div'); c.className = 'count'; $('#svgwrap').appendChild(c);
+  let n = 10; c.textContent = n;
+  const iv = setInterval(() => { n -= 1; c.textContent = n; if (n > 0) return; clearInterval(iv); c.remove(); document.body.classList.remove('peek');
+    const o = $('#overlay'); o.hidden = false;
+    o.innerHTML = `<div class="card"><h2 style="margin-top:0">Senza guardare di nuovo</h2><p>1. Che cos’è questo oggetto, in una frase?</p><textarea id="t-what"></textarea><p>2. Che cosa fa il pezzo evidenziato, «${esc(I.parts[pick].name)}»?</p><textarea id="t-does"></textarea><p style="display:flex;gap:8px;justify-content:flex-end"><button class="btn ghost" id="t-cancel">Annulla</button><button class="btn primary" id="t-save">Salva</button></p></div>`;
+    $('#t-cancel').onclick = () => { o.hidden = true; };
+    $('#t-save').onclick = () => { const a = loadTests(); a.push({ fx: state.fx, ap: state.ap, what: $('#t-what').value, partName: I.parts[pick].name, does: $('#t-does').value, at: new Date().toISOString() }); saveTests(a); o.hidden = true; state.sel = null; draw(); };
+  }, 1000);
+}
+
+// ---------- events
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-fx],[data-ap],[data-act],[data-feed],[data-brick],[data-opt],[data-id]'); if (!t) return;
+  if (t.dataset.fx) { state.fx = t.dataset.fx; state.sel = null; state.open = null; state.brick = null; state.step = -1; state.answered = {}; }
+  else if (t.dataset.ap) { state.ap = t.dataset.ap; state.sel = null; state.open = null; }
+  else if (t.dataset.feed) { state.sim.feed = t.dataset.feed; }
+  else if (t.dataset.brick !== undefined) { state.brick = t.dataset.brick || null; state.sel = state.brick || null; }
+  else if (t.dataset.opt !== undefined) { const r = D.runs.find(r => r.type === 'scenario'), st = r.steps[state.step], o = st.predict.options[+t.dataset.opt]; state.answered[state.step] = true; draw(); $('#controls .say').insertAdjacentHTML('afterbegin', `<span class="chip ${o.correct ? '' : 'warn'}">${o.correct ? 'Giusto' : 'Non proprio'}: ${esc(o.why)}</span> `); return; }
+  else if (t.dataset.act) {
+    const a = t.dataset.act, s = state.sim;
+    if (a === 'next') state.step++; else if (a === 'prev') state.step--;
+    else if (a === 'open') { state.open = state.sel; } else if (a === 'close') { state.open = null; }
+    else if (a === 'desel') state.sel = null; else if (a === 'ext') state.ext = !state.ext;
+    else if (a === 'play') s.playing = !s.playing; else if (a === 'tick') simTick(); else if (a === 'tick10') for (let k = 0; k < 10; k++) simTick();
+    else if (a === 'pause') { s.paused = !s.paused; } else if (a === 'reset') simInit();
+    else if (a === 'cleartests') saveTests([]);
+    if (a === 'pause' && t.closest('svg')) { /* the switch in the drawing is also a part */ }
+  }
+  else if (t.dataset.id) { state.sel = state.sel === t.dataset.id ? null : t.dataset.id; }
+  history.replaceState(null, '', `#${state.fx}/${state.ap}`);
+  draw();
+});
+document.addEventListener('dblclick', e => { const t = e.target.closest('[data-id]'); if (t && I.parts[t.dataset.id]?.parts && state.ap === 'A') { state.sel = t.dataset.id; state.open = t.dataset.id; draw(); } });
+document.addEventListener('keydown', e => {
+  if (e.target.closest?.('textarea')) return;
+  if (e.key === 'ArrowDown' && state.ap === 'A' && I.parts[state.sel]?.parts) { state.open = state.sel; draw(); }
+  if ((e.key === 'ArrowUp' || e.key === 'Escape') && state.open) { state.sel = state.open; state.open = null; draw(); }
+});
+$('#test').onclick = runTest;
+{ const [fx, ap] = location.hash.slice(1).split('/'); if (DATA[fx]) state.fx = fx; if (['A', 'B', 'C'].includes(ap)) state.ap = ap; }
+draw();
+</script>
+</body>
+</html>

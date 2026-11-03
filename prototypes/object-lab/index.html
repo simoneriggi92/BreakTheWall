@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio: la consolle</title>
+<style>
+:root {
+  --bg: #f3f1ec; --card: #fbfaf7; --ink: #1d2630; --muted: #66707b; --line: #dedad1; --slate: #1f2b38;
+  --coral: #e5533d; --coral-soft: #fde3dc; --cyan: #1f97cf; --cyan-soft: #e2f1fa; --amber: #c47a12;
+  --dock: 210px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; display: grid; grid-template-rows: 44px 1fr; overflow: hidden; }
+header { background: var(--slate); color: #eef2f6; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
+header strong { font-size: 16px; letter-spacing: .01em; }
+header .sep { width: 1px; height: 20px; background: #4a5a6b; }
+header .mode { color: #c9d3de; font-size: 15px; }
+header .spacer { flex: 1; }
+header .src { color: #c9d3de; font-size: 13px; }
+header button { background: transparent; border: 1px solid #4a5a6b; color: #e6ebf0; border-radius: 7px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+#app { display: grid; grid-template-columns: 216px 1fr 300px; grid-template-rows: 1fr var(--dock); min-height: 0; }
+/* left: the path through the source */
+#path { grid-row: 1 / 3; background: var(--card); border-right: 1px solid var(--line); overflow: auto; padding: 14px 12px 14px 14px; }
+#path h2 { font-size: 15px; margin: 0 0 2px; }
+#path .hint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+.step { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px 7px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: var(--ink); border-left: 3px solid transparent; }
+.step:hover { background: #f1eee7; }
+.step.on { background: var(--coral-soft); border-left-color: var(--coral); }
+.step .t { font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+.step .n { color: var(--muted); font-weight: 500; margin-right: 4px; }
+.step .roles { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px; }
+.role { font-size: 10.5px; padding: 0 6px; border-radius: 999px; line-height: 17px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.role.add { background: #e8eef6; color: #2c4f75; } .role.back { background: #f0ece3; color: #6b5a3b; } .role.rel { background: var(--cyan-soft); color: #145f86; } .role.ctx { background: #efefef; color: #777; }
+.legend { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); display: grid; gap: 4px; }
+/* centre: the object */
+#stage { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px 4px; flex-wrap: wrap; }
+#back { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+#back[disabled] { opacity: .45; cursor: default; }
+#crumb { font-size: 14px; color: var(--muted); }
+#crumb b { color: var(--ink); font-weight: 600; } #crumb .cur { color: var(--coral); font-weight: 600; }
+.chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--cyan-soft); color: #145f86; }
+#canvas { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+#upper { flex: 1 1 100%; min-height: 0; position: relative; transition: flex-basis .38s cubic-bezier(.2,.8,.2,1), opacity .25s; }
+#upper svg, #lower svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#link, #lower { display: none; }
+#canvas.stacked #upper { flex: 0 0 30%; opacity: .5; }
+#canvas.stacked #upper:hover { opacity: .85; }
+#canvas.stacked #link { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; font-size: 13px; font-weight: 600; color: var(--coral); border-top: 1px dashed #e9b2a6; }
+#canvas.stacked #link .muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+#canvas.stacked #lower { display: block; flex: 1 1 auto; min-height: 0; position: relative; }
+#bar .spacer { flex: 1; }
+.nb { border: 1px solid var(--line); background: var(--card); border-radius: 7px; padding: 3px 9px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.nb.on { border-color: #a9cfe6; background: var(--cyan-soft); color: #145f86; }
+#stepnav { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.ghost { fill: rgba(255, 255, 255, .35); stroke: #9aa3ad; stroke-width: 1; stroke-dasharray: 4 4; }
+.arrive { animation: arrive .7s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes arrive { from { transform: translateY(-46px); opacity: 0; } }
+.joint.arrive .cable.c { stroke-dasharray: 900; animation: drawc 1s ease-out both; }
+@keyframes drawc { from { stroke-dashoffset: 900; } to { stroke-dashoffset: 0; } }
+#mini { position: relative; width: 100%; height: 118px; margin: 6px 0 12px; background: rgba(251, 250, 247, .94); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+#mini svg { width: 100%; height: 100%; }
+#mini .here { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--coral); color: #fff; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+#keys { position: absolute; left: 16px; bottom: 6px; font-size: 11.5px; color: var(--muted); }
+#keys kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--card); }
+#tip { position: fixed; pointer-events: none; background: var(--slate); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 7px; z-index: 20; display: none; max-width: 260px; }
+#tip b { display: block; font-size: 12.5px; }
+/* right: the inspector */
+#inspector { background: var(--card); border-left: 1px solid var(--line); overflow: auto; padding: 14px 16px; }
+#inspector .kind { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--coral); font-weight: 600; }
+#inspector h2 { font-size: 20px; line-height: 1.2; margin: 4px 0 6px; }
+#inspector h3 { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 14px 0 5px; }
+#inspector p { margin: 4px 0; }
+#inspector ul { margin: 4px 0; padding-left: 17px; } #inspector li { margin: 3px 0; }
+.box { border-radius: 9px; padding: 8px 10px; margin-top: 8px; font-size: 13px; }
+.box.obj { background: #eef2f6; } .box.lim { background: #fdf1e3; color: #6d4511; } .box.meta { background: #f2efe8; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; }
+.btn.primary { background: var(--coral); border-color: var(--coral); color: #fff; font-weight: 600; }
+.link { border: 0; background: none; color: #145f86; cursor: pointer; padding: 0; font: inherit; font-size: 13px; text-align: left; }
+.cite { font: 11.5px ui-monospace, Menlo, monospace; background: var(--cyan-soft); color: #145f86; border: 0; border-radius: 5px; padding: 1px 6px; cursor: pointer; }
+/* bottom: the source dock */
+#dock { grid-column: 2 / 4; border-top: 1px solid var(--line); background: #fdfcf9; display: flex; flex-direction: column; min-height: 0; position: relative; }
+#grip { position: absolute; top: -5px; left: 0; right: 0; height: 10px; cursor: ns-resize; z-index: 2; }
+#grip::after { content: ""; position: absolute; left: 50%; top: 3px; width: 46px; height: 4px; margin-left: -23px; border-radius: 3px; background: #cfc9bc; }
+#dockbar { display: flex; align-items: center; gap: 10px; padding: 7px 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+#dockbar .t { font-weight: 600; } #dockbar .r { color: var(--muted); } #dockbar .spacer { flex: 1; }
+#dockbar button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 1px 8px; cursor: pointer; font: inherit; font-size: 12px; }
+#lines { overflow: auto; flex: 1; font: var(--fs, 13px)/1.6 ui-monospace, Menlo, monospace; padding: 4px 0 10px; }
+.ln { display: grid; grid-template-columns: 50px 1fr; padding-right: 16px; white-space: pre-wrap; }
+.ln > span:first-child { color: #aaa295; text-align: right; padding-right: 12px; user-select: none; }
+.ln.pass { background: #f4f1ea; }
+.ln.hit { background: var(--coral-soft); box-shadow: inset 3px 0 0 var(--coral); }
+.ln.pre { background: #eaf4fb; }
+/* svg */
+svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.ff, .fr, .ft { stroke-width: .8; stroke-linejoin: round; }
+.hl { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 1.1; }
+.part { cursor: pointer; outline: none; }
+.part:hover, .part:focus-visible { filter: drop-shadow(0 0 2.5px rgba(229, 83, 61, .85)); }
+.part.sel .ft { fill: #f8b9ab !important; } .part.sel .ff { fill: #ef8b77 !important; } .part.sel .fr { fill: #d96a55 !important; }
+.part.sel .ff, .part.sel .fr, .part.sel .ft { stroke: #9e3423 !important; }
+.part.inpass:not(.sel) { filter: drop-shadow(0 0 3px rgba(31, 151, 207, .9)); }
+.dim { opacity: .26; pointer-events: none; }
+.part.opened .ft { fill: #fbd3c9 !important; } .part.opened .ff { fill: #f4ab9b !important; } .part.opened .fr { fill: #e48d7a !important; }
+.cable { fill: none; stroke-linecap: round; }
+.cable.under { stroke: rgba(20, 30, 40, .22); stroke-width: 6; }
+.cable.c { stroke: var(--cyan); stroke-width: 2.8; }
+.cable.dep { stroke: #7a8591; stroke-width: 2.4; stroke-dasharray: 2 5; }
+.joint { cursor: pointer; }
+.joint:hover .c, .joint.sel .c { stroke: var(--coral); }
+.jl rect { fill: #fff; stroke: #9fcbe6; } .jl text { font-size: 11.5px; fill: #145f86; font-weight: 600; }
+.jl.dep rect { stroke: #b8c0c8; } .jl.dep text { fill: #4f5a66; }
+.guide { fill: none; stroke: #8796a6; stroke-width: 1; stroke-dasharray: 3 4; }
+.plate-t { font-weight: 700; letter-spacing: .06em; }
+#note { position: fixed; inset: 0; background: rgba(15, 22, 30, .5); display: none; place-items: center; z-index: 30; }
+#note.on { display: grid; }
+#note .card { background: var(--card); width: min(860px, 94vw); max-height: 86vh; overflow: auto; border-radius: 14px; padding: 20px 24px; }
+#note table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+#note th, #note td { border-bottom: 1px solid var(--line); text-align: left; padding: 6px 8px; vertical-align: top; }
+#insp .lead { font-size: 15px; line-height: 1.4; margin: 2px 0 8px; } #insp .muted, .muted { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
+.pts { list-style: none; padding: 0 !important; margin: 8px 0 !important; display: grid; gap: 6px; }
+.pts li { display: grid; grid-template-columns: 16px 1fr; gap: 4px; margin: 0 !important; font-size: 13.5px; line-height: 1.4; }
+.pts li > :nth-child(n+3) { grid-column: 2; }
+.pts .mk { color: var(--muted); font-weight: 700; text-align: center; } .pts .m-caveat .mk { color: #b5651d; } .pts .m-keeps .mk { color: #2c4f75; }
+.pts.rel li { font-size: 13px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.stepchip { min-width: 26px; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 1px 6px; font: inherit; font-size: 12px; cursor: pointer; } .stepchip:hover { border-color: var(--coral); }
+.fold { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 6px; } .fold summary { cursor: pointer; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 4px 0; }
+.fold > div { font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <strong>Break the Wall</strong><span class="sep"></span><span class="mode">Laboratorio</span>
+  <span class="spacer"></span>
+  <span class="src" id="srcname"></span>
+  <button id="noteBtn">Come è costruito</button>
+</header>
+<div id="app">
+  <nav id="path"></nav>
+  <section id="stage">
+    <div id="bar"><button id="back" disabled>← Torna all’insieme</button><span id="crumb"></span><span class="chip">Oggetto proposto: consolle con programmatore a camme</span><span class="spacer"></span><span id="stepnav"><button class="nb" data-act="prev" aria-label="Passo precedente">◀</button><span id="stepn"></span><button class="nb" data-act="next" aria-label="Passo successivo">▶</button></span><button id="buildBtn" class="nb"></button></div>
+    <div id="canvas"><div id="upper"><svg id="svg" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="L’insieme"></svg></div><div id="link"></div><div id="lower"><svg id="svgSub" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Il livello aperto"></svg></div><div id="keys"><kbd>Tab</kbd> pezzi · <kbd>Invio</kbd> scegli o apri · <kbd>Esc</kbd> torna · <kbd>←</kbd><kbd>→</kbd> passaggi</div></div>
+  </section>
+  <aside id="inspector"><div id="mini" title="L’insieme: premi per tornarci"></div><div id="insp"></div></aside>
+  <section id="dock"><div id="grip" title="Trascina per ridimensionare"></div><div id="dockbar"><span class="t">Fonte originale</span><span class="r" id="dockr"></span><span class="spacer"></span><button id="fsm">A−</button><button id="fsp">A+</button></div><div id="lines"></div></section>
+</div>
+<div id="tip"></div>
+<div id="note"><div class="card" id="notecard"></div></div>
+<script src="../guided-reading/data.js"></script>
+<script>
+'use strict';
+const D = window.DISASSEMBLIES.importer;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ===== 1. What comes from the disassembly =====
+const parts = {}, parent = {}, joints = [];
+(function walk(ps, par) { for (const p of ps) { parts[p.id] = p; parent[p.id] = par; if (p.parts) walk(p.parts, p.id); for (const j of p.joints || []) joints.push({ ...j, level: p.id }); } })(D.parts, null);
+for (const j of D.joints) joints.push({ ...j, level: null });
+const topOf = id => parent[id] ? topOf(parent[id]) : id;
+const SRC = D.sources[0], LINES = SRC.text.split('\n');
+const overlaps = (a, b) => a.some(x => b.some(y => x.from <= y.to && y.from <= x.to));
+const rangeTxt = cs => cs.map(c => c.from === c.to ? c.from : `${c.from}–${c.to}`).join(', ');
+
+// The path: one step per section of the source. What each section does comes from the citations, never from the order of the paragraphs.
+const STEPS = (() => {
+  const heads = []; LINES.forEach((l, i) => { if (/^#{1,2} /.test(l)) heads.push({ from: i + 1, title: l.replace(/^#+\s*/, '') }); });
+  heads.forEach((h, k) => { h.to = k + 1 < heads.length ? heads[k + 1].from - 1 : LINES.length; });
+  const seen = new Set();
+  return heads.map((h, k) => {
+    const range = [{ from: h.from, to: h.to }];
+    const cited = [...new Set(Object.values(parts).filter(p => overlaps(p.cites || [], range)).map(p => topOf(p.id)))];
+    const add = cited.filter(id => !seen.has(id)), back = cited.filter(id => seen.has(id));
+    add.forEach(id => seen.add(id));
+    const rel = joints.filter(j => j.level === null && overlaps(j.cites || [], range));
+    return { ...h, k, add, back, rel, parts: cited };
+  });
+})();
+// When each part enters the object (the section that first cites it), and each relation (the first section that cites it).
+const INTRO = {}; STEPS.forEach(s => s.add.forEach(id => { INTRO[id] = s.k; }));
+const JSTEP = {}; joints.filter(j => j.level === null).forEach(j => { const s = STEPS.find(s => overlaps(j.cites || [], [s])); JSTEP[j.from + '>' + j.to] = s ? s.k : Math.max(INTRO[j.from], INTRO[j.to]); });
+const stepsOf = id => STEPS.filter(s => s.parts.includes(id) || (parts[id].cites && overlaps(parts[id].cites, [s])));
+// Which step of the round writes a register: the sub-part that cites the same lines as the joint.
+const writer = j => (parts.round.parts || []).find(q => overlaps(q.cites || [], j.cites || []));
+const scenario = D.runs.find(r => r.type === 'scenario');
+const VARS = { ...scenario.vars };
+const varFor = name => { const w = s => s.toLowerCase().normalize('NFD').replace(/[^a-z ]/g, ' ').split(/\s+/).filter(x => x.length >= 4); const mine = new Set(w(name)); return Object.keys(VARS).find(k => w(k).some(x => mine.has(x))); };
+
+// ===== 2. What is drawn by hand: the object =====
+// Each component: what it is in the object, and where the analogy stops. The names, roles and joints stay the disassembly's.
+const OBJ = {
+  round: { look: 'Il programmatore a camme al centro: un tamburo con cinque camme gira sempre nello stesso verso, e ogni camma aziona un passo.', limit: 'Un tamburo gira a velocità costante; un passo del giro dura quanto serve, e lo scaricamento può non finire mai. Qui un blocco è il tamburo che si ferma sulla camma 3.' },
+  'round-stamp': { look: 'Camma 1: la prima a toccare il suo pulsante, a ogni giro.', limit: 'Il pulsante preme il timbro; nella fonte il giro scrive un’ora in memoria e su un file.' },
+  'round-switch': { look: 'Camma 2: tasta l’interruttore di pausa prima di proseguire.', limit: 'Una camma non decide; qui «decidere» è il ramo in cui il giro annota la pausa e si ferma.' },
+  'round-fetch': { look: 'Camma 3: il punto in cui il tamburo può incepparsi.', limit: 'Il feed è fuori dalla consolle: il disegno mostra solo il passo che lo chiama.' },
+  'round-hand': { look: 'Camma 4: passa i record ai worker e prosegue senza aspettarli.', limit: 'I worker non sono disegnati: la fonte non li descrive come parti.' },
+  'round-close': { look: 'Camma 5: l’ultima, l’unica che scrive l’ora di fine.', limit: 'Dopo la camma 5 il giro dorme; il tamburo non ha un motore che lo faccia ripartire.' },
+  heartbeat: { look: 'Un registro con display a sinistra, accanto alla camma 1: mostra quanto è vecchio l’ultimo timbro.', limit: 'Il display mostra l’età; nella fonte il timbro è un’ora in memoria e su un piccolo file.' },
+  finished: { look: 'Un registro gemello a destra, accanto alla camma 5, con la bandierina d’arrivo.', limit: 'Non dice nulla dei singoli record: per quelli c’è il nastro.' },
+  outcomes: { look: 'Una stampante a nastro davanti al tamburo: una riga per record.', limit: 'Il nastro mostra quattro righe di esempio; il registro vero ha una riga per ogni record ricevuto.' },
+  pause: { look: 'Un selettore a chiave sul banco, che la camma 2 legge.', limit: 'Nella fonte l’interruttore sta nel servizio di configurazione, fuori dalla macchina: qui è sul banco perché si veda chi lo legge.' },
+  restart: { look: 'Un relè di controllo con un quadrante a 30 minuti, collegato soltanto al timbro.', limit: 'Il relè non mostra i cinque minuti di tolleranza dopo un avvio.' },
+  board: { look: 'Il pannello alto sul retro: tre spie, una per cavo in ingresso.', limit: 'Il pannello vero è una pagina per chi è di turno, non un pezzo della macchina.' },
+};
+
+// ===== 3. Geometry: a cabinet view, front faces almost frontal so their labels read =====
+const KX = [0.95, 0.16], KY = [0.46, -0.34];
+const VIEW = [1, -2.065];               // the direction towards the viewer, in plan
+let BB = null;
+const P = (x, y, z = 0) => { const p = [x * KX[0] + y * KY[0], x * KX[1] + y * KY[1] - z]; if (BB) { BB[0] = Math.min(BB[0], p[0]); BB[1] = Math.min(BB[1], p[1]); BB[2] = Math.max(BB[2], p[0]); BB[3] = Math.max(BB[3], p[1]); } return p; };
+const f1 = n => Math.round(n * 10) / 10;
+const pts = a => a.map(p => f1(p[0]) + ',' + f1(p[1])).join(' ');
+const mat = (a, b, c, d, [e, f]) => `matrix(${a},${b},${c},${d},${f1(e)},${f1(f)})`;
+const onFront = (x, y, z) => mat(KX[0], KX[1], 0, 1, P(x, y, z));        // face y = const: u along x, v down
+const onTop = (x, y, z) => mat(KX[0], KX[1], -KY[0], -KY[1], P(x, y, z)); // origin at the back edge: u along x, v towards the front
+const onSide = (x, y, z) => mat(KY[0], KY[1], 0, 1, P(x, y, z));          // face x = const: u along y, v down
+const MAT = {
+  alu: ['url(#aluT)', 'url(#aluF)', 'url(#aluR)', '#77818c'],
+  ivory: ['#fbfaf6', 'url(#ivF)', '#d8d7d2', '#8d949b'],
+  dark: ['#4d5966', '#36424e', '#2a343e', '#1b232b'],
+  steel: ['#c9cfd5', '#aab2ba', '#949da6', '#5d6772'],
+};
+const poly = (p, fill, cls, stroke) => `<polygon class="${cls}" points="${pts(p)}" fill="${fill}" stroke="${stroke}"/>`;
+function box(x, y, z, w, d, h, m) {
+  const M = MAT[m];
+  const f = [P(x, y, z), P(x + w, y, z), P(x + w, y, z + h), P(x, y, z + h)];
+  const r = [P(x + w, y, z), P(x + w, y + d, z), P(x + w, y + d, z + h), P(x + w, y, z + h)];
+  const t = [P(x, y, z + h), P(x + w, y, z + h), P(x + w, y + d, z + h), P(x, y + d, z + h)];
+  return poly(r, M[2], 'fr', M[3]) + poly(t, M[0], 'ft', M[3]) + poly(f, M[1], 'ff', M[3]) + `<polyline class="hl" points="${pts([f[3], f[2], r[2]])}"/>`;
+}
+const screw = (u, v) => `<circle cx="${u}" cy="${v}" r="2.6" fill="#b8c0c8" stroke="#56616c" stroke-width=".7"/><line x1="${u - 1.6}" y1="${v}" x2="${u + 1.6}" y2="${v}" stroke="#56616c" stroke-width=".7"/>`;
+// a vertical cylinder: the half that faces the viewer, then the top
+function cylV(cx, cy, z, r, h, m) {
+  const M = MAT[m], tv = Math.atan2(VIEW[1], VIEW[0]), at = (t, zz) => P(cx + r * Math.cos(t), cy + r * Math.sin(t), zz);
+  const side = []; for (let i = 0; i <= 24; i++) side.push(at(tv - Math.PI / 2 + Math.PI * i / 24, z)); for (let i = 24; i >= 0; i--) side.push(at(tv - Math.PI / 2 + Math.PI * i / 24, z + h));
+  const lid = []; for (let i = 0; i < 48; i++) lid.push(at(i * Math.PI / 24, z + h));
+  return poly(side, M[1], 'ff', M[3]) + poly(lid, M[0], 'ft', M[3]);
+}
+// a disc standing in the plane x = const (a cam, or the end of a roll); profile(t) gives its radius
+function disc(x, cy, cz, profile, fill, stroke, cls = 'fr') {
+  const p = []; for (let i = 0; i < 60; i++) { const t = i * Math.PI / 30, r = profile(t); p.push(P(x, cy + r * Math.cos(t), cz + r * Math.sin(t))); }
+  return poly(p, fill, cls, stroke);
+}
+// a cylinder lying along x: the band between its two ends, then the near end
+function cylX(x0, x1, cy, cz, r, m) {
+  const M = MAT[m];
+  // silhouette: where the circle's tangent is parallel to the axis on screen
+  let best = [], prev = null;
+  for (let i = 0; i <= 720; i++) { const t = i * Math.PI / 360; const dq = [-Math.sin(t) * KY[0], -Math.sin(t) * KY[1] - Math.cos(t)]; const cr = dq[0] * KX[1] - dq[1] * KX[0]; if (prev !== null && Math.sign(cr) !== Math.sign(prev)) best.push(t); prev = cr; }
+  const [ta, tb] = best;
+  const at = (x, t) => P(x, cy + r * Math.cos(t), cz + r * Math.sin(t));
+  return poly([at(x0, ta), at(x1, ta), at(x1, tb), at(x0, tb)], M[1], 'ff', M[3]) + disc(x1, cy, cz, () => r, M[0], M[3], 'ft');
+}
+function cable(a, b, lift = 46, t = 0.5) {
+  const [ax, ay] = a, [bx, by] = b, l = lift + Math.hypot(bx - ax, by - ay) * 0.12;
+  const d = `M${f1(ax)},${f1(ay)} C${f1(ax)},${f1(ay - l)} ${f1(bx)},${f1(by - l)} ${f1(bx)},${f1(by)}`;
+  const u = 1 - t, w = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+  const mid = [w[0] * ax + w[1] * ax + w[2] * bx + w[3] * bx, w[0] * ay + w[1] * (ay - l) + w[2] * (by - l) + w[3] * by];
+  return { d, mid };
+}
+
+// ===== 4. The object =====
+const CAMS = (parts.round.parts || []).map(q => q.id);
+const CAM_X = k => 240 + k * 62, CAM_Y = 182, CAM_Z = 108, CAM_R = 40;
+const OPEN_X = k => 70 + k * 152, LIFT = 150;
+const camProfile = k => t => CAM_R * (0.8 + 0.2 * Math.max(0, Math.cos(t - (Math.PI / 2 + k * 1.26))) ** 2);
+const LAMP_X = { heartbeat: 300, outcomes: 430, finished: 560 };   // where each incoming cable lands on the board, chosen by hand
+
+function camUnit(id, k, x, z, open) {
+  const pr = camProfile(k);
+  let s = '';
+  for (const dx of [0, 4, 8]) s += disc(x + dx, CAM_Y, z, pr, dx === 8 ? '#dfe3e7' : '#9aa3ac', '#56616c', dx === 8 ? 'fr' : 'fr');
+  s += disc(x + 9, CAM_Y, z, () => 7, '#56616c', '#2b343e', 'fr');
+  // the follower: a small switch block above the cam, with its number on the front
+  const w = open ? 124 : 30, fx = x + 4 - w / 2, fz = z + CAM_R + 6;
+  s += box(fx, CAM_Y - 14, fz, w, 28, 24, 'ivory');
+  const [lx, ly] = P(x + 4, CAM_Y - 14, fz), [cx, cy2] = P(x + 4, CAM_Y - 14, z + CAM_R * 0.86);
+  s += `<line x1="${f1(lx)}" y1="${f1(ly)}" x2="${f1(cx)}" y2="${f1(cy2)}" stroke="#56616c" stroke-width="2"/>`;
+  s += `<g transform="${onFront(fx, CAM_Y - 14, fz + 24)}"><text x="${open ? 10 : w / 2}" y="17" font-size="15" font-weight="700" fill="#1d2630" ${open ? '' : 'text-anchor="middle"'}>${k + 1}</text>${open ? `<text x="22" y="16.5" font-size="11.5" font-weight="650" fill="#1d2630">${esc(parts[id].name)}</text>` : ''}</g>`;
+  return s;
+}
+function scene({ open = null, mini = false } = {}) {
+  const sel = state.sel, inpass = new Set(STEPS[state.step]?.parts || []);
+  const cls = id => `part${sel === id ? ' sel' : ''}${open === id ? ' opened' : ''}${!mini && inpass.has(id) ? ' inpass' : ''}${!mini && state.arrive && state.build && INTRO[id] === state.step ? ' arrive' : ''}`;
+  const attrs = id => mini ? '' : ` data-id="${id}" tabindex="0" role="button" aria-label="${esc(parts[id].name)}"`;
+  // a part not yet met in the reading is an empty footprint on the bench
+  const G = (id, inner) => built(id) ? `<g class="${cls(id)}"${attrs(id)}>${inner}</g>` : ghost(id);
+  let s = '';
+  const dimAll = '';
+  // the bench
+  s += `<g${dimAll}><polygon points="${pts([P(8, 4, 0), P(748, 4, 0), P(748, 296, 0), P(8, 296, 0)].map(([x, y]) => [x + 6, y + 10]))}" fill="rgba(30,40,50,.12)" filter="url(#soft)"/>`;
+  s += box(0, 0, 0, 740, 290, 8, 'dark') + box(0, 0, 8, 740, 290, 16, 'alu');
+  if (!mini) s += `<g transform="${onFront(0, 0, 24)}">${screw(10, 8)}${screw(730, 8)}<rect x="18" y="3" width="190" height="11" rx="2" fill="#2b3640"/><text x="26" y="12" font-size="9" fill="#e9edf1" class="plate-t">${esc(D.whole.name.toUpperCase())}</text></g>`;
+  s += `</g>`;
+  // the board, at the back: one lamp per incoming joint
+  const inBoard = joints.filter(j => j.to === 'board');
+  let boardInner = box(250, 262, 24, 360, 16, 284, 'ivory') + box(244, 258, 24, 12, 24, 288, 'dark') + box(606, 258, 24, 12, 24, 288, 'dark');
+  if (!mini) {
+    boardInner += `<g transform="${onFront(250, 262, 308)}"><rect x="0" y="0" width="360" height="20" fill="#2b3640"/><text x="12" y="14" font-size="11" fill="#eef2f6" class="plate-t">${esc(parts.board.name.toUpperCase())}</text>`
+      + inBoard.map(j => { const u = LAMP_X[j.from] - 250, on = jointBuilt(j.from + '>' + j.to), v = on ? VARS[j.label] : null; const col = !v ? '#cfd5da' : /verde/.test(v) ? '#2f9e5b' : /ross/.test(v) ? '#d0453a' : '#9aa1a9';
+        return `<circle cx="${u}" cy="44" r="13" fill="#2b3640"/><circle cx="${u}" cy="44" r="9" fill="${col}"/><circle cx="${u - 3}" cy="41" r="2.5" fill="rgba(255,255,255,.7)"/>${on ? `<g class="joint" data-joint="${j.from}>${j.to}"><rect x="${u - 46}" y="60" width="92" height="17" rx="8.5" fill="#fff" stroke="#9fcbe6"/><text x="${u}" y="72" font-size="10.5" text-anchor="middle" fill="#145f86" font-weight="600">${esc(j.label)}</text></g>` : ''}`; }).join('')
+      + `${screw(8, 30)}${screw(352, 30)}</g>`;
+  }
+  s += G('board', boardInner);
+  // the restart relay: tall, behind the heartbeat register, a dial on its front
+  let rr = box(30, 176, 24, 120, 80, 152, 'steel');
+  if (!mini) rr += `<g transform="${onFront(30, 176, 176)}"><rect x="10" y="8" width="100" height="16" rx="3" fill="#2b3640"/><text x="60" y="20" font-size="9.5" fill="#eef2f6" text-anchor="middle" font-weight="600">${esc(parts.restart.name)}</text><circle cx="60" cy="60" r="27" fill="#fbfaf6" stroke="#56616c"/>${Array.from({ length: 12 }, (_, i) => { const a = i * Math.PI / 6; return `<line x1="${f1(60 + Math.cos(a) * 21)}" y1="${f1(60 + Math.sin(a) * 21)}" x2="${f1(60 + Math.cos(a) * 26)}" y2="${f1(60 + Math.sin(a) * 26)}" stroke="#56616c"/>`; }).join('')}<path d="M60,60 L60,34 A26,26 0 0 1 86,60 Z" fill="rgba(229,83,61,.18)"/><line x1="60" y1="60" x2="${60 + 18}" y2="${60 - 9}" stroke="#1d2630" stroke-width="2.2" stroke-linecap="round"/><circle cx="60" cy="60" r="3" fill="#1d2630"/>${screw(8, 140)}${screw(112, 140)}</g>`;
+  s += G('restart', rr);
+  // the heartbeat register: a display that shows the stamp's age
+  const reg = (id, x, flag) => {
+    let r = box(x, 34, 24, 130, 90, 72, 'ivory');
+    if (flag) { const [a, b] = P(x + 96, 96, 96); r += `<line x1="${f1(a)}" y1="${f1(b)}" x2="${f1(a)}" y2="${f1(b - 34)}" stroke="#36424e" stroke-width="2"/><path d="M${f1(a)},${f1(b - 34)} l20,4 l-20,8 z" fill="#36424e"/><path d="M${f1(a)},${f1(b - 34)} l10,2 l0,4 l-10,-2 z M${f1(a + 10)},${f1(b - 28)} l10,2 l-10,2 z" fill="#fbfaf6"/>`; }
+    else r += cylV(x + 96, 80, 96, 12, 8, 'dark') + cylV(x + 96, 80, 104, 6, 10, 'steel');
+    if (!mini) { const k = varFor(parts[id].name), v = k ? VARS[k] : '—';
+      r += `<g transform="${onFront(x, 34, 96)}"><rect x="10" y="9" width="110" height="30" rx="4" fill="#1f2a35"/><line x1="10" y1="24" x2="120" y2="24" stroke="#0f161d"/><text x="65" y="30" font-size="17" text-anchor="middle" fill="#ffd38a" font-family="ui-monospace, Menlo, monospace" font-weight="700">${esc(v)}</text><text x="65" y="51" font-size="8.5" text-anchor="middle" fill="#66707b">${esc(k || '')}</text><text x="65" y="65" font-size="11" text-anchor="middle" fill="#1d2630" font-weight="700">${esc(parts[id].name)}</text>${screw(6, 6)}${screw(124, 6)}</g>`; }
+    return r;
+  };
+  s += G('heartbeat', reg('heartbeat', 24, false));
+  // the round: a cradle, two end plates, the shaft and five cams
+  let rd = `<g${open ? ' class="cradle-open"' : ''}>` + box(190, 120, 24, 350, 115, 18, 'dark') + box(196, 150, 42, 18, 64, 116, 'alu') + box(516, 150, 42, 18, 64, 116, 'alu');
+  if (!mini) rd += `<g transform="${onFront(190, 120, 42)}"><rect x="120" y="3" width="110" height="12" rx="2" fill="#f3f1ec"/><text x="175" y="12.5" font-size="9.5" text-anchor="middle" fill="#1d2630" class="plate-t">${esc(parts.round.name.toUpperCase())}</text></g>`
+    + `<g transform="${onSide(534, 150, 140)}"><circle cx="32" cy="34" r="17" fill="#fbfaf6" stroke="#56616c"/><line x1="32" y1="34" x2="32" y2="22" stroke="#1d2630" stroke-width="1.8"/><line x1="32" y1="34" x2="41" y2="37" stroke="#1d2630" stroke-width="1.4"/></g>`;
+  if (open) { const o = [P(190, 120, 42), P(540, 120, 42), P(540, 235, 42), P(190, 235, 42)]; rd += `<polygon points="${pts(o)}" fill="none" stroke="#e5533d" stroke-width="1.6" stroke-dasharray="5 4"/>`; }
+  rd += `</g>`;
+  {
+    const [s0x, s0y] = P(205, CAM_Y, CAM_Z), [s1x, s1y] = P(525, CAM_Y, CAM_Z);
+    rd += `<line x1="${f1(s0x)}" y1="${f1(s0y)}" x2="${f1(s1x)}" y2="${f1(s1y)}" stroke="#36424e" stroke-width="5" stroke-linecap="round"/>`;
+    CAMS.forEach((id, k) => { rd += camUnit(id, k, CAM_X(k), CAM_Z, false); });
+  }
+  if (!mini) { const [a, b] = P(365, CAM_Y, CAM_Z + 8), [c, d] = P(365, CAM_Y, 206); rd += `<line x1="${f1(a)}" y1="${f1(b)}" x2="${f1(c)}" y2="${f1(d + 4)}" stroke="#3d4651" stroke-width=".9"/><rect x="${f1(c - 34)}" y="${f1(d - 15)}" width="68" height="20" rx="10" fill="#1f2b38"/><text x="${f1(c)}" y="${f1(d - 1)}" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">${esc(parts.round.name)}</text>`; }
+  s += G('round', rd);
+  // the pause switch: a key on the front
+  let ps = box(200, 18, 24, 120, 78, 46, 'steel');
+  if (!mini) ps += `<g transform="${onFront(200, 18, 70)}"><circle cx="32" cy="22" r="13" fill="#2b3640"/><circle cx="32" cy="22" r="9" fill="#c9cfd5"/><rect x="30.5" y="13" width="3" height="18" rx="1" fill="#2b3640" transform="rotate(-35 32 22)"/><text x="16" y="44" font-size="7.5" fill="#1d2630" font-weight="700">ACCESO</text><text x="40" y="9" font-size="7.5" fill="#66707b">PAUSA</text><text x="52" y="26" font-size="10" fill="#1d2630" font-weight="700">${esc(parts.pause.name.split(' ')[0])}</text><text x="52" y="38" font-size="10" fill="#1d2630" font-weight="700">${esc(parts.pause.name.split(' ').slice(1).join(' '))}</text></g>`;
+  s += G('pause', ps);
+  // the outcome log: a printer, a roll at the back, the tape over the front
+  let pr = box(360, 18, 24, 160, 82, 50, 'ivory') + cylX(372, 508, 84, 82, 13, 'ivory');
+  if (!mini) {
+    const rows = (parts.outcomes.role.split(':')[1] || '').replace('.', '').split(/,\s*|\s+o\s+/).map(s => s.trim()).filter(Boolean);
+    pr += `<g transform="${onTop(440, 72, 74)}"><rect x="0" y="0" width="64" height="54" fill="#fff" stroke="#b9c0c8" stroke-width=".6"/></g>`;
+    pr += `<g transform="${onFront(440, 18, 74)}"><rect x="0" y="0" width="64" height="58" fill="#fff" stroke="#b9c0c8" stroke-width=".6"/>${rows.map((r, i) => `<rect x="5" y="${7 + i * 12}" width="5" height="5" fill="${['#2f9e5b', '#d99a1e', '#d0453a', '#7a8591'][i] || '#999'}"/><text x="14" y="${12 + i * 12}" font-size="8" fill="#1d2630" font-family="ui-monospace, Menlo, monospace">${esc(r)}</text>`).join('')}</g>`;
+    pr += `<g transform="${onFront(360, 18, 74)}"><text x="10" y="20" font-size="10.5" fill="#1d2630" font-weight="700">Registro</text><text x="10" y="33" font-size="10.5" fill="#1d2630" font-weight="700">degli esiti</text>${screw(6, 44)}</g>`;
+  }
+  s += G('outcomes', pr);
+  // the last-finished register, the heartbeat's twin, on the right
+  s += G('finished', reg('finished', 580, true));
+  // the joints: cables with a label and a citation; dotted where one part depends on another
+  if (!mini) s += cables();
+  return s;
+}
+const ANCHOR = {
+  'round>heartbeat': () => [P(CAM_X(0) + 4, CAM_Y - 14, CAM_Z + CAM_R + 18), P(130, 70, 96)],
+  'round>finished': () => [P(CAM_X(4) + 4, CAM_Y - 14, CAM_Z + CAM_R + 18), P(600, 80, 96)],
+  'round>outcomes': () => [P(470, 120, 36), P(470, 70, 74)],
+  'round>pause': () => [P(250, 92, 70), P(CAM_X(1) + 4, CAM_Y - 14, CAM_Z + CAM_R + 18)],
+  'heartbeat>restart': () => [P(70, 110, 96), P(70, 176, 120)],
+  'heartbeat>board': () => [P(40, 70, 96), P(LAMP_X.heartbeat, 262, 264)],
+  'finished>board': () => [P(690, 70, 96), P(LAMP_X.finished, 262, 264)],
+  'outcomes>board': () => [P(380, 80, 74), P(LAMP_X.outcomes, 262, 264)],
+};
+const LABEL_T = { 'round>heartbeat': 0.72, 'round>pause': 0.3, 'round>finished': 0.72, 'heartbeat>restart': 0.5, 'round>outcomes': 0.5 };
+function cables() {
+  let lines = '', labels = [], open = false;
+  for (const j of joints.filter(j => j.level === null)) {
+    const key = j.from + '>' + j.to, an = ANCHOR[key]; if (!an || !jointBuilt(key)) continue;
+    let [a, b] = an(); if (j.type === 'depends-on') [a, b] = [b, a];   // the round reads the switch: the line runs from the switch to the round
+    const { d, mid } = cable(a, b, key === 'round>outcomes' ? 18 : 40, LABEL_T[key] ?? 0.5);
+    const dep = j.type === 'depends-on', on = state.joint === key;
+    lines += `<g class="joint${on ? ' sel' : ''}${state.arrive && state.build && JSTEP[key] === state.step ? ' arrive' : ''}" data-joint="${key}"><path class="cable under" d="${d}"/><path class="cable ${dep ? 'dep' : 'c'}" d="${d}" marker-end="url(#${dep ? 'ag' : 'ac'})"/><circle cx="${f1(a[0])}" cy="${f1(a[1])}" r="3.4" fill="#2b3640"/></g>`;
+    if (j.to !== 'board') labels.push({ x: mid[0], y: mid[1], text: j.label, key, dep, open });   // on the board, the lamp carries the label
+  }
+  // keep labels apart
+  for (const l of labels) { l.w = l.text.length * 6.6 + 16; l.h = 19; }
+  for (let it = 0; it < 60; it++) { let mv = false; for (let i = 0; i < labels.length; i++) for (let k = i + 1; k < labels.length; k++) { const a = labels[i], b = labels[k]; const ox = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2), oy = Math.min(a.y + a.h / 2, b.y + b.h / 2) - Math.max(a.y - a.h / 2, b.y - b.h / 2); if (ox > 0 && oy > 0) { const up = a.y <= b.y ? a : b, dn = up === a ? b : a; up.y -= oy / 2 + 1; dn.y += oy / 2 + 1; mv = true; } } if (!mv) break; }
+  return lines + labels.map(l => `<g class="joint jl${l.dep ? ' dep' : ''}${l.open ? ' dim' : ''}" data-joint="${l.key}" transform="translate(${f1(l.x)},${f1(l.y)})"><rect x="${f1(-l.w / 2)}" y="-9.5" width="${f1(l.w)}" height="19" rx="9.5"/><text y="4" text-anchor="middle">${esc(l.text)}</text></g>`).join('');
+}
+const FOOT = { board: [244, 258, 374, 24], restart: [30, 176, 120, 80], heartbeat: [24, 34, 130, 90], round: [190, 120, 350, 115], pause: [200, 18, 120, 78], outcomes: [360, 18, 160, 82], finished: [580, 34, 130, 90] };
+function ghost(id) { const [x, y, w, d] = FOOT[id]; return `<polygon class="ghost" points="${pts([P(x, y, 24), P(x + w, y, 24), P(x + w, y + d, 24), P(x, y + d, 24)])}"/>`; }
+const built = id => !state.build || (INTRO[topOf(id)] ?? 0) <= state.step;
+const jointBuilt = key => { const [f, t] = key.split('>'); return !state.build || (JSTEP[key] <= state.step && built(f) && built(t)); };
+// The round, taken out of the console: the same cradle, plates and cams, with the cams spread along their shaft.
+const SUB_X = k => 100 + k * 138;
+function subScene(id) {
+  BB = [1e9, 1e9, -1e9, -1e9];
+  const X0 = 40, X1 = SUB_X(CAMS.length - 1) + 90;
+  let s = `<polygon points="${pts([P(X0, 110, 0), P(X1, 110, 0), P(X1, 250, 0), P(X0, 250, 0)].map(([x, y]) => [x + 6, y + 10]))}" fill="rgba(30,40,50,.10)" filter="url(#soft)"/>`;
+  let rd = box(X0, 120, 24, X1 - X0, 115, 18, 'dark') + box(X0 + 6, 150, 42, 18, 64, 116, 'alu') + box(X1 - 24, 150, 42, 18, 64, 116, 'alu');
+  rd += `<g transform="${onFront(X0, 120, 42)}"><rect x="${(X1 - X0) / 2 - 55}" y="3" width="110" height="12" rx="2" fill="#f3f1ec"/><text x="${(X1 - X0) / 2}" y="12.5" font-size="9.5" text-anchor="middle" fill="#1d2630" class="plate-t">${esc(parts[id].name.toUpperCase())}</text></g>`;
+  rd += `<g transform="${onSide(X1, 150, 140)}"><circle cx="32" cy="34" r="17" fill="#fbfaf6" stroke="#56616c"/><line x1="32" y1="34" x2="32" y2="22" stroke="#1d2630" stroke-width="1.8"/><line x1="32" y1="34" x2="41" y2="37" stroke="#1d2630" stroke-width="1.4"/></g>`;
+  rd += `<polygon points="${pts([P(X0, 120, 42), P(X1, 120, 42), P(X1, 235, 42), P(X0, 235, 42)])}" fill="none" stroke="#e5533d" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  s += `<g class="part${state.sel === id ? ' sel' : ''}" data-id="${id}" tabindex="0" role="button" aria-label="${esc(parts[id].name)}">${rd}</g>`;
+  const [s0x, s0y] = P(X0 + 15, CAM_Y, CAM_Z), [s1x, s1y] = P(X1 - 15, CAM_Y, CAM_Z);
+  s += `<line x1="${f1(s0x)}" y1="${f1(s0y)}" x2="${f1(s1x)}" y2="${f1(s1y)}" stroke="#36424e" stroke-width="5" stroke-linecap="round"/>`;
+  CAMS.forEach((q, k) => { s += `<g class="part${state.sel === q ? ' sel' : ''}" data-id="${q}" tabindex="0" role="button" aria-label="${esc(parts[q].name)}">${camUnit(q, k, SUB_X(k), CAM_Z, true)}</g>`; });
+  const fz = CAM_Z + CAM_R + 18;
+  let labels = '';
+  for (const j of joints.filter(j => j.level === id)) {
+    const ka = CAMS.indexOf(j.from), kb = CAMS.indexOf(j.to);
+    const a = P(SUB_X(ka) + 67, CAM_Y - 14, fz), b = P(SUB_X(kb) - 59, CAM_Y - 14, fz);
+    s += `<path class="cable c" d="M${f1(a[0])},${f1(a[1])} L${f1(b[0])},${f1(b[1])}" marker-end="url(#ac)"/>`;
+    const w = j.label.length * 6.4 + 14, m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 30];
+    labels += `<g class="jl" transform="translate(${f1(m[0])},${f1(m[1])})"><rect x="${f1(-w / 2)}" y="-9.5" width="${f1(w)}" height="19" rx="9.5"/><text y="4" text-anchor="middle">${esc(j.label)}</text></g>`;
+  }
+  // the cables that leave this level: from the step that cites the same lines, towards the side where the register stands in the console
+  for (const j of joints.filter(j => j.level === null && j.from === id && jointBuilt(j.from + '>' + j.to))) {
+    const q = writer(j); if (!q) continue; const k = CAMS.indexOf(q);
+    const left = FOOT[j.to][0] < FOOT[id][0];
+    const a = P(SUB_X(k) + (left ? -59 : 67), CAM_Y - 14, fz + 4), b = P(left ? X0 - 24 : X1 + 24, CAM_Y - 14, fz + 4);
+    s += `<path class="cable c" d="M${f1(a[0])},${f1(a[1])} L${f1(b[0])},${f1(b[1])}" marker-end="url(#ac)"/>`;
+    const t = `${j.label} → ${parts[j.to].name}`, w = t.length * 6.2 + 14, m = [b[0] + (left ? -w / 2 - 6 : w / 2 + 6), b[1]];
+    labels += `<g class="jl joint" data-joint="${j.from}>${j.to}" transform="translate(${f1(m[0])},${f1(m[1])})"><rect x="${f1(-w / 2)}" y="-9.5" width="${f1(w)}" height="19" rx="9.5"/><text y="4" text-anchor="middle">${esc(t)}</text></g>`;
+    BB[0] = Math.min(BB[0], m[0] - w / 2); BB[2] = Math.max(BB[2], m[0] + w / 2);
+  }
+  s += labels;
+  const v = BB.map(f1); BB = null;
+  return { svg: s, vb: `${v[0] - 16} ${v[1] - 20} ${v[2] - v[0] + 32} ${v[3] - v[1] + 36}` };
+}
+const DEFS = `<defs>
+<linearGradient id="aluT" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1f3f5"/><stop offset="1" stop-color="#dfe3e7"/></linearGradient>
+<linearGradient id="aluF" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d4d9de"/><stop offset=".5" stop-color="#e6e9ec"/><stop offset="1" stop-color="#c8ced4"/></linearGradient>
+<linearGradient id="aluR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bcc3ca"/><stop offset="1" stop-color="#a6aeb6"/></linearGradient>
+<linearGradient id="ivF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1efe9"/><stop offset="1" stop-color="#e2e0d9"/></linearGradient>
+<filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="6"/></filter>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1f97cf"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7a8591"/></marker>
+</defs>`;
+
+// ===== 5. State and drawing =====
+const state = { step: 0, sel: null, open: null, joint: null, saved: null, build: true, arrive: false };
+// One viewBox for both states, so nothing moves when a part opens.
+const VB = (() => { BB = [1e9, 1e9, -1e9, -1e9]; state.build = false; scene(); state.build = true; const v = BB.map(f1); BB = null; return `${v[0] - 24} ${v[1] - 30} ${v[2] - v[0] + 48} ${v[3] - v[1] + 54}`; })();
+function draw() {
+  $('#svg').setAttribute('viewBox', VB);
+  $('#svg').innerHTML = DEFS + scene({ open: state.open });
+  const wasStacked = $('#canvas').classList.contains('stacked');
+  $('#canvas').classList.toggle('stacked', !!state.open);
+  if (state.open) { const sub = subScene(state.open); $('#svgSub').setAttribute('viewBox', sub.vb); $('#svgSub').innerHTML = DEFS + sub.svg; $('#link').innerHTML = `<span>▼</span> ${esc(parts[state.open].name)} <span class="muted">· aperto qui sotto · il livello sopra resta premibile</span>`; if (!wasStacked) $('#lower').animate?.([{ opacity: 0, transform: 'translateY(-24px)' }, { opacity: 1, transform: 'none' }], { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 380, easing: 'cubic-bezier(.2,.8,.2,1)' }); }
+  else $('#svgSub').innerHTML = '';
+  $('#stepn').textContent = `Passo ${state.step} di ${STEPS.length - 1}`;
+  $('#buildBtn').textContent = state.build ? 'Costruzione progressiva: sì' : 'Costruzione progressiva: no';
+  $('#buildBtn').classList.toggle('on', state.build);
+  $('#mini').innerHTML = `<span class="here">Sei qui</span><svg viewBox="${VB}"></svg>`; miniMark();
+  $('#back').disabled = !state.open;
+  const crumb = [`<b>${esc(D.whole.name)}</b>`];
+  if (state.open) crumb.push(`<b>${esc(parts[state.open].name)}</b>`);
+  if (state.sel && parent[state.sel] === state.open && state.open) crumb.push(`<span class="cur">${esc(parts[state.sel].name)}</span>`);
+  else if (state.sel && !state.open) crumb.push(`<span class="cur">${esc(parts[state.sel].name)}</span>`);
+  $('#crumb').innerHTML = crumb.join(' &nbsp;/&nbsp; ');
+  drawPath(); drawInspector(); drawSource();
+  state.arrive = false;
+}
+function miniMark() {
+  // the mini draws without ids; mark the part to find by drawing it again with the selection
+  const id = state.open || (state.sel && topOf(state.sel));
+  const saved = state.sel; state.sel = id;
+  $('#mini svg').innerHTML = DEFS + scene({ mini: true });
+  state.sel = saved;
+}
+function drawPath() {
+  const el = $('#path');
+  el.innerHTML = `<h2>Percorso nella fonte</h2><div class="hint">${esc(SRC.title)} · ${STEPS.length} sezioni</div>` + STEPS.map(s => {
+    const chips = [...s.add.map(id => `<span class="role add" title="Introduce">+ ${esc(parts[id].name)}</span>`), ...s.back.map(id => `<span class="role back" title="Torna su">↺ ${esc(parts[id].name)}</span>`), ...(s.rel.length ? [`<span class="role rel" title="Introduce una relazione">↔ ${s.rel.length} ${s.rel.length > 1 ? 'relazioni' : 'relazione'}</span>`] : []), ...(!s.parts.length ? ['<span class="role ctx">contesto</span>'] : [])];
+    return `<button class="step${s.k === state.step ? ' on' : ''}" data-step="${s.k}"><div class="t"><span class="n">${s.k}</span>${esc(s.title)}</div><div class="roles">${chips.join('')}</div></button>`;
+  }).join('') + `<div class="legend"><span><span class="role add">+</span> introduce un pezzo</span><span><span class="role back">↺</span> torna su un pezzo</span><span><span class="role rel">↔</span> introduce una relazione</span><span><span class="role ctx">contesto</span> nessun pezzo</span><span style="margin-top:4px">L’ordine dei paragrafi non crea legami: li creano le citazioni.</span></div>`;
+  el.querySelector('.step.on')?.scrollIntoView({ block: 'nearest' });
+}
+const KIND = { step: 'Passo del giro', artifact: 'Registro', component: 'Componente' };
+const VERB_OUT = { 'depends-on': 'dipende da', 'sends-to': 'invia a' }, VERB_IN = { 'depends-on': 'serve a', 'sends-to': 'riceve da' };
+const MARKS = { step: ['→', 'poi'], keeps: ['=', 'resta uguale'], caveat: ['⚠', 'attenzione'] };
+const flowOf = j => j.type === 'depends-on' ? [j.to, j.from] : [j.from, j.to];
+const pointsList = ps => `<ul class="pts">${ps.map(x => `<li class="m-${x.mark || 'none'}"><span class="mk" aria-hidden="true">${(MARKS[x.mark] || ['•'])[0]}</span>${x.mark ? `<span class="sr">${MARKS[x.mark][1]}: </span>` : ''}<span>${esc(x.text)}</span></li>`).join('')}</ul>`;
+const citeChips = cs => cs?.length ? `<div class="chips">${cs.map(c => `<button class="cite" data-cite="${c.from}">righe ${c.from}–${c.to}</button>`).join('')}</div>` : '';
+const fold = (label, body) => `<details class="fold"><summary>${label}</summary><div>${body}</div></details>`;
+function drawInspector() {
+  const el = $('#insp');
+  if (state.joint) {
+    const j = joints.find(j => j.from + '>' + j.to === state.joint);
+    el.innerHTML = `<div class="kind">Relazione</div><h2>${esc(parts[j.from].name)}</h2><p class="lead">${VERB_OUT[j.type] || '→'} <b>${esc(parts[j.to].name)}</b></p><p class="muted">«${esc(j.label)}»</p>${citeChips(j.cites)}${!j.cites ? '<p class="muted">Nessuna riga citata.</p>' : ''}`;
+    return;
+  }
+  const p = state.sel && parts[state.sel];
+  if (!p) {
+    const s = STEPS[state.step];
+    const rows = [...s.add.map(id => `<li><span class="mk">+</span><button class="link" data-pick="${id}">${esc(parts[id].name)}</button></li>`), ...s.back.map(id => `<li><span class="mk">↺</span><button class="link" data-pick="${id}">${esc(parts[id].name)}</button></li>`), ...s.rel.map(j => `<li><span class="mk">↔</span><span>${esc(parts[j.from].name)} ${VERB_OUT[j.type]} ${esc(parts[j.to].name)}</span></li>`)];
+    el.innerHTML = `<div class="kind">L’insieme</div><h2>${esc(D.whole.name)}</h2><p class="lead">${esc(D.whole.does)}</p>${citeChips(D.whole.cites)}<h3>Passo ${s.k} · ${esc(s.title)}</h3>${rows.length ? `<ul class="pts">${rows.join('')}</ul>` : '<p class="muted">Contesto: nessun pezzo citato.</p>'}<div class="actions"><button class="btn" data-act="prev">←</button><button class="btn primary" data-act="next">Passo successivo →</button></div>${fold('Perché conta', `<p>${esc(D.whole.why)}</p>`)}`;
+    return;
+  }
+  const o = OBJ[p.id] || {}, js = joints.filter(j => j.from === p.id || j.to === p.id), ss = stepsOf(topOf(p.id)).filter(s => overlaps(p.cites || [], [s]));
+  let h = `<div class="kind">${esc(KIND[p.kind] || p.kind)}${parent[p.id] ? ' · dentro «' + esc(parts[parent[p.id]].name) + '»' : ''}</div><h2>${esc(p.name)}</h2><p class="lead">${esc(p.role || '')}</p>${citeChips(p.cites)}`;
+  h += p.points?.length ? pointsList(p.points) : p.explain ? `<p>${esc(p.explain)}</p>` : '';
+  if (p.parts && state.open !== p.id) h += `<div class="actions"><button class="btn primary" data-act="open">Apri: ${p.parts.length} parti ↓</button></div>`;
+  const writes = joints.filter(j => j.level === null && j.from === 'round' && writer(j)?.id === p.id);
+  const rels = [...js.map(j => { const out = j.from === p.id, gives = flowOf(j)[0] === p.id; return `<li><span class="mk">${gives ? '→' : '←'}</span><button class="link" data-joint="${j.from}>${j.to}">${out ? VERB_OUT[j.type] : VERB_IN[j.type]} ${esc(parts[out ? j.to : j.from].name)}</button><span class="muted"> · ${esc(j.label)}</span></li>`; }),
+    ...writes.map(j => `<li><span class="mk">→</span><button class="link" data-joint="${j.from}>${j.to}">scrive ${esc(parts[j.to].name)}</button><span class="muted"> · ${esc(j.label)}, stesse righe</span></li>`)];
+  if (rels.length) h += `<h3>Relazioni</h3><ul class="pts rel">${rels.join('')}</ul>`;
+  if (ss.length) h += `<h3>Nei passi</h3><div class="chips">${ss.map(s => `<button class="stepchip" data-step="${s.k}" title="${esc(s.title)}">${s.k}</button>`).join('')}</div>`;
+  h += fold('Nell’oggetto', `<ul class="pts"><li><span class="mk">•</span><span>${esc(o.look || '')}</span></li><li class="m-caveat"><span class="mk">⚠</span><span>${esc(o.limit || '')}</span></li></ul>`);
+  if (p.metaphor) h += fold('Metafora della scomposizione', `<ul class="pts"><li><span class="mk">•</span><span>${esc(p.metaphor.text)}</span></li><li class="m-caveat"><span class="mk">⚠</span><span>${esc(p.metaphor.limit)}</span></li></ul>`);
+  if (state.open) h += `<div class="actions"><button class="btn" data-act="back">← Torna all’insieme</button></div>`;
+  el.innerHTML = h;
+}
+function drawSource(scroll = true) {
+  const s = STEPS[state.step], sel = state.joint ? joints.find(j => j.from + '>' + j.to === state.joint)?.cites || [] : (state.sel ? parts[state.sel].cites || [] : []);
+  $('#srcname').textContent = `Fonte: ${SRC.title}`;
+  $('#dockr').textContent = sel.length ? `${state.joint ? 'Relazione' : parts[state.sel].name} · righe ${rangeTxt(sel)}` : `${s.title} · righe ${s.from}–${s.to}`;
+  const inP = n => n >= s.from && n <= s.to, hit = n => sel.some(c => n >= c.from && n <= c.to);
+  $('#lines').innerHTML = LINES.map((l, i) => { const n = i + 1; return `<div class="ln${hit(n) ? ' hit' : inP(n) ? ' pass' : ''}" data-n="${n}"><span>${n}</span><span>${esc(l) || ' '}</span></div>`; }).join('');
+  if (scroll) scrollTo(sel[0]?.from || s.from);
+}
+function scrollTo(n) { const el = $(`#lines [data-n="${n}"]`); if (el) $('#lines').scrollTop = el.offsetTop - $('#lines').offsetTop - 8; }
+
+// ===== 6. Interaction =====
+function goStep(k) {
+  k = Math.max(0, Math.min(STEPS.length - 1, k)); if (k === state.step) return;
+  state.arrive = k > state.step; state.step = k;
+  if (state.open && !built(state.open)) { state.open = null; }
+  if (state.sel && !built(state.sel)) state.sel = null;
+  if (state.joint && !jointBuilt(state.joint)) state.joint = null;
+  draw();
+}
+function select(id) { state.joint = null; if (state.sel === id && parts[id].parts && !state.open) return openPart(id); state.sel = id; draw(); }
+function openPart(id) { state.saved = { step: state.step, sel: id, scroll: $('#lines').scrollTop }; state.open = id; state.sel = id; state.animate = true; draw(); }
+function back() { if (!state.open) { state.sel = null; state.joint = null; draw(); return; } const s = state.saved || {}; state.open = null; state.sel = s.sel ?? null; state.step = s.step ?? state.step; draw(); if (s.scroll != null) $('#lines').scrollTop = s.scroll; $(`#svg [data-id="${state.sel}"]`)?.focus(); }
+document.addEventListener('click', e => {
+  const t = e.target;
+  const step = t.closest('[data-step]'); if (step) { if (!state.open) { state.sel = null; state.joint = null; } goStep(+step.dataset.step); draw(); return; }
+  if (t.closest('#buildBtn')) { state.build = !state.build; if (state.sel && !built(state.sel)) state.sel = null; return draw(); }
+  const pick = t.closest('[data-pick]'); if (pick) { select(pick.dataset.pick); return; }
+  const cite = t.closest('[data-cite]'); if (cite) { scrollTo(+cite.dataset.cite); return; }
+  const act = t.closest('[data-act]')?.dataset.act;
+  if (act === 'open') return openPart(state.sel);
+  if (act === 'back') return back();
+  if (act === 'desel') { state.sel = null; state.joint = null; return draw(); }
+  if (act === 'next' || act === 'prev') return goStep(state.step + (act === 'next' ? 1 : -1));
+  const jt = t.closest('[data-joint]'); if (jt) { state.joint = jt.dataset.joint; state.sel = null; draw(); return; }
+  const part = t.closest('#svg [data-id]');
+  if (part && state.open) { const id = part.dataset.id; if (parts[id].parts) { if (id !== state.open) openPart(id); else { state.sel = id; draw(); } } else { state.open = null; state.sel = id; state.joint = null; draw(); } return; }
+  if (part) { select(part.dataset.id); return; }
+  const sub = t.closest('#svgSub [data-id]'); if (sub) { state.joint = null; state.sel = sub.dataset.id; draw(); return; }
+  if (state.open && t.closest('#upper') && !t.closest('[data-joint]')) return back();
+  if (t.closest('#mini')) { if (state.open) back(); else { state.sel = null; draw(); } return; }
+  if (t.closest('#back')) return back();
+  if (t.closest('#noteBtn')) { $('#note').classList.add('on'); return; }
+  if (t.closest('#note') && !t.closest('.card') || t.closest('[data-act="closenote"]')) { $('#note').classList.remove('on'); }
+});
+document.addEventListener('dblclick', e => { const p = e.target.closest('#svg [data-id]'); if (p && parts[p.dataset.id].parts && !state.open) openPart(p.dataset.id); });
+document.addEventListener('keydown', e => {
+  if ($('#note').classList.contains('on')) { if (e.key === 'Escape') $('#note').classList.remove('on'); return; }
+  const p = e.target.closest?.('#svg [data-id], #svgSub [data-id]');
+  if ((e.key === 'Enter' || e.key === ' ') && p) { e.preventDefault(); const id = p.dataset.id; if (state.sel === id && parts[id].parts && !state.open) openPart(id); else { select(id); $(`#svg [data-id="${id}"]`)?.focus(); } return; }
+  if (e.key === 'ArrowDown' && state.sel && parts[state.sel].parts && !state.open) { e.preventDefault(); openPart(state.sel); return; }
+  if (e.key === 'Escape' || (e.key === 'ArrowUp' && state.open)) { e.preventDefault(); back(); return; }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { if (e.target.closest?.('#lines')) return; goStep(state.step + (e.key === 'ArrowRight' ? 1 : -1)); }
+});
+// hover anticipates: the name, what a press does, and the lines in the source
+const tip = $('#tip');
+document.addEventListener('mouseover', e => {
+  const p = e.target.closest('#svg [data-id], #svgSub [data-id]'); const j = e.target.closest('#svg [data-joint], #svgSub [data-joint]');
+  document.querySelectorAll('#lines .pre').forEach(x => x.classList.remove('pre'));
+  if (!p && !j) { tip.style.display = 'none'; return; }
+  let cites, html;
+  if (p) { const q = parts[p.dataset.id]; cites = q.cites || []; html = `<b>${esc(q.name)}</b>${q.parts && !state.open ? (state.sel === q.id ? 'Premi di nuovo o Invio per aprire' : 'Premi per sceglierlo, doppio clic per aprirlo') : 'Premi per sceglierlo'}`; }
+  else { const jj = joints.find(x => x.from + '>' + x.to === j.dataset.joint); cites = jj.cites || []; html = `<b>«${esc(jj.label)}»</b>${esc(parts[jj.from].name)} → ${esc(parts[jj.to].name)}`; }
+  tip.innerHTML = html; tip.style.display = 'block';
+  cites.forEach(c => { for (let n = c.from; n <= c.to; n++) { const l = $(`#lines [data-n="${n}"]`); if (l && !l.classList.contains('hit')) l.classList.add('pre'); } });
+});
+document.addEventListener('mousemove', e => { if (tip.style.display === 'block') { tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; } });
+document.addEventListener('focusin', e => { const p = e.target.closest?.('#svg [data-id]'); if (p && state.sel !== p.dataset.id) { /* focus previews like hover */ } });
+// the source dock: resizable and readable
+(() => {
+  let y0 = null, h0 = 0;
+  $('#grip').addEventListener('pointerdown', e => { y0 = e.clientY; h0 = $('#dock').getBoundingClientRect().height; e.target.setPointerCapture(e.pointerId); });
+  $('#grip').addEventListener('pointermove', e => { if (y0 === null) return; const h = Math.max(110, Math.min(window.innerHeight * 0.6, h0 - (e.clientY - y0))); document.documentElement.style.setProperty('--dock', h + 'px'); });
+  $('#grip').addEventListener('pointerup', () => { y0 = null; });
+  let fs = 13; const setFs = d => { fs = Math.max(11, Math.min(18, fs + d)); document.documentElement.style.setProperty('--fs', fs + 'px'); };
+  $('#fsm').onclick = () => setFs(-1); $('#fsp').onclick = () => setFs(1);
+})();
+// the note on how this is built, kept out of the reading space
+$('#notecard').innerHTML = `<h2 style="margin-top:0">Come è costruito questo prototipo</h2>
+<p><b>Tre oggetti considerati.</b></p>
+<table><tr><th>Oggetto</th><th>Corrispondenze</th><th>Perché sì o no</th></tr>
+<tr><td><b>Consolle con programmatore a camme</b> (scelto)</td><td>il giro = un tamburo che esegue cinque passi sempre nello stesso ordine; timbro e ora di fine = due registri ai due capi del tamburo; esiti = una stampante; regola = un relè collegato a un solo cavo; pannello = il retro con tre spie</td><td>Il cuore della fonte è distinguere tre segnali: la consolle li rende tre oggetti diversi, e la posizione dice chi scrive cosa (primo a sinistra, ultimo a destra).</td></tr>
+<tr><td>Orologio da ronda (la metafora della scomposizione)</td><td>il giro = la ronda di una guardia; il timbro = la chiave all’ingresso</td><td>Chiaro per il giro, ma regola di riavvio e pannello andrebbero inventati (un sorvegliante che telefona), contro la fonte.</td></tr>
+<tr><td>Banco di smistamento</td><td>feed → giro → worker → esiti</td><td>Chiaro per i record, debole per ciò che conta: timbro e ora di fine sembrerebbero lo stesso tipo di uscita.</td></tr></table>
+<p style="margin-top:14px"><b>I componenti.</b></p>
+<table><tr><th>Pezzo</th><th>Nell’oggetto</th><th>Passaggi (dalle citazioni)</th><th>Dove finisce l’analogia</th></tr>
+${Object.keys(OBJ).map(id => `<tr><td>${esc(parts[id].name)}</td><td>${esc(OBJ[id].look)}</td><td>${stepsOf(topOf(id)).filter(s => overlaps(parts[id].cites || [], [s])).map(s => s.k).join(', ')}</td><td>${esc(OBJ[id].limit)}</td></tr>`).join('')}</table>
+<p style="margin-top:14px"><b>Fatto a mano:</b> la scelta dell’oggetto, la forma e la posizione di ogni pezzo, i materiali, i punti in cui i cavi si attaccano, il testo «Nell’oggetto» e «Dove finisce l’analogia».<br>
+<b>Dai dati:</b> nomi, ruoli, punti e citazioni dei pezzi; i cinque passi del giro e i loro legami; tutte le relazioni e le loro etichette (nessun cavo senza un giunto); le spie del pannello, una per giunto in ingresso; i valori sui display (variabili della prova); le righe della stampante (dal ruolo del registro); il percorso, una sezione della fonte per passo, e che cosa fa ogni sezione (dalle citazioni); quale passo scrive il timbro e l’ora di fine (passo e giunto citano le stesse righe).<br>
+<b>Costruzione progressiva</b> (attiva di default, si spegne dalla barra): un pezzo compare nel passaggio che lo cita per primo; prima è un’impronta tratteggiata sul banco. Un cavo compare dal primo passaggio che cita il giunto, quando entrambi i pezzi ci sono.<br><b>Apertura in pila:</b> il livello aperto compare sotto l’insieme, che resta sopra, trasparente e premibile: un pezzo con parti si apre al posto del livello sotto, un altro pezzo chiude il livello e resta scelto, lo sfondo riporta all’insieme.<br><b>Interattivo davvero:</b> passaggio del mouse (nome, azione, righe della fonte in anteprima), scelta di un pezzo o di una relazione, apertura del giro (clic ripetuto, doppio clic, Invio o ↓), ritorno (pulsante, miniatura, Esc o ↑) con il punto di lettura ripristinato, passaggi con ← →, fonte ridimensionabile e con dimensione del testo regolabile.<br>
+<b>Non c’è:</b> la prova sotto carico, la ricomposizione, un’immagine generata. Il disegno è SVG fatto a mano: niente generazione di immagini in questo ambiente.</p>
+<div class="actions"><button class="btn primary" data-act="closenote">Chiudi</button></div>`;
+draw();
+</script>
+</body>
+</html>

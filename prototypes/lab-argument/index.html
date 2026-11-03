@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorio: telaio portante</title>
+<!-- Public prototype: the whole object is composed by rules from the public fixture mill-harm. -->
+<style>
+:root { --bg: #f3f1ec; --card: #fbfaf7; --ink: #1d2630; --muted: #66707b; --line: #dedad1; --slate: #1f2b38; --coral: #e5533d; --coral-soft: #fde3dc; --cyan: #1f97cf; --cyan-soft: #e2f1fa; --dock: 210px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; display: grid; grid-template-rows: 44px 1fr; overflow: hidden; }
+header { background: var(--slate); color: #eef2f6; display: flex; align-items: center; gap: 14px; padding: 0 18px; }
+header strong { font-size: 16px; } header .sep { width: 1px; height: 20px; background: #4a5a6b; } header .mode { color: #c9d3de; font-size: 15px; } header .spacer { flex: 1; } header .src { color: #c9d3de; font-size: 13px; }
+header button { background: transparent; border: 1px solid #4a5a6b; color: #e6ebf0; border-radius: 7px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+#app { display: grid; grid-template-columns: 216px 1fr 300px; grid-template-rows: 1fr var(--dock); min-height: 0; }
+#path { grid-row: 1 / 3; background: var(--card); border-right: 1px solid var(--line); overflow: auto; padding: 14px 12px 14px 14px; }
+#path h2 { font-size: 15px; margin: 0 0 2px; } #path .hint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+#path .src-h { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 10px 0 4px 10px; }
+.step { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px 7px 10px; border-radius: 8px; cursor: pointer; font: inherit; color: var(--ink); border-left: 3px solid transparent; }
+.step:hover { background: #f1eee7; } .step.on { background: var(--coral-soft); border-left-color: var(--coral); }
+.step .t { font-size: 12.5px; font-weight: 600; line-height: 1.3; } .step .n { color: var(--muted); font-weight: 500; margin-right: 4px; }
+.step .roles { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px; }
+.role { font-size: 10.5px; padding: 0 6px; border-radius: 999px; line-height: 17px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.role.add { background: #e8eef6; color: #2c4f75; } .role.back { background: #f0ece3; color: #6b5a3b; } .role.rel { background: var(--cyan-soft); color: #145f86; } .role.ctx { background: #efefef; color: #777; }
+.legend { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); display: grid; gap: 4px; }
+#stage { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px 4px; flex-wrap: wrap; } #bar .spacer { flex: 1; }
+#back { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; } #back[disabled] { opacity: .45; cursor: default; }
+#crumb { font-size: 14px; color: var(--muted); } #crumb b { color: var(--ink); font-weight: 600; } #crumb .cur { color: var(--coral); font-weight: 600; }
+.chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--cyan-soft); color: #145f86; }
+.nb { border: 1px solid var(--line); background: var(--card); border-radius: 7px; padding: 3px 9px; font: inherit; font-size: 12.5px; cursor: pointer; } .nb.on { border-color: #a9cfe6; background: var(--cyan-soft); color: #145f86; }
+#stepnav { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+#canvas { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+#upper { flex: 1 1 100%; min-height: 0; position: relative; transition: opacity .25s; }
+#upper svg, #lower svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#link, #lower { display: none; }
+#canvas.stacked #upper { flex: 0 0 30%; opacity: .5; } #canvas.stacked #upper:hover { opacity: .85; }
+#canvas.stacked #link { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; font-size: 13px; font-weight: 600; color: var(--coral); border-top: 1px dashed #e9b2a6; }
+#canvas.stacked #link .muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+#canvas.stacked #lower { display: block; flex: 1 1 auto; min-height: 0; position: relative; }
+#keys { position: absolute; left: 16px; bottom: 6px; font-size: 11.5px; color: var(--muted); z-index: 2; }
+#keys kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--card); }
+#tip { position: fixed; pointer-events: none; background: var(--slate); color: #fff; font-size: 12px; padding: 5px 9px; border-radius: 7px; z-index: 20; display: none; max-width: 260px; } #tip b { display: block; font-size: 12.5px; }
+#inspector { background: var(--card); border-left: 1px solid var(--line); overflow: auto; padding: 8px 16px 14px; }
+#mini { position: relative; width: 100%; height: 118px; margin: 6px 0 12px; background: rgba(251, 250, 247, .94); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+#mini svg { width: 100%; height: 100%; }
+#mini .here { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--coral); color: #fff; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+#insp .kind { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--coral); font-weight: 600; }
+#insp h2 { font-size: 20px; line-height: 1.2; margin: 4px 0 6px; } #insp h3 { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 14px 0 5px; }
+#insp p { margin: 4px 0; } #insp ul { margin: 4px 0; padding-left: 17px; } #insp li { margin: 3px 0; }
+.box { border-radius: 9px; padding: 8px 10px; margin-top: 8px; font-size: 13px; } .box.obj { background: #eef2f6; } .box.lim { background: #fdf1e3; color: #6d4511; } .box.meta { background: #f2efe8; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; } .btn.primary { background: var(--coral); border-color: var(--coral); color: #fff; font-weight: 600; }
+.link { border: 0; background: none; color: #145f86; cursor: pointer; padding: 0; font: inherit; font-size: 13px; text-align: left; }
+.cite { font: 11.5px ui-monospace, Menlo, monospace; background: var(--cyan-soft); color: #145f86; border: 0; border-radius: 5px; padding: 1px 6px; cursor: pointer; }
+#dock { grid-column: 2 / 4; border-top: 1px solid var(--line); background: #fdfcf9; display: flex; flex-direction: column; min-height: 0; position: relative; }
+#grip { position: absolute; top: -5px; left: 0; right: 0; height: 10px; cursor: ns-resize; z-index: 2; }
+#grip::after { content: ""; position: absolute; left: 50%; top: 3px; width: 46px; height: 4px; margin-left: -23px; border-radius: 3px; background: #cfc9bc; }
+#dockbar { display: flex; align-items: center; gap: 10px; padding: 7px 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; } #dockbar .t { font-weight: 600; } #dockbar .r { color: var(--muted); } #dockbar .spacer { flex: 1; }
+#dockbar button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 1px 8px; cursor: pointer; font: inherit; font-size: 12px; }
+#lines { overflow: auto; flex: 1; font: var(--fs, 13px)/1.6 ui-monospace, Menlo, monospace; padding: 4px 0 10px; }
+.ln { display: grid; grid-template-columns: 50px 1fr; padding-right: 16px; white-space: pre-wrap; } .ln > span:first-child { color: #aaa295; text-align: right; padding-right: 12px; user-select: none; }
+.ln.pass { background: #f4f1ea; } .ln.hit { background: var(--coral-soft); box-shadow: inset 3px 0 0 var(--coral); } .ln.pre { background: #eaf4fb; }
+svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.ff, .fr, .ft { stroke-width: .8; stroke-linejoin: round; } .hl { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 1.1; }
+.part { cursor: pointer; outline: none; }
+.part:hover, .part:focus-visible { filter: drop-shadow(0 0 2.5px rgba(229, 83, 61, .85)); }
+.part.sel .ft { fill: #f8b9ab !important; } .part.sel .ff { fill: #ef8b77 !important; } .part.sel .fr { fill: #d96a55 !important; }
+.part.sel .ff, .part.sel .fr, .part.sel .ft { stroke: #9e3423 !important; }
+.part.opened .ft { fill: #fbd3c9 !important; } .part.opened .ff { fill: #f4ab9b !important; } .part.opened .fr { fill: #e48d7a !important; }
+.part.inpass:not(.sel) { filter: drop-shadow(0 0 3px rgba(31, 151, 207, .9)); }
+.cable { fill: none; stroke-linecap: round; } .cable.under { stroke: rgba(20, 30, 40, .22); stroke-width: 6; }
+.cable.c { stroke: var(--cyan); stroke-width: 2.8; } .cable.cause { stroke: #3d6fb0; stroke-width: 3; } .cable.dep { stroke: #7a8591; stroke-width: 2.4; stroke-dasharray: 2 5; }
+.joint { cursor: pointer; } .joint:hover .c, .joint.sel .c, .joint:hover .cause, .joint.sel .cause { stroke: var(--coral); }
+.jl rect { fill: #fff; stroke: #9fcbe6; } .jl text { font-size: 11.5px; fill: #145f86; font-weight: 600; } .jl.dep rect { stroke: #b8c0c8; } .jl.dep text { fill: #4f5a66; }
+.plate-t { font-weight: 700; letter-spacing: .06em; }
+.ghost { fill: rgba(255, 255, 255, .35); stroke: #9aa3ad; stroke-width: 1; stroke-dasharray: 4 4; }
+.arrive { animation: arrive .7s cubic-bezier(.2,.8,.2,1) both; } @keyframes arrive { from { transform: translateY(-46px); opacity: 0; } }
+.joint.arrive .cable.c, .joint.arrive .cable.cause { stroke-dasharray: 900; animation: drawc 1s ease-out both; } @keyframes drawc { from { stroke-dashoffset: 900; } to { stroke-dashoffset: 0; } }
+#note { position: fixed; inset: 0; background: rgba(15, 22, 30, .5); display: none; place-items: center; z-index: 30; } #note.on { display: grid; }
+#note .card { background: var(--card); width: min(900px, 94vw); max-height: 86vh; overflow: auto; border-radius: 14px; padding: 20px 24px; }
+#note table { border-collapse: collapse; width: 100%; font-size: 12.5px; } #note th, #note td { border-bottom: 1px solid var(--line); text-align: left; padding: 6px 8px; vertical-align: top; }
+#insp .lead { font-size: 15px; line-height: 1.4; margin: 2px 0 8px; } #insp .muted, .muted { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
+.pts { list-style: none; padding: 0 !important; margin: 8px 0 !important; display: grid; gap: 6px; }
+.pts li { display: grid; grid-template-columns: 16px 1fr; gap: 4px; margin: 0 !important; font-size: 13.5px; line-height: 1.4; }
+.pts li > :nth-child(n+3) { grid-column: 2; }
+.pts .mk { color: var(--muted); font-weight: 700; text-align: center; } .pts .m-caveat .mk { color: #b5651d; } .pts .m-keeps .mk { color: #2c4f75; }
+.pts.rel li { font-size: 13px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.stepchip { min-width: 26px; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 1px 6px; font: inherit; font-size: 12px; cursor: pointer; } .stepchip:hover { border-color: var(--coral); }
+.fold { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 6px; } .fold summary { cursor: pointer; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 4px 0; }
+.fold > div { font-size: 13px; } .lens { margin: 4px 0; } .lens dt { font-weight: 600; font-size: 12px; margin-top: 6px; } .lens dd { margin: 2px 0 0; }
+/* the opened part is lifted out of the whole: the whole fades behind, its place stays marked */
+#canvas.lifted { justify-content: flex-end; } #canvas.lifted #upper { flex: 0 0 27%; opacity: .5; transition: opacity .25s; } #canvas.lifted #upper:hover { opacity: .8; }
+#canvas.lifted #lower { display: block; position: absolute; left: 0; right: 0; top: 0; bottom: 25%; z-index: 1; }
+#canvas.lifted #keys { display: none; } #canvas.lifted.exploring #lower { top: 40px; }
+#lower svg { pointer-events: none; } #lower svg * { pointer-events: visiblePainted; }
+#beam { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.beam { fill: rgba(229, 83, 61, .07); stroke: rgba(229, 83, 61, .4); stroke-width: 1; stroke-dasharray: 3 4; }
+.socket { fill: rgba(229, 83, 61, .10); stroke: var(--coral); stroke-width: 1.8; stroke-dasharray: 6 4; }
+/* reading position ≠ explored part */
+#explore { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 4; display: none; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; background: #fff; border: 1px solid #a9cfe6; box-shadow: 0 3px 12px rgba(20, 40, 60, .14); border-radius: 10px; padding: 5px 8px 5px 12px; font-size: 12.5px; width: max-content; max-width: 96%; }
+#explore.on { display: flex; flex-wrap: nowrap; } #explore .nm { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #explore > * { flex: none; } #explore .x { color: var(--muted); } #explore .btn { padding: 3px 9px; font-size: 12px; }
+.step.ex { box-shadow: inset -3px 0 0 var(--cyan); } .tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 0 6px; border-radius: 999px; line-height: 16px; margin-left: 4px; vertical-align: 1px; }
+.tag.read { background: var(--coral); color: #fff; } .tag.here { background: var(--cyan-soft); color: #145f86; }
+/* faces of a sub-part: drawers, dials, holders */
+.feat { cursor: pointer; outline: none; } .feat:hover .fz, .feat:focus-visible .fz { stroke: var(--coral); stroke-width: 1.5; }
+.feat.sel .fz { fill: #f8b9ab !important; stroke: #9e3423; stroke-width: 1.5; }
+.readout { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; } .readout div { background: #1f2a35; color: #e9eef3; border-radius: 8px; padding: 6px 9px; font-size: 12px; } .readout b { display: block; font-size: 15px; } .readout .old b { color: #f2b35e; } .readout .ok b { color: #8fe0a6; }
+.rounds { display: flex; flex-wrap: wrap; gap: 5px; } .rounds .btn { font-size: 12px; padding: 4px 8px; }
+.verdict { font-size: 12.5px; margin: 6px 0 0; padding-left: 0; list-style: none; } .verdict li { margin: 3px 0; }
+/* the source, formatted for reading; the original lines stay one click away */
+#lines.fmt { font: var(--fs, 14px)/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; padding: 6px 0 18px; }
+.fmt .blk { position: relative; padding: 1px 24px 1px 62px; max-width: 900px; }
+.fmt .blk[data-g]::before { content: attr(data-g); position: absolute; left: 0; width: 46px; text-align: right; font: 11px/2 ui-monospace, Menlo, monospace; color: #b3ab9d; }
+.fmt h2, .fmt h3, .fmt h4, .fmt h5 { margin: 12px 0 4px; line-height: 1.25; } .fmt h2 { font-size: 1.3em; } .fmt h3 { font-size: 1.12em; } .fmt h4 { font-size: 1em; } .fmt h5 { font-size: .95em; }
+.fmt p { margin: 3px 0 8px; } .fmt ul, .fmt ol { margin: 2px 0 8px; padding-left: 20px; } .fmt li { margin: 2px 0; }
+.fmt table { border-collapse: collapse; font-size: .88em; margin: 4px 0 10px; } .fmt th, .fmt td { border-bottom: 1px solid var(--line); padding: 3px 8px; text-align: left; vertical-align: top; } .fmt th { font-weight: 600; background: #f4f1ea; }
+.fmt pre { margin: 4px 0 10px; padding: 8px 10px; background: #f4f1ea; border-radius: 6px; font: .84em/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; } .fmt pre span { display: block; }
+.fmt code { font: .88em ui-monospace, Menlo, monospace; background: #f1eee7; padding: 0 3px; border-radius: 3px; } .fmt hr { border: 0; border-top: 1px solid var(--line); margin: 10px 0; }
+.fmt [data-n].pass { background: #f4f1ea; } .fmt [data-n].hit { background: var(--coral-soft); } .fmt [data-n].pre { background: #eaf4fb; }
+.fmt .blk:has(.hit) { box-shadow: inset 3px 0 0 var(--coral); }
+.cable.sup { stroke: #e5533d; stroke-width: 3; } .cable.att { stroke: #d08a22; stroke-width: 3; } .cable.lim { stroke: #5d6772; stroke-width: 2.6; }
+.verdict-tag rect { fill: #fff; stroke: #9aa3ad; stroke-width: 1.2; } .verdict-tag text { font-size: 13px; font-weight: 700; fill: #1d2630; }
+.verdict-tag.falls rect { fill: #fde3dc; stroke: #e5533d; } .verdict-tag.weakens rect { fill: #fdf1e3; stroke: #d08a22; } .verdict-tag.holds rect { fill: #e8eef6; stroke: #7f9bb3; }
+.part.lifted { pointer-events: none; }
+.box.verdict { background: #f2efe8; } .box.verdict.falls { background: #fde3dc; } .box.verdict.weakens { background: #fdf1e3; } .box.verdict.holds { background: #e8eef6; }
+.chip.amber { background: #fdf1e3; color: #8a4f12; display: inline-block; margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header><strong>Break the Wall</strong><span class="sep"></span><span class="mode">Laboratorio</span><span class="spacer"></span><span class="src" id="srcname"></span><button id="noteBtn">Come è costruito</button></header>
+<div id="app">
+  <nav id="path"></nav>
+  <section id="stage">
+    <div id="bar"><button id="back" disabled>← Torna all’insieme</button><span id="crumb"></span><span class="chip">Corpo composto dalle regole: telaio portante</span><span class="spacer"></span><span id="stepnav"><button class="nb" data-act="prev" aria-label="Passo precedente">◀</button><span id="stepn"></span><button class="nb" data-act="next" aria-label="Passo successivo">▶</button></span><button id="buildBtn" class="nb"></button></div>
+    <div id="canvas"><div id="upper"><svg id="svg" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="L’insieme"></svg></div><div id="link"></div><div id="lower"><svg id="svgSub" preserveAspectRatio="xMidYMax meet" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Il livello aperto"></svg></div><svg id="beam" aria-hidden="true"></svg><div id="explore" role="status"></div><div id="keys"><kbd>Tab</kbd> pezzi · <kbd>Invio</kbd> scegli o apri · <kbd>Esc</kbd> torna · <kbd>←</kbd><kbd>→</kbd> passaggi</div></div>
+  </section>
+  <aside id="inspector"><div id="mini" title="L’insieme: premi per tornarci"></div><div id="insp"></div></aside>
+  <section id="dock"><div id="grip" title="Trascina per ridimensionare"></div><div id="dockbar"><span class="t" id="docktitle">Fonte originale</span><span class="r" id="dockr"></span><span class="spacer"></span><button id="rawBtn" title="Mostra le righe come sono scritte">Righe originali</button><button id="fsm">A−</button><button id="fsp">A+</button></div><div id="lines"></div></section>
+</div>
+<div id="tip"></div>
+<div id="note"><div class="card" id="notecard"></div></div>
+<script src="../guided-reading/data.js"></script>
+<script>
+'use strict';
+const D = window.DISASSEMBLIES.mill;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ===== 1. From the disassembly =====
+const parts = {}, parent = {}, joints = [];
+(function walk(ps, par) { for (const p of ps) { parts[p.id] = p; parent[p.id] = par; if (p.parts) walk(p.parts, p.id); for (const j of p.joints || []) joints.push({ ...j, level: p.id }); } })(D.parts, null);
+for (const j of D.joints) joints.push({ ...j, level: null });
+const TOP = D.parts.map(p => p.id);
+const topOf = id => parent[id] ? topOf(parent[id]) : id;
+const SOURCES = [...D.sources].sort((a, b) => a.title.localeCompare(b.title));
+const srcOf = id => D.sources.find(s => s.id === id);
+const overlaps = (a, b) => a.some(x => b.some(y => x.source === y.source && x.from <= y.to && y.from <= x.to));
+const rangeTxt = cs => cs.map(c => `${srcOf(c.source).title} ${c.from === c.to ? c.from : `${c.from}–${c.to}`}`).join(', ');
+const jkey = j => j.from + '>' + j.to;
+
+// The path: one step per section, across both pages; headings inside code blocks are not sections.
+const STEPS = (() => {
+  const out = [];
+  for (const s of SOURCES) {
+    const L = s.text.split('\n'); let fence = false; const heads = [];
+    L.forEach((l, i) => { if (/^\s*```/.test(l)) fence = !fence; else if (!fence && /^#{1,2} /.test(l)) heads.push({ source: s.id, from: i + 1, title: l.replace(/^#+\s*/, '') }); });
+    heads.forEach((h, k) => { h.to = k + 1 < heads.length ? heads[k + 1].from - 1 : L.length; });
+    // a source with fewer than three sections is read by paragraph: each run of non-blank lines is a step
+    if (heads.length >= 3) { out.push(...heads); continue; }
+    let st = null; const blocks = [];
+    L.forEach((l, i) => { if (l.trim()) { if (!st) st = { source: s.id, from: i + 1 }; st.to = i + 1; } else if (st) { blocks.push(st); st = null; } }); if (st) blocks.push(st);
+    blocks.forEach(b => { const w = L[b.from - 1].replace(/^#+\s*/, '').split(/\s+/); b.title = w.slice(0, 7).join(' ') + (w.length > 7 ? '…' : ''); out.push(b); });
+  }
+  const seen = new Set();
+  return out.map((h, k) => {
+    const range = [{ source: h.source, from: h.from, to: h.to }];
+    const cited = [...new Set(Object.values(parts).filter(p => overlaps(p.cites || [], range)).map(p => topOf(p.id)))].sort((a, b) => TOP.indexOf(a) - TOP.indexOf(b));
+    const add = cited.filter(id => !seen.has(id)), back = cited.filter(id => seen.has(id)); add.forEach(id => seen.add(id));
+    const rel = joints.filter(j => j.level === null && overlaps(j.cites || [], range));
+    return { ...h, k, range, add, back, rel, parts: cited };
+  });
+})();
+const INTRO = {}; STEPS.forEach(s => s.add.forEach(id => { INTRO[id] = s.k; }));
+const JSTEP = {}; joints.filter(j => j.level === null).forEach(j => { const s = STEPS.find(s => overlaps(j.cites || [], s.range)); JSTEP[jkey(j)] = s ? s.k : Math.max(INTRO[j.from], INTRO[j.to]); });
+const stepsCiting = p => STEPS.filter(s => overlaps(p.cites || [], s.range));
+// a sub-part that cites the same lines as a joint of its parent: where that joint enters or leaves the opened level
+const attachOf = (j, id) => (parts[id].parts || []).find(q => overlaps(q.cites || [], j.cites || []));
+
+// What a part's own lines are made of: the headings and table rows inside its citations. A sub-part's face is drawn
+// from these (a drawer per register, a dial per gauge, a holder per group), never invented to look better.
+const clean = s => s.replace(/`|\*\*/g, '').replace(/\s*\([^)]*\)/g, '').replace(/^\d+(\.\d+)*\s+/, '').replace(/:.*$/, '').trim();
+function sectionsOf(p) {
+  const out = [];
+  for (const c of p.cites || []) {
+    const L = srcOf(c.source).text.split('\n'); let fence = false, cur = null, head = null;
+    for (let n = c.from; n <= c.to; n++) {
+      const l = L[n - 1] ?? '';
+      if (/^\s*```/.test(l)) { fence = !fence; head = null; continue; }
+      if (fence) continue;
+      if (/^#{3,} /.test(l)) { cur = { label: clean(l.replace(/^#+\s*/, '')), source: c.source, line: n, items: [] }; out.push(cur); head = null; continue; }
+      if (!/^\|/.test(l)) { head = null; continue; }
+      const cells = l.split('|').slice(1, -1).map(x => x.trim());
+      if (cells.every(x => /^:?-+:?$/.test(x))) continue;
+      if (!head) { head = cells; continue; }            // a table's first row is its header
+      if (!cur) { cur = { label: null, source: c.source, line: n, items: [] }; out.push(cur); }
+      cur.items.push({ label: clean(cells[0]), cells, head, source: c.source, line: n, warn: /⚠/.test(l) });
+    }
+  }
+  return out;
+}
+// a register per table row; a section without a table is one register
+const drawersOf = p => sectionsOf(p).flatMap(s => s.items.length ? s.items.map(it => ({ ...it, sec: s.label })) : s.label ? [{ label: s.label, source: s.source, line: s.line }] : []);
+// Where else the source says what a drawer holds: a heading outside the part's own lines that names it. Only a code
+// name is specific enough to search for. The disassembly may have no joint between the two places.
+function definedElsewhere(p, f) {
+  if (!/^[A-Z][a-z]+[A-Z]\w{4,}$/.test(f.label)) return null;
+  for (const s of SOURCES) {
+    const L = s.text.split('\n'); let fence = false;
+    for (let i = 0; i < L.length; i++) {
+      if (/^\s*```/.test(L[i])) { fence = !fence; continue; }
+      if (fence || !/^#{2,} /.test(L[i]) || !L[i].includes(f.label)) continue;
+      const n = i + 1, at = [{ source: s.id, from: n, to: n }];
+      if (overlaps(p.cites, at)) continue;
+      let to = i + 1; while (to < L.length && !/^#{1,3} /.test(L[to])) to++;
+      const owner = Object.values(parts).find(q => !q.parts && overlaps(q.cites || [], at));
+      const rows = sectionsOf({ cites: [{ source: s.id, from: n, to }] })[0]?.items || [];
+      const fields = [...new Set(rows.flatMap(r => (r.cells[1] || '').split('+').map(x => clean(x))).filter(Boolean))];
+      return { source: s.id, from: n, to, title: clean(L[i].replace(/^#+\s*/, '')), owner, rows, fields };
+    }
+  }
+  return null;
+}
+const FEAT = {};   // the faces drawn on the opened level, by key "part#index"
+
+// ===== 2. The library's words: one text per kind of part, written once for every source =====
+// What each shape is in the object, and where the analogy ends. Not written for this source.
+const LOOK = {
+  conclusion: ['La trave: ciò che il resto deve reggere.', 'Una trave cade per gravità; una tesi non «cade»: perde le ragioni per accettarla.'],
+  ground: ['La fondazione: sta sotto tutto e regge attraverso un perno.', 'Una fondazione non si discute; un fondamento sì.'],
+  premise: ['Una colonna sul suo basamento: regge la trave senza poggiare sul fondamento.', 'Una colonna regge da sola; una premessa regge solo se la si accetta.'],
+  limit: ['Un morsetto d’acciaio sull’estremità della trave: dice fin dove arriva.', 'Un morsetto stringe soltanto; un limite può anche estendere ciò che si può pretendere.'],
+  objection: ['Un cuneo ambra che preme sul bordo della trave.', 'Il cuneo dice dove spinge l’obiezione, non se vince.'],
+  consequence: ['Un piano sopra la trave: ciò che ne segue.', 'Un piano poggia sulla trave; una conseguenza può valere anche per altre vie.'],
+  rejected: ['Un mattone nel vassoio a lato, non montato.', 'Il vassoio mostra un’assenza voluta, non un pezzo dimenticato.'],
+};
+const LOOK_ANY = ['Un blocco: il suo tipo non ha ancora una forma nella biblioteca.', 'La forma non dice nulla del suo ruolo.'];
+const SUBLOOK = (q, par) => (LOOK[q.kind] || LOOK_ANY)[0];
+const SUBLIMIT = 'La disposizione del livello aperto segue i legami, non l’ordine del testo.';
+
+// ===== 3. Geometry: cabinet view =====
+const KX = [0.95, 0.16], KY = [0.46, -0.34], VIEW = [1, -2.065];
+let BB = null;
+const P = (x, y, z = 0) => { const p = [x * KX[0] + y * KY[0], x * KX[1] + y * KY[1] - z]; if (BB) { BB[0] = Math.min(BB[0], p[0]); BB[1] = Math.min(BB[1], p[1]); BB[2] = Math.max(BB[2], p[0]); BB[3] = Math.max(BB[3], p[1]); } return p; };
+const f1 = n => Math.round(n * 10) / 10;
+const pts = a => a.map(p => f1(p[0]) + ',' + f1(p[1])).join(' ');
+const mat = (a, b, c, d, [e, f]) => `matrix(${a},${b},${c},${d},${f1(e)},${f1(f)})`;
+const onFront = (x, y, z) => mat(KX[0], KX[1], 0, 1, P(x, y, z));
+const onTop = (x, y, z) => mat(KX[0], KX[1], -KY[0], -KY[1], P(x, y, z));
+const onSide = (x, y, z) => mat(KY[0], KY[1], 0, 1, P(x, y, z));
+const MAT = { alu: ['url(#aluT)', 'url(#aluF)', 'url(#aluR)', '#77818c'], ivory: ['#fbfaf6', 'url(#ivF)', '#d8d7d2', '#8d949b'], dark: ['#4d5966', '#36424e', '#2a343e', '#1b232b'], steel: ['#c9cfd5', '#aab2ba', '#949da6', '#5d6772'], glass: ['rgba(222,236,246,.85)', 'rgba(196,220,238,.85)', 'rgba(176,204,226,.85)', '#7f9bb3'], amber: ['#f6d9ab', '#efc285', '#e2ac68', '#a26a1f'] };
+const poly = (p, fill, cls, stroke) => `<polygon class="${cls}" points="${pts(p)}" fill="${fill}" stroke="${stroke}"/>`;
+function box(x, y, z, w, d, h, m) {
+  const M = MAT[m];
+  const f = [P(x, y, z), P(x + w, y, z), P(x + w, y, z + h), P(x, y, z + h)], r = [P(x + w, y, z), P(x + w, y + d, z), P(x + w, y + d, z + h), P(x + w, y, z + h)], t = [P(x, y, z + h), P(x + w, y, z + h), P(x + w, y + d, z + h), P(x, y + d, z + h)];
+  return poly(r, M[2], 'fr', M[3]) + poly(t, M[0], 'ft', M[3]) + poly(f, M[1], 'ff', M[3]) + `<polyline class="hl" points="${pts([f[3], f[2], r[2]])}"/>`;
+}
+const screw = (u, v) => `<circle cx="${u}" cy="${v}" r="2.6" fill="#b8c0c8" stroke="#56616c" stroke-width=".7"/><line x1="${u - 1.6}" y1="${v}" x2="${u + 1.6}" y2="${v}" stroke="#56616c" stroke-width=".7"/>`;
+function wrap(t, n) { const w = t.split(' '), out = ['']; for (const x of w) { if ((out.at(-1) + ' ' + x).trim().length > n && out.at(-1)) out.push(x); else out[out.length - 1] = (out.at(-1) + ' ' + x).trim(); } return out; }
+const nameText = (t, x, y, n, size = 11, anchor = 'start', fill = '#1d2630') => wrap(t, n).map((l, i) => `<text x="${x}" y="${y + i * (size + 3)}" font-size="${size}" font-weight="700" fill="${fill}" text-anchor="${anchor}">${esc(l)}</text>`).join('');
+function cable(a, b, lift = 46, t = 0.5) {
+  const [ax, ay] = a, [bx, by] = b, l = lift + Math.hypot(bx - ax, by - ay) * 0.12;
+  const d = `M${f1(ax)},${f1(ay)} C${f1(ax)},${f1(ay - l)} ${f1(bx)},${f1(by - l)} ${f1(bx)},${f1(by)}`;
+  const u = 1 - t, w = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+  return { d, mid: [w[0] * ax + w[1] * ax + w[2] * bx + w[3] * bx, w[0] * ay + w[1] * (ay - l) + w[2] * (by - l) + w[3] * by] };
+}
+const STYLE = j => ({ 'depends-on': 'dep', causes: 'cause', supports: 'sup', attacks: 'att', limits: 'lim' })[j.type] || 'c';
+const MARK = j => ({ 'depends-on': 'ag', causes: 'ab', supports: 'as', attacks: 'aa', limits: 'ag' })[j.type] || 'ac';
+// a dependency is drawn from what is depended on to what depends: the flow of information
+const flow = j => j.type === 'depends-on' ? [j.to, j.from] : [j.from, j.to];
+function spread(labels) {
+  for (const l of labels) { l.w = l.text.length * 6.5 + 16; l.h = 19; }
+  for (let it = 0; it < 80; it++) { let mv = false; for (let i = 0; i < labels.length; i++) for (let k = i + 1; k < labels.length; k++) { const a = labels[i], b = labels[k]; const ox = Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2), oy = Math.min(a.y + a.h / 2, b.y + b.h / 2) - Math.max(a.y - a.h / 2, b.y - b.h / 2); if (ox > 0 && oy > 0) { const up = a.y <= b.y ? a : b, dn = up === a ? b : a; up.y -= oy / 2 + 1; dn.y += oy / 2 + 1; mv = true; } } if (!mv) break; }
+  return labels.map(l => { if (BB) { BB[0] = Math.min(BB[0], l.x - l.w / 2); BB[2] = Math.max(BB[2], l.x + l.w / 2); BB[1] = Math.min(BB[1], l.y - 10); } return `<g class="joint jl${l.dep ? ' dep' : ''}" data-joint="${l.key}" transform="translate(${f1(l.x)},${f1(l.y)})"><rect x="${f1(-l.w / 2)}" y="-9.5" width="${f1(l.w)}" height="19" rx="9.5"/><text y="4" text-anchor="middle">${esc(l.text)}</text></g>`; }).join('');
+}
+
+// ===== 4. The whole, composed by rules =====
+// One grammar for arguments, written once: it reads only the kinds of the parts and the types of their joints.
+// supports → stands under, joined by a load pin (a ground is a slab, a premise a column); what is held up is a beam;
+// limits → a steel clamp on the end of what it limits; attacks → an amber wedge on its edge; what a beam supports is a
+// deck above it; a rejected part, or one with no joint, lies in a tray to the side. No position is written by hand.
+const TJ = joints.filter(j => j.level === null);
+const supporters = id => TJ.filter(j => j.type === 'supports' && j.to === id).map(j => j.from);
+const LEVEL = {};
+const levelOf = (id, seen = new Set()) => { if (LEVEL[id] != null) return LEVEL[id]; if (seen.has(id)) return 0; seen.add(id); const s = supporters(id); return (LEVEL[id] = s.length ? 1 + Math.max(...s.map(x => levelOf(x, seen))) : 0); };
+TOP.forEach(id => levelOf(id));
+const attachedTo = id => { const p = parts[id], out = TJ.filter(j => j.from === id), into = TJ.filter(j => j.to === id); if (into.length || !out.length) return null; return out.every(j => j.type === 'limits' || j.type === 'attacks') ? out[0] : null; };
+const ROLE = {}, LAY = {};
+const COLUMN_H = 126, BEAM_H = 22, BASE = 24;
+(function compose() {
+  const aside = TOP.filter(id => parts[id].kind === 'rejected' || !TJ.some(j => j.from === id || j.to === id));
+  const att = TOP.filter(id => !aside.includes(id) && attachedTo(id));
+  const stack = TOP.filter(id => !aside.includes(id) && !att.includes(id));
+  // beams: what is held up by something; the rest of the stack stands on the bench
+  const beams = stack.filter(id => LEVEL[id] === 1), decks = stack.filter(id => LEVEL[id] >= 2), feet = stack.filter(id => LEVEL[id] === 0);
+  let bx = 250;
+  for (const b of beams) {
+    const sup = supporters(b).sort((a, c) => (parts[a].kind === 'ground' ? 0 : 1) - (parts[c].kind === 'ground' ? 0 : 1));
+    const span = Math.max(300, sup.length * 190), x0 = bx, z = BASE + COLUMN_H;
+    LAY[b] = { x: x0, y: 110, z, w: span + 80, d: 70, h: BEAM_H }; ROLE[b] = 'beam';
+    sup.forEach((s, k) => {
+      const px = sup.length > 1 ? x0 + 80 + k * (span - 80) / (sup.length - 1) : x0 + (span + 80) / 2;
+      if (parts[s].kind === 'ground') { LAY[s] = { x: px - 120, y: 175, z: BASE, w: 240, d: 95, h: 28, pin: [px, 182] }; ROLE[s] = 'slab'; }
+      else { LAY[s] = { x: px - 26, y: 119, z: BASE, w: 52, d: 52, h: z - BASE, pin: [px, 145] }; ROLE[s] = 'column'; }
+    });
+    bx += span + 200;
+  }
+  // anything on the bench that holds up nothing drawn above stays a block at the front
+  feet.filter(id => !LAY[id]).forEach((id, k) => { LAY[id] = { x: 40 + k * 150, y: 20, z: BASE, w: 120, d: 60, h: 46 }; ROLE[id] = 'block'; });
+  for (const c of decks) {
+    const b = supporters(c).find(s => LAY[s]) , B = LAY[b];
+    LAY[c] = { x: B.x + 50, y: B.y + 4, z: B.z + B.h + 20, w: B.w - 100, d: B.d - 8, h: 14, on: b }; ROLE[c] = 'deck';
+  }
+  for (const a of att) {
+    const j = attachedTo(a), T = LAY[j.to]; if (!T) { LAY[a] = { x: 40, y: 20, z: BASE, w: 120, d: 60, h: 46 }; ROLE[a] = 'block'; continue; }
+    if (j.type === 'limits') { LAY[a] = { x: T.x - 14, y: T.y - 9, z: T.z - 12, w: 54, d: T.d + 18, h: T.h + 24, on: j.to }; ROLE[a] = 'clamp'; }
+    else { LAY[a] = { x: T.x + T.w + 8, y: T.y + 12, z: BASE, w: 70, d: 46, h: T.z + T.h / 2 - BASE, on: j.to }; ROLE[a] = 'wedge'; }
+  }
+  // the tray stands in front of the frame, to the right, where it cannot be read as holding anything up
+  const right = Math.max(...TOP.filter(id => LAY[id]).map(id => LAY[id].x + LAY[id].w));
+  aside.forEach((id, k) => { LAY[id] = { x: right - 150 - k * 170, y: -70, z: BASE, w: 150, d: 60, h: 16 }; ROLE[id] = 'tray'; });
+})();
+// the bench fits what stands on it; the clamp's tabs hang to its left
+const BENCH = (() => { const xs = TOP.flatMap(id => [LAY[id].x - (ROLE[id] === 'clamp' ? 170 : 0), LAY[id].x + LAY[id].w]), ys = TOP.flatMap(id => [LAY[id].y, LAY[id].y + LAY[id].d]); return { x: Math.min(...xs) - 30, y: Math.min(...ys) - 30, w: Math.max(...xs) - Math.min(...xs) + 60, d: Math.max(...ys) - Math.min(...ys) + 50 }; })();
+const FOOT = Object.fromEntries(TOP.map(id => [id, [LAY[id].x, LAY[id].y, LAY[id].w, LAY[id].d]]));
+const FOOTZ = Object.fromEntries(TOP.map(id => [id, LAY[id].z]));
+const MAT2 = { coral: ['#f6b4a5', '#e5533d', '#c9442f', '#8f2a1b'] };
+Object.assign(MAT, MAT2);
+const label = (t, x, y, n, size = 10.5, fill = '#1d2630') => nameText(t, x, y, n, size, 'start', fill);
+// the shapes of the library, one per role
+const SHAPE = {
+  beam(id) { const L = LAY[id], p = parts[id]; return box(L.x, L.y, L.z, L.w, L.d, L.h, 'ivory') + `<g transform="${onFront(L.x, L.y, L.z + L.h)}"><rect x="40" y="3" width="${L.w - 80}" height="16" rx="2" fill="#2b3640"/><text x="${L.w / 2}" y="14.5" font-size="10.5" font-weight="700" fill="#eef2f6" text-anchor="middle">${esc(p.name)}</text></g>`; },
+  slab(id) { const L = LAY[id], p = parts[id]; return box(L.x, L.y, L.z, L.w, L.d, L.h, 'steel') + `<g transform="${onFront(L.x, L.y, L.z + L.h)}">${label(p.name, 10, 17, 34, 10.5)}</g>`; },
+  column(id) { const L = LAY[id], p = parts[id], n = wrap(p.name, 11).length; return box(L.x - 9, L.y - 9, L.z, L.w + 18, L.d + 18, 14, 'steel') + box(L.x, L.y, L.z + 14, L.w, L.d, L.h - 14, 'ivory') + `<g transform="${onFront(L.x, L.y, L.z + 30 + n * 12)}"><rect x="3" y="0" width="${L.w - 6}" height="${6 + n * 12}" rx="2" fill="#2b3640"/>${nameText(p.name, 7, 11, 11, 8.6, 'start', '#eef2f6')}</g>`; },
+  block(id) { const L = LAY[id], p = parts[id]; return box(L.x, L.y, L.z, L.w, L.d, L.h, 'alu') + `<g transform="${onFront(L.x, L.y, L.z + L.h)}">${label(p.name, 8, 16, 18, 10)}</g>`; },
+  deck(id) { const L = LAY[id], p = parts[id], subs = p.parts || [];
+    let s = [0.2, 0.8].map(t => box(L.x + L.w * t - 4, L.y + L.d / 2 - 4, L.z - 20, 8, 8, 20, 'coral')).join('') + box(L.x, L.y, L.z, L.w, L.d, L.h, 'alu');
+    const rw = subs.length ? (L.w - 20) / subs.length : 0;
+    subs.forEach((q, k) => { s += box(L.x + 10 + k * rw + 4, L.y + 10, L.z + L.h, rw - 8, L.d - 22, 30, 'ivory') + `<g transform="${onFront(L.x + 10 + k * rw + 4, L.y + 10, L.z + L.h + 30)}">${label(q.name, 5, 12, Math.floor((rw - 14) / 5.6), 9)}</g>`; });
+    return s + `<g transform="${onFront(L.x, L.y, L.z + L.h)}">${label(p.name, 8, 11, 60, 9.5)}</g>`; },
+  clamp(id) { const L = LAY[id], p = parts[id], subs = p.parts || [];
+    let s = box(L.x, L.y, L.z, L.w, L.d, L.h, 'steel') + box(L.x + 12, L.y - 3, L.z + L.h / 2 - 4, 30, 3, 8, 'dark');
+    // the limits it holds hang from it as engraved tabs
+    const tw = 170, tx = L.x - tw + 10;
+    s += box(tx, L.y - 2, L.z - 18 - subs.length * 17, tw, 4, 18 + subs.length * 17, 'steel');
+    s += `<g transform="${onFront(tx, L.y - 2, L.z)}"><rect x="0" y="0" width="${tw}" height="16" fill="#2b3640"/>${label(p.name, 6, 12, 34, 9.5, '#eef2f6')}${subs.map((q, k) => `<rect x="5" y="${20 + k * 17}" width="${tw - 10}" height="14" rx="2" fill="#e3e7eb" stroke="#9aa3ad"/>${label(q.name, 10, 30.5 + k * 17, 40, 8.8)}`).join('')}</g>`;
+    return s; },
+  wedge(id) { const L = LAY[id], p = parts[id], zt = L.z + L.h, x = L.x, y = L.y, w = 64, d = L.d, h = 34;
+    let s = box(x + 20, y, L.z, 40, d, L.h - h / 2, 'dark');
+    const A = P(x - 8, y, zt), B = P(x - 8, y + d, zt), C1 = P(x + w, y, zt - h / 2), C2 = P(x + w, y + d, zt - h / 2), D1 = P(x + w, y, zt + h / 2), D2 = P(x + w, y + d, zt + h / 2);
+    s += poly([C1, C2, D2, D1], MAT.amber[2], 'fr', MAT.amber[3]) + poly([A, B, D2, D1], MAT.amber[0], 'ft', MAT.amber[3]) + poly([A, C1, D1], MAT.amber[1], 'ff', MAT.amber[3]);
+    return s + `<g transform="${onFront(x + 20, y, L.z + 40)}"><rect x="-6" y="-2" width="132" height="${12 + 13 * wrap(p.name, 22).length}" rx="3" fill="rgba(255,255,255,.92)" stroke="#e0ab66"/>${label(p.name, 0, 9, 22, 9.5)}</g>`; },
+  tray(id) { const L = LAY[id], p = parts[id];
+    return box(L.x, L.y, L.z, L.w, L.d, L.h, 'ivory') + box(L.x + 30, L.y + 16, L.z + L.h, 80, 36, 22, 'steel') + `<g transform="${onFront(L.x, L.y, L.z + L.h)}">${label(p.name, 6, 12, 30, 9.5)}</g><g transform="${onFront(L.x + 30, L.y + 16, L.z + L.h + 22)}"><rect x="4" y="5" width="56" height="12" rx="6" fill="#efefef" stroke="#9aa3ad"/><text x="32" y="14" font-size="8.5" text-anchor="middle" fill="#56616c">scartato</text></g>`; },
+};
+// paint order: further back and lower first
+const ORDER = [...TOP].sort((a, b) => (LAY[b].y - LAY[a].y) || (LAY[a].z - LAY[b].z) || (LAY[a].x - LAY[b].x));
+const ROLE_PAINT = { slab: 0, column: 1, beam: 2, deck: 3, clamp: 4, wedge: 5, tray: 6, block: 6 };
+ORDER.sort((a, b) => ROLE_PAINT[ROLE[a]] - ROLE_PAINT[ROLE[b]]);
+// the load test: which parts ride on a beam and move with it when it gives way
+const riders = b => TOP.filter(id => LAY[id].on === b && ROLE[id] !== 'wedge');   // a wedge stands on its own foot
+function loadEffect() {
+  const L = state.load; if (!L || !state.predicted) return null;
+  const run = LOADRUN, br = run.bricks.find(x => x.part === L), T = run.target;
+  if (!br) return null;
+  const out = { removed: L, verdict: br.verdict, target: T, move: null };
+  if (br.verdict === 'holds' || !LAY[T]) return out;
+  const rest = supporters(T).filter(s => s !== L && LAY[s]?.pin), B = LAY[T];
+  const lx = LAY[L]?.pin?.[0] ?? (LAY[L] ? LAY[L].x + LAY[L].w / 2 : B.x), px = rest.length ? LAY[rest[0]].pin[0] : B.x + B.w / 2;
+  const [cx, cy] = P(px, B.y + B.d / 2, B.z), sign = Math.sign(lx - px) || -1;
+  // falls: the beam turns on the support that is left until its free end meets the bench; weakens: it only bends
+  const end = sign < 0 ? B.x : B.x + B.w, reach = Math.max(40, Math.abs(end - px) * 0.95), drop = B.z - BASE;
+  const fall = Math.min(28, Math.atan2(drop, reach) * 180 / Math.PI);
+  out.move = br.verdict === 'falls' ? (rest.length ? `rotate(${f1(sign * fall)} ${f1(cx)} ${f1(cy)})` : `translate(0 ${f1(drop)})`) : `rotate(${sign * 2} ${f1(cx)} ${f1(cy)}) translate(0 3)`;
+  return out;
+}
+function scene({ open = null, mini = false } = {}) {
+  const inpass = new Set(STEPS[state.step]?.parts || []), fx = mini ? null : loadEffect();
+  const cls = id => `part${state.sel === id ? ' sel' : ''}${!mini && inpass.has(id) ? ' inpass' : ''}${!mini && state.arrive && state.build && INTRO[id] === state.step ? ' arrive' : ''}`;
+  const attrs = id => mini ? '' : ` data-id="${id}" tabindex="0" role="button" aria-label="${esc(parts[id].name)}"`;
+  const { x: X, y: Y, w: W, d: Dd } = BENCH;
+  let s = `<polygon points="${pts([P(X + 8, Y + 4, 0), P(X + W + 8, Y + 4, 0), P(X + W + 8, Y + Dd + 6, 0), P(X + 8, Y + Dd + 6, 0)].map(([x, y]) => [x + 6, y + 10]))}" fill="rgba(30,40,50,.12)" filter="url(#soft)"/>`;
+  s += box(X, Y, 0, W, Dd, 10, 'dark') + box(X, Y, 10, W, Dd, 14, 'alu');
+  if (!mini) s += `<g transform="${onFront(X, Y, 24)}">${screw(10, 7)}${screw(W - 10, 7)}<rect x="18" y="2" width="250" height="11" rx="2" fill="#2b3640"/><text x="26" y="11" font-size="8.5" fill="#e9edf1" class="plate-t">${esc(D.whole.name.toUpperCase())}</text></g>`;
+  const moving = fx?.move ? new Set([fx.target, ...riders(fx.target)]) : new Set();
+  let still = '', ride = '', up = '';
+  for (const id of ORDER) {
+    let g;
+    if (open === id && !mini) g = ghost(id, 'socket');
+    else if (!built(id)) g = ghost(id);
+    else if (fx && fx.removed === id) { g = ghost(id, 'socket'); const [u, v] = P(0, -150, 30); up = `<g class="${cls(id)} lifted"${attrs(id)} transform="translate(${f1(u)},${f1(v)})" opacity=".8" style="filter:drop-shadow(0 0 4px rgba(229,83,61,.8))">${SHAPE[ROLE[id]](id)}</g>`; }   // pulled out towards the viewer
+    else g = `<g class="${cls(id)}"${attrs(id)}>${SHAPE[ROLE[id]](id)}</g>`;
+    if (moving.has(id)) ride += g; else still += g;
+    if (ROLE[id] === 'beam' && !mini) still += pins(id, fx);
+  }
+  s += still + (fx?.move ? `<g class="giving" transform="${fx.move}">${ride}</g>` : ride) + up;
+  if (!mini) s += jointLabels(fx);
+  if (fx && !mini && LAY[fx.target]) { const B = LAY[fx.target], [u, v] = P(B.x + B.w / 2, B.y, B.z + B.h + 56); const t = { falls: 'Crolla', weakens: 'Si indebolisce', holds: 'Regge' }[fx.verdict]; s += `<g class="verdict-tag ${fx.verdict}" transform="translate(${f1(u)},${f1(v)})"><rect x="-52" y="-12" width="104" height="24" rx="12"/><text y="5" text-anchor="middle">${t}</text></g>`; }
+  return s;
+}
+// the load pins: each supports joint is a coral strut from its supporter to the beam
+function pins(b, fx) {
+  let s = '';
+  for (const sId of supporters(b)) {
+    const L = LAY[sId], B = LAY[b]; if (!L?.pin || !built(sId) || !built(b)) continue;
+    const j = TJ.find(j => j.from === sId && j.to === b), key = jkey(j), [x, y] = L.pin, z0 = ROLE[sId] === 'slab' ? L.z + L.h : B.z - 1;
+    if (ROLE[sId] === 'column') continue;   // a column is its own strut
+    const cut = fx && fx.removed === sId;
+    s += `<g class="joint${state.joint === key ? ' sel' : ''}" data-joint="${key}">${cut ? `<polyline points="${pts([P(x, y, z0), P(x, y, z0 + (B.z - z0) * 0.4)])}" class="cable dep" style="stroke:#c9442f"/>` : box(x - 5, y - 5, z0, 10, 10, B.z - z0, 'coral')}</g>`;
+  }
+  return s;
+}
+// joint labels: on the pin, beside the clamp, at the wedge's tip, between the beam and its deck
+function jointLabels(fx) {
+  const labels = [];
+  for (const j of TJ) {
+    const key = jkey(j); if (!jointBuilt(key)) continue;
+    const A = LAY[j.from], B = LAY[j.to]; if (!A || !B) continue;
+    let at;
+    if (j.type === 'supports' && ROLE[j.to] === 'beam') at = A.pin ? P(A.pin[0], A.pin[1], (ROLE[j.from] === 'slab' ? A.z + A.h : A.z) + (B.z - (ROLE[j.from] === 'slab' ? A.z + A.h : A.z)) * 0.55) : P(A.x + A.w / 2, A.y, A.z + A.h / 2);
+    else if (j.type === 'supports') at = P(A.x + A.w / 2, A.y, A.z + A.h + 10);
+    else if (ROLE[j.from] === 'clamp') at = P(A.x + A.w / 2, A.y, A.z + A.h + 14);
+    else if (ROLE[j.from] === 'wedge') at = P(A.x - 10, A.y, A.z + A.h + 26);
+    else at = P(A.x + A.w / 2, A.y, A.z + A.h + 14);
+    if (fx && fx.removed === j.from) continue;
+    labels.push({ x: at[0], y: at[1], text: j.label, key, dep: j.type !== 'supports' });
+  }
+  return spread(labels);
+}
+function ghost(id, cls = 'ghost') { const [x, y, w, d] = FOOT[id], z = FOOTZ[id] ?? 24; return `<polygon class="${cls}" points="${pts([P(x, y, z), P(x + w, y, z), P(x + w, y + d, z), P(x, y + d, z)])}"/>`; }
+const built = id => !state.build || (INTRO[topOf(id)] ?? 0) <= state.step;
+const jointBuilt = key => { const [f, t] = key.split('>'); return !state.build || (JSTEP[key] <= state.step && built(f) && built(t)); };
+const LOADRUN = (D.runs || []).find(r => r.type === 'load');
+
+// ===== 5. An opened level: its sub-parts as modules from a small library, laid out by their joints =====
+const GLYPH = {
+  map: '<path d="M-9,-6 L-3,-8 L3,-6 L9,-8 L9,6 L3,8 L-3,6 L-9,8 Z" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  gauge: '<path d="M-8,4 A8,8 0 1 1 8,4" fill="none" stroke="#fff" stroke-width="1.8"/><line x1="0" y1="4" x2="5" y2="-3" stroke="#fff" stroke-width="1.8"/>',
+  'book-open': '<path d="M0,-6 L0,7 M0,-6 C-4,-8 -8,-7 -9,-6 L-9,7 C-7,6 -3,6 0,7 C3,6 7,6 9,7 L9,-6 C8,-7 4,-8 0,-6" fill="none" stroke="#fff" stroke-width="1.5"/>',
+  'file-text': '<rect x="-6" y="-8" width="12" height="16" rx="1.5" fill="none" stroke="#fff" stroke-width="1.6"/><line x1="-3" y1="-3" x2="3" y2="-3" stroke="#fff"/><line x1="-3" y1="1" x2="3" y2="1" stroke="#fff"/><line x1="-3" y1="5" x2="1" y2="5" stroke="#fff"/>',
+  plug: '<path d="M-4,-9 L-4,-3 M4,-9 L4,-3 M-7,-3 L7,-3 L5,4 L-5,4 Z M0,4 L0,9" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  send: '<path d="M-8,-7 L9,0 L-8,7 L-5,0 Z" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  settings: '<circle r="4" fill="none" stroke="#fff" stroke-width="1.6"/><circle r="8" fill="none" stroke="#fff" stroke-width="1.2" stroke-dasharray="3 2.3"/>',
+  ruler: '<rect x="-9" y="-4" width="18" height="8" fill="none" stroke="#fff" stroke-width="1.5"/><line x1="-5" y1="-4" x2="-5" y2="0" stroke="#fff"/><line x1="0" y1="-4" x2="0" y2="1" stroke="#fff"/><line x1="5" y1="-4" x2="5" y2="0" stroke="#fff"/>',
+  database: '<ellipse cx="0" cy="-5" rx="7" ry="3" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M-7,-5 L-7,5 A7,3 0 0 0 7,5 L7,-5" fill="none" stroke="#fff" stroke-width="1.5"/>',
+  'list-checks': '<path d="M-8,-5 l2,2 l3,-4 M-8,4 l2,2 l3,-4 M0,-4 L8,-4 M0,5 L8,5" fill="none" stroke="#fff" stroke-width="1.5"/>',
+  'git-branch': '<circle cx="-5" cy="-6" r="2.2" fill="#fff"/><circle cx="-5" cy="6" r="2.2" fill="#fff"/><circle cx="6" cy="-2" r="2.2" fill="#fff"/><path d="M-5,-6 L-5,6 M-5,2 C-5,-2 6,0 6,-2" fill="none" stroke="#fff" stroke-width="1.5"/>',
+  package: '<path d="M0,-8 L8,-4 L8,5 L0,9 L-8,5 L-8,-4 Z M-8,-4 L0,0 L8,-4 M0,0 L0,9" fill="none" stroke="#fff" stroke-width="1.4"/>',
+  repeat: '<path d="M-7,-2 A7,7 0 0 1 6,-4 M7,2 A7,7 0 0 1 -6,4" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M6,-8 L6,-3 L1,-3 M-6,8 L-6,3 L-1,3" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  download: '<path d="M0,-8 L0,4 M-5,-1 L0,4 L5,-1 M-8,8 L8,8" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  lock: '<rect x="-6" y="-1" width="12" height="9" rx="1.5" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M-4,-1 L-4,-4 A4,4 0 0 1 4,-4 L4,-1" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  play: '<path d="M-5,-7 L7,0 L-5,7 Z" fill="#fff"/>',
+  filter: '<path d="M-8,-7 L8,-7 L2,1 L2,8 L-2,8 L-2,1 Z" fill="none" stroke="#fff" stroke-width="1.5"/>',
+  search: '<circle cx="-2" cy="-2" r="5" fill="none" stroke="#fff" stroke-width="1.6"/><line x1="2" y1="2" x2="7" y2="7" stroke="#fff" stroke-width="1.8"/>',
+  timer: '<circle cy="1" r="7" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M0,1 L0,-3 M-2,-8 L2,-8" stroke="#fff" stroke-width="1.6"/>',
+  'clipboard-check': '<rect x="-6" y="-7" width="12" height="15" rx="1.5" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M-3,1 l2,2 l4,-5" fill="none" stroke="#fff" stroke-width="1.6"/>',
+  'key-round': '<circle cx="-4" cy="0" r="4" fill="none" stroke="#fff" stroke-width="1.6"/><path d="M0,0 L9,0 M6,0 L6,3 M3,0 L3,3" stroke="#fff" stroke-width="1.6"/>',
+  'triangle-alert': '<path d="M0,-8 L8,7 L-8,7 Z" fill="none" stroke="#fff" stroke-width="1.6"/><line x1="0" y1="-2" x2="0" y2="2" stroke="#fff" stroke-width="1.6"/><circle cy="4.6" r="1" fill="#fff"/>',
+  code: '<path d="M-4,-6 L-9,0 L-4,6 M4,-6 L9,0 L4,6" fill="none" stroke="#fff" stroke-width="1.7"/>',
+};
+// In an argument the opened level keeps the grammar's shapes: a limit is a small clamp, a consequence a room.
+const KIND_COMP = {
+  limit(p, x, y, mini) {
+    const H = 44; let g = box(x, y, 20, MW, MD, 12, 'dark') + box(x + 10, y + 12, 32, 16, MD - 24, H, 'steel') + box(x + MW - 26, y + 12, 32, 16, MD - 24, H, 'steel') + box(x + 6, y + 8, 32 + H, MW - 12, MD - 16, 12, 'steel');
+    if (mini) return { g, h: 12 + H + 12 };
+    const n = wrap(p.name, 28).length;
+    return { g: g + `<g transform="${onFront(x + 6, y + 8, 32 + H + 12)}"><rect x="0" y="0" width="${MW - 12}" height="${4 + n * 11.5}" fill="#2b3640"/>${nameText(p.name, 6, 10, 28, 8.5, 'start', '#eef2f6')}</g>`, h: 12 + H + 12 };
+  },
+  consequence(p, x, y, mini) {
+    const H = 56; let g = box(x, y, 20, MW, MD, H, 'ivory') + box(x - 4, y - 4, 20 + H, MW + 8, MD + 8, 6, 'dark');
+    if (mini) return { g, h: H + 6 };
+    return { g: g + `<g transform="${onFront(x, y, 20 + H)}">${plate(p.name, MW)}<rect x="${MW / 2 - 12}" y="${H - 30}" width="24" height="30" fill="#c9cfd5" stroke="#56616c"/><rect x="14" y="24" width="26" height="16" fill="rgba(196,220,238,.9)" stroke="#56616c"/><rect x="${MW - 40}" y="24" width="26" height="16" fill="rgba(196,220,238,.9)" stroke="#56616c"/></g>`, h: H + 6 };
+  },
+};
+const MW = 150, MD = 66, MH = 46, GXS = 188, GYS = 100, PER_ROW = 3;
+// Components a sub-part can become, by its icon. Each draws its face from the part's own lines (sectionsOf), and
+// gives up (null) when those lines have no structure to show: the part then stays a plain module.
+const WIDE = { gauge: 52 }, widthOf = q => MW + (!KIND_COMP[q.kind] && COMP[q.icon] && WIDE[q.icon] || 0);
+const featG = (key, label, body) => `<g class="feat${state.feat === key ? ' sel' : ''}" data-feat="${key}" tabindex="0" role="button" aria-label="${esc(label)}">${body}</g>`;
+const plate = (name, w) => `<rect x="0" y="0" width="${w}" height="16" fill="#2b3640"/><text x="6" y="11.5" font-size="9.5" font-weight="700" fill="#eef2f6">${esc(name.length > 30 ? name.slice(0, 29) + '…' : name)}</text>`;
+const lamp = (u, v, fresh, label) => `<circle cx="${u}" cy="${v}" r="3.6" fill="${fresh ? '#3fbf6a' : '#f2a33a'}" stroke="#1b232b" stroke-width=".7"/><text x="${u + 6}" y="${v + 3}" font-size="8.5" fill="#1d2630">${esc(label)}</text>`;
+const COMP = {
+  // a register: an archive cabinet, one drawer per register its lines describe
+  database(p, x, y, mini) {
+    const ds = drawersOf(p).slice(0, 4); if (ds.length < 2) return null;
+    const xr = ds.map(f => definedElsewhere(p, f)), units = xr.map(r => r ? 2 : 1), H = 24 + units.reduce((a, b) => a + b, 0) * 19;
+    const g = box(x, y, 20, MW, MD, H, 'ivory') + box(x - 3, y - 3, 20 + H, MW + 6, MD + 6, 5, 'dark');
+    if (mini) return { g, h: H + 5 };
+    let f = plate(p.name, MW), v = 20;
+    ds.forEach((d, i) => {
+      const key = `${p.id}#${i}`, hh = units[i] * 19 - 3; FEAT[key] = { part: p.id, kind: 'drawer', ...d, xref: xr[i] };
+      let body = `<rect class="fz" x="5" y="${v}" width="${MW - 10}" height="${hh}" rx="2.5" fill="#f1eee6" stroke="#b9b2a2"/><rect x="${MW - 30}" y="${v + 6}" width="18" height="3.4" rx="1.7" fill="#8d949b"/><text x="10" y="${v + 12}" font-size="10" font-weight="700" fill="#1d2630">${esc(d.label)}</text>`;
+      // the clocks this register keeps, as lamps: lit while written this round
+      if (xr[i]) xr[i].fields.filter(n => /^Last/.test(n)).slice(0, 2).forEach((n, k) => { body += lamp(14 + k * 64, v + 26, (state.demo[n] ?? 0) === 0, n); });
+      f += featG(key, d.label, body); v += units[i] * 19;
+    });
+    return { g: g + `<g transform="${onFront(x, y, 20 + H)}">${f}${screw(4, H - 4)}${screw(MW - 4, H - 4)}</g>`, h: H + 5 };
+  },
+  // gauges: an instrument panel, one dial per gauge, labelled with the gauge's own name
+  gauge(p, x, y, mini) {
+    const its = sectionsOf(p).flatMap(s => s.items).slice(0, 6); if (its.length < 2) return null;
+    const H = 22 + its.length * 16, W = MW + WIDE.gauge;
+    const g = box(x, y, 20, W, MD, 12, 'dark') + box(x + 6, y + MD - 18, 32, W - 12, 12, H, 'ivory');
+    if (mini) return { g, h: 12 + H };
+    let f = plate(p.name, W - 12);
+    its.forEach((it, i) => {
+      const key = `${p.id}#${i}`, cy = 28 + i * 16, src = (it.cells[1] || '').match(/Last\w+/)?.[0], age = src ? state.demo[src] ?? 0 : null;
+      const a = (age == null ? -40 : -130 + Math.min(age, 4) * 55) * Math.PI / 180;
+      FEAT[key] = { part: p.id, kind: 'dial', ...it, reads: src };
+      f += featG(key, it.label, `<rect class="fz" x="3" y="${cy - 7.5}" width="${W - 18}" height="15" rx="3" fill="transparent" stroke="transparent"/><circle cx="12" cy="${cy}" r="6.4" fill="#fbfaf6" stroke="#56616c"/><line x1="12" y1="${cy}" x2="${f1(12 + 5 * Math.cos(a))}" y2="${f1(cy + 5 * Math.sin(a))}" stroke="${age ? '#d0453a' : '#1d2630'}" stroke-width="1.6" stroke-linecap="round"/><text x="23" y="${cy + 3}" font-size="8.6" fill="#1d2630">${esc(it.label.replace(/^[a-z]+\.(?=\w+\.\w)/, ''))}</text>`);
+    });
+    return { g: g + `<g transform="${onFront(x + 6, y + MD - 18, 32 + H)}">${f}</g>`, h: 12 + H };
+  },
+  // typed holders: a rack, one row per group of methods, one peg per method; a method nobody calls is an empty peg
+  ruler(p, x, y, mini) {
+    const secs = sectionsOf(p).filter(s => s.label && s.items.length).slice(0, 5); if (secs.length < 2) return null;
+    const H = 22 + secs.length * 16;
+    const g = box(x, y, 20, MW, MD, H, 'steel');
+    if (mini) return { g, h: H };
+    let f = plate(p.name, MW);
+    secs.forEach((s, i) => {
+      const key = `${p.id}#${i}`, v = 20 + i * 16; FEAT[key] = { part: p.id, kind: 'holder', label: s.label, source: s.source, line: s.line, to: s.items.at(-1).line, items: s.items };
+      f += featG(key, s.label, `<rect class="fz" x="4" y="${v}" width="${MW - 8}" height="13" rx="2" fill="#e3e7eb" stroke="#9aa3ad"/><text x="8" y="${v + 9.6}" font-size="8.8" font-weight="700" fill="#1d2630">${esc(s.label)}</text>${s.items.slice(0, 6).map((it, k) => `<circle cx="${92 + k * 9}" cy="${v + 6.5}" r="3.2" fill="${it.warn ? 'none' : '#3b4754'}" stroke="${it.warn ? '#b5651d' : '#1b232b'}" stroke-width="${it.warn ? 1.1 : .6}"${it.warn ? ' stroke-dasharray="1.6 1.4"' : ''}/>`).join('')}`);
+    });
+    return { g: g + `<g transform="${onFront(x, y, 20 + H)}">${f}${screw(4, H - 4)}${screw(MW - 4, H - 4)}</g>`, h: H };
+  },
+  // a catalogue: a card index, one card per entry; an entry marked ⚠ in the source has an amber card
+  'list-checks'(p, x, y, mini) {
+    const its = sectionsOf(p).flatMap(s => s.items); if (its.length < 4) return null;
+    const warn = its.filter(i => i.warn).length, H = 30, n = Math.min(12, its.length);
+    let g = box(x, y, 20, MW, MD, H, 'steel');
+    for (let k = 0; k < n; k++) { const it = its[Math.floor(k * its.length / n)]; g += box(x + 14 + k * 10.4, y + 12, 20 + H, 3.2, MD - 24, 16 + (k % 3) * 3, it.warn ? 'amber' : 'ivory'); }
+    if (mini) return { g, h: H + 25 };
+    return { g: g + `<g transform="${onFront(x, y, 20 + H)}">${plate(p.name, MW)}<text x="8" y="26" font-size="9" fill="#1d2630"><tspan font-weight="700">${its.length}</tspan> voci · <tspan font-weight="700" fill="#a2601a">${warn}</tspan> con ⚠</text></g>`, h: H + 25 };
+  },
+};
+// The rest of a part's lines, beyond tables: its headings with their extent, list items, numbered steps in code, code.
+const bare = s => String(s ?? '').replace(/`|\*\*/g, '');
+const fit = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+function outlineOf(p) {
+  const o = { heads: [], rows: [], list: [], steps: [], code: [] };
+  for (const c of p.cites || []) {
+    const L = srcOf(c.source).text.split('\n'); let fence = false, head = null, cur = null;
+    for (let n = c.from; n <= c.to; n++) {
+      const l = L[n - 1] ?? '';
+      if (/^\s*```/.test(l)) { fence = !fence; if (cur) cur.to = n; continue; }
+      if (cur) cur.to = n;
+      if (fence) {
+        if (l.trim()) o.code.push({ line: n, text: l, source: c.source });
+        const m = l.match(/^\s*(\d+)\s+(\S.*)$/); if (m) o.steps.push({ label: `${m[1]}. ${bare(m[2].replace(/\s*←.*$/, '')).trim()}`, text: bare(l.trim()), source: c.source, line: n });
+        continue;
+      }
+      if (/^#{3,} /.test(l)) { cur = { label: clean(l.replace(/^#+\s*/, '').replace(/^⚠\s*/, '')), source: c.source, line: n, to: n, n: 0, warn: /⚠/.test(l) }; o.heads.push(cur); head = null; continue; }
+      if (/^\|/.test(l)) {
+        const cells = l.split('|').slice(1, -1).map(x => x.trim());
+        if (cells.every(x => /^:?-+:?$/.test(x))) continue;
+        if (!head) { head = cells; continue; }
+        o.rows.push({ label: clean(cells[0]), cells, head, source: c.source, line: n, warn: /⚠/.test(l) }); if (cur) cur.n++; continue;
+      }
+      head = null;
+      const li = l.match(/^\s*(?:[-*]|\d+\.)\s+(.*)/), last = o.list.at(-1);
+      // a bold phrase names the item when it is a phrase; otherwise its first words do
+      if (li) { const t = li[1], b = t.match(/\*\*([^*]+)\*\*/), named = b && b[1].length >= 10 ? b[1] : t.split(/\s+/).slice(0, 5).join(' '); o.list.push({ label: clean(named) || bare(named), text: bare(t), source: c.source, line: n, to: n, warn: /⚠/.test(t) }); if (cur) cur.n++; }
+      else if (last && last.to === n - 1 && /^\s{2,}\S/.test(l)) { last.text += ' ' + bare(l.trim()); last.to = n; }
+    }
+  }
+  return o;
+}
+// the first kind of structure with enough entries, in the order given
+const pickFeats = (o, order, min = 2) => { for (const k of order) if (o[k].length >= min) return { from: k, feats: o[k] }; return null; };
+const FROM = { heads: 'Sezione', rows: 'Riga', list: 'Voce', steps: 'Passo' };
+// One row of a face per feature: a clickable band with its label and a mark that says what kind of thing it is.
+function rowsFace(p, feats, kind, W, mark, top = 20, rh = 15) {
+  return feats.map((f, i) => {
+    const key = `${p.id}#${i}`, v = top + i * rh; FEAT[key] = { part: p.id, kind, ...f };
+    return featG(key, f.label, `<rect class="fz" x="4" y="${v}" width="${W - 8}" height="${rh - 2}" rx="2" fill="rgba(255,255,255,.55)" stroke="rgba(60,70,80,.35)"/>${mark(f, 10, v + (rh - 2) / 2)}<text x="20" y="${v + rh / 2 + 2.4}" font-size="8.6" font-weight="600" fill="#1d2630">${esc(fit(f.label, Math.floor((W - 28) / 4.7)))}</text>`);
+  }).join('');
+}
+const FACE_MARK = {
+  sheet: (f, u, v) => `<path d="M${u - 3.5},${v - 4.5} h5 l2,2 v7 h-7 Z" fill="#fff" stroke="#56616c" stroke-width=".7"/>`,
+  warn: (f, u, v) => `<path d="M${u},${v - 4.5} L${u + 4.6},${v + 3.8} L${u - 4.6},${v + 3.8} Z" fill="#f2a33a" stroke="#7a4a10" stroke-width=".6"/>`,
+  socket: (f, u, v) => `<circle cx="${u}" cy="${v}" r="4.2" fill="#1f2a35"/><circle cx="${u - 1.5}" cy="${v}" r=".9" fill="#c9cfd5"/><circle cx="${u + 1.5}" cy="${v}" r=".9" fill="#c9cfd5"/>`,
+  knob: (f, u, v) => `<circle cx="${u}" cy="${v}" r="4.4" fill="#d4d9de" stroke="#1b232b" stroke-width=".7"/><line x1="${u}" y1="${v}" x2="${u}" y2="${v - 3.6}" stroke="#1b232b" stroke-width="1.2"/>`,
+  box: (f, u, v) => `<rect x="${u - 3.8}" y="${v - 3.8}" width="7.6" height="7.6" rx="1" fill="#fff" stroke="${f.warn ? '#b5651d' : '#56616c'}" stroke-width=".9"/>`,
+  pin: (f, u, v) => `<circle cx="${u}" cy="${v}" r="3.2" fill="${f.warn ? '#f2a33a' : '#e5533d'}" stroke="#1b232b" stroke-width=".6"/>`,
+  lens: (f, u, v) => `<circle cx="${u - 1}" cy="${v - 1}" r="3" fill="none" stroke="#1b232b" stroke-width="1"/><line x1="${u + 1.2}" y1="${v + 1.2}" x2="${u + 3.6}" y2="${v + 3.6}" stroke="#1b232b" stroke-width="1.2"/>`,
+};
+// An upright panel standing on a base, its front face carrying the rows: the shape most faces share.
+function panelBody(p, x, y, mini, feats, kind, { base = 'dark', panel = 'ivory', mark, max = 7, plateFill } = {}) {
+  const fs = feats.slice(0, max), H = 22 + fs.length * 15;
+  const g = box(x, y, 20, MW, MD, 12, base) + box(x + 6, y + MD - 18, 32, MW - 12, 12, H, panel);
+  if (mini) return { g, h: 12 + H };
+  const more = feats.length > fs.length ? `<text x="${MW - 18}" y="11.5" font-size="8" fill="#eef2f6" text-anchor="end">+${feats.length - fs.length}</text>` : '';
+  return { g: g + `<g transform="${onFront(x + 6, y + MD - 18, 32 + H)}">${plate(p.name, MW - 12)}${more}${rowsFace(p, fs, kind, MW - 12, mark)}</g>`, h: 12 + H };
+}
+// a box of files: sheets standing in it, a tab on its front for each
+function fileBox(p, x, y, mini, feats, kind, mark = FACE_MARK.sheet) {
+  const fs = feats.slice(0, 6), H = 22 + fs.length * 15;
+  let g = box(x, y, 20, MW, MD, H, 'ivory');
+  for (let k = 0; k < fs.length; k++) g += box(x + 12, y + 10 + k * ((MD - 20) / fs.length), 20 + H, MW - 24, 1.6, 9 + (k % 2) * 4, 'ivory');
+  if (mini) return { g, h: H + 13 };
+  return { g: g + `<g transform="${onFront(x, y, 20 + H)}">${plate(p.name, MW)}${rowsFace(p, fs, kind, MW, mark)}${screw(4, H - 4)}${screw(MW - 4, H - 4)}</g>`, h: H + 13 };
+}
+// a round: a turntable with one station per numbered step of the code the part cites
+function wheel(p, x, y, mini, steps) {
+  const n = Math.min(16, steps.length), H = 26, r = MD / 2 - 6;
+  let g = box(x, y, 20, MW, MD, H, 'steel');
+  let top = `<circle cx="${MW / 2}" cy="${MD / 2}" r="${r + 3}" fill="#2b3640"/><circle cx="${MW / 2}" cy="${MD / 2}" r="${r}" fill="#d4d9de" stroke="#56616c"/><circle cx="${MW / 2}" cy="${MD / 2}" r="5" fill="#56616c"/>`;
+  for (let k = 0; k < n; k++) {
+    const a = -Math.PI / 2 + k * 2 * Math.PI / n, u = f1(MW / 2 + (r - 5) * Math.cos(a)), v = f1(MD / 2 + (r - 5) * Math.sin(a)), key = `${p.id}#${k}`;
+    if (!mini) FEAT[key] = { part: p.id, kind: 'station', ...steps[k] };
+    const dot = `<circle class="fz" cx="${u}" cy="${v}" r="4" fill="${k === 0 ? '#e5533d' : '#fbfaf6'}" stroke="#1b232b" stroke-width=".7"/>`;
+    top += mini ? dot : featG(key, steps[k].label, dot);
+  }
+  g += `<g transform="${onTop(x, y + MD, 20 + H)}">${top}</g>`;
+  if (mini) return { g, h: H };
+  return { g: g + `<g transform="${onFront(x, y, 20 + H)}">${plate(p.name, MW)}<text x="8" y="${H - 2}" font-size="8.6" fill="#1d2630"><tspan font-weight="700">${steps.length}</tspan> passi, in ordine dal rosso</text></g>`, h: H };
+}
+// code the part cites, shown as a screen of lines: the shape of the code, not its text
+function screen(p, x, y, mini, code) {
+  const n = Math.min(12, code.length), H = 26 + n * 5.2;
+  let g = box(x, y, 20, MW, MD, 12, 'dark') + box(x + 10, y + MD - 16, 32, MW - 20, 10, H, 'dark');
+  if (mini) return { g, h: 12 + H };
+  const lines = code.slice(0, n).map((c, k) => { const ind = (c.text.match(/^\s*/)[0].length) * 2.2, w = Math.min(MW - 44 - ind, 8 + c.text.trim().length * 1.5); return `<rect x="${12 + ind}" y="${22 + k * 5.2}" width="${f1(w)}" height="2.6" rx="1" fill="${/←|⚠/.test(c.text) ? '#f2a33a' : '#8fe0a6'}" opacity=".85"/>`; }).join('');
+  return { g: g + `<g transform="${onFront(x + 10, y + MD - 16, 32 + H)}"><rect x="0" y="0" width="${MW - 20}" height="${H}" fill="#1f2a35"/><text x="6" y="12" font-size="9" font-weight="700" fill="#eef2f6">${esc(fit(p.name, 24))}</text>${lines}</g>`, h: 12 + H };
+}
+Object.assign(COMP, {
+  'book-open': (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['heads', 'list']); return s && fileBox(p, x, y, m, s.feats, 'sheet'); },
+  'file-text': (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['heads', 'list']); return s && fileBox(p, x, y, m, s.feats, 'sheet'); },
+  'key-round': (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['list', 'heads']); return s && fileBox(p, x, y, m, s.feats, 'note', FACE_MARK.pin); },
+  'triangle-alert': (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['heads', 'list']); return s && panelBody(p, x, y, m, s.feats, 'warning', { panel: 'amber', mark: FACE_MARK.warn, max: 9 }); },
+  map: (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['rows', 'heads']); return s && panelBody(p, x, y, m, s.feats, 'legend', { base: 'steel', mark: FACE_MARK.pin }); },
+  plug: (p, x, y, m) => { const o = outlineOf(p), s = pickFeats(o, ['heads', 'rows']); return s && panelBody(p, x, y, m, s.feats, 'socket', { base: 'steel', panel: 'steel', mark: FACE_MARK.socket }); },
+  search: (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['heads', 'list']); return s && panelBody(p, x, y, m, s.feats, 'lens', { mark: FACE_MARK.lens }); },
+  settings: (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['rows', 'heads', 'list']); return s && panelBody(p, x, y, m, s.feats, 'knob', { panel: 'steel', mark: FACE_MARK.knob, max: 8 }); },
+  send: (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['rows', 'list'], 3); return s && panelBody(p, x, y, m, s.feats, 'knob', { panel: 'steel', mark: FACE_MARK.knob, max: 8 }); },
+  'clipboard-check': (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['heads', 'list']); return s && panelBody(p, x, y, m, s.feats, 'check', { base: 'steel', mark: FACE_MARK.box }); },
+  filter: (p, x, y, m) => { const s = pickFeats(outlineOf(p), ['list', 'heads'], 3); return s && panelBody(p, x, y, m, s.feats, 'check', { base: 'steel', mark: FACE_MARK.box }); },
+  repeat: (p, x, y, m) => { const o = outlineOf(p); return o.steps.length >= 3 ? wheel(p, x, y, m, o.steps) : null; },
+  download: (p, x, y, m) => { const o = outlineOf(p); return o.code.length >= 3 ? screen(p, x, y, m, o.code) : null; },
+  play: (p, x, y, m) => { const o = outlineOf(p); return o.code.length >= 3 ? screen(p, x, y, m, o.code) : null; },
+  timer: (p, x, y, m) => { const o = outlineOf(p); return o.code.length >= 3 ? screen(p, x, y, m, o.code) : null; },
+  'git-branch': (p, x, y, m) => { const o = outlineOf(p); return o.code.length >= 3 ? screen(p, x, y, m, o.code) : null; },
+});
+// a gauge with no gauge table still has its sections; a checklist with no table still has its items; code files are a card index
+{ const g = COMP.gauge, idx = COMP['list-checks'];
+  COMP.gauge = (p, x, y, m) => g(p, x, y, m) ?? (() => { const s = pickFeats(outlineOf(p), ['heads']); return s && panelBody(p, x, y, m, s.feats, 'dial', { mark: (f, u, v) => `<circle cx="${u}" cy="${v}" r="4.8" fill="#fbfaf6" stroke="#56616c"/><line x1="${u}" y1="${v}" x2="${u + 3}" y2="${v - 2.4}" stroke="#1d2630" stroke-width="1.2"/>` }); })();
+  COMP['list-checks'] = (p, x, y, m) => idx(p, x, y, m) ?? (() => { const s = pickFeats(outlineOf(p), ['list'], 3); return s && panelBody(p, x, y, m, s.feats, 'check', { base: 'steel', mark: FACE_MARK.box, max: 8 }); })();
+  COMP.code = idx; }
+// a component drawn small, without labels, wherever its part appears on the whole
+function miniComp(q, ox, oy, oz, k) {
+  const c = COMP[q.icon], bb = BB; BB = null;
+  const r = c?.(q, 0, 0, true); BB = bb;
+  if (!r) return null;
+  const [u, v] = P(ox, oy, oz - 20 * k);
+  return `<g transform="translate(${f1(u)},${f1(v)}) scale(${k})">${r.g}</g>`;
+}
+function layoutSub(id) {
+  const ids = parts[id].parts.map(q => q.id), js = joints.filter(j => j.level === id);
+  const L = Object.fromEntries(ids.map(i => [i, 0]));
+  for (let k = 0; k < ids.length; k++) for (const j of js) { const [u, v] = flow(j); if (L[v] < L[u] + 1) L[v] = L[u] + 1; }
+  const cols = {}; ids.forEach(i => (cols[L[i]] ??= []).push(i));
+  const pos = {};
+  // the row's order: flow first, then each part moved next to the parts it is joined to, so cables stay short
+  const near = Object.fromEntries(ids.map(i => [i, js.flatMap(j => j.from === i ? [j.to] : j.to === i ? [j.from] : [])]));
+  let order = [...ids].sort((a, b) => L[a] - L[b] || ids.indexOf(a) - ids.indexOf(b));
+  for (let it = 0; it < 6; it++) { const ix = Object.fromEntries(order.map((i, k) => [i, k])); const bc = i => (ix[i] + near[i].reduce((t, n) => t + ix[n], 0)) / (1 + near[i].length); order = [...order].sort((a, b) => bc(a) - bc(b) || ix[a] - ix[b]); }
+  if (ids.length > 5) {
+    const row = order, half = Math.ceil(row.length / 2);
+    row.forEach((i, k) => { const back = k < half, c = back ? k : k - half; pos[i] = { x: 40 + row.slice(back ? 0 : half, back ? c : half + c).reduce((w, q) => w + widthOf(parts[q]) + 22, 0), y: back ? 180 + 150 : 180, z: back ? 70 : 0 }; });
+    return { ids, js, pos };
+  }
+  if (ids.length <= 5) {
+    // a small level stands in one row, in the order of its joints, so tall components never hide each other
+    const row = order; let x = 40;
+    row.forEach(i => { pos[i] = { x, y: 180 }; x += widthOf(parts[i]) + 22; });
+    return { ids, js, pos };
+  }
+  // more than three columns fold into a second band, in front of the first, so a long chain stays readable
+  const tall = Math.max(...Object.values(cols).map(a => a.length));
+  for (const [l, arr] of Object.entries(cols)) arr.forEach((i, r) => { const band = Math.floor(+l / PER_ROW); pos[i] = { x: 40 + (+l % PER_ROW) * GXS + band * 60, y: 180 + (r - (arr.length - 1) / 2) * GYS - band * (tall * GYS + 30) }; });
+  return { ids, js, pos };
+}
+function subScene(id) {
+  BB = [1e9, 1e9, -1e9, -1e9];
+  const { ids, js, pos } = layoutSub(id);
+  const xs = ids.map(i => pos[i].x), ys = ids.map(i => pos[i].y);
+  const X0 = Math.min(...xs) - 18, X1 = Math.max(...ids.map(i => pos[i].x + widthOf(parts[i]))) + 18, Y0 = Math.min(...ys) - 18, Y1 = Math.max(...ys) + MD + 18;
+  let s = `<polygon points="${pts([P(X0, Y0, 0), P(X1, Y0, 0), P(X1, Y1, 0), P(X0, Y1, 0)].map(([x, y]) => [x + 6, y + 10]))}" fill="rgba(30,40,50,.10)" filter="url(#soft)"/>`;
+  let tray = box(X0, Y0, 0, X1 - X0, Y1 - Y0, 20, 'dark') + `<polygon points="${pts([P(X0, Y0, 20), P(X1, Y0, 20), P(X1, Y1, 20), P(X0, Y1, 20)])}" fill="none" stroke="#e5533d" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  tray += `<g transform="${onFront(X0, Y0, 20)}"><rect x="12" y="4" width="${Math.min(300, (X1 - X0) - 24)}" height="12" rx="2" fill="#f3f1ec"/><text x="20" y="13.5" font-size="9" fill="#1d2630" class="plate-t">${esc(parts[id].name.toUpperCase())}</text></g>`;
+  s += `<g class="part tray" data-id="${id}" tabindex="0" role="button" aria-label="${esc(parts[id].name)}">${tray}</g>`;
+  // far to near
+  const order = [...ids].sort((a, b) => (pos[b].y - pos[a].y) || (pos[a].x - pos[b].x)), HT = {}, Z = q => pos[q].z || 0;
+  for (const q of order) {
+    const p = parts[q], { x, y } = pos[q], m = p.kind === 'step' ? 'steel' : p.kind === 'artifact' ? 'ivory' : 'alu';
+    const comp = (KIND_COMP[p.kind] || COMP[p.icon])?.(p, x, y);
+    let g = comp?.g; HT[q] = comp ? comp.h : MH;
+    if (!comp) g = box(x, y, 20, MW, MD, MH, m) + `<g transform="${onFront(x, y, 20 + MH)}"><rect x="8" y="9" width="26" height="26" rx="5" fill="#2b3640"/><g transform="translate(21,22)">${GLYPH[p.icon] || ''}</g>${nameText(p.name, 42, 20, 18, 11)}${screw(5, 41)}${screw(MW - 5, 41)}</g>`;
+    // a module in the back row stands on a step, raised by z: the projection is linear, so raising is a shift up
+    const riser = Z(q) ? box(x - 6, y - 6, 20, widthOf(p) + 12, MD + 12, Z(q), 'steel') : '';
+    if (Z(q)) { P(x, y, 20 + Z(q) + HT[q]); P(x + widthOf(p), y + MD, 20 + Z(q) + HT[q]); }
+    s += riser + `<g class="part${state.sel === q && !state.feat ? ' sel' : ''}" data-id="${q}" tabindex="0" role="button" aria-label="${esc(p.name)}"${Z(q) ? ` transform="translate(0,${-Z(q)})"` : ''}>${g}</g>`;
+  }
+  // the level's own joints
+  let lines = '', labels = [];
+  for (const j of js) {
+    const [u, v] = flow(j), a = pos[u], b = pos[v];
+    const A = P(a.x + widthOf(parts[u]) * 0.75, a.y + MD / 2, 20 + Z(u) + HT[u]), B = P(b.x + widthOf(parts[v]) * 0.25, b.y + MD / 2, 20 + Z(v) + HT[v]);
+    // a cable that passes over other modules arcs above the tallest of them, so its label never sits on a face
+    const between = ids.filter(i => i !== u && i !== v && pos[i].x > Math.min(a.x, b.x) && pos[i].x < Math.max(a.x, b.x)).map(i => 20 + Z(i) + HT[i]);
+    const over = Math.max(0, ...between) - Math.min(20 + Z(u) + HT[u], 20 + Z(v) + HT[v]);
+    const c = cable(A, B, 28 + Math.hypot(B[0] - A[0], B[1] - A[1]) * 0.06 + (between.length ? over / 0.75 + 30 : 0));
+    lines += `<g class="joint" data-joint="${jkey(j)}"><path class="cable under" d="${c.d}"/><path class="cable ${STYLE(j)}" d="${c.d}" marker-end="url(#${MARK(j)})"/></g>`;
+    labels.push({ x: c.mid[0], y: c.mid[1], text: j.label, key: jkey(j), dep: j.type === 'depends-on' });
+  }
+  // the joints that leave or enter this level: at the sub-part that cites the same lines, towards the side where the other part stands
+  for (const j of joints.filter(j => j.level === null && (j.from === id || j.to === id) && jointBuilt(jkey(j)))) {
+    const q = attachOf(j, id); if (!q) continue;
+    const other = j.from === id ? j.to : j.from, left = FOOT[other][0] + FOOT[other][2] / 2 < FOOT[id][0] + FOOT[id][2] / 2;
+    const out = flow(j)[0] === id, a = pos[q.id];
+    // it leaves from the module's foot and runs along the tray's front lip, below every face, to the side of the other part
+    const k = ids.indexOf(q.id), lane = Y0 - 8 - (k % 3) * 7, cx = a.x + widthOf(q) * (left ? 0.3 : 0.7);
+    const route = [P(cx, a.y, 22 + Z(q.id)), P(cx, lane, 21), P(left ? X0 - 26 : X1 + 26, lane, 21)], outer = route[2];
+    const path = (out ? route : [...route].reverse()).map((p, i) => (i ? 'L' : 'M') + pts([p])).join(' ');
+    lines += `<g class="joint" data-joint="${jkey(j)}"><path class="cable under" d="${path}"/><path class="cable ${STYLE(j)}" d="${path}" marker-end="url(#${MARK(j)})"/></g>`;
+    // the label stands above the stub's free end, naming the part outside; the joint's own words are in its card
+    const short = n => n.length > 20 ? n.slice(0, 19) + '…' : n;
+    const t = out ? `→ ${short(parts[other].name)}` : `${short(parts[other].name)} →`;
+    labels.push({ x: outer[0] + (left ? 1 : -1) * (t.length * 3.2 + 8), y: outer[1] + 13, text: t, key: jkey(j), dep: j.type === 'depends-on' });
+  }
+  s += lines + spread(labels);
+  const v = BB.map(f1); BB = null;
+  return { svg: s, vb: `${v[0] - 16} ${v[1] - 24} ${v[2] - v[0] + 32} ${v[3] - v[1] + 40}` };
+}
+const DEFS = `<defs>
+<linearGradient id="aluT" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1f3f5"/><stop offset="1" stop-color="#dfe3e7"/></linearGradient>
+<linearGradient id="aluF" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d4d9de"/><stop offset=".5" stop-color="#e6e9ec"/><stop offset="1" stop-color="#c8ced4"/></linearGradient>
+<linearGradient id="aluR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bcc3ca"/><stop offset="1" stop-color="#a6aeb6"/></linearGradient>
+<linearGradient id="ivF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1efe9"/><stop offset="1" stop-color="#e2e0d9"/></linearGradient>
+<filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="6"/></filter>
+<marker id="ac" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1f97cf"/></marker>
+<marker id="ab" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#3d6fb0"/></marker>
+<marker id="as" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e5533d"/></marker>
+<marker id="aa" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d08a22"/></marker>
+<marker id="ag" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7a8591"/></marker>
+</defs>`;
+
+// ===== 6. State and drawing =====
+// `step` is the reading position; `sel`, `feat` and `joint` are what the learner explores. They are kept apart on purpose.
+const state = { step: 0, sel: null, open: null, joint: null, feat: null, saved: null, build: true, arrive: false, raw: false, read: null, demo: {}, load: null, predicted: null, shownOpen: null };
+const VB = (() => { BB = [1e9, 1e9, -1e9, -1e9]; state.build = false; scene(); state.build = true; const v = BB.map(f1); BB = null; return `${v[0] - 24} ${v[1] - 30} ${v[2] - v[0] + 48} ${v[3] - v[1] + 54}`; })();
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function draw() {
+  $('#svg').setAttribute('viewBox', VB);
+  $('#svg').innerHTML = DEFS + scene({ open: state.open });
+  const lifting = state.open && state.shownOpen !== state.open, sinking = !!state.open !== !!state.shownOpen;
+  state.shownOpen = state.open;
+  const r0 = $('#upper').getBoundingClientRect();
+  $('#canvas').classList.toggle('lifted', !!state.open);
+  if (sinking && !reduced()) { const r1 = $('#upper').getBoundingClientRect(); $('#upper').style.transformOrigin = '0 0'; $('#upper').animate?.([{ transform: `translate(${f1(r0.left - r1.left)}px, ${f1(r0.top - r1.top)}px) scale(${f1(r0.width / r1.width * 100) / 100}, ${f1(r0.height / r1.height * 100) / 100})` }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' }); }
+  if (state.open) { const sub = subScene(state.open); $('#svgSub').setAttribute('viewBox', sub.vb); $('#svgSub').innerHTML = DEFS + sub.svg; }
+  else $('#svgSub').innerHTML = '';
+  $('#beam').innerHTML = '';
+  $('#mini').innerHTML = `<span class="here">Sei qui</span><svg viewBox="${VB}"></svg>`; miniMark();
+  $('#back').disabled = !state.open;
+  $('#stepn').textContent = `Passo ${state.step + 1} di ${STEPS.length}`;
+  $('#buildBtn').textContent = state.build ? 'Costruzione progressiva: sì' : 'Costruzione progressiva: no'; $('#buildBtn').classList.toggle('on', state.build);
+  const crumb = [`<b>${esc(D.whole.name)}</b>`];
+  if (state.open) crumb.push(`<b>${esc(parts[state.open].name)}</b>`);
+  if (state.sel && state.sel !== state.open && (!state.open || parent[state.sel] === state.open)) crumb.push(`<${state.feat ? 'b' : 'span class="cur"'}>${esc(parts[state.sel].name)}</${state.feat ? 'b' : 'span'}>`);
+  if (state.feat && FEAT[state.feat]) crumb.push(`<span class="cur">${esc(FEAT[state.feat].label)}</span>`);
+  $('#crumb').innerHTML = crumb.join(' &nbsp;/&nbsp; ');
+  drawPath(); drawInspector(); drawExplore(); drawSource();
+  state.arrive = false;
+  if (state.open) lifting ? flip(false) : drawBeam();
+}
+// The opened part rises from its place on the whole to the size of the stage; closing puts it back.
+function flip(reverse, done) {
+  const el = $('#svgSub'), a = $('#svg .socket')?.getBoundingClientRect(), b = $('#svgSub .tray')?.getBoundingClientRect();
+  if (!a || !b || reduced() || !el.animate) { done?.(); if (!reverse) drawBeam(); return; }
+  const c = el.getBoundingClientRect(), k = Math.max(0.08, a.width / b.width);
+  el.style.transformOrigin = `${f1(b.left + b.width / 2 - c.left)}px ${f1(b.top + b.height / 2 - c.top)}px`;
+  const from = { transform: `translate(${f1(a.left + a.width / 2 - b.left - b.width / 2)}px, ${f1(a.top + a.height / 2 - b.top - b.height / 2)}px) scale(${f1(k * 100) / 100})`, opacity: 0.25 }, to = { transform: 'none', opacity: 1 };
+  $('#beam').innerHTML = '';
+  const ms = reverse ? 320 : 480, an = el.animate(reverse ? [to, from] : [from, to], { duration: ms, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+  // a throttled page may never report the end: the state still settles
+  let over = false; const end = () => { if (over) return; over = true; if (reverse) { done?.(); an.cancel(); } else { an.cancel(); drawBeam(); } };
+  an.onfinish = end; setTimeout(end, ms + 250);
+}
+// a faint beam from the empty place to the lifted part, when the place is still in view
+function drawBeam() {
+  const cv = $('#canvas').getBoundingClientRect(), a = $('#svg .socket')?.getBoundingClientRect(), b = $('#svgSub .tray')?.getBoundingClientRect();
+  if (!a || !b) return;
+  $('#beam').setAttribute('viewBox', `0 0 ${f1(cv.width)} ${f1(cv.height)}`);
+  if (a.top < b.bottom - 4) return;
+  const X = v => f1(v - cv.left), Y = v => f1(v - cv.top);
+  $('#beam').innerHTML = `<polygon class="beam" points="${X(a.left)},${Y(a.top + a.height / 2)} ${X(a.right)},${Y(a.top + a.height / 2)} ${X(b.right - b.width * .12)},${Y(b.bottom - 6)} ${X(b.left + b.width * .12)},${Y(b.bottom - 6)}"/>`;
+}
+function miniMark() { const id = state.open || (state.sel && topOf(state.sel)); const saved = state.sel; state.sel = id; $('#mini svg').innerHTML = DEFS + scene({ mini: true }); state.sel = saved; }
+
+// What is being explored, and whether it lies outside the passage being read.
+function focusOf() {
+  const f = state.feat && FEAT[state.feat];
+  if (f) return { name: f.label, cites: [{ source: f.source, from: f.line, to: f.to ?? f.line }] };
+  if (state.joint) { const j = joints.find(j => jkey(j) === state.joint); return { name: `«${j.label}»`, cites: j.cites || [] }; }
+  if (state.sel) return { name: parts[state.sel].name, cites: parts[state.sel].cites || [] };
+  return null;
+}
+const exploring = () => { const f = focusOf(); return f && f.cites.length && !overlaps(f.cites, STEPS[state.step].range) ? f : null; };
+function drawExplore() {
+  const f = exploring(), el = $('#explore');
+  el.classList.toggle('on', !!f); $('#canvas').classList.toggle('exploring', !!f);
+  if (!f) { state.read = null; return; }
+  if (!state.read) state.read = { step: state.step, src: shown, scroll: $('#lines').scrollTop };
+  const s = STEPS[state.step], m = STEPS.find(x => overlaps(f.cites, x.range));
+  const c0 = f.cites[0];
+  el.innerHTML = `<span class="x">Esplori</span><b class="nm">${esc(f.name)}</b><span class="x">r. ${c0.from}${c0.to !== c0.from ? '–' + c0.to : ''} · stai leggendo il passo ${s.k + 1}</span><button class="btn" data-act="toread">↩ Torna al passo ${s.k + 1}</button>${m ? `<button class="btn" data-act="readhere" data-k="${m.k}">Leggi da qui (passo ${m.k + 1})</button>` : ''}`;
+}
+function toRead() {
+  const r = state.read;
+  const finish = () => { state.open = null; state.sel = null; state.joint = null; state.feat = null; state.saved = null; draw(); if (r && r.src === shown) $('#lines').scrollTop = r.scroll; };
+  state.open ? flip(true, finish) : finish();
+}
+function drawPath() {
+  const f = focusOf(), ex = exploring();
+  let h = `<h2>Percorso nella fonte</h2><div class="hint">${SOURCES.length} pagine · ${STEPS.length} sezioni</div>`, cur = null;
+  for (const s of STEPS) {
+    if (s.source !== cur) { cur = s.source; h += `<div class="src-h">${esc(srcOf(cur).title)}</div>`; }
+    const here = f && overlaps(f.cites, s.range);
+    const chips = [...s.add.map(id => `<span class="role add">+ ${esc(parts[id].name)}</span>`), ...s.back.map(id => `<span class="role back">↺ ${esc(parts[id].name)}</span>`), ...(s.rel.length ? [`<span class="role rel">↔ ${s.rel.length} ${s.rel.length > 1 ? 'relazioni' : 'relazione'}</span>`] : []), ...(!s.parts.length ? ['<span class="role ctx">contesto</span>'] : [])];
+    const tag = s.k === state.step && ex ? '<span class="tag read">in lettura</span>' : here && s.k !== state.step ? '<span class="tag here">qui</span>' : '';
+    h += `<button class="step${s.k === state.step ? ' on' : ''}${here ? ' ex' : ''}" data-step="${s.k}"><div class="t"><span class="n">${s.k + 1}</span>${esc(s.title)}${tag}</div><div class="roles">${chips.join('')}</div></button>`;
+  }
+  h += `<div class="legend"><span><span class="role add">+</span> introduce un pezzo</span><span><span class="role back">↺</span> torna su un pezzo</span><span><span class="role rel">↔</span> introduce una relazione</span><span><span class="tag here" style="margin:0">qui</span> parla di ciò che stai esplorando</span><span style="margin-top:4px">L’ordine dei paragrafi non crea legami: li creano le citazioni.</span></div>`;
+  $('#path').innerHTML = h; $('#path .step.on')?.scrollIntoView({ block: 'nearest' });
+}
+const KIND = { step: 'Passo', artifact: 'Documento', component: 'Componente', conclusion: 'Tesi', premise: 'Premessa', ground: 'Fondamento', limit: 'Limite', objection: 'Obiezione', consequence: 'Conseguenza', rejected: 'Scartato' };
+const TYPE = { 'depends-on': 'dipende da', 'sends-to': 'invia a', causes: 'causa', supports: 'sostiene', attacks: 'attacca', limits: 'limita' };
+const VERB_OUT = { 'depends-on': 'dipende da', 'sends-to': 'invia a', causes: 'mette in moto', supports: 'sostiene', attacks: 'attacca', limits: 'limita' };
+const VERB_IN = { 'depends-on': 'serve a', 'sends-to': 'riceve da', causes: 'è messo in moto da', supports: 'è sostenuto da', attacks: 'è attaccato da', limits: 'è limitato da' };
+const MARKS = { step: ['→', 'poi'], keeps: ['=', 'resta uguale'], caveat: ['⚠', 'attenzione'] };
+const FKIND = { drawer: 'Cassetto', dial: 'Quadrante', holder: 'Supporto', sheet: 'Foglio', note: 'Nota', warning: 'Avviso', legend: 'Voce della mappa', socket: 'Presa', lens: 'Lente', knob: 'Regolazione', check: 'Controllo', station: 'Stazione' };
+const plain = s => String(s ?? '').replace(/`|\*\*/g, '');
+const pointsList = ps => `<ul class="pts">${ps.map(x => `<li class="m-${x.mark || 'none'}"><span class="mk" aria-hidden="true">${(MARKS[x.mark] || ['•'])[0]}</span>${x.mark ? `<span class="sr">${MARKS[x.mark][1]}: </span>` : ''}<span>${esc(x.text)}</span></li>`).join('')}</ul>`;
+const citeChips = cs => cs?.length ? `<div class="chips">${cs.map(c => `<button class="cite" data-src="${c.source}" data-cite="${c.from}">${esc(srcOf(c.source).title)} · ${c.from}${c.to !== c.from ? '–' + c.to : ''}</button>`).join('')}</div>` : '';
+const fold = (label, body, open = false) => `<details class="fold"${open ? ' open' : ''}><summary>${label}</summary><div>${body}</div></details>`;
+function featureCard(f) {
+  const p = parts[f.part];
+  let h = `<div class="kind">${FKIND[f.kind]} · dentro «${esc(p.name)}»</div><h2>${esc(f.label)}</h2>`;
+  if (f.kind === 'holder') h += `<ul class="pts">${f.items.map(it => `<li class="${it.warn ? 'm-caveat' : ''}"><span class="mk">${it.warn ? '⚠' : '•'}</span><span><b>${esc(it.label)}</b> → ${esc(plain(it.cells[1]))}${it.warn ? ' <span class="muted">· nessun chiamante</span>' : ''}</span></li>`).join('')}</ul>`;
+  else if (f.cells) h += `<ul class="pts">${f.head.slice(1).map((hd, i) => f.cells[i + 1] ? `<li><span class="mk">•</span><span><span class="muted">${esc(plain(hd))}:</span> ${esc(plain(f.cells[i + 1]))}</span></li>` : '').join('')}</ul>`;
+  else if (f.text) h += `<p style="font-size:13.5px">${esc(f.text)}</p>`;
+  else if (f.to) h += `<p class="muted" style="font-size:12.5px">Una sezione della fonte, righe ${f.line}–${f.to}${f.n ? `, con ${f.n} ${f.n > 1 ? 'voci' : 'voce'}` : ''}.</p>`;
+  if (f.warn) h += `<p style="font-size:12.5px;color:#8a4f12">⚠ La fonte la segna come problema o limite.</p>`;
+  h += citeChips([{ source: f.source, from: f.line, to: f.to ?? f.line }]);
+  h += `<div class="actions"><button class="btn" data-pick="${p.id}">← ${esc(p.name)}</button></div>`;
+  return h;
+}
+const VERD = { falls: 'Crolla', weakens: 'Si indebolisce', holds: 'Regge' };
+// The run: take a brick out, predict first, then see what the disassembly says happens to the claim.
+function loadCard() {
+  const R = LOADRUN; if (!R || !built(R.target)) return '';
+  let h = `<h3>Metti sotto carico · ${esc(R.title)}</h3><p class="muted" style="font-size:12.5px;margin:2px 0 6px">${esc(R.question)}</p><div class="rounds">${R.bricks.map(b => `<button class="btn${state.load === b.part ? ' primary' : ''}" data-brick="${b.part}"${built(b.part) ? '' : ' disabled'}>${esc(parts[b.part].name)}</button>`).join('')}</div>`;
+  const b = state.load && R.bricks.find(x => x.part === state.load);
+  if (b && !state.predicted) h += `<p style="font-size:13px;margin:10px 0 4px"><b>Prima prevedi.</b> Senza «${esc(parts[b.part].name)}», «${esc(parts[R.target].name)}»…</p><div class="rounds">${Object.entries(VERD).map(([v, t]) => `<button class="btn" data-predict="${v}">${t}</button>`).join('')}</div>`;
+  if (b && state.predicted) h += `<div class="box verdict ${b.verdict}">${b.explain.startsWith(VERD[b.verdict]) ? '' : `<b>${VERD[b.verdict]}.</b> `}${esc(b.explain)}</div><p style="font-size:12.5px;margin:6px 0 0">${state.predicted === b.verdict ? 'La tua previsione coincide.' : `Avevi previsto: ${VERD[state.predicted].toLowerCase()}.`}</p>${b.inference ? '<span class="chip amber">Interpretazione: il testo non lo dice</span>' : ''}${citeChips(b.cites)}<div class="actions"><button class="btn" data-act="putback">Rimetti il mattone</button></div>`;
+  return h;
+}
+function drawInspector() {
+  const el = $('#insp');
+  if (state.feat && FEAT[state.feat]) { el.innerHTML = featureCard(FEAT[state.feat]); return; }
+  if (state.joint) {
+    const j = joints.find(j => jkey(j) === state.joint);
+    el.innerHTML = `<div class="kind">Relazione</div><h2>${esc(parts[j.from].name)}</h2><p class="lead">${VERB_OUT[j.type] || '→'} <b>${esc(parts[j.to].name)}</b></p><p class="muted">«${esc(j.label)}»</p>${citeChips(j.cites)}${!j.cites ? '<p class="muted">Nessuna riga citata.</p>' : ''}`;
+    return;
+  }
+  const p = state.sel && parts[state.sel];
+  if (!p) {
+    const s = STEPS[state.step];
+    const rows = [...s.add.map(id => `<li><span class="mk">+</span><button class="link" data-pick="${id}">${esc(parts[id].name)}</button></li>`), ...s.back.map(id => `<li><span class="mk">↺</span><button class="link" data-pick="${id}">${esc(parts[id].name)}</button></li>`), ...s.rel.map(j => `<li><span class="mk">↔</span><span>${esc(parts[j.from].name)} ${VERB_OUT[j.type]} ${esc(parts[j.to].name)}</span></li>`)];
+    el.innerHTML = `<div class="kind">L’insieme</div><h2>${esc(D.whole.name)}</h2><p class="lead">${esc(D.whole.does)}</p>${citeChips(D.whole.cites)}
+      <h3>Passo ${s.k + 1} · ${esc(s.title)}</h3>${rows.length ? `<ul class="pts">${rows.join('')}</ul>` : '<p class="muted">Contesto: nessun pezzo citato.</p>'}
+      <div class="actions"><button class="btn" data-act="prev">←</button><button class="btn primary" data-act="next">Passo successivo →</button></div>
+      ${loadCard()}${fold('Perché conta', `<p>${esc(D.whole.why)}</p>`)}`;
+    return;
+  }
+  const top = !parent[p.id], o = { look: (LOOK[p.kind] || LOOK_ANY)[0], limit: (LOOK[p.kind] || LOOK_ANY)[1] }, js = joints.filter(j => j.from === p.id || j.to === p.id), ss = stepsCiting(p);
+  let h = `<div class="kind">${esc(KIND[p.kind] || p.kind)}${parent[p.id] ? ' · dentro «' + esc(parts[parent[p.id]].name) + '»' : ''}</div><h2>${esc(p.name)}</h2><p class="lead">${esc(p.role || '')}</p>${citeChips(p.cites)}`;
+  h += p.points?.length ? pointsList(p.points) : p.explain ? `<p>${esc(p.explain)}</p>` : '';
+  if (p.parts && state.open !== p.id) h += `<div class="actions"><button class="btn primary" data-act="open">Apri: ${p.parts.length} parti ↓</button></div>`;
+  const faces = Object.entries(FEAT).filter(([, v]) => v.part === p.id && state.open === parent[p.id]);
+  if (faces.length) h += `<h3>Sulla sua faccia · dalle sue righe</h3><div class="chips">${faces.map(([k, v]) => `<button class="stepchip" data-featpick="${k}">${esc(v.label)}</button>`).join('')}</div>`;
+  if (p.icon === 'list-checks' && state.open === parent[p.id]) { const its = sectionsOf(p).flatMap(s => s.items), w = its.filter(i => i.warn); if (its.length >= 4) h += fold(`Il catalogo · ${its.length} voci, ${w.length} con ⚠`, `<ul class="pts">${w.map(it => `<li class="m-caveat"><span class="mk">⚠</span><span>${esc(it.label)} <button class="cite" data-src="${it.source}" data-cite="${it.line}">${it.line}</button></span></li>`).join('')}</ul>`); }
+  if (LOADRUN && (p.id === LOADRUN.target || LOADRUN.bricks.some(b => b.part === p.id))) h += loadCard();
+  if (js.length) h += `<h3>Relazioni</h3><ul class="pts rel">${js.map(j => { const out = j.from === p.id, gives = flow(j)[0] === p.id; return `<li><span class="mk" title="${gives ? 'verso' : 'da'}">${gives ? '→' : '←'}</span><button class="link" data-joint="${jkey(j)}">${out ? VERB_OUT[j.type] : VERB_IN[j.type]} ${esc(parts[out ? j.to : j.from].name)}</button><span class="muted"> · ${esc(j.label)}</span></li>`; }).join('')}</ul>`;
+  if (ss.length) h += `<h3>Nei passi</h3><div class="chips">${ss.map(s => `<button class="stepchip" data-step="${s.k}" title="${esc(s.title)}">${s.k + 1}</button>`).join('')}</div>`;
+  h += fold('Nell’oggetto', `<ul class="pts"><li><span class="mk">•</span><span>${esc(top ? o.look : SUBLOOK(p, parts[parent[p.id]]))}</span></li><li class="m-caveat"><span class="mk">⚠</span><span>${esc(top ? o.limit : SUBLIMIT)}</span></li></ul>`);
+  if (p.lens) h += fold('Lente', `<dl class="lens"><dt>Cos’è</dt><dd>${esc(p.lens.what)}</dd><dt>Perché qui</dt><dd>${esc(p.lens.why)}</dd><dt>Come funziona</dt><dd>${esc(p.lens.how)}</dd><dt>⚠ Punto critico</dt><dd>${esc(p.lens.critical)}</dd></dl>`);
+  if (state.open) h += `<div class="actions"><button class="btn" data-act="back">← Torna all’insieme</button></div>`;
+  el.innerHTML = h;
+}
+
+// The source, formatted for reading: headings, paragraphs, lists, tables and code, every line still addressable.
+const inline = t => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\([^)]*\)/g, '<u>$1</u>');
+const LIST = /^\s*([-*]|\d+\.)\s+/;
+function formatted(L) {
+  let h = '', n = 0;
+  while (n < L.length) {
+    const l = L[n], k = n + 1;
+    if (!l.trim()) { n++; continue; }
+    if (/^\s*```/.test(l)) { let m = n + 1; const rows = []; while (m < L.length && !/^\s*```/.test(L[m])) { rows.push(`<span data-n="${m + 1}">${esc(L[m]) || ' '}</span>`); m++; } h += `<div class="blk" data-g="${k}"><pre>${rows.join('')}</pre></div>`; n = m + 1; continue; }
+    const hm = l.match(/^(#{1,6})\s+(.*)/);
+    if (hm) { const lv = Math.min(hm[1].length + 1, 5); h += `<div class="blk" data-g="${k}"><h${lv} data-n="${k}">${inline(hm[2])}</h${lv}></div>`; n++; continue; }
+    if (/^\|/.test(l)) {
+      const rows = []; let m = n;
+      while (m < L.length && /^\|/.test(L[m])) { const cells = L[m].split('|').slice(1, -1).map(x => x.trim()); if (!cells.every(x => /^:?-+:?$/.test(x))) rows.push({ m: m + 1, cells }); m++; }
+      const [hd, ...body] = rows;
+      h += `<div class="blk" data-g="${k}"><table><thead><tr data-n="${hd.m}">${hd.cells.map(c => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr data-n="${r.m}" title="riga ${r.m}">${r.cells.map(c => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      n = m; continue;
+    }
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) { h += `<div class="blk"><hr data-n="${k}"></div>`; n++; continue; }
+    if (LIST.test(l)) {
+      const items = [], ordered = /^\s*\d+\./.test(l); let m = n;
+      while (m < L.length && L[m].trim() && (LIST.test(L[m]) || /^\s{2,}\S/.test(L[m]))) { if (LIST.test(L[m])) items.push([{ m: m + 1, t: L[m].replace(LIST, '') }]); else items.at(-1).push({ m: m + 1, t: L[m].trim() }); m++; }
+      const tag = ordered ? 'ol' : 'ul';
+      h += `<div class="blk" data-g="${k}"><${tag}>${items.map(it => `<li>${it.map(x => `<span data-n="${x.m}">${inline(x.t)}</span>`).join(' ')}</li>`).join('')}</${tag}></div>`;
+      n = m; continue;
+    }
+    let m = n; const ps = [];
+    while (m < L.length && L[m].trim() && (m === n || !/^(#{1,6}\s|\||\s*```)/.test(L[m]) && !LIST.test(L[m]))) { ps.push(`<span data-n="${m + 1}">${inline(L[m].trim().replace(/^>\s?/, ''))}</span>`); m++; }
+    h += `<div class="blk" data-g="${k}"><p>${ps.join(' ')}</p></div>`; n = m;
+  }
+  return h;
+}
+let shown = null, rendered = null;
+function renderSource(src) {
+  const key = src + (state.raw ? ':raw' : ':fmt'); if (rendered === key) return;
+  rendered = key; shown = src;
+  const L = srcOf(src).text.split('\n'), el = $('#lines');
+  el.classList.toggle('fmt', !state.raw);
+  el.innerHTML = state.raw ? L.map((l, i) => `<div class="ln" data-n="${i + 1}"><span>${i + 1}</span><span>${esc(l) || ' '}</span></div>`).join('') : formatted(L);
+  $('#docktitle').textContent = `Fonte originale · ${srcOf(src).title}`;
+}
+function drawSource(scroll = true) {
+  const s = STEPS[state.step], f = focusOf(), sel = f?.cites || [];
+  const src = sel[0]?.source || s.source; renderSource(src);
+  $('#srcname').textContent = `Fonte: ${SOURCES.map(x => x.title).join(' + ')}`;
+  $('#rawBtn').textContent = state.raw ? 'Testo formattato' : 'Righe originali';
+  const mine = sel.filter(c => c.source === src);
+  $('#dockr').textContent = mine.length ? `${f.name} · righe ${mine.map(c => `${c.from}–${c.to}`).join(', ')}${exploring() ? ` · lettura al passo ${s.k + 1}` : ''}` : `Passo ${s.k + 1} · ${s.title} · righe ${s.from}–${s.to}`;
+  const inP = n => s.source === src && n >= s.from && n <= s.to, hit = n => mine.some(c => n >= c.from && n <= c.to);
+  for (const e of $('#lines').querySelectorAll('[data-n]')) { const n = +e.dataset.n, h = hit(n); e.classList.toggle('hit', h); e.classList.toggle('pass', !h && inP(n)); }
+  if (scroll) scrollToLine(mine[0]?.from || (s.source === src ? s.from : 1));
+}
+function scrollToLine(n) {
+  const box = $('#lines'); let el = null;
+  for (const e of box.querySelectorAll('[data-n]')) if (+e.dataset.n >= n) { el = e; break; }
+  if (el) box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 10;
+}
+
+// ===== 7. Interaction =====
+function goStep(k) { k = Math.max(0, Math.min(STEPS.length - 1, k)); if (k === state.step) return draw(); state.arrive = k > state.step; state.step = k; if (state.open && !built(state.open)) state.open = null; if (state.sel && !built(state.sel)) { state.sel = null; state.feat = null; } if (state.joint && !jointBuilt(state.joint)) state.joint = null; draw(); }
+function select(id) { state.joint = null; state.feat = null; if (state.sel === id && parts[id].parts && !state.open) return openPart(id); state.sel = id; draw(); }
+function openPart(id) { if (!state.open) state.saved = { step: state.step, sel: id, scroll: $('#lines').scrollTop, src: shown }; state.open = id; state.sel = id; state.joint = null; state.feat = null; draw(); }
+function back() {
+  if (!state.open) { state.sel = null; state.joint = null; state.feat = null; draw(); return; }
+  const s = state.saved || {};
+  flip(true, () => { state.open = null; state.joint = null; state.feat = null; state.sel = s.sel ?? null; state.step = s.step ?? state.step; draw(); if (s.scroll != null && s.src === shown) $('#lines').scrollTop = s.scroll; $(`#svg [data-id="${state.sel}"]`)?.focus(); });
+}
+function pickFeat(key) { const f = FEAT[key]; if (!f) return; state.feat = key; state.sel = f.part; state.joint = null; draw(); $(`[data-feat="${key}"]`)?.focus({ preventScroll: true }); }
+document.addEventListener('click', e => {
+  const t = e.target;
+  if (t.closest('#note') && !t.closest('.card') || t.closest('[data-act="closenote"]')) { $('#note').classList.remove('on'); return; }
+  if (t.closest('#noteBtn')) { $('#note').classList.add('on'); return; }
+  if (t.closest('#buildBtn')) { state.build = !state.build; if (state.sel && !built(state.sel)) state.sel = null; return draw(); }
+  if (t.closest('#rawBtn')) { const top = $('#lines').scrollTop; state.raw = !state.raw; rendered = null; drawSource(!!focusOf()); if (!focusOf()) scrollToLine(STEPS[state.step].from); return; }
+  const br = t.closest('[data-brick]'); if (br) { state.load = state.load === br.dataset.brick ? null : br.dataset.brick; state.predicted = null; return draw(); }
+  const pr = t.closest('[data-predict]'); if (pr) { state.predicted = pr.dataset.predict; return draw(); }
+  if (t.closest('[data-act="putback"]')) { state.load = null; state.predicted = null; return draw(); }
+  const fp = t.closest('[data-featpick]'); if (fp) return pickFeat(fp.dataset.featpick);
+  const act = t.closest('[data-act]')?.dataset.act;
+  if (act === 'toread') return toRead();
+  if (act === 'readhere') { const k = +t.closest('[data-act]').dataset.k; state.read = null; return goStep(k); }
+  const step = t.closest('[data-step]'); if (step) { if (!state.open) { state.sel = null; state.joint = null; state.feat = null; } return goStep(+step.dataset.step); }
+  const pick = t.closest('[data-pick]'); if (pick) return select(pick.dataset.pick);
+  const cite = t.closest('[data-cite]'); if (cite) { if (cite.dataset.src) renderSource(cite.dataset.src); scrollToLine(+cite.dataset.cite); return; }
+  if (act === 'open') return openPart(state.sel);
+  if (act === 'back') return back();
+  if (act === 'desel') { state.sel = null; state.joint = null; state.feat = null; return draw(); }
+  if (act === 'next' || act === 'prev') return goStep(state.step + (act === 'next' ? 1 : -1));
+  const ft = t.closest('#svgSub [data-feat]'); if (ft) return pickFeat(ft.dataset.feat);
+  const jt = t.closest('[data-joint]'); if (jt) { state.joint = jt.dataset.joint; state.feat = null; draw(); return; }
+  const part = t.closest('#svg [data-id]');
+  if (part && state.open) { const id = part.dataset.id; if (parts[id].parts) { if (id !== state.open) openPart(id); else { state.sel = id; state.feat = null; draw(); } } else { state.open = null; state.sel = id; state.joint = null; state.feat = null; draw(); } return; }
+  if (part) return select(part.dataset.id);
+  const sub = t.closest('#svgSub [data-id]'); if (sub) { state.joint = null; state.feat = null; state.sel = sub.dataset.id; return draw(); }
+  if (state.open && t.closest('#upper')) return back();
+  if (t.closest('#mini')) { if (state.open) back(); else { state.sel = null; state.feat = null; draw(); } return; }
+  if (t.closest('#back')) return back();
+});
+document.addEventListener('dblclick', e => { const p = e.target.closest('#svg [data-id]'); if (p && parts[p.dataset.id].parts) openPart(p.dataset.id); });
+document.addEventListener('keydown', e => {
+  if ($('#note').classList.contains('on')) { if (e.key === 'Escape') $('#note').classList.remove('on'); return; }
+  const ft = e.target.closest?.('#svgSub [data-feat]');
+  if ((e.key === 'Enter' || e.key === ' ') && ft) { e.preventDefault(); pickFeat(ft.dataset.feat); return; }
+  const p = e.target.closest?.('#svg [data-id], #svgSub [data-id]');
+  if ((e.key === 'Enter' || e.key === ' ') && p) { e.preventDefault(); const id = p.dataset.id; const inUpper = !!p.closest('#svg'); if (state.sel === id && parts[id].parts && inUpper) openPart(id); else { if (inUpper && state.open && !parts[id].parts) { state.open = null; } state.sel = id; state.joint = null; state.feat = null; draw(); $(`[data-id="${id}"]`)?.focus(); } return; }
+  if (e.key === 'ArrowDown' && state.sel && parts[state.sel].parts && state.open !== state.sel) { e.preventDefault(); openPart(state.sel); return; }
+  if (e.key === 'Escape' || (e.key === 'ArrowUp' && state.open)) { e.preventDefault(); back(); return; }
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !e.target.closest?.('#lines')) goStep(state.step + (e.key === 'ArrowRight' ? 1 : -1));
+});
+const tip = $('#tip');
+document.addEventListener('mouseover', e => {
+  const ft = e.target.closest('#svgSub [data-feat]'), p = !ft && e.target.closest('#svg [data-id], #svgSub [data-id]'), j = e.target.closest('#svg [data-joint], #svgSub [data-joint]');
+  document.querySelectorAll('#lines .pre').forEach(x => x.classList.remove('pre'));
+  if (!ft && !p && !j) { tip.style.display = 'none'; return; }
+  let cites, html;
+  if (ft) { const f = FEAT[ft.dataset.feat]; cites = [{ source: f.source, from: f.line, to: f.to ?? f.line }]; html = `<b>${esc(f.label)}</b>${FKIND[f.kind]} di «${esc(parts[f.part].name)}» · riga ${f.line}${f.to ? '–' + f.to : ''}`; }
+  else if (p) { const q = parts[p.dataset.id]; cites = q.cites || []; html = `<b>${esc(q.name)}</b>${q.parts && p.closest('#svg') ? (state.sel === q.id ? 'Premi di nuovo o Invio per aprire' : 'Premi per sceglierlo, doppio clic per aprirlo') : 'Premi per sceglierlo'}`; }
+  else { const jj = joints.find(x => jkey(x) === j.dataset.joint); cites = jj.cites || []; html = `<b>«${esc(jj.label)}»</b>${esc(parts[jj.from].name)} ${TYPE[jj.type] || '→'} ${esc(parts[jj.to].name)}`; }
+  tip.innerHTML = html; tip.style.display = 'block';
+  cites.filter(c => c.source === shown).forEach(c => { for (let n = c.from; n <= c.to; n++) { const l = $(`#lines [data-n="${n}"]`); if (l && !l.classList.contains('hit')) l.classList.add('pre'); } });
+});
+document.addEventListener('mousemove', e => { if (tip.style.display === 'block') { tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; } });
+(() => {
+  let y0 = null, h0 = 0;
+  $('#grip').addEventListener('pointerdown', e => { y0 = e.clientY; h0 = $('#dock').getBoundingClientRect().height; e.target.setPointerCapture(e.pointerId); });
+  $('#grip').addEventListener('pointermove', e => { if (y0 === null) return; const h = Math.max(110, Math.min(window.innerHeight * 0.6, h0 - (e.clientY - y0))); document.documentElement.style.setProperty('--dock', h + 'px'); });
+  $('#grip').addEventListener('pointerup', () => { y0 = null; });
+  let fs = 13; const setFs = d => { fs = Math.max(11, Math.min(18, fs + d)); document.documentElement.style.setProperty('--fs', fs + 'px'); };
+  $('#fsm').onclick = () => setFs(-1); $('#fsp').onclick = () => setFs(1);
+})();
+$('#notecard').innerHTML = `<h2 style="margin-top:0">Come è costruito questo prototipo</h2>
+<p>Una prova del laboratorio su un argomento, la fixture pubblica <code>mill-harm</code>: Mill, <i>On Liberty</i>, cap. I. A differenza della consolle e della centralina, qui <b>l’oggetto dell’insieme non è disegnato a mano</b>: lo compone una grammatica scritta una volta per gli argomenti, che legge soltanto i tipi dei pezzi e dei legami.</p>
+<table><tr><th>Regola</th><th>Che cosa diventa</th></tr>
+<tr><td>un pezzo che ne <b>sostiene</b> un altro</td><td>sta sotto, con un perno corallo: un fondamento è una platea, una premessa una colonna sul suo basamento</td></tr>
+<tr><td>un pezzo sostenuto</td><td>la trave</td></tr>
+<tr><td>ciò che la trave sostiene</td><td>un piano sopra la trave, con una stanza per sotto-pezzo</td></tr>
+<tr><td>un pezzo che <b>limita</b></td><td>un morsetto sull’estremità, con una targhetta per sotto-pezzo</td></tr>
+<tr><td>un pezzo che <b>attacca</b></td><td>un cuneo ambra sul bordo</td></tr>
+<tr><td>scartato, o senza legami</td><td>un vassoio a lato</td></tr></table>
+<p style="margin-top:12px"><b>Dalla biblioteca (per tipo, non per questa fonte):</b> le forme, i materiali, i testi «Nell’oggetto» e «Dove finisce l’analogia».<br>
+<b>Dalla scomposizione:</b> nomi, ruoli, punti, metafore, citazioni, i legami e le loro etichette, la prova «Togli un mattone» con i suoi esiti, il percorso (un passo per paragrafo, perché la fonte ha un solo titolo).<br>
+<b>Interattivo:</b> scelta, apertura con il pezzo che si solleva, ritorno al punto di lettura, «Esplori», la prova sotto carico con la previsione prima dell’esito, costruzione progressiva, fonte formattata.<br>
+<b>Non c’è:</b> la ricomposizione, il caso nuovo (la seconda prova della fixture), facce dalle righe (la fonte è prosa: niente titoli, tabelle o elenchi su cui costruirle).</p>
+<div class="actions"><button class="btn primary" data-act="closenote">Chiudi</button></div>`;
+draw();
+</script>
+</body>
+</html>
