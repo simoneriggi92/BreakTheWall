@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { billOfMaterials, DisassemblyError, type Disassembly, type Part } from '../src/core/disassembly';
 import { readFileSync } from 'node:fs';
 import {
-  acceptContent, acceptExpansion, acceptRuns, acceptStructure, acceptSuggestions, answerLengthRatio, applyShortened, givesAway, assembleDisassembly, buildContentInput, buildRunsInput,
+  acceptContent, acceptRuns, acceptStructure, acceptSuggestions, answerLengthRatio, applyShortened, givesAway, assembleDisassembly, buildContentInput, buildRunsInput,
   buildStructureInput, buildSuggestionInput, compose, contentJsonSchema, defaultContentLanguage, formatSourceBlock, LEAD_LIMIT, sourcePages, longTexts, restates, runsJsonSchema, structureJsonSchema,
   type GenerationMeta,
 } from '../src/core/disassembly-generation';
@@ -16,9 +16,9 @@ import type { CompletionRequest } from '../src/desktop/completion';
 import { DisassemblyStore } from '../src/desktop/disassembly-store';
 import { Generator } from '../src/desktop/generator';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
-import { buildExpansionInput, CONTENT_INSTRUCTIONS, EXPANSION_INSTRUCTIONS, expansionInstructions, instructionsFor, STRUCTURE_INSTRUCTIONS, structureInstructions } from '../src/core/disassembly-generation';
+import { CONTENT_INSTRUCTIONS, instructionsFor, STRUCTURE_INSTRUCTIONS, structureInstructions } from '../src/core/disassembly-generation';
 import { goalSchema } from '../src/core/source';
-import { deepDisassembly, draftsFrom, generatedFrom, pastedSource, scriptedAnswer, splitAnswer } from './disassembly-drafts';
+import { draftsFrom, pastedSource, scriptedAnswer } from './disassembly-drafts';
 
 const meta: GenerationMeta = { id: 'g-test', createdAt: '2026-10-26T10:00:00.000Z', provider: 'chatgpt', model: 'model-a' };
 const goalOf = (d: Disassembly) => ({ outcome: d.question ?? '', priorKnowledge: '' });
@@ -220,7 +220,6 @@ describe('generation without a question (P-20261029-source-entry E4)', () => {
     expect(instructions).not.toContain('outside-question');
     expect(instructions).toContain('relevant: always true');
     expect(instructions).toMatch(/start: the top-level part a learner new to the source should begin with.*Never null/);
-    expect(expansionInstructions(false)).not.toContain('outside-question');
   });
   it('leaves the question-led request as it was, apart from the start line', async () => {
     const { sources, goal, language } = await setupFor(story());
@@ -229,7 +228,6 @@ describe('generation without a question (P-20261029-source-entry E4)', () => {
     expect(STRUCTURE_INSTRUCTIONS).toBe(structureInstructions(true));
     expect(STRUCTURE_INSTRUCTIONS).toContain('outside-question');
     expect(STRUCTURE_INSTRUCTIONS).toContain('or null when the question already says where to begin');
-    expect(EXPANSION_INSTRUCTIONS).toBe(expansionInstructions(true));
   });
   it('rejects a whole-source structure without a start, with a closed sub-assembly or with lines outside a question', async () => {
     const atlasCase = await setupFor(atlas());
@@ -249,7 +247,6 @@ describe('generation without a question (P-20261029-source-entry E4)', () => {
     const d = await assembleDisassembly({ ...base, structure, contents, runs });
     expect(d.question).toBeUndefined();
     expect(d.start).toEqual({ part: 'claim', why: 'The rest of the essay supports or limits it.' });
-    expect(buildExpansionInput({ ...d, kind: 'generated' }, 'bounds').split('\n')[0]).toBe('FOCUS: none. The learner wants to understand the whole source.');
   });
   it('writes in the interface language when there is no question, whatever the sources (owner, 2026-10-29)', () => {
     expect(defaultContentLanguage('', 'it')).toBe('it');
@@ -464,7 +461,6 @@ describe('generation orchestration across phases and routes (D9)', () => {
   it('asks for leads of at most 100 characters and for points and explanations that add to them (D20)', () => {
     expect(STRUCTURE_INSTRUCTIONS).toContain("role: the part's lead, at most 100 characters");
     expect(CONTENT_INSTRUCTIONS).toContain('Never say the lead again');
-    expect(EXPANSION_INSTRUCTIONS).toContain('role: its lead, at most 100 characters');
   });
 });
 
@@ -485,16 +481,12 @@ describe('the restate check (D20)', () => {
     expect(walk(d.parts)).toEqual([]);
   });
 
-  it('locates a restated point in a content answer and a restated explanation in a split', async () => {
+  it('locates a restated point in a content answer', async () => {
     const { sources, goal, drafts } = await setupFor(story());
     const lead = 'The council votes to raise a stone wall against the winter storms.';
     const structure = acceptStructure(JSON.stringify({ ...drafts.structure, parts: drafts.structure.parts.map((p, i) => i === 1 ? { ...p, role: lead } : p) }), { sources, goal, language: 'en', meta });
     const content = { ...drafts.contents[1], points: [{ text: 'The council votes for a stone wall against the storms of winter.', mark: null }, drafts.contents[1].points[1]] };
     expect(findings(() => acceptContent(JSON.stringify(content), structure, 1, 'en'))).toEqual([{ path: 'points[0]', message: expect.stringMatching(/^Says the lead again \("The council votes/) }]);
-    const d = generatedFrom(await deepDisassembly(2));
-    const split = splitAnswer(d, 'p2');
-    split.parts[0] = { ...split.parts[0], role: lead, explain: 'The council votes to raise the stone wall against storms in winter.' };
-    expect(findings(() => acceptExpansion(JSON.stringify(split), d, 'p2', { provider: 'chatgpt', model: 'm', createdAt: meta.createdAt }))).toContainEqual({ path: 'parts[0].explain', message: expect.stringMatching(/^Says the lead again/) });
   });
 });
 

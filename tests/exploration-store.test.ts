@@ -31,7 +31,7 @@ function setup(answers: (string | ((signal: AbortSignal) => Promise<string>))[])
     return typeof next === 'string' ? next : next(signal);
   });
   const store = new ExplorationStore(join(root, 'explorations'));
-  const generator = new Generator({ chatgpt: { complete }, local: () => ({ complete }) }, { save: async d => d }, () => new Date('2026-11-06T12:00:00Z'), undefined, undefined, store);
+  const generator = new Generator({ chatgpt: { complete }, local: () => ({ complete }) }, { save: async d => d }, () => new Date('2026-11-06T12:00:00Z'), undefined, store);
   return { generator, store, requests, complete };
 }
 

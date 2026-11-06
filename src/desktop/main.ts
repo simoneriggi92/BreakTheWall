@@ -48,7 +48,7 @@ function trustedSender(event: Electron.IpcMainInvokeEvent) {
 }
 
 /** Import, account and generation operations. Tokens and file paths never cross into the renderer. */
-function registerStudio(userData: string, lessons: LessonStore, disassemblies: DisassemblyStore, progress: ProgressStore) {
+function registerStudio(userData: string, lessons: LessonStore, disassemblies: DisassemblyStore) {
   const account = new ChatGPTAccount({
     vault: new SafeStorageVault(join(userData, 'credentials', 'chatgpt.bin'), safeStorage),
     hostId: hostIdFile(join(userData, 'credentials', 'agent-host.json')),
@@ -57,10 +57,9 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     log: message => console.info(`[chatgpt] ${message}`),
   });
   const localFetch = globalThis.fetch.bind(globalThis);
-  // Taking a part apart moves the learner's progress to the new revision, through the same store the player uses.
   // A failed or cancelled generation keeps what was accepted next to the saved disassemblies (D21).
   const explorations = new ExplorationStore(join(userData, 'explorations'));
-  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, disassemblies, undefined, (previous, next) => progress.carry(previous, next), new DraftStore(join(userData, 'generation-draft.json')), explorations);
+  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, disassemblies, undefined, new DraftStore(join(userData, 'generation-draft.json')), explorations);
   const settings = new SettingsStore(join(userData, 'settings.json'));
   // Host-side text (file dialog, sign-in page) follows the same setting as the interface.
   const language = async () => resolveLanguage((await settings.read()).language, systemLocale());
@@ -121,11 +120,6 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
   ipcMain.handle('exploration:start', async (event, input: unknown) => {
     trustedSender(event);
     try { return await generator.explore(input, progressTo(event)); }
-    catch (error) { return asFailure(error); }
-  });
-  ipcMain.handle('disassembly:expand', async (event, input: unknown) => {
-    trustedSender(event);
-    try { return await generator.expand(input, progressTo(event)); }
     catch (error) { return asFailure(error); }
   });
   ipcMain.handle('settings:get', event => { trustedSender(event); return settings.read(); });
@@ -289,7 +283,7 @@ void app.whenReady().then(async () => {
     async key => preparedDisassemblies.find(x => x.id === key.disassemblyId && x.revision === key.revision) ?? disassemblies.find(key.disassemblyId, key.revision));
   ipcMain.handle('progress:load', (event, key: unknown) => { trustedSender(event); return store.load(progressKeySchema.parse(key)); });
   ipcMain.handle('progress:save', (event, input: unknown) => { trustedSender(event); return store.save(progressStateSchema.parse(input)); });
-  registerStudio(userData, lessons, disassemblies, store);
+  registerStudio(userData, lessons, disassemblies);
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 }).catch(error => { console.error('Desktop initialization failed:', error.message); app.quit(); });

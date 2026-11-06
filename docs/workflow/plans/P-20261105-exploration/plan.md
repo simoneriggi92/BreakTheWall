@@ -3,9 +3,9 @@ id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
 version: 6
 state: implementing
-current_task: X12
-last_evidence: Phase style done on feature/exploration (2026-11-06) - X11 tokens and exploration.css; tsc passes; npx vitest run --dir tests 39 files 556 tests passed; npm run build passes
-next_action: implement P-20261105-exploration v6 --phase view (X12-X19)
+current_task: X20
+last_evidence: Phase view done on feature/exploration (2026-11-06) - X12-X19; tsc passes; npx vitest run --dir tests 41 files 586 tests passed; npm run build passes; seen in the browser preview (paper, blueprint, phone width), no console errors
+next_action: implement P-20261105-exploration v6 --phase verify (X20); CI after a confirmed push, X20.3 runs and X20.4 need the owner
 approval: approved
 ---
 
@@ -598,6 +598,17 @@ Not included:
   - a click on a cited line selects its part;
   - folding a panel keeps the state;
   - an aspect's roles carry its hue in the sub-level, and a prerequisite never takes one.
+- **Done (2026-11-06):** `src/renderer/exploration/` holds the view:
+  - `model.ts`: the level drawn on the whole, the premise, the hues, the guide's steps and what each shows; pure functions;
+  - `state.ts`: the one reducer;
+  - `Graph.tsx`: one level drawn;
+  - `Panels.tsx`: the card, the index and the source;
+  - `Report.tsx`;
+  - `ExplorationView.tsx`: the bar, the panels, the step strip, the sub-level and the leader line.
+  
+  Its text is in `src/renderer/i18n/x-it.ts` and `x-en.ts`, reached as `t.x`; its layout rules are in `exploration.css`, still tokens only. Parts set apart (references, procedures, loose roles) sit in a tray under the structure. `tests/exploration-view.test.tsx` runs on the prepared examples, with 31 tests for X12–X17.
+  - Seen in the browser preview at 1280×800, in paper and blueprint and at phone width: there were no console errors, and the leader line reached the source.
+  - At 800 px high the structure gets about a third of the column, under the step strip and the card. This is for the owner's look in X20.2.
 
 **X13. The guides.**
 - **"The whole source":**
@@ -625,6 +636,9 @@ Not included:
   - "back to the step" restores it;
   - a question's step lights the aspects of its parts;
   - the source view (no nucleus) has no guide.
+- **Done (2026-11-06):** the guides are in `model.ts` (`shown`, `guided`, `crossing`) and in the step strip.
+  - The aspect level has its own shape, so it picks its own trace. On the importer that is "the morning catalogue has nothing new", not the winter night chosen at the roles level (X10). The other questions are listed under the step.
+  - The banner is tested on Mill with one bond removed, since no prepared example has two nuclei.
 
 **X14. The sub-level in place.**
 - **Opening.** An aspect's toggle, a click on one of its roles in the card, or "open «X»: n roles" lifts the aspect's sub-level (X5) out under its block.
@@ -653,6 +667,10 @@ Not included:
   - with "reduce motion" (a stubbed `matchMedia`) no animation is started.
   
   The motion itself is checked in X20.2, since the test environment has no layout.
+- **Done (2026-11-06):** the sub-level is in `ExplorationView.tsx`.
+  - It is placed under its block, with the beam, and the whole fades block by block while the opened block stays.
+  - The motion is FLIP with `Element.animate`: 320 ms to grow, and 80% of that to play back; no animation under "reduce motion".
+  - Tested on the importer. In the preview it opens in place; the motion itself waits for X20.2.
 
 **X15. Joints and their labels.**
 - Each joint's label is a short tag placed by X4, above its joint, on the whole and in the sub-level.
@@ -682,6 +700,10 @@ Not included:
   - choosing a block lights exactly its joints, and choosing it again lights none;
   - pointing at a label marks its acting block "chi" and the other "a chi";
   - a label's arrow matches its joint's way.
+- **Done (2026-11-06):** labels are in `Graph.tsx`.
+  - Each is placed by `placeLabels` and moved by pointer or by the arrow keys (8 px a press). A double click or Home puts it back.
+  - The way comes from `jointGeometry`, and "chi" and "a chi" show while a label is pointed at or focused.
+  - A joint standing for several bonds lists its verbs when lit. Moved labels live in the view state only.
 
 **X16. The card and the index.**
 - **The card:**
@@ -708,6 +730,10 @@ Not included:
   - a section with no part shows "not extracted";
   - a section a trace walks shows its question;
   - the dots follow the guide.
+- **Done (2026-11-06):** the card and the index are in `Panels.tsx`.
+  - A role's card says "ruolo" at every level, and an aspect's card says "aspetto".
+  - At the aspect level, a link from a prerequisite to a role shows as the joint to that role's aspect.
+  - The dots are tested on the bakery, since Mill has no index.
 
 **X17. "How it was read".**
 - A button in the bar opens it in place of the three columns, and the same button returns.
@@ -722,6 +748,7 @@ Not included:
   - a cell opens its line in the view;
   - an interpreted link opens on the card;
   - the texts exist in both languages.
+- **Done (2026-11-06):** `Report.tsx` words X6's `readingReport` and adds the points-inside measure to the order reading. A cell or an interpreted link closes the report and opens its line or link in the view.
 
 **X18. A source opens as an exploration** (`App.tsx`, `Library.tsx`, `Studio.tsx`, `i18n`).
 - The library lists explorations and prepared examples beside disassemblies, with what each is.
@@ -733,6 +760,11 @@ Not included:
   - a component test opens a prepared exploration from the library;
   - a generation with a fake route ends in the view;
   - an old disassembly still opens in its player.
+- **Done (2026-11-06):**
+  - `App.tsx` loads the prepared explorations and the stored ones, opens an assistant's exploration as it arrives, and shows the view.
+  - `Library.tsx` lists the explorations first, each labelled prepared, generated or written by the assistant.
+  - In `Studio.tsx`, "Esplora la fonte" is the primary action and the disassembly is secondary. It needs one source, and the local route is refused with its reason.
+  - The tests: `tests/exploration-app.test.tsx` and two Studio tests (a fake route ends in the view; a refusal shows its findings). `i18n.test` passes.
 
 **X19. Retire taking a part apart during use.**
 - Removed:
@@ -747,6 +779,20 @@ Not included:
   - a component test shows a part with no sub-parts and no "take apart" action;
   - a stored disassembly with expansions still loads and opens its levels;
   - no IPC channel named `disassembly:expand` remains (static check in a test).
+- **Done (2026-11-06):** the following are removed:
+  - from the player and the part card: `TakeApart` and its state;
+  - from the bridge and the preload: `expandPart`;
+  - from `main.ts`: the `disassembly:expand` handler;
+  - from the generator: `Generator.expand`, with its `carry` argument;
+  - from the core: the expansion request (`expandPart`, `acceptExpansion`, `buildExpansionInput`, `expansionJsonSchema`, `expansionInstructions`);
+  - `ExpansionRequest` and `ExpansionResult`, the reason `part-not-divisible` and its texts;
+  - the `--expand` option of `eval/runner.ts`.
+  
+  What stays:
+  - the contract's `expansions`, `isExpansionOf`, `carryOver` and `ProgressStore.carry`, for stored revisions;
+  - the eval ledger's old expansion entries, which the budget still reads.
+  
+  The tests: `tests/disassembly-drafts.ts` gains `takenApart`, which builds a stored revision for the tests; `depth.test` keeps its stored-revision tests and drops the on-demand ones; the player tests check that no action is offered and that an expanded disassembly opens its levels; a static test finds no channel or function left.
 
 ### Phase `verify`
 

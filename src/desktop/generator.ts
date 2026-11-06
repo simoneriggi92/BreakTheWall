@@ -1,17 +1,16 @@
 import { z } from 'zod';
-import { allParts, divisible, DisassemblyError, isExpansionOf, validateDisassembly, type Disassembly, type Finding } from '../core/disassembly';
+import { DisassemblyError, type Disassembly, type Finding } from '../core/disassembly';
 import {
-  acceptContent, acceptExpansion, acceptRuns, acceptStructure, acceptSuggestions, applyShortened, assembleDisassembly, buildContentInput, buildExpansionInput,
-  buildRepairRequest, buildRunsInput, buildShortenInput, buildStructureInput, buildSuggestionInput, CONTENT_INSTRUCTIONS, contentJsonSchema, expansionInstructions,
-  expansionJsonSchema, generatedDisassemblyId, longTexts, RUNS_INSTRUCTIONS, runsJsonSchema, SHORTEN_INSTRUCTIONS, shortenJsonSchema, instructionsFor,
+  acceptContent, acceptRuns, acceptStructure, acceptSuggestions, applyShortened, assembleDisassembly, buildContentInput,
+  buildRepairRequest, buildRunsInput, buildShortenInput, buildStructureInput, buildSuggestionInput, CONTENT_INSTRUCTIONS, contentJsonSchema,
+  generatedDisassemblyId, longTexts, RUNS_INSTRUCTIONS, runsJsonSchema, SHORTEN_INSTRUCTIONS, shortenJsonSchema, instructionsFor,
   structureJsonSchema, SUGGEST_INSTRUCTIONS, suggestionsJsonSchema, type ContentDraft, type ContentLanguage, type GenerationMeta, type RunsDraft, type StructureDraft,
 } from '../core/disassembly-generation';
 import { ExplorationError, type Exploration } from '../core/exploration';
 import { acceptExploration, explorationRequest, generatedExplorationId, sourceFindings } from '../core/exploration-generation';
-import { idSchema } from '../core/lesson';
 import { detectLanguage } from '../core/generation';
 import {
-  failure, ProviderError, routeSchema, setupSchema, type DraftState, type ExpansionResult, type GenerationPhase, type GenerationPreview, type GenerationProgress,
+  failure, ProviderError, routeSchema, setupSchema, type DraftState, type GenerationPhase, type GenerationPreview, type GenerationProgress,
   type ExplorationResult, type GenerationResult, type GenerationRoute, type GenerationStats, type LocalModel, type PART_STATUSES, type PhaseStats, type ProviderFailure, type SuggestionResult,
 } from '../core/provider';
 import { goalSchema, SourceImportError, verifySelection } from '../core/source';
@@ -20,9 +19,7 @@ import type { DraftStore, KeptDraft } from './generation-draft';
 
 export type { Completer } from './completion';
 export interface AcceptedExplorations { save(exploration: Exploration): Promise<Exploration> }
-export interface AcceptedDisassemblies { save(disassembly: Disassembly): Promise<Disassembly>; find?(id: string, revision: string): Promise<Disassembly | undefined> }
-/** Moves the learner's progress to the revision that took a part apart; true when there was progress to move. */
-export type CarryProgress = (previous: Disassembly, next: Disassembly) => Promise<boolean>;
+export interface AcceptedDisassemblies { save(disassembly: Disassembly): Promise<Disassembly> }
 export interface Routes { chatgpt: Completer; local: (target: LocalModel) => Completer }
 /** Where a failed or cancelled generation keeps what was accepted (D21). */
 export type Drafts = Pick<DraftStore, 'read' | 'state' | 'write' | 'clear'>;
@@ -30,7 +27,6 @@ export type Drafts = Pick<DraftStore, 'read' | 'state' | 'write' | 'clear'>;
 /** Parts written at the same time: a hosted model serves several requests at once; a local server queues them anyway. */
 const PARALLEL = { chatgpt: 3, local: 1 } as const;
 const requestSchema = z.strictObject({ sources: z.unknown(), goal: goalSchema, language: z.enum(['it', 'en']), setup: setupSchema, resume: z.boolean().optional() });
-const expansionSchema = z.strictObject({ disassemblyId: idSchema, revision: idSchema, part: idSchema, route: routeSchema });
 const explorationSchema = z.strictObject({ source: z.unknown(), language: z.enum(['it', 'en']), route: routeSchema });
 const suggestionSchema = z.strictObject({ sources: z.unknown(), language: z.enum(['it', 'en']), priorKnowledge: goalSchema.shape.priorKnowledge, route: routeSchema, avoid: z.array(z.string().max(400)).max(20) });
 const emptyStats = (): GenerationStats => ({ structure: blank(), content: blank(), runs: blank() });
@@ -114,7 +110,7 @@ const parsed = <T>(accept: (raw: string) => T, value: unknown): T | undefined =>
 export class Generator {
   private active?: AbortController;
   private suggesting?: AbortController;
-  constructor(private routes: Routes, private store: AcceptedDisassemblies, private now = () => new Date(), private carry?: CarryProgress, private drafts?: Drafts, private explorations?: AcceptedExplorations) {}
+  constructor(private routes: Routes, private store: AcceptedDisassemblies, private now = () => new Date(), private drafts?: Drafts, private explorations?: AcceptedExplorations) {}
   private completer(route: GenerationRoute): Completer {
     return route.provider === 'local' ? this.routes.local({ runtime: route.runtime, baseUrl: route.baseUrl, model: route.model }) : this.routes.chatgpt;
   }
@@ -257,40 +253,6 @@ export class Generator {
   }
   cancelSuggestions() { this.suggesting?.abort(); }
 
-  /**
-   * Takes one part of a saved generated disassembly apart: one request carrying only the part's lines, one repair.
-   * The result must be an expansion of the saved revision, so the learner's progress can follow it. On failure or
-   * cancellation nothing changes.
-   */
-  async expand(input: unknown, onProgress: (progress: GenerationProgress) => void): Promise<ExpansionResult> {
-    if (this.active) return { ok: false, failure: failure('busy') };
-    const controller = new AbortController();
-    this.active = controller;
-    const stats = blank();
-    try {
-      const request = expansionSchema.parse(input);
-      const previous = await this.store.find?.(request.disassemblyId, request.revision);
-      const part = previous && allParts(previous).find(x => x.part.id === request.part)?.part;
-      if (!previous || previous.kind !== 'generated' || !part || part.parts) return { ok: false, failure: failure('unsupported', { message: 'Questo pezzo non può essere smontato da qui.' }) };
-      if (!divisible(previous, part)) return { ok: false, failure: failure('unsupported', { reason: 'part-not-divisible', message: 'Il pezzo cita troppe poche righe per essere smontato.' }) };
-      const { route } = request;
-      const meta = { provider: route.provider, ...(route.provider === 'local' ? { runtime: route.runtime } : {}), model: route.model, createdAt: this.now().toISOString() };
-      const report = (mode: Mode, received: number) => onProgress({ phase: 'structure', repairing: mode !== 'first', ...(mode === 'shorten' ? { shortening: true } : {}), received, requests: stats.requests });
-      const next = await withRepair((body, mode) => { const sent = counted(this.completer(route), body, controller.signal, stats, mode, n => report(mode, n)); report(mode, 0); return sent; }, {
-        model: route.model, instructions: expansionInstructions(!!previous.question), schemaName: 'break_the_wall_expansion', schema: expansionJsonSchema(previous, part.id),
-        messages: [{ role: 'user', content: buildExpansionInput(previous, part.id) }],
-      }, raw => acceptExpansion(raw, previous, part.id, meta), controller.signal, `part ${part.id}`, previous.language);
-      const checked = await validateDisassembly(next);
-      if (isExpansionOf(checked, previous) !== part.id) throw new DisassemblyError([{ path: '', message: 'The new revision changes more than the part taken apart' }]);
-      if (controller.signal.aborted) return { ok: false, failure: failure('cancelled'), stats };
-      const saved = await this.store.save(checked);
-      return { ok: true, disassembly: saved, moved: await this.carry?.(previous, saved) ?? false, stats };
-    } catch (error) {
-      return { ok: false, failure: failureOf(error, controller.signal.aborted), stats };
-    } finally {
-      this.active = undefined;
-    }
-  }
   /**
    * Explores one source (plan P-20261105-exploration X8): one request on the ChatGPT route, at most one repair (and the
    * shorten request when only lengths are left), saved only after the final check. The local route is refused with a

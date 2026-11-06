@@ -56,7 +56,6 @@ const studio = Object.freeze<StudioBridge>({
   listLessons: () => ipcRenderer.invoke('lessons:list'),
   listDisassemblies: () => ipcRenderer.invoke('disassemblies:list'),
   findDisassembly: key => ipcRenderer.invoke('disassemblies:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),
-  expandPart: request => ipcRenderer.invoke('disassembly:expand', request),
   listExplorations: () => ipcRenderer.invoke('explorations:list'),
   findExploration: key => ipcRenderer.invoke('explorations:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),
   startExploration: request => ipcRenderer.invoke('exploration:start', request),

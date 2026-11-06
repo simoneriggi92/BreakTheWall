@@ -1,5 +1,6 @@
 import type { ImportErrorParams } from '../../core/source';
 import type { Messages } from './it';
+import { xEn } from './x-en';
 
 /** English interface text, with the same shape as the Italian catalog. */
 export const en: Messages = {
@@ -188,13 +189,6 @@ export const en: Messages = {
     reasons: { context: 'context', 'outside-question': 'outside the question', repetition: 'repetition', detail: 'detail', secrets: 'contains secrets', generated: 'generated' },
     states: { ok: 'done', active: 'in progress', failed: 'failed', restored: 'restored' },
     tag: 'Prepared disassembly', tagGenerated: 'Generated disassembly', tagAssistant: 'Written by your assistant',
-    expand: {
-      action: 'Take this part apart', cost: (route: string) => `One request to ${route}, with only this part's lines.`,
-      running: 'Taking the part apart…', repairing: 'second pass: fixing what the checks found', shortening: 'shortening texts that are too long',
-      requests: (n: number) => `${n} ${n === 1 ? 'request sent' : 'requests sent'}`, cancel: 'Cancel',
-      leaf: (n: number, min: number) => `This part does not come apart further: it cites ${n} ${n === 1 ? 'line' : 'lines'}, and at least ${min} are needed.`,
-      noRoute: 'Choose a model in "Take apart a source" to take parts apart.', local: (model: string) => `the local model ${model}`,
-    },
     otherVersion: (language: string) => `This disassembly also exists in ${language}. Progress stays separate for each version.`, openVersion: 'Open that version',
     widenSource: 'Focus on the source', narrowSource: 'Show drawing and source',
     panes: { source: 'Width of the source' },
@@ -308,7 +302,6 @@ export const en: Messages = {
     'sign-in-invalid-client': 'The app registration is not valid. Sign in again.',
     'sign-in-refused': 'The sign-in server refused the request. Try again or sign in again.',
     'identity-unverified': 'The identity token failed verification. Sign in again.',
-    'part-not-divisible': 'This part cites too few lines to be taken apart further.',
     'question-language': 'The question is in a different language from the chosen content language: change the content language or rewrite the question.',
     'draft-changed': 'The sources, the question or the language are no longer those of the interrupted generation: start over.',
     'exploration-local': 'Exploring a source does not use a local model yet: choose ChatGPT or your Claude assistant.',
@@ -328,4 +321,5 @@ export const en: Messages = {
     lessonReferences: 'The saved progress no longer matches the lesson. A copy was kept; the session restarted.',
     lessonEmpty: 'Empty file kept; the session restarted.',
   },
+  x: xEn,
 };

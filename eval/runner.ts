@@ -2,7 +2,6 @@ import { app, safeStorage } from 'electron';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { allParts, divisible, linesOf, type Disassembly } from '../src/core/disassembly';
 import { localModelSchema, type GenerationRoute, type GenerationSetup } from '../src/core/provider';
 import { ChatGPTAccount } from '../src/desktop/chatgpt/account';
 import { Generator } from '../src/desktop/generator';
@@ -10,9 +9,10 @@ import { localCompleter } from '../src/desktop/local/runtimes';
 import { hostIdFile, SafeStorageVault } from '../src/desktop/secure-files';
 import { SettingsStore } from '../src/desktop/settings-store';
 import { loadCases } from './cases';
-import { disassemblyMetrics, summarize, type AttemptRecord, type ExpansionRecord } from './metrics';
+import { disassemblyMetrics, summarize, type AttemptRecord } from './metrics';
 import { chatgptRunRefusal, LEDGER, type LedgerEntry } from './policy';
 import { reviewTemplate } from './review';
+import type { Disassembly } from '../src/core/disassembly';
 
 const USAGE = `npm run eval -- [--route local|chatgpt] [--cases id,id] [--runs 2]
   local:   [--runtime ollama|lmstudio|llamacpp|openai --base http://127.0.0.1:PORT --model NAME]
@@ -21,7 +21,6 @@ const USAGE = `npm run eval -- [--route local|chatgpt] [--cases id,id] [--runs 2
            A = strong on every phase · B = cheap on every phase · C = strong structure, cheap parts and runs
            or --structure-model SLUG [--content-model SLUG] for one custom setup
            [--private-to-chatgpt] only after the owner has confirmed that a private case may go to OpenAI
-  --expand        then take apart one divisible part per case, on the first valid attempt of the first setup
   --list-models   list the account's models (no generation)
 Public cases run by default; a private case runs only when named in --cases.`;
 
@@ -59,7 +58,7 @@ async function main(argv: string[]): Promise<number> {
     route: { type: 'string', default: 'local' }, runtime: { type: 'string' }, base: { type: 'string' }, model: { type: 'string' },
     setups: { type: 'string' }, strong: { type: 'string' }, cheap: { type: 'string' }, 'structure-model': { type: 'string' }, 'content-model': { type: 'string' },
     cases: { type: 'string' }, runs: { type: 'string', default: '2' }, 'allow-chatgpt': { type: 'boolean', default: false },
-    'private-to-chatgpt': { type: 'boolean', default: false }, expand: { type: 'boolean', default: false },
+    'private-to-chatgpt': { type: 'boolean', default: false },
     'list-models': { type: 'boolean', default: false }, help: { type: 'boolean', default: false },
   } });
   if (values.help) { console.log(USAGE); return 0; }
@@ -90,7 +89,6 @@ async function main(argv: string[]): Promise<number> {
     const refusal = chatgptRunRefusal({
       allowed: values['allow-chatgpt'], privateAllowed: values['private-to-chatgpt'], attempts: runs, used,
       publicPlanned: cases.filter(c => !c.private).length * per, privatePlanned: cases.filter(c => c.private).length * per,
-      expansionsPlanned: values.expand ? cases.length : 0,
     });
     if (refusal) throw new Error(refusal);
     // A slug the account does not list is refused here, before any source is sent.
@@ -124,14 +122,12 @@ async function main(argv: string[]): Promise<number> {
   const ledger = async (entry: LedgerEntry) => { await mkdir(join(root, '.local', 'eval'), { recursive: true }); await appendFile(join(root, LEDGER), JSON.stringify(entry) + '\n'); };
   outer: for (const c of cases) {
     const reviewed = new Set<string>();
-    let firstValid: Disassembly | undefined;
     // Setups alternate within a case, so a usage limit leaves every setup measured on the same cases.
     for (let attempt = 1; attempt <= runs; attempt++) for (const { name, setup } of setups) {
       const started = Date.now();
       const result = await generator.generate({ sources: c.sources, goal: c.goal, language: c.language, setup }, () => {});
       const record: AttemptRecord = { run, case: c.id, private: c.private, setup: name, attempt, language: c.language, ok: result.ok, seconds: Math.round((Date.now() - started) / 1000), stats: result.stats };
       if (result.ok) {
-        if (name === setups[0].name && !firstValid) firstValid = result.disassembly;
         record.metrics = disassemblyMetrics(result.disassembly);
         record.file = `${c.id}-${name}-${attempt}.disassembly.json`;
         await writeFile(join(dir, record.file), JSON.stringify(result.disassembly, null, 1));
@@ -150,23 +146,6 @@ async function main(argv: string[]): Promise<number> {
       console.log(`${c.id} ${name} #${attempt}: ${record.ok ? 'valid' : `failed (${record.failure})`}, ${sent} requests, ${record.seconds} s`);
       if (!result.ok && result.failure.code === 'usage-limit') { console.log('Stopped: the ChatGPT usage limit was reached.'); break outer; }
       if (!result.ok && ['signed-out', 'session-expired', 'plan-disabled', 'model-unavailable', 'local-unreachable', 'local-model-missing'].includes(result.failure.code)) { console.log(`Stopped: ${result.failure.message}`); break outer; }
-    }
-    // D14: the leaf with the most lines of its own is the one with the most left to take apart.
-    const leaf = firstValid && allParts(firstValid).filter(x => !x.part.parts && divisible(firstValid!, x.part)).sort((a, b) => linesOf(firstValid!, b.part.cites).size - linesOf(firstValid!, a.part.cites).size)[0]?.part;
-    if (values.expand && firstValid && leaf) {
-      const started = Date.now();
-      const result = await generator.expand({ disassemblyId: firstValid.id, revision: firstValid.revision, part: leaf.id, route: setups[0].setup.structure }, () => {});
-      const record: ExpansionRecord = { run, case: c.id, setup: setups[0].name, part: leaf.id, ok: result.ok, seconds: Math.round((Date.now() - started) / 1000), stats: result.stats };
-      if (result.ok) {
-        record.metrics = disassemblyMetrics(result.disassembly);
-        record.file = `${c.id}-${setups[0].name}.expanded.disassembly.json`;
-        await writeFile(join(dir, record.file), JSON.stringify(result.disassembly, null, 1));
-        await writeFile(join(dir, `${c.id}-${setups[0].name}.expanded.review.md`), reviewTemplate(result.disassembly, { case: c.id, setup: setups[0].name, run }));
-      } else { record.failure = result.failure.reason ?? result.failure.code; record.issues = result.failure.issues?.slice(0, 8); }
-      await appendFile(join(dir, 'expansions.jsonl'), JSON.stringify(record) + '\n');
-      if (chatgpt && result.stats?.requests) await ledger({ run, case: c.id, private: c.private, setup: setups[0].name, at: new Date().toISOString(), kind: 'expansion' });
-      console.log(`${c.id} ${setups[0].name} expand ${leaf.id}: ${result.ok ? 'valid' : `failed (${record.failure})`}, ${result.stats?.requests ?? 0} requests, ${record.seconds} s`);
-      if (!result.ok && result.failure.code === 'usage-limit') { console.log('Stopped: the ChatGPT usage limit was reached.'); break outer; }
     }
   }
   const summary = summarize(records);

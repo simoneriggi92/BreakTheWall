@@ -1,5 +1,5 @@
-import type { ContentDraft, ExpansionDraft, RunsDraft, StructureDraft } from '../src/core/disassembly-generation';
-import { allParts, lineRanges, linesOf, type Cite, type Disassembly, type Joint, type Part } from '../src/core/disassembly';
+import type { ContentDraft, RunsDraft, StructureDraft } from '../src/core/disassembly-generation';
+import { allParts, lineRanges, linesOf, nextRevision, type Cite, type Disassembly, type Joint, type Part } from '../src/core/disassembly';
 import { hashText } from '../src/core/lesson';
 import { importSource, type UserSource } from '../src/core/source';
 
@@ -87,7 +87,7 @@ export async function deepDisassembly(levels = 5): Promise<Disassembly> {
 }
 
 /** What a model would answer to take `partId` apart: its non-blank lines in three runs, joined in a chain. */
-export function splitAnswer(d: Disassembly, partId: string): ExpansionDraft {
+export function splitAnswer(d: Disassembly, partId: string) {
   const part = allParts(d).find(x => x.part.id === partId)!.part;
   const keys = [...linesOf(d, part.cites)];
   const third = Math.ceil(keys.length / 3);
@@ -96,7 +96,22 @@ export function splitAnswer(d: Disassembly, partId: string): ExpansionDraft {
     id: `${partId}-x${k + 1}`, name: `${part.name.slice(0, 40)} ${k + 1}`, kind: part.kind, icon: part.icon,
     role: english ? `This is the ${['first', 'second', 'third'][k]} piece of the part.` : `È il ${['primo', 'secondo', 'terzo'][k]} pezzo della parte.`,
     explain: english ? 'It takes one stretch of the lines and explains what it does in the part.' : 'Prende un tratto delle righe e spiega che cosa fa nella parte.',
-    critique: null, cites: lineRanges(d, keys.slice(k * third, (k + 1) * third)),
+    critique: null as string | null, cites: lineRanges(d, keys.slice(k * third, (k + 1) * third)),
   }));
-  return { parts, joints: [{ from: parts[0].id, to: parts[1].id, type: 'leads-to', label: 'then', cites: [] }, { from: parts[1].id, to: parts[2].id, type: 'leads-to', label: 'then', cites: [] }], excluded: [] };
+  return { parts, joints: [{ from: parts[0].id, to: parts[1].id, type: 'leads-to' as const, label: 'then', cites: [] as Cite[] }, { from: parts[1].id, to: parts[2].id, type: 'leads-to' as const, label: 'then', cites: [] as Cite[] }], excluded: [] as never[] };
+}
+
+/**
+ * A part taken apart, as the app wrote it before taking apart during use was retired (P-20261105-exploration X19): the
+ * stored revisions the app must still open. The app no longer makes them; this builds one for the tests.
+ */
+export type ExpansionDraft = ReturnType<typeof splitAnswer>;
+export function takenApart(d: Disassembly, partId: string, draft: ExpansionDraft, meta: { provider: 'chatgpt' | 'local'; model: string; createdAt: string }): Disassembly {
+  const next = structuredClone(d);
+  next.revision = nextRevision(d.revision);
+  const part = allParts(next).find(x => x.part.id === partId)!.part;
+  part.parts = draft.parts.map(({ critique, ...x }) => ({ ...x, ...(critique ? { critique } : {}) }));
+  if (draft.joints.length) part.joints = draft.joints.map(({ cites, ...j }) => ({ ...j, ...(cites.length ? { cites } : {}) }));
+  next.expansions = [...(d.expansions ?? []), { part: partId, provider: meta.provider, model: meta.model, createdAt: meta.createdAt }];
+  return next;
 }
