@@ -310,6 +310,8 @@ export const it = {
     'part-not-divisible': 'Questo pezzo cita troppe poche righe per essere smontato ancora.',
     'question-language': 'La domanda è in un’altra lingua rispetto al contenuto scelto: cambia la lingua del contenuto o riscrivi la domanda.',
     'draft-changed': 'Le fonti, la domanda o la lingua non sono più quelle della generazione interrotta: ricomincia da capo.',
+    'exploration-local': 'L’esplorazione di una fonte non usa ancora un modello locale: scegli ChatGPT o il tuo assistente Claude.',
+    'exploration-too-long': 'Questa fonte è troppo lunga per essere esplorata in una sola richiesta: seleziona la parte che vuoi esplorare.',
   },
   accountNotices: {
     'plan-not-authorized': 'Accesso riuscito, ma l’uso del piano ChatGPT non è stato autorizzato.',

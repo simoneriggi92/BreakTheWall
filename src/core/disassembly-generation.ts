@@ -271,7 +271,7 @@ function parseJson<T>(raw: string, schema: z.ZodType<T>): T {
 /** What the part is for in the whole: the opening line of its card. */
 export const LEAD_LIMIT = 100;
 const LENGTH = / has (\d+) characters; at most (\d+)$/;
-const lengthMessage = (what: string, length: number, limit: number) => `${what} has ${length} characters; at most ${limit}`;
+export const lengthMessage = (what: string, length: number, limit: number) => `${what} has ${length} characters; at most ${limit}`;
 function valueAt(json: unknown, path: readonly PropertyKey[]): unknown {
   return path.reduce<unknown>((node, key) => node && typeof node === 'object' ? (node as Record<PropertyKey, unknown>)[key] : undefined, json);
 }

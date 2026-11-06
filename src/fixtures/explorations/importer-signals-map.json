@@ -1,0 +1,1090 @@
+{
+ "schemaVersion": 1,
+ "id": "importer-signals-map",
+ "revision": "v1",
+ "kind": "prepared",
+ "title": "Importer di Larkspur: riconoscere una notte silenziosa",
+ "language": "it",
+ "whole": "Come i segnali dell’importer notturno permettono a chi è di turno di distinguere un importer fermo da una notte quieta.",
+ "source": {
+  "id": "importer",
+  "title": "night-importer.md",
+  "origin": "original-prepared",
+  "revision": "v1",
+  "text": "# Larkspur catalogue importer: telling a silent night apart\n\n**Purpose:** explain how the overnight importer shows what it is doing, so that\nwhoever is on call can tell a stopped importer from a quiet night.\n**Audience:** people who have never read the importer's code.\n**Note:** Larkspur is a fictional library network, written for the Break the Wall\nexamples. Names, numbers and times are illustrative.\n\n## 1. What the importer does\n\nEvery night, publishers add and correct records for the books they sell: titles,\nauthors, prices, cover images. The importer brings those records into the\nLarkspur catalogue, so that a branch librarian who searches in the morning finds\nyesterday's corrections.\n\nIt is a background process with no screen and no web page. It runs on one\nmachine, starts with the machine, and repeats the same round every ten minutes\nuntil it is stopped.\n\nA round asks each publisher's feed for records changed since the last round,\nhands every new record to a worker, and the worker writes it to the catalogue.\n\n## 2. Why silence is the hard failure\n\nWhen the importer crashes, the machine restarts it and someone gets an email.\nThat is the easy case. The hard case is silence: the morning catalogue has no\nnew records, and nothing says why.\n\nSilence has several causes that look the same from outside:\n\n- the importer is stuck inside a call that never returns;\n- someone paused it for maintenance and forgot to switch it back on;\n- the publishers really sent nothing new;\n- every round runs, but every record is turned away;\n- the workers report success for records they never wrote.\n\nThe importer's signals exist to separate these causes. Each one answers a\ndifferent question, and the design keeps the questions apart on purpose:\n\n1. Is the importer running at all?\n2. Do its rounds reach the end?\n3. What happened to each record?\n\nA single \"healthy\" light would have to answer all three at once, and it would\nbe wrong in at least one of the cases above.\n\n## 3. One round, step by step\n\nA round always goes through the same steps, in this order:\n\n1. **Wake and stamp.** The round writes the heartbeat stamp (section 4)\n   before it does anything that could fail or wait.\n2. **Read the switch.** It reads the pause switch (section 7). If the switch\n   is off, the round records that it is paused and ends here.\n3. **Fetch.** It asks each feed for records changed since the last round.\n   This is the step that can hang: a feed may accept the call and never answer.\n4. **Hand over.** It gives each record to a worker and moves on; it does not\n   wait for the worker to finish.\n5. **Close.** It writes the last-finished time (section 5) and goes back to\n   sleep until the next round.\n\nThe order matters. Because the stamp comes first, a round that hangs in step 3\nstill left a stamp behind, and the next missing stamp is what gives it away.\nBecause the last-finished time comes last, it moves only when a round really\nreached the end.\n\nA round that fails in step 3 with an error, rather than hanging, ends early: it\nlogs the error, skips step 5, and the next round starts on time.\n\n## 4. The heartbeat stamp\n\nThe heartbeat stamp is a single time, kept in the importer's memory and copied\nto a small file on the machine's disk: the moment the latest round started.\n\n- It is written at the start of every round, paused or not.\n- It is never written anywhere else.\n- Its age is the only thing it says: how long ago a round last began.\n\nWith rounds every ten minutes, a stamp younger than ten minutes is normal. A\nstamp thirty minutes old means three rounds did not start, or one round has\nbeen stuck for half an hour.\n\nThe stamp does not say whether rounds succeed. A round that fails on every\nfetch still stamps on time. That is deliberate: the stamp answers question 1\nand nothing else.\n\n## 5. The last-finished time\n\nThe last-finished time is the moment the latest round reached step 5.\n\n- It is written only at the end of a round that got through the fetch.\n- A paused round does not write it.\n- A round that fails in step 3 does not write it.\n\nSo the last-finished time can fall far behind the heartbeat stamp while the\nimporter is perfectly alive: during a pause, or while a feed keeps refusing\ncalls. The gap between the two times is itself information. A recent stamp and\nan old last-finished time mean \"running, but not getting through\".\n\nIt answers question 2. It says nothing about individual records.\n\n## 6. What happened to each record\n\n### 6.1 The four outcomes\n\nEvery record a worker receives ends in exactly one of four outcomes, written to\nthe outcome log with the record's identifier:\n\n- **Stored:** the record is in the catalogue.\n- **Waiting:** the publisher announced it, but its details are not ready yet.\n  The worker will try again in an hour, up to a day.\n- **Rejected:** the record is malformed or breaks a catalogue rule. Trying\n  again would not help, so nobody does.\n- **Failed:** something went wrong that might go right next time: the\n  catalogue was busy, a cover image did not download.\n\nThe log line always has the same shape, so a search for one record's\nidentifier returns its whole story across retries.\n\n### 6.2 Why \"the job succeeded\" is not enough\n\nThe workers run inside a job system that keeps its own score: a job either\nsucceeded or failed. That score is about the job, not the record.\n\nA worker that finds a rejected record finishes normally: there is nothing to\nretry. The job system counts it as a success. A worker that finds a waiting\nrecord asks for a retry, and the job system counts a failure, even though\nnothing is wrong. Read alone, the job score says \"all good\" on a night when\nevery record was rejected, and \"trouble\" on a night when publishers were\nmerely slow.\n\nThis is why the outcome log exists, and why the night board reads it instead\nof the job score. \"The job succeeded\" and \"the record is in the catalogue\" are\ntwo different facts.\n\n## 7. The pause switch\n\nOperators can pause the importer without stopping the process: a switch in\nthe configuration service, read at the start of every round.\n\nA paused importer keeps running its rounds. Each round stamps the heartbeat,\nreads the switch, sees it off, records \"paused\" and goes back to sleep. Nothing\nis fetched, nothing is handed over, and the last-finished time stays where it\nwas.\n\nThe heartbeat goes on during a pause on purpose. If a pause stopped the\nheartbeat, the restart rule (section 8) would take a deliberate pause for a\nstuck importer and restart it, again and again, for as long as the pause\nlasted.\n\nThe current state of the switch is shown on the night board, so that an old\nlast-finished time can be read next to \"paused since 01:40\".\n\n## 8. The restart rule\n\nThe machine runs a check every minute and restarts the importer when it looks\nstuck. The rule reads one thing only: the age of the heartbeat stamp.\n\n- Younger than three rounds (thirty minutes): leave it alone.\n- Older: restart the importer.\n- In the first five minutes after a start, leave it alone whatever the stamp\n  says, so that a slow start is not mistaken for a hang.\n\nThe rule does not read the last-finished time, the pause switch or the\noutcome log, and this is the point of the design. A restart can fix exactly\none problem: a round stuck inside a call that will never return. It cannot\nfix a feed that refuses calls, a publisher that sent nothing, or a record that\nbreaks a catalogue rule. Restarting for those would only add noise, and it\nwould interrupt the workers that were doing fine.\n\nThe rule also leaves the catalogue and the feeds out of its check. If it asked\nthe catalogue whether it was healthy, a slow catalogue would cause the\nimporter to be restarted, which repairs nothing.\n\n## 9. The night board\n\nThe night board is the page the on-call person opens. It shows three lights\nand two numbers, one for each question:\n\n- **Running:** green while the heartbeat stamp is younger than thirty minutes.\n- **Getting through:** green while the last-finished time is younger than an\n  hour, grey while the importer is paused.\n- **Records:** the counts of the four outcomes since midnight, and the share\n  of rejected records.\n- The age of the heartbeat stamp, in minutes.\n- The age of the last-finished time, in minutes.\n\nThe board reads the outcome log, not the job score (section 6.2).\n\nIt raises an alert in three cases: the running light turns red; the\ngetting-through light stays red for an hour while the switch is on; rejected\nrecords pass a quarter of the night's total.\n\n## 10. Reading the board\n\n| Running | Getting through | Records | Most likely |\n|---|---|---|---|\n| red | — | — | the importer is down or stuck; the restart rule acts |\n| green | grey | none | paused: check who paused it and when |\n| green | red | none | a feed refuses calls, or every fetch fails |\n| green | green | none | the publishers sent nothing tonight |\n| green | green | mostly rejected | a publisher changed its format |\n| green | green | mostly waiting | publishers are slow; nothing to do yet |\n| green | green | mostly stored | a normal night |\n\nTwo rows look alike at first: \"paused\" and \"a feed refuses calls\" both leave\nthe running light green and nothing in the records. The getting-through light\ntells them apart, grey for a pause and red for a refusing feed.\n\n## 11. One night, as the board saw it\n\nA night from last winter, reconstructed from the board and the outcome log.\n\n- **00:00 to 01:40.** All three lights green. Rounds every ten minutes, a few\n  hundred records stored, a handful waiting.\n- **01:40.** An operator pauses the importer to move the catalogue to a new\n  disk. Running stays green; getting through turns grey; no new outcomes.\n- **02:30.** The switch goes back on. The next round fetches the backlog of\n  fifty minutes and the last-finished time catches up.\n- **03:10.** One publisher's feed accepts the call and never answers. The\n  round stamped at 03:10 hangs in the fetch. No stamp at 03:20, 03:30, 03:40.\n- **03:41.** The heartbeat stamp is thirty-one minutes old. The restart rule\n  restarts the importer. The first round after the start stamps at 03:41,\n  times out on the silent feed after two minutes, and fetches the others.\n- **04:00.** Another publisher starts sending prices in a new format. Every\n  record from that publisher is rejected. Running and getting through are\n  green; the share of rejected records climbs past a quarter, and the board\n  raises an alert.\n- **04:20.** The on-call person sees the rejected records, all from one\n  publisher, and calls them. The importer itself needed nothing.\n\nThree alerts would have been one, or none, with a single \"healthy\" light: the\npause would have looked like a hang, the hang would have looked like a pause,\nand the format change would not have shown at all.\n\n## 12. Things this design does not catch\n\n- **A worker that writes a wrong record.** The outcome says stored; the\n  catalogue holds a mistake. Only a check of the content would see it.\n- **A feed that silently drops records.** If a publisher never announces a\n  record, no outcome is ever written for it.\n- **A full disk.** The heartbeat file cannot be updated; the restart rule sees\n  an old stamp and restarts the importer, which does not free the disk.\n- **A board that is itself down.** The lights cannot show their own absence.\n  The alert for a missing board comes from a different system.\n\nThese gaps are known. Each needs a signal of its own, and adding one would not\nmake the existing three answer more questions.\n\n## 13. Glossary\n\n- **Round:** one pass of the importer, every ten minutes.\n- **Heartbeat stamp:** when the latest round started.\n- **Last-finished time:** when the latest round reached its end.\n- **Outcome:** stored, waiting, rejected or failed; one per record.\n- **Job score:** the job system's own success or failure, about the job only.\n- **Pause switch:** an operator's way to stop fetching without stopping the\n  process.",
+  "sha256": "c64ac2e57739d1cdad2b11d533b1f805dc7fc7385bf832f2346137caf4e21ed4",
+  "language": "en"
+ },
+ "start": "round",
+ "aspects": [
+  {
+   "id": "signals",
+   "name": "Il giro e i segnali che lascia"
+  },
+  {
+   "id": "reading",
+   "name": "Chi legge i segnali e agisce"
+  }
+ ],
+ "parts": [
+  {
+   "id": "silence",
+   "kind": "prerequisite",
+   "name": "Il silenzio, il guasto difficile",
+   "role": "Una notte silenziosa ha cinque cause che sembrano uguali; tre domande distinte le separano.",
+   "cites": [
+    {
+     "from": 3,
+     "to": 4
+    },
+    {
+     "from": 23,
+     "to": 45
+    }
+   ],
+   "points": [
+    {
+     "text": "Un crash riavvia l’importer e manda una mail: è il caso facile",
+     "cites": [
+      {
+       "from": 25,
+       "to": 26
+      }
+     ]
+    },
+    {
+     "text": "Bloccato, in pausa, nulla inviato, tutto rifiutato, falsi successi: stesso silenzio",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 29,
+       "to": 35
+      }
+     ]
+    },
+    {
+     "text": "È in esecuzione? I giri arrivano in fondo? Che cosa è successo a ogni record?",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 40,
+       "to": 42
+      }
+     ]
+    },
+    {
+     "text": "Una sola luce “in salute” sbaglierebbe in almeno un caso",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 44,
+       "to": 45
+      }
+     ]
+    }
+   ],
+   "members": []
+  },
+  {
+   "id": "round",
+   "kind": "part",
+   "aspect": "signals",
+   "name": "Il giro",
+   "role": "Ogni dieci minuti recupera i record cambiati e li consegna ai worker, sempre negli stessi passi.",
+   "cites": [
+    {
+     "from": 9,
+     "to": 21
+    },
+    {
+     "from": 47,
+     "to": 68
+    }
+   ],
+   "points": [
+    {
+     "text": "Prima il timbro, alla fine la chiusura: l’ordine rende visibile un blocco",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 62,
+       "to": 65
+      }
+     ]
+    },
+    {
+     "text": "Il recupero è il passo che può bloccarsi su un feed muto",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 55,
+       "to": 56
+      }
+     ]
+    },
+    {
+     "text": "Consegna i record e prosegue, senza aspettare",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 57,
+       "to": 58
+      }
+     ]
+    },
+    {
+     "text": "Un recupero in errore chiude il giro in anticipo, senza chiusura",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 67,
+       "to": 68
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "feeds",
+     "name": "feed degli editori",
+     "does": "rispondono con i record cambiati dall’ultimo giro",
+     "cites": [
+      {
+       "from": 20,
+       "to": 20
+      },
+      {
+       "from": 55,
+       "to": 56
+      }
+     ]
+    },
+    {
+     "id": "machine",
+     "name": "una macchina",
+     "does": "esegue il processo e lo avvia con sé",
+     "cites": [
+      {
+       "from": 16,
+       "to": 18
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "heartbeat",
+   "kind": "part",
+   "aspect": "signals",
+   "name": "Il timbro del battito",
+   "role": "Quando è iniziato l’ultimo giro: risponde a “è in esecuzione?” e a nient’altro.",
+   "cites": [
+    {
+     "from": 70,
+     "to": 85
+    }
+   ],
+   "points": [
+    {
+     "text": "Scritto all’inizio di ogni giro, in pausa o no",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 75,
+       "to": 76
+      }
+     ]
+    },
+    {
+     "text": "Vecchio di trenta minuti: tre giri mancati, o uno bloccato",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 79,
+       "to": 81
+      }
+     ]
+    },
+    {
+     "text": "Un giro che fallisce ogni recupero timbra comunque in orario",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 83,
+       "to": 85
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "stamp-file",
+     "name": "il file del timbro",
+     "does": "una copia del timbro sul disco della macchina",
+     "cites": [
+      {
+       "from": 72,
+       "to": 73
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "finished",
+   "kind": "part",
+   "aspect": "signals",
+   "name": "L’ora dell’ultima chiusura",
+   "role": "Quando l’ultimo giro è arrivato in fondo: risponde a “i giri arrivano in fondo?”.",
+   "cites": [
+    {
+     "from": 87,
+     "to": 100
+    }
+   ],
+   "points": [
+    {
+     "text": "Non lo scrive un giro in pausa né un recupero fallito",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 91,
+       "to": 93
+      }
+     ]
+    },
+    {
+     "text": "Timbro recente, chiusura vecchia: gira ma non arriva in fondo",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 95,
+       "to": 98
+      }
+     ]
+    }
+   ],
+   "members": []
+  },
+  {
+   "id": "outcomes",
+   "kind": "part",
+   "aspect": "signals",
+   "name": "Che cosa è successo a ogni record",
+   "role": "Ogni record finisce in uno di quattro esiti, registrato con il suo identificativo.",
+   "cites": [
+    {
+     "from": 102,
+     "to": 118
+    }
+   ],
+   "points": [
+    {
+     "text": "Esattamente un esito per ogni record che un worker riceve",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 106,
+       "to": 107
+      }
+     ]
+    },
+    {
+     "text": "Una ricerca per identificativo dà tutta la storia di un record",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 117,
+       "to": 118
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "workers",
+     "name": "worker",
+     "does": "scrivono ogni record nel catalogo e ne registrano l’esito",
+     "cites": [
+      {
+       "from": 21,
+       "to": 21
+      },
+      {
+       "from": 106,
+       "to": 107
+      }
+     ]
+    },
+    {
+     "id": "outcome-log",
+     "name": "registro degli esiti",
+     "does": "una riga per esito, sempre della stessa forma",
+     "cites": [
+      {
+       "from": 106,
+       "to": 107
+      },
+      {
+       "from": 117,
+       "to": 118
+      }
+     ]
+    },
+    {
+     "id": "stored",
+     "name": "Memorizzato",
+     "does": "il record è nel catalogo",
+     "cites": [
+      {
+       "from": 109,
+       "to": 109
+      }
+     ]
+    },
+    {
+     "id": "waiting",
+     "name": "In attesa",
+     "does": "annunciato, non ancora pronto; riprovato ogni ora per un giorno",
+     "cites": [
+      {
+       "from": 110,
+       "to": 111
+      }
+     ]
+    },
+    {
+     "id": "rejected",
+     "name": "Rifiutato",
+     "does": "malformato o contro una regola; mai riprovato",
+     "cites": [
+      {
+       "from": 112,
+       "to": 113
+      }
+     ]
+    },
+    {
+     "id": "failed",
+     "name": "Fallito",
+     "does": "è andato storto ora, potrebbe riuscire la prossima volta",
+     "cites": [
+      {
+       "from": 114,
+       "to": 115
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "job-score",
+   "kind": "annotation",
+   "on": "outcomes",
+   "name": "Il punteggio del job non è il record",
+   "role": "Un record rifiutato conta come successo e uno in attesa come fallimento.",
+   "cites": [
+    {
+     "from": 120,
+     "to": 134
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "pause",
+   "kind": "part",
+   "aspect": "signals",
+   "name": "L’interruttore di pausa",
+   "role": "Ferma il recupero senza fermare il processo; ogni giro lo legge per primo.",
+   "cites": [
+    {
+     "from": 136,
+     "to": 152
+    }
+   ],
+   "points": [
+    {
+     "text": "Un giro in pausa timbra, legge l’interruttore, registra “in pausa”",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 141,
+       "to": 142
+      }
+     ]
+    },
+    {
+     "text": "Il battito continua, così una pausa non passa mai per un blocco",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 146,
+       "to": 149
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "config-service",
+     "name": "servizio di configurazione",
+     "does": "conserva l’interruttore che i giri leggono",
+     "cites": [
+      {
+       "from": 138,
+       "to": 139
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "restart",
+   "kind": "part",
+   "aspect": "reading",
+   "name": "La regola di riavvio",
+   "role": "Un controllo ogni minuto riavvia l’importer quando il timbro è troppo vecchio, e non legge altro.",
+   "cites": [
+    {
+     "from": 154,
+     "to": 173
+    }
+   ],
+   "points": [
+    {
+     "text": "Più vecchio di trenta minuti: riavvio",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 159,
+       "to": 160
+      }
+     ]
+    },
+    {
+     "text": "Un riavvio ripara solo un giro bloccato in una chiamata",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 165,
+       "to": 166
+      }
+     ]
+    },
+    {
+     "text": "Non interroga mai il catalogo: uno lento causerebbe riavvii",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 171,
+       "to": 173
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "grace",
+     "name": "primi cinque minuti",
+     "does": "un avvio lento non passa per un blocco",
+     "cites": [
+      {
+       "from": 161,
+       "to": 162
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "full-disk",
+   "kind": "annotation",
+   "on": "restart",
+   "name": "Un disco pieno",
+   "role": "Il file del timbro non si aggiorna, e il riavvio non libera il disco.",
+   "cites": [
+    {
+     "from": 242,
+     "to": 243
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "board",
+   "kind": "part",
+   "aspect": "reading",
+   "name": "La bacheca notturna",
+   "role": "La pagina di chi è di turno: una luce per domanda, due età, tre allarmi.",
+   "cites": [
+    {
+     "from": 175,
+     "to": 192
+    }
+   ],
+   "points": [
+    {
+     "text": "Legge il registro degli esiti, non il punteggio dei job",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 188,
+       "to": 188
+      }
+     ]
+    },
+    {
+     "text": "Allarmi: running rosso, getting through rosso per un’ora, un quarto rifiutato",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 190,
+       "to": 192
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "running-light",
+     "name": "Running",
+     "does": "verde finché il timbro ha meno di trenta minuti",
+     "cites": [
+      {
+       "from": 180,
+       "to": 180
+      }
+     ]
+    },
+    {
+     "id": "through-light",
+     "name": "Getting through",
+     "does": "verde entro l’ora; grigio durante la pausa",
+     "cites": [
+      {
+       "from": 181,
+       "to": 182
+      }
+     ]
+    },
+    {
+     "id": "records-count",
+     "name": "Records",
+     "does": "i quattro esiti da mezzanotte, e la quota di rifiutati",
+     "cites": [
+      {
+       "from": 183,
+       "to": 184
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "board-reading",
+   "kind": "reference",
+   "on": "board",
+   "name": "Leggere la bacheca",
+   "role": "Ogni combinazione di luci con la sua causa più probabile.",
+   "cites": [
+    {
+     "from": 194,
+     "to": 208
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "board-down",
+   "kind": "annotation",
+   "on": "board",
+   "name": "Una bacheca a sua volta spenta",
+   "role": "Le luci non possono mostrare la propria assenza; quell’allarme viene da un altro sistema.",
+   "cites": [
+    {
+     "from": 244,
+     "to": 245
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "wrong-record",
+   "kind": "annotation",
+   "on": "outcomes",
+   "name": "Un record sbagliato memorizzato",
+   "role": "L’esito dice memorizzato, il catalogo contiene un errore: solo un controllo del contenuto lo vede.",
+   "cites": [
+    {
+     "from": 238,
+     "to": 239
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "dropped",
+   "kind": "annotation",
+   "on": "outcomes",
+   "name": "Un record mai annunciato",
+   "role": "Un feed che perde un record in silenzio non lascia alcun esito.",
+   "cites": [
+    {
+     "from": 240,
+     "to": 241
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "glossary",
+   "kind": "reference",
+   "name": "Glossario",
+   "role": "Definizioni brevi di giro, timbro, ora di chiusura, esito, punteggio del job e interruttore.",
+   "cites": [
+    {
+     "from": 250,
+     "to": 258
+    }
+   ],
+   "points": [],
+   "members": []
+  }
+ ],
+ "links": [
+  {
+   "from": "round",
+   "to": "heartbeat",
+   "class": "bond",
+   "label": "lo timbra per primo",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 51,
+     "to": 52
+    },
+    {
+     "from": 75,
+     "to": 75
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "pause",
+   "class": "bond",
+   "label": "legge l’interruttore",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 53,
+     "to": 54
+    },
+    {
+     "from": 138,
+     "to": 139
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "outcomes",
+   "class": "bond",
+   "label": "consegna i record",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 20,
+     "to": 21
+    },
+    {
+     "from": 57,
+     "to": 58
+    }
+   ]
+  },
+  {
+   "from": "round",
+   "to": "finished",
+   "class": "bond",
+   "label": "la scrive alla chiusura",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 59,
+     "to": 60
+    }
+   ]
+  },
+  {
+   "from": "restart",
+   "to": "heartbeat",
+   "class": "bond",
+   "label": "ne legge l’età",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 156,
+     "to": 157
+    }
+   ]
+  },
+  {
+   "from": "restart",
+   "to": "round",
+   "class": "bond",
+   "label": "riavvia un giro bloccato",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 156,
+     "to": 160
+    },
+    {
+     "from": 165,
+     "to": 166
+    }
+   ]
+  },
+  {
+   "from": "board",
+   "to": "heartbeat",
+   "class": "bond",
+   "label": "lo mostra come Running",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 180,
+     "to": 180
+    },
+    {
+     "from": 185,
+     "to": 185
+    }
+   ]
+  },
+  {
+   "from": "board",
+   "to": "finished",
+   "class": "bond",
+   "label": "mostra getting through",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 181,
+     "to": 182
+    },
+    {
+     "from": 186,
+     "to": 186
+    }
+   ]
+  },
+  {
+   "from": "board",
+   "to": "outcomes",
+   "class": "bond",
+   "label": "conta gli esiti",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 183,
+     "to": 184
+    },
+    {
+     "from": 188,
+     "to": 188
+    }
+   ]
+  },
+  {
+   "from": "board",
+   "to": "pause",
+   "class": "bond",
+   "label": "mostra l’interruttore",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 151,
+     "to": 152
+    }
+   ]
+  },
+  {
+   "from": "silence",
+   "to": "heartbeat",
+   "class": "prerequisite",
+   "label": "pone la domanda 1",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 40,
+     "to": 40
+    },
+    {
+     "from": 84,
+     "to": 85
+    }
+   ]
+  },
+  {
+   "from": "silence",
+   "to": "finished",
+   "class": "prerequisite",
+   "label": "pone la domanda 2",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 41,
+     "to": 41
+    },
+    {
+     "from": 100,
+     "to": 100
+    }
+   ]
+  },
+  {
+   "from": "silence",
+   "to": "outcomes",
+   "class": "prerequisite",
+   "label": "pone la domanda 3",
+   "basis": "interpreted",
+   "cites": [
+    {
+     "from": 42,
+     "to": 42
+    },
+    {
+     "from": 102,
+     "to": 107
+    }
+   ]
+  }
+ ],
+ "traces": [
+  {
+   "question": "Che cosa fa un giro, passo per passo?",
+   "steps": [
+    {
+     "text": "Scrive il timbro del battito prima di tutto ciò che può fallire o attendere.",
+     "parts": [
+      "round",
+      "heartbeat"
+     ],
+     "cites": [
+      {
+       "from": 51,
+       "to": 52
+      }
+     ]
+    },
+    {
+     "text": "Legge l’interruttore di pausa; se è spento, il giro finisce qui.",
+     "parts": [
+      "round",
+      "pause"
+     ],
+     "cites": [
+      {
+       "from": 53,
+       "to": 54
+      }
+     ]
+    },
+    {
+     "text": "Chiede a ogni feed i record cambiati: il passo che può bloccarsi.",
+     "parts": [
+      "round"
+     ],
+     "cites": [
+      {
+       "from": 55,
+       "to": 56
+      }
+     ]
+    },
+    {
+     "text": "Consegna ogni record a un worker, che ne registra l’esito.",
+     "parts": [
+      "round",
+      "outcomes"
+     ],
+     "cites": [
+      {
+       "from": 57,
+       "to": 58
+      },
+      {
+       "from": 106,
+       "to": 107
+      }
+     ]
+    },
+    {
+     "text": "Scrive l’ora dell’ultima chiusura e dorme fino al giro successivo.",
+     "parts": [
+      "round",
+      "finished"
+     ],
+     "cites": [
+      {
+       "from": 59,
+       "to": 60
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "question": "Stamattina il catalogo non ha niente di nuovo: perché?",
+   "steps": [
+    {
+     "text": "Running è rosso: l’importer è giù o bloccato, e agisce la regola di riavvio.",
+     "parts": [
+      "board",
+      "heartbeat",
+      "restart"
+     ],
+     "cites": [
+      {
+       "from": 198,
+       "to": 198
+      }
+     ]
+    },
+    {
+     "text": "Running verde, getting through grigio: in pausa; verifica chi l’ha messa.",
+     "parts": [
+      "board",
+      "pause"
+     ],
+     "cites": [
+      {
+       "from": 199,
+       "to": 199
+      }
+     ]
+    },
+    {
+     "text": "Running verde, getting through rosso: un feed rifiuta le chiamate.",
+     "parts": [
+      "board",
+      "finished"
+     ],
+     "cites": [
+      {
+       "from": 200,
+       "to": 200
+      }
+     ]
+    },
+    {
+     "text": "Tutto verde e nessun record: stanotte gli editori non hanno inviato nulla.",
+     "parts": [
+      "board",
+      "outcomes"
+     ],
+     "cites": [
+      {
+       "from": 201,
+       "to": 201
+      }
+     ]
+    },
+    {
+     "text": "Tutto verde, quasi tutti rifiutati: un editore ha cambiato formato.",
+     "parts": [
+      "board",
+      "outcomes"
+     ],
+     "cites": [
+      {
+       "from": 202,
+       "to": 202
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "question": "Che cosa ha mostrato la bacheca in una notte d’inverno?",
+   "steps": [
+    {
+     "text": "01:40, una pausa: running resta verde, getting through diventa grigio.",
+     "parts": [
+      "pause",
+      "board"
+     ],
+     "cites": [
+      {
+       "from": 216,
+       "to": 217
+      }
+     ]
+    },
+    {
+     "text": "02:30, l’interruttore torna acceso e l’ora di chiusura si riallinea.",
+     "parts": [
+      "pause",
+      "round",
+      "finished"
+     ],
+     "cites": [
+      {
+       "from": 218,
+       "to": 219
+      }
+     ]
+    },
+    {
+     "text": "03:10, un feed non risponde mai: il giro si blocca e non segue alcun timbro.",
+     "parts": [
+      "round",
+      "heartbeat"
+     ],
+     "cites": [
+      {
+       "from": 220,
+       "to": 221
+      }
+     ]
+    },
+    {
+     "text": "03:41, il timbro ha trentuno minuti: la regola riavvia l’importer.",
+     "parts": [
+      "restart",
+      "heartbeat",
+      "round"
+     ],
+     "cites": [
+      {
+       "from": 222,
+       "to": 224
+      }
+     ]
+    },
+    {
+     "text": "04:00, un nuovo formato dei prezzi: i rifiuti superano un quarto e la bacheca avvisa.",
+     "parts": [
+      "outcomes",
+      "board"
+     ],
+     "cites": [
+      {
+       "from": 225,
+       "to": 228
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

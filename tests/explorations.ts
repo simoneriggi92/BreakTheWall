@@ -63,3 +63,18 @@ export async function bakery(): Promise<Exploration> {
     ] }],
   };
 }
+
+const range = (c: { from: number; to: number }) => [c.from, c.to];
+/** An exploration as a model answers the structure request (X7): the shape that passed the gate. */
+export function toAnswer(x: Pick<Exploration, 'start' | 'whole' | 'aspects' | 'parts' | 'links' | 'traces'>) {
+  return {
+    start: x.start, whole: x.whole, aspects: x.aspects,
+    parts: x.parts.map(p => ({
+      id: p.id, kind: p.kind === 'prerequisite' ? 'prereq' : p.kind, on: p.on ?? null, aspect: p.aspect ?? null, name: p.name, role: p.role, cites: p.cites.map(range),
+      points: p.points.map(q => ({ text: q.text, mark: q.mark ?? null, cites: q.cites.map(range) })),
+      members: p.members.map(m => ({ id: m.id, name: m.name, does: m.does, cites: m.cites.map(range) })),
+    })),
+    links: x.links.map(l => ({ from: l.from, to: l.to, cls: l.class, label: l.label, basis: l.basis, cites: l.cites.map(range) })),
+    traces: x.traces.map(t => ({ question: t.question, steps: t.steps.map(s => ({ text: s.text, parts: s.parts, cites: s.cites.map(range) })) })),
+  };
+}

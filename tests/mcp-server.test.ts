@@ -84,20 +84,23 @@ describe('the open_in_break_the_wall tool against the app\'s entry point (M3)', 
   const app = async (at: string) => { const s = new IncomingServer(at, handlers); servers.push(s); await s.setEnabled(true); return s; };
   const call = (server: ReturnType<typeof createBreakTheWallServer>, args: object) => server.handle(request(2, 'tools/call', { name: 'open_in_break_the_wall', arguments: args }));
 
-  it('lists the open tool, whose schema needs only the text, before the level B tools', async () => {
-    expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall', 'start_disassembly', 'read_source', 'submit_structure', 'submit_part', 'submit_runs']);
-    expect(TOOLS[2]).toMatchObject({ inputSchema: { required: ['page'] } });
-    expect(TOOLS[2].description).toContain('Read every page before submit_structure');
+  it('lists the open tool, whose schema needs only the text, before the exploration and level B tools', async () => {
+    const tool = (name: string) => TOOLS.find(t => t.name === name)!;
+    expect(TOOLS.map(t => t.name)).toEqual(['open_in_break_the_wall', 'start_exploration', 'submit_exploration', 'start_disassembly', 'read_source', 'submit_structure', 'submit_part', 'submit_runs']);
+    expect(tool('read_source')).toMatchObject({ inputSchema: { required: ['page'] } });
+    expect(tool('read_source').description).toContain('Read every page before submit_exploration or submit_structure');
     expect(TOOLS[0].inputSchema).toMatchObject({ required: ['text'] });
-    // "Take apart" belongs to level B: in Claude Desktop, "smonta questo testo" once picked the open tool (M9).
+    // "Take apart" and "explore" go to exploration (P-20261105-exploration X9): in Claude Desktop, "smonta questo testo" once picked the open tool (M9).
     expect(TOOLS[0].description).toContain('WITHOUT taking it apart');
-    expect(TOOLS[0].description).toContain('use start_disassembly instead');
-    expect(TOOLS[1].description).toMatch(/^Take a text apart with Break the Wall/);
+    expect(TOOLS[0].description).toContain('use start_exploration instead');
+    expect(tool('start_exploration').description).toMatch(/^Take a text apart with Break the Wall/);
+    expect(tool('start_disassembly').description).toContain('to take a text apart or explore it, use start_exploration');
     // P-20261029-source-limits S3: the limits are the app's own, not numbers written into the descriptions.
     const limits = `at most ${SOURCE_LIMITS.maxCharsPerSource.toLocaleString('en-US')} characters and ${SOURCE_LIMITS.maxLines.toLocaleString('en-US')} lines`;
     expect(limits).toBe('at most 120,000 characters and 5,000 lines');
     expect(TOOLS[0].description).toContain(limits);
-    expect((TOOLS[1].inputSchema as { properties: { text: { description: string } } }).properties.text.description).toContain(limits);
+    expect((tool('start_disassembly').inputSchema as { properties: { text: { description: string } } }).properties.text.description).toContain(limits);
+    expect(tool('start_exploration').description).toContain('at most 52,000 characters');
   });
 
   it('opens a text in the running app and says that nothing was generated yet', async () => {
@@ -151,8 +154,9 @@ describe('the break prompt (M4a)', () => {
     expect(role).toBe('user');
     expect(content.type).toBe('text');
     expect(content.text).toMatch(/^The user wants to take something apart with Break the Wall\. What they asked for: How does a browser check a certificate\?\n/);
-    // Version 3: the prompt takes the text apart with level B, never through the open tool.
-    for (const step of ['start_disassembly', 'submit_structure', 'submit_part', 'submit_runs']) expect(content.text).toContain(step);
+    // Version 4 (X9): the prompt takes the text apart as an exploration, never through the open tool.
+    for (const step of ['start_exploration', 'submit_exploration']) expect(content.text).toContain(step);
+    expect(content.text).not.toContain('start_disassembly');
     expect(content.text).not.toContain('open_in_break_the_wall');
     expect(content.text).toContain('use that answer unchanged');
   });

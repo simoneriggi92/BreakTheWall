@@ -6,17 +6,20 @@ import {
   expansionJsonSchema, generatedDisassemblyId, longTexts, RUNS_INSTRUCTIONS, runsJsonSchema, SHORTEN_INSTRUCTIONS, shortenJsonSchema, instructionsFor,
   structureJsonSchema, SUGGEST_INSTRUCTIONS, suggestionsJsonSchema, type ContentDraft, type ContentLanguage, type GenerationMeta, type RunsDraft, type StructureDraft,
 } from '../core/disassembly-generation';
+import { ExplorationError, type Exploration } from '../core/exploration';
+import { acceptExploration, explorationRequest, generatedExplorationId, sourceFindings } from '../core/exploration-generation';
 import { idSchema } from '../core/lesson';
 import { detectLanguage } from '../core/generation';
 import {
   failure, ProviderError, routeSchema, setupSchema, type DraftState, type ExpansionResult, type GenerationPhase, type GenerationPreview, type GenerationProgress,
-  type GenerationResult, type GenerationRoute, type GenerationStats, type LocalModel, type PART_STATUSES, type PhaseStats, type ProviderFailure, type SuggestionResult,
+  type ExplorationResult, type GenerationResult, type GenerationRoute, type GenerationStats, type LocalModel, type PART_STATUSES, type PhaseStats, type ProviderFailure, type SuggestionResult,
 } from '../core/provider';
 import { goalSchema, SourceImportError, verifySelection } from '../core/source';
 import type { Completer, CompletionRequest } from './completion';
 import type { DraftStore, KeptDraft } from './generation-draft';
 
 export type { Completer } from './completion';
+export interface AcceptedExplorations { save(exploration: Exploration): Promise<Exploration> }
 export interface AcceptedDisassemblies { save(disassembly: Disassembly): Promise<Disassembly>; find?(id: string, revision: string): Promise<Disassembly | undefined> }
 /** Moves the learner's progress to the revision that took a part apart; true when there was progress to move. */
 export type CarryProgress = (previous: Disassembly, next: Disassembly) => Promise<boolean>;
@@ -28,10 +31,13 @@ export type Drafts = Pick<DraftStore, 'read' | 'state' | 'write' | 'clear'>;
 const PARALLEL = { chatgpt: 3, local: 1 } as const;
 const requestSchema = z.strictObject({ sources: z.unknown(), goal: goalSchema, language: z.enum(['it', 'en']), setup: setupSchema, resume: z.boolean().optional() });
 const expansionSchema = z.strictObject({ disassemblyId: idSchema, revision: idSchema, part: idSchema, route: routeSchema });
+const explorationSchema = z.strictObject({ source: z.unknown(), language: z.enum(['it', 'en']), route: routeSchema });
 const suggestionSchema = z.strictObject({ sources: z.unknown(), language: z.enum(['it', 'en']), priorKnowledge: goalSchema.shape.priorKnowledge, route: routeSchema, avoid: z.array(z.string().max(400)).max(20) });
 const emptyStats = (): GenerationStats => ({ structure: blank(), content: blank(), runs: blank() });
 const blank = () => ({ requests: 0, repairs: 0, sentChars: 0, receivedChars: 0, ms: 0 });
 const located = (where: string) => (f: Finding) => `${where} · ${f.path || '(answer)'}: ${f.message}`;
+/** The findings of a refused answer, from a disassembly's checks or an exploration's. */
+const findingsOf = (error: unknown): Finding[] | undefined => error instanceof DisassemblyError || error instanceof ExplorationError ? error.findings : undefined;
 type Mode = 'first' | 'repair' | 'shorten';
 type Status = typeof PART_STATUSES[number];
 
@@ -44,16 +50,18 @@ async function withRepair<T>(send: (body: CompletionRequest, mode: Mode) => Prom
   const raw = await send(first, 'first');
   try { return accept(raw); }
   catch (error) {
-    if (!(error instanceof DisassemblyError) || signal.aborted) throw error;
-    const repaired = await send({ ...first, messages: [...first.messages, { role: 'assistant', content: raw }, { role: 'user', content: buildRepairRequest(error.findings) }] }, 'repair');
+    const findings = findingsOf(error);
+    if (!findings || signal.aborted) throw error;
+    const repaired = await send({ ...first, messages: [...first.messages, { role: 'assistant', content: raw }, { role: 'user', content: buildRepairRequest(findings) }] }, 'repair');
     try { return accept(repaired); }
     catch (again) {
-      if (!(again instanceof DisassemblyError) || signal.aborted) throw again;
-      const long = longTexts(repaired, again.findings);
-      if (!long) throw new PhaseError(again.findings.map(located(where)));
+      const left = findingsOf(again);
+      if (!left || signal.aborted) throw again;
+      const long = longTexts(repaired, left);
+      if (!long) throw new PhaseError(left.map(located(where)));
       const answer = await send({ model: first.model, instructions: SHORTEN_INSTRUCTIONS, schemaName: 'break_the_wall_shorten', schema: shortenJsonSchema(long), messages: [{ role: 'user', content: buildShortenInput(long, language) }] }, 'shorten');
       try { return accept(applyShortened(repaired, long, answer)); }
-      catch (last) { throw last instanceof DisassemblyError ? new PhaseError(last.findings.map(located(where))) : last; }
+      catch (last) { const out = findingsOf(last); throw out ? new PhaseError(out.map(located(where))) : last; }
     }
   }
 }
@@ -72,6 +80,7 @@ function failureOf(error: unknown, aborted: boolean): ProviderFailure {
   if (error instanceof ProviderError) return error.failure;
   if (error instanceof PhaseError) return failure('invalid-output', { issues: error.issues.slice(0, 8) });
   if (error instanceof DisassemblyError) return failure('invalid-output', { issues: error.findings.slice(0, 8).map(located('disassembly')) });
+  if (error instanceof ExplorationError) return failure('invalid-output', { issues: error.findings.slice(0, 8).map(located('exploration')) });
   if (error instanceof SourceImportError) return failure('unsupported', { message: error.message });
   if (error instanceof z.ZodError) return error.issues.some(x => x.message === 'Indirizzo non locale') ? failure('local-address') : failure('unsupported', { message: error.issues[0]?.message ?? 'Richiesta non valida.' });
   throw error;
@@ -105,7 +114,7 @@ const parsed = <T>(accept: (raw: string) => T, value: unknown): T | undefined =>
 export class Generator {
   private active?: AbortController;
   private suggesting?: AbortController;
-  constructor(private routes: Routes, private store: AcceptedDisassemblies, private now = () => new Date(), private carry?: CarryProgress, private drafts?: Drafts) {}
+  constructor(private routes: Routes, private store: AcceptedDisassemblies, private now = () => new Date(), private carry?: CarryProgress, private drafts?: Drafts, private explorations?: AcceptedExplorations) {}
   private completer(route: GenerationRoute): Completer {
     return route.provider === 'local' ? this.routes.local({ runtime: route.runtime, baseUrl: route.baseUrl, model: route.model }) : this.routes.chatgpt;
   }
@@ -276,6 +285,40 @@ export class Generator {
       if (controller.signal.aborted) return { ok: false, failure: failure('cancelled'), stats };
       const saved = await this.store.save(checked);
       return { ok: true, disassembly: saved, moved: await this.carry?.(previous, saved) ?? false, stats };
+    } catch (error) {
+      return { ok: false, failure: failureOf(error, controller.signal.aborted), stats };
+    } finally {
+      this.active = undefined;
+    }
+  }
+  /**
+   * Explores one source (plan P-20261105-exploration X8): one request on the ChatGPT route, at most one repair (and the
+   * shorten request when only lengths are left), saved only after the final check. The local route is refused with a
+   * code until its own phase; a source over the request limit is refused before anything is sent.
+   */
+  async explore(input: unknown, onProgress: (progress: GenerationProgress) => void): Promise<ExplorationResult> {
+    if (this.active) return { ok: false, failure: failure('busy') };
+    this.suggesting?.abort();
+    const controller = new AbortController();
+    this.active = controller;
+    const stats = blank();
+    try {
+      const request = explorationSchema.parse(input);
+      const { route, language } = request;
+      if (route.provider === 'local') return { ok: false, failure: failure('unsupported', { reason: 'exploration-local', message: 'L’esplorazione non usa ancora un modello locale: scegli ChatGPT o il tuo assistente Claude.' }) };
+      if (!this.explorations) return { ok: false, failure: failure('unsupported', { message: 'L’esplorazione non è disponibile qui.' }) };
+      const [source] = await verifySelection([request.source]);
+      const over = sourceFindings(source);
+      if (over.length) return { ok: false, failure: failure('unsupported', { reason: 'exploration-too-long', message: 'La fonte è troppo lunga per una sola richiesta di esplorazione.', issues: over.map(located('source')) }) };
+      const created = this.now();
+      const meta = { id: generatedExplorationId(created), createdAt: created.toISOString(), provider: 'chatgpt' as const, model: route.model };
+      const body = explorationRequest(source, language);
+      const report = (mode: Mode, received: number) => onProgress({ phase: 'structure', repairing: mode !== 'first', ...(mode === 'shorten' ? { shortening: true } : {}), received, requests: stats.requests });
+      const exploration = await withRepair((sent, mode) => { const answer = counted(this.routes.chatgpt, sent, controller.signal, stats, mode, n => report(mode, n)); report(mode, 0); return answer; }, {
+        model: route.model, instructions: body.instructions, schemaName: body.schemaName, schema: body.schema, messages: [{ role: 'user', content: body.input }],
+      }, raw => acceptExploration(raw, { source, language, meta }), controller.signal, 'exploration', language);
+      if (controller.signal.aborted) return { ok: false, failure: failure('cancelled'), stats };
+      return { ok: true, exploration: await this.explorations.save(exploration), stats };
     } catch (error) {
       return { ok: false, failure: failureOf(error, controller.signal.aborted), stats };
     } finally {

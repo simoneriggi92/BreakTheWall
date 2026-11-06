@@ -6,7 +6,10 @@ import { z } from 'zod';
 import { INCOMING_PROTOCOL, lineReader, type IncomingReply } from '../desktop/incoming';
 import type { Disassembly } from '../core/disassembly';
 import { SOURCE_LIMITS } from '../core/source';
+import type { Finding } from '../core/disassembly';
+import { EXPLORATION_SOURCE_LIMIT } from '../core/exploration-generation';
 import { AssistantWriter, type StepReply } from './assistant';
+import { ExplorationWriter } from './exploration';
 
 /** The limits a text must meet, read from the app's own (P-20261029-source-limits S3). */
 const LIMITS = `at most ${SOURCE_LIMITS.maxCharsPerSource.toLocaleString('en-US')} characters and ${SOURCE_LIMITS.maxLines.toLocaleString('en-US')} lines`;
@@ -97,7 +100,7 @@ const openArgs = z.object({
 export const TOOLS: ToolDefinition[] = [{
   name: 'open_in_break_the_wall',
   title: 'Open in Break the Wall',
-  description: `Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates the disassembly in the app, with the app's own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), use start_disassembly instead. Send the text exactly as the user should study it, as plain text or Markdown (${LIMITS}).`,
+  description: `Open a text in Break the Wall Studio WITHOUT taking it apart: the user then generates it in the app, with the app's own route (ChatGPT or a local model). Use it only when the user asks to open, send or paste a text into Break the Wall, or to generate it in the app. When the user asks to take a text apart, break it down, explore it or see how it holds together with Break the Wall (in Italian: smonta, scomponi, esplora), use start_exploration instead. Send the text exactly as the user should study it, as plain text or Markdown (${LIMITS}).`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -109,9 +112,28 @@ export const TOOLS: ToolDefinition[] = [{
     additionalProperties: false,
   },
 }, {
+  name: 'start_exploration',
+  title: 'Explore a text with Break the Wall',
+  description: `Take a text apart with Break the Wall so the user can explore how it holds together: you read the source and write its structure yourself (its parts, their components, its large concerns, the links the source states and the questions it walks), and Break the Wall checks it. This is the tool to use when the user asks to take a text apart, break it down, explore it or see how it holds together with Break the Wall (in Italian: smonta, scomponi, esplora), including an answer you just wrote. This call returns the instructions, the JSON schema and the numbered source; a long source comes in pages, the rest read with read_source. Then call submit_exploration with your JSON. The accepted exploration is saved in the user's Break the Wall library and opened there. The text may have at most ${EXPLORATION_SOURCE_LIMIT.toLocaleString('en-US')} characters.`,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: `The full text to explore, as plain text or Markdown (at most ${EXPLORATION_SOURCE_LIMIT.toLocaleString('en-US')} characters).` },
+      title: { type: 'string', description: 'A short name for the source, shown in citations (at most 120 characters).' },
+      language: { type: 'string', enum: ['it', 'en'], description: 'The language to write the exploration in; by default the text\'s.' },
+    },
+    required: ['text'],
+    additionalProperties: false,
+  },
+}, {
+  name: 'submit_exploration',
+  title: 'Submit the exploration',
+  description: 'Submit the structure of the text started with start_exploration, as JSON matching the schema it gave. Break the Wall checks it with its own rules: either it is saved and opened in the user\'s library, or the findings come back for one repair. After a second refusal nothing is saved.',
+  inputSchema: { type: 'object', properties: { json: { type: 'string', description: 'The structure, as a JSON string.' } }, required: ['json'], additionalProperties: false },
+}, {
   name: 'start_disassembly',
   title: 'Write a Break the Wall disassembly',
-  description: 'Take a text apart with Break the Wall: you write the disassembly yourself, and Break the Wall checks it. This is the tool to use when the user asks to take a text apart, break it down or disassemble it with Break the Wall (in Italian: smonta, scomponi), including an answer you just wrote. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the JSON schema for the first phase and the numbered source; a long source comes in pages, the rest read with read_source.',
+  description: 'Write a Break the Wall disassembly with runs and a reassembly: you write it yourself, and Break the Wall checks it. Use it only when the user asks for a disassembly with runs or a reassembly; to take a text apart or explore it, use start_exploration. You write three phases as JSON (the structure, then each top-level part, then the runs), and Break the Wall checks each one with its own rules before the next; fix what it reports and submit again. The finished disassembly is saved in the user\'s Break the Wall library and opened there. This call returns the instructions, the JSON schema for the first phase and the numbered source; a long source comes in pages, the rest read with read_source.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -126,7 +148,7 @@ export const TOOLS: ToolDefinition[] = [{
 }, {
   name: 'read_source',
   title: 'Read a page of the source',
-  description: 'Read one page of the numbered source of the disassembly started with start_disassembly. A long source comes in pages so that each reply stays readable; start_disassembly says how many there are and returns page 1. Read every page before submit_structure, and any page again later to check line numbers.',
+  description: 'Read one page of the numbered source of the exploration or disassembly started last (start_exploration or start_disassembly). A long source comes in pages so that each reply stays readable; the start call says how many there are and returns page 1. Read every page before submit_exploration or submit_structure, and any page again later to check line numbers.',
   inputSchema: { type: 'object', properties: { page: { type: 'integer', minimum: 1, description: 'The page to read, from 1 to the number start_disassembly gave.' } }, required: ['page'], additionalProperties: false },
 }, {
   name: 'submit_structure',
@@ -150,6 +172,7 @@ export const PROMPTS: PromptDefinition[] = prompts;
 
 const asResult = (reply: StepReply): ToolResult => ({ content: [{ type: 'text', text: reply.text }], ...(reply.isError ? { isError: true } : {}) });
 const clientName = (client?: ClientInfo) => client ? `${client.name} ${client.version}`.trim() : 'assistant';
+const exploreArgs = z.object({ text: z.string(), title: z.string().optional(), language: z.string().optional() });
 const startArgs = z.object({ text: z.string(), title: z.string().optional(), question: z.string().optional(), language: z.string().optional() });
 
 /** Hands a finished disassembly to the app, which checks it again and saves it in the library (M7). */
@@ -164,19 +187,50 @@ async function save(link: AppLink, disassembly: Disassembly, done: string): Prom
   return { content: [{ type: 'text', text: `${done} It is saved in the user's Break the Wall library and open there. Tell the user in one line; do not repeat the disassembly in the chat.` }] };
 }
 
-export function createBreakTheWallServer(link: AppLink, version: string, writer = new AssistantWriter()) {
+/** Hands an exploration answer to the app, which checks it with its own rules; findings come back for the one repair (X9). */
+async function explore(link: AppLink, explorer: ExplorationWriter, raw: unknown): Promise<ToolResult> {
+  const next = explorer.submission(raw);
+  if ('reply' in next) return asResult(next.reply);
+  let reply: IncomingReply;
+  try { reply = await reachApp(link, { type: 'explore', ...next.submit }); }
+  catch (error) {
+    if (!(error instanceof AppUnreachable)) throw error;
+    return { content: [{ type: 'text', text: `The exploration could not be checked yet: ${error.message} Once Break the Wall runs, call submit_exploration again with the same JSON. This does not count as an attempt.` }], isError: true };
+  }
+  if (reply.ok && 'saved' in reply) {
+    explorer.saved();
+    return { content: [{ type: 'text', text: `Exploration accepted: "${reply.title}" is saved in the user's Break the Wall library and open there. Tell the user in one line; do not repeat the structure in the chat.` }] };
+  }
+  if (!reply.ok && reply.code === 'invalid') {
+    const findings = Array.isArray(reply.params?.findings) ? reply.params.findings as Finding[] : [{ path: '', message: reply.message }];
+    return asResult(explorer.refused(findings));
+  }
+  return { content: [{ type: 'text', text: reply.ok ? 'Break the Wall answered, but not as expected.' : `Break the Wall did not save the exploration (${reply.code}): ${reply.message}` }], isError: true };
+}
+
+export function createBreakTheWallServer(link: AppLink, version: string, writer = new AssistantWriter(), explorer = new ExplorationWriter()) {
+  // read_source reads the source of whichever was started last.
+  let reading: 'disassembly' | 'exploration' = 'disassembly';
   return createMcpServer({
     info: { name: 'break-the-wall', title: 'Break the Wall', version },
-    instructions: 'Break the Wall is a desktop app on the user\'s computer. It takes a text apart into source-linked parts the user explores, runs and reassembles. When the user asks to take a text apart, break it down or disassemble it with Break the Wall, use start_disassembly: you write the disassembly and the app checks and saves it. Use open_in_break_the_wall only when the user asks to open a text in Break the Wall for the app to generate.',
+    instructions: 'Break the Wall is a desktop app on the user\'s computer. It takes a text apart into source-linked parts the user explores. When the user asks to take a text apart, break it down or explore it with Break the Wall, use start_exploration: you write the structure and the app checks and saves it. Use start_disassembly only when the user asks for a disassembly with runs and a reassembly, and open_in_break_the_wall only when the user asks to open a text in Break the Wall for the app to generate.',
     tools: TOOLS,
     prompts: PROMPTS,
     call: async (name, args, client): Promise<ToolResult> => {
+      if (name === 'start_exploration') {
+        const input = exploreArgs.safeParse(args);
+        if (!input.success) return { content: [{ type: 'text', text: 'start_exploration needs "text" as a string, and optionally "title" and "language" ("it" or "en").' }], isError: true };
+        reading = 'exploration';
+        return asResult(await explorer.start(input.data, clientName(client)));
+      }
+      if (name === 'submit_exploration') return explore(link, explorer, args.json);
       if (name === 'start_disassembly') {
         const input = startArgs.safeParse(args);
         if (!input.success) return { content: [{ type: 'text', text: 'start_disassembly needs "text" as a string, and optionally "title", "question" and "language" ("it" or "en").' }], isError: true };
+        reading = 'disassembly';
         return asResult(await writer.start(input.data, clientName(client)));
       }
-      if (name === 'read_source') return asResult(writer.readSource(args.page));
+      if (name === 'read_source') return asResult(reading === 'exploration' ? explorer.readSource(args.page) : writer.readSource(args.page));
       if (name === 'submit_structure') return asResult(writer.submitStructure(args.json));
       if (name === 'submit_part') return asResult(writer.submitPart(args.index, args.json));
       if (name === 'submit_runs') {

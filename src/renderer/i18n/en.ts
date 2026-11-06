@@ -311,6 +311,8 @@ export const en: Messages = {
     'part-not-divisible': 'This part cites too few lines to be taken apart further.',
     'question-language': 'The question is in a different language from the chosen content language: change the content language or rewrite the question.',
     'draft-changed': 'The sources, the question or the language are no longer those of the interrupted generation: start over.',
+    'exploration-local': 'Exploring a source does not use a local model yet: choose ChatGPT or your Claude assistant.',
+    'exploration-too-long': 'This source is too long to explore in one request: select the part you want to explore.',
   },
   accountNotices: {
     'plan-not-authorized': 'Signed in, but ChatGPT plan usage was not authorized.',

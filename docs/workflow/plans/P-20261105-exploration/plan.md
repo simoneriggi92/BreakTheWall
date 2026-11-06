@@ -3,9 +3,9 @@ id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
 version: 6
 state: implementing
-current_task: X7
-last_evidence: Phase core done on feature/exploration (2026-11-06) - X2-X6 in src/core with 61 unit tests; tsc passes; npx vitest run --dir tests 35 files 524 tests passed; npm run build passes
-next_action: implement P-20261105-exploration v6 --phase generation (X7-X10)
+current_task: X11
+last_evidence: Phase generation done on feature/exploration (2026-11-06) - X7-X10, 27 new unit tests; tsc passes; npx vitest run --dir tests 39 files 551 tests passed; npm run build passes
+next_action: implement P-20261105-exploration v6 --phase style (X11)
 approval: approved
 ---
 
@@ -481,6 +481,10 @@ Not included:
   - a bad member cite yields a repair finding with its path;
   - an over-long source is refused;
   - the instructions and the schema are stable (snapshot).
+- **Done (2026-11-06):** `src/core/exploration-generation.ts` (`explorationRequest`, `explorationInstructions`, `explorationJsonSchema`, `acceptExploration`, `fromDraft`, `sourceFindings`, `EXPLORATION_SOURCE_LIMIT`, `generatedExplorationId`); `tests/exploration-generation.test.ts`, 6 tests, with a snapshot of the instructions and the schema.
+  - The instructions are A2's, byte for byte in both languages (compared with `gate/abstraction.mjs` before the port). The answer keeps the shape that passed the gate (`prereq`, `cls`, `[from, to]`, `null`); the app maps it to the contract, and a finding on a link's class names `cls`, as the answer does.
+  - The limit is 52,000 characters: the explainer (955 lines, 51,125 characters) is the longest source that passed X1 on both routes.
+  - A text over a contract limit is worded as a length, so the existing shorten request fixes it after the repair. Automated test only.
 
 **X8. The store and the app's actions** (`src/desktop/`).
 - **Storage.** An `ExplorationStore`, one directory per exploration, as the disassembly store does. Invalid files are counted, never shown.
@@ -498,6 +502,8 @@ Not included:
   - cancel stops the request;
   - the store round-trips;
   - an invalid file is skipped and counted.
+- **Done (2026-11-06):** `src/desktop/exploration-store.ts` (`ExplorationStore`); `Generator.explore` in `src/desktop/generator.ts`; IPC `exploration:start`, `explorations:list`, `explorations:find` in `main.ts` and `preload.ts`; `ExplorationRequest`, `ExplorationResult` and the bridge methods in `src/core/provider.ts`; the reasons `exploration-local` and `exploration-too-long`, worded in both languages. `tests/exploration-store.test.ts`, 8 tests with a fake completer.
+  - The repair step (`withRepair`) now takes an exploration's findings as well as a disassembly's; cancel uses the existing `generation:cancel`. Automated test only: no request reached ChatGPT.
 
 **X9. Claude writes an exploration** (`src/mcp/`, `src/desktop/incoming.ts`).
 - Two tools, beside the disassembly tools:
@@ -514,6 +520,9 @@ Not included:
   - an invalid one returns findings with paths;
   - a second invalid one saves nothing;
   - the local entry point stays off unless the learner turns it on.
+- **Done (2026-11-06):** `src/mcp/exploration.ts` (`ExplorationWriter`: the request, pages for a long source, two attempts); `start_exploration` and `submit_exploration` in `src/mcp/server.ts`, with `read_source` reading whichever was started last; the entry point's `explore` message in `src/desktop/incoming.ts`, with the findings as data; `exploreFromAssistant` in `src/desktop/assistants.ts`, wired in `main.ts` (saved, then sent to the window as `studio:exploration`).
+  - The steering: the open tool, the server's instructions and `start_disassembly` send "take apart" and "explore" to `start_exploration`, and the `break` prompt now uses it. The manifest (`scripts/zip.mjs`) lists the two tools and `read_source`. The existing tests of the tool list and the prompt are updated to this.
+  - `tests/mcp-exploration.test.ts`, 7 tests against a real local entry point. `npm run build` rebuilds the extension; it is not published. Automated test only: no Claude client was used.
 
 **X10. Three prepared examples** (`src/fixtures/explorations/`), on the public fixtures `importer-signals`, `mill-harm` and `atlas-release`.
 - Hand-written, original, in English and Italian.
@@ -523,6 +532,11 @@ Not included:
 - Acceptance (unit tests):
   - all six files are valid (X2);
   - their shapes, levels and reading reports are recorded (nuclei, aspects, premise, entry, coverage), so a change in the detector, the levels or the report shows (X3, X5, X6).
+- **Done (2026-11-06):** `src/fixtures/explorations/` (six files) and `src/fixtures/explorations.ts` (`loadPreparedExplorations`); `tests/prepared-explorations.test.ts`, 6 tests.
+  - The importer: two aspects (the round and its signals, who reads them), seven roles in one nucleus, the premise "silence", gaps as annotations; it enters by the winter night, the trace that walks every role.
+  - Mill: no aspects, five roles joined by bonds, the maturity limit as an annotation; no premise, entry by layers.
+  - The runbook: two aspects (the chain, the person releasing), the release's identity by digest as the premise, entry by its first trace.
+  - The Italian and English files share ids, cites, links and traces (tested). Automated test only; the owner has not looked at them.
 
 ### Phase `style`
 
