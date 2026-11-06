@@ -1,0 +1,822 @@
+---
+id: P-20261105-exploration
+title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
+version: 6
+state: implementing
+current_task: X7
+last_evidence: Phase core done on feature/exploration (2026-11-06) - X2-X6 in src/core with 61 unit tests; tsc passes; npx vitest run --dir tests 35 files 524 tests passed; npm run build passes
+next_action: implement P-20261105-exploration v6 --phase generation (X7-X10)
+approval: approved
+---
+
+# Exploration
+
+## Outcome
+
+A learner gives a source, and the app opens it for exploration:
+- **The app reads the source's structure** in one request:
+  - parts of five kinds, at the grain of roles: what a piece does for the whole, not every component the source names;
+  - the **members** of each role: the components the source names (classes, services, settings, files), already extracted, each with what it does and its cites;
+  - the **aspects**: the large concerns of the source, and the aspect of each role;
+  - the **whole**: one sentence on what the source is about;
+  - links of four classes, each citing its lines and saying whether the source declares it or the extractor interprets it;
+  - 2–4 points per part, each citing its own lines;
+  - the questions the source itself walks (traces).
+  
+  The app checks every citation and relation before keeping it.
+- **The app computes the levels and chooses the way in** from the shape, never from a genre:
+  - the nuclei (the groups the bonds connect), with their layers along the flow;
+  - the prerequisites, the annotations and the pieces aside;
+  - how much of the main nucleus the source's own question walks;
+  - the **premise**: the starting point the source states before any part, read first and alone;
+  - the **aspect level**, derived by the app from the roles' aspects, and each aspect's **sub-level** of roles.
+- **One view, three roles, on one shared state** (prototype E):
+  - the **guide** moves it: "the whole source" by layers, after the premise, or "a question of the source";
+  - the **structure** shows it, by levels of abstraction on one page:
+    - the aspects, in labelled layer strips, with the prerequisites above what they open;
+    - opening an aspect lifts its roles out **in place**, on a sub-level under the block. The whole keeps every position and fades, and the opened block stays highlighted;
+    - inside the sub-level, a role shows its components in place, each selectable;
+    - closing plays the sub-level back into its block, and the reader is on the same step;
+    - each aspect has its own hue, kept by its roles, its sub-level, the card and the index;
+    - a joint's label is short and says a relation, with an arrow the way the joint runs; labels are placed clear of blocks and can be moved, tied to their joint by a dashed leader;
+    - choosing a block lights its joints and their labels, and steps the others back;
+  - the **source** proves it, with a leader line from the selection (part, component, point or link) to its lines.
+- **Beside the three roles:**
+  - the source's own **index**, in its order;
+  - the **card**, which leads with the explanation and its points; components, roles and joints wait folded;
+  - **"how it was read"**: a verdict for every line, plus coverage, shape, basis, why this way in, and whether the logic follows the chapters.
+- **Exploring off the guide is a pause**, with a way back to the step. An open sub-level is such a pause.
+- **Everything is read before the view opens.** Every part, member, layer, aspect and nucleus is there when the source opens. The guide paces the reading. Nothing is taken apart on demand, and the learner never waits inside the view.
+- **Style:** the technical drawing, in paper and blueprint, set as tokens before the view is built.
+- **Routes:** the structure is written by OpenAI through the app's ChatGPT route, or by Claude through the MCP server. Local models come in a later phase.
+
+Run and reassemble are not part of this outcome (owner, 2026-11-04). Disassemblies made so far stay readable in their player, which loses its "take this part apart" action.
+
+## What changes from v4
+
+v4 was approved on 2026-11-05 and its X1 ran run 0 and R1. The owner then set R2 aside for an abstraction study (2026-11-06). v5 carries what that study and the owner's three looks decided:
+- **X1** continues with the abstraction request (R2's rules, the top-down principle, members, aspects, whole), on all six sources and both routes;
+- **the contract** gains members, aspects and the whole (X2);
+- **a new core task** derives the aspect level, the sub-levels and the premise (X5);
+- **the layout** gains the spacing of E and the placement of joint labels (X4);
+- **the view** is prototype E instead of D: two new tasks, the sub-level in place (X14) and movable joint labels (X15);
+- D's "detail" control (aspects / roles / roles and components) is not built: E replaces it.
+
+The tasks are renumbered:
+
+| v4 | v5 | v4 | v5 |
+|---|---|---|---|
+| X1–X4 | X1–X4 | X11 view | X12 |
+| — | X5 levels of abstraction | X12 guides | X13 |
+| X5 reading report | X6 | — | X14 sub-level in place |
+| X6 request | X7 | — | X15 joint labels |
+| X7 store | X8 | X13 card and index | X16 |
+| X8 MCP | X9 | X14 how it was read | X17 |
+| X9 prepared examples | X10 | X15 open as exploration | X18 |
+| X10 tokens | X11 | X16 retire take-apart | X19 |
+| | | X17 verify | X20 |
+
+## What changes from v5
+
+v5 was approved on 2026-11-06 and its gate ran A1 on six sources and both routes, then A2 on the README. The owner judged the results and the prototype, and closed the gate: "vanno bene A2 … ho valutato tutto, creiamo questa parte di prodotto". v6 carries what the owner decided while judging:
+- **X1 is passed.** The request the app ports (X7) is A2's: A1's rules plus "the problem and what answers it" and "a whiteboard grain".
+- **Labels** always say a relation, never a bare count (X4, X5). Short, with an arrow the way the joint runs. The acting block is marked on pointing, and its hue colours the arrow (X15).
+- **A chosen block lights its joints** and their labels, animated, and the others step back; choosing it again restores the view (X15).
+- **Each aspect has a hue** at every level, from a colour study the owner preferred; prerequisites keep their own colour (X11, X12).
+- **The card leads with the explanation**, with components, roles and joints folded (X16).
+- **The aspect level draws every aspect** when no bond joins them (X5).
+- **The frame is prototype NB**, whose panels fold; D's "space" control is not built (X12).
+
+No task is added or renumbered.
+
+## Evidence
+
+- [Research R-20261104-exploration-experience](../../research/R-20261104-exploration-experience.md):
+  - the diagnosis (`src/core/disassembly-generation.ts:110` asks for 3–7 parts, `:114` for a joint on every part);
+  - the structure-first elements and the detector rule;
+  - the owner's looks of 2026-11-04 and 2026-11-05;
+  - the gate: run 0 (section 7) and R1 (section 8). Both routes were valid, but the explainer had too many blocks and the README lacked its pipeline nucleus;
+  - **section 9, abstraction on the explainer (2026-11-06):**
+    - four model-written approaches (by role, from the top, life cycle, reader's questions);
+    - 15–21 roles, 97–121 members and 4 aspects each, all valid, citing 90–93% of the source;
+    - the aspect level computed by the app;
+    - prototype E, and the owner's three looks at it.
+- [Product definition](../../../product.md#identity), revised on 2026-11-05: identity, the structure of a source, the signature, the visual direction, the exploration loop. X2 adds members, aspects and the derived levels to it.
+- The private prototype `.local/experiments/exploration/` (outside the repository: it carries the owner's private sources). Behaviour is described here; no private content enters the repository.
+  - `one.html` with `one.js` and `app.js` is the reference for the view. View E, "Livelli di astrazione", shows:
+    - `aspectsOf`, `rolesOf`, `levelShape` and the premise rule;
+    - `openSub` / `closeSub` and `drawSub`: the sub-level in place, with its motion;
+    - `placeTags`: joint labels, placed and movable, with their arrow and the acting block's hue;
+    - `nb.html`, `nb.js` and `nb.css`: prototype NB, the frame and the look the owner accepted, with the aspect hues of the colour study (`.local/prototypes/nb-color-study/`).
+  - `gate/` holds the requests (`prompt.mjs` revisions 1–2, `abstraction.mjs` for the four approaches), the ChatGPT runner and the checker.
+- [Research R-20261102-depth-in-advance](../../research/R-20261102-depth-in-advance.md): the owner already asked, on 2026-11-02, for "every level already taken apart and openable at once, without waiting".
+- The lab's stage on `feature/lab-mode` (`src/renderer/lab/Stage.tsx`, `lab.css`) shows the motion pattern the owner named: FLIP with `Element.animate`, none under "reduce motion". It is a reference only. This plan does not depend on that branch.
+- The app today, on `origin/main` (the base of this plan):
+  - `src/core/disassembly.ts` (the disassembly contract, `schemaVersion: 1`, which requires runs and a reassembly);
+  - `src/core/disassembly-generation.ts` (`formatSourceBlock`, repair requests);
+  - `src/desktop/generator.ts` and `disassembly-store.ts` (routes, store);
+  - taking a part apart during use:
+    - `TakeApart` in `src/renderer/disassembly/PartCard.tsx` and `takeApart` in `DisassemblyPlayer.tsx`;
+    - `expandPart` in the bridge (`src/core/provider.ts:178`, `src/desktop/preload.ts`);
+    - the `disassembly:expand` handler in `src/desktop/main.ts`;
+    - `expandPart` / `acceptExpansion`, with the expansion request, in `src/core/disassembly-generation.ts`;
+  - `src/renderer/disassembly/SourceDocument.tsx` (a formatted source with addressable lines);
+  - `src/renderer/styles.css` (paper and blueprint tokens, checked by `tests/theme.test.ts`).
+- **The two routes this plan uses**, both on `origin/main`:
+  - **Claude** reaches the app through the MCP server (`src/mcp/server.ts`: `start_disassembly`, `read_source`, `submit_structure`, `submit_part`, `submit_runs`). The assistant writes, the app checks and saves. Verified in Claude Desktop ([plan P-20261028-mcp-integration](../P-20261028-mcp-integration/plan.md), completed).
+  - **OpenAI** is the app's ChatGPT route (`src/desktop/chatgpt/`).
+    - The evaluation runner (`eval/runner.ts`, `npm run eval -- --route chatgpt --allow-chatgpt`) already drives it from outside the app, with a budget ledger (`eval/policy.ts`).
+    - The gate's runner uses the same account class, and ran nine requests in run 0 and R1, all answered.
+    - A witnessed ChatGPT inference in the app is still an open question of the adapter.
+- The local route exists and was verified in October ([R-20261022-local-inference](../../research/R-20261022-local-inference.md)). This plan leaves it to a later phase.
+- The source limits per route are in [R-20261029-source-limits](../../research/R-20261029-source-limits.md).
+- ⚠ The local `main` is behind `origin/main` by the merges of pull requests #29–#39 (MCP, workbench, source entry, source limits). The base of this plan is `origin/main`.
+
+## Owner's decisions
+
+- **Exploration is the core**, on 2026-11-05: "Adesso direi che abbiamo un prodotto da costruire". Product definition and adapter are revised with this plan.
+- **The experience is view D's three roles** (2026-11-04 and 2026-11-05):
+  - two guides named by intent;
+  - the source's order shown by the index;
+  - the guide's step between the structure and the card;
+  - "how it was read".
+  
+  On 2026-11-06 the structure became E's levels of abstraction.
+- **Abstraction, not every component** (2026-11-06):
+  - "non dobbiamo rappresentare a schermo tutto, altrimenti l'utente non sa più come navigare";
+  - no fixed number of blocks: the app, through the model, finds the level that sums up without listing every technical component;
+  - the components stay available as members, never drawn as parts.
+- **No hand-made abstraction** (2026-11-06): "devi riutilizzare la stessa metodologia che userebbe l'applicazione". Levels come from the request and from functions the app runs.
+- **The premise first, as a level of its own** (2026-11-06): the starting point of the source, before the aspects.
+- **One interface for aspects and roles** (2026-11-06):
+  - a separate roles page "fa perdere riferimento all'utente, ed è destabilizzante";
+  - the whole must stay as it is, only fainter;
+  - the sub-level opens and closes in place, with a transition like the lab's;
+  - closing continues the exploration from the graph already expanded.
+- **Only the level's own blocks in a sub-level** (2026-11-06): the prerequisites "sono rumore, sembra che sia uno dei blocchi relativi al livello sottostante".
+- **The premise stands apart** (2026-11-06, on prototype NB): every later block sits below it, "anche quelli propedeutici".
+- **The interface's look is prototype NB** (2026-11-06, "il tuo prototipo è perfetto"):
+  - the frame of a notebook-style research app: an app bar with the work's title and whole, three soft card panels, folding rails, pills, tabs on a phone;
+  - Break the Wall's own technical sheet, tokens and drawing conventions.
+  
+  X11 and X12 follow it.
+- **Joints readable when crowded** (2026-11-06): more space between blocks, labels movable and tied to their joint by a dashed line. "Adesso ci siamo… l'unico accorgimento è il discorso dei giunti".
+- **The app decides the way in.** The learner is never asked to choose a representation.
+- **The technical drawing is kept**, revised: the drawing shows and the text reads; color carries the role and the stroke carries the basis; the title block is "how it was read"; tokens before views.
+- **Run and reassemble are set aside**, to be designed later on top of exploration.
+- **No part is taken apart during use** (2026-11-05): "non voglio più smontare un pezzo durante l'utilizzo ed attendere".
+- **The lab-mode pull request is set aside** (2026-11-05): "per ora da parte". This plan does not depend on it.
+- **Claude and OpenAI first, local models later** (2026-11-05): local models still have limitations, so the product is built on ChatGPT and on Claude's MCP first.
+- **Usefulness is the owner's judgement.**
+
+## Decisions this plan takes, to confirm at approval
+
+1. **A new stored document, not a new version of the disassembly.**
+   - Reason: a disassembly requires runs and a reassembly, and 3–7 parts per level. A structure has neither.
+   - Effect: old disassemblies stay valid and keep their player; nothing is migrated.
+2. **One source per exploration.** The index, the line verdicts and the leader lines are per source. Several sources are a later step.
+3. **Two routes: Claude through MCP, OpenAI through ChatGPT.** The local route is not offered for exploration: it has not passed the gate. Its code path stays generic, so a later phase adds it with its own gate.
+4. **One request, repaired once.** A source too long for one request is refused, with a message that names the limit, set by the gate (X1). Long sources split across requests come later, and every request runs before the view opens.
+5. **Exploration becomes the default action** for a new source. Generating a disassembly stays reachable as a secondary action until run and reassemble are redesigned.
+6. **Views A, B, C, D's "detail" control and the "space" control are not built.** E in NB's frame replaces them, and its panels fold to give the room.
+7. **The top-down principle is X1's request.** The model first decides the whole, then 2–4 aspects, then the roles inside each, with their members. It is the approach the owner judged in E ("ABS dall'alto"). A source with a single concern names no aspects.
+8. **Two drawn levels, the components inside.** The view draws the aspects and an aspect's roles. A role's components are members, shown inside the role, never a third drawn level.
+9. **The aspect level is derived, not stored.** The model writes each role's aspect. The app computes the aspect blocks, their bonds and the sub-levels from it, so one stored document serves every level.
+10. **No aspects, no aspect level.** With fewer than two aspects, the view opens on the roles, with their components inside them, and no sub-level exists.
+11. **One sub-level open at a time.** Touching another aspect moves the sub-level there.
+12. **Moved joint labels are kept for the session, not stored.** A moved label keeps its place while the exploration stays open. Storing it is a later step, if the owner asks.
+13. **Motion is short and optional.** The sub-level grows out of its block and returns into it in about 0.3 s, and a lit joint's dash flows. Under "reduce motion" nothing moves, and the states are the same.
+14. **Four aspect hues, by the aspect's order.** The request allows at most four aspects, so each has its own hue. The hue says which aspect; rings and outlines say selection; prerequisites, annotations and pieces aside keep their own colours.
+15. **Choosing is a toggle.** A click on a block chooses it and lights its joints; a second click, or "back to the step", lets it go.
+
+## Scope
+
+Included:
+- the gate on a real model, with the abstraction request;
+- in `src/core`, pure and tested:
+  - the structure contract, with members, aspects and the whole, and its checker;
+  - the detector;
+  - the source index;
+  - the layout of the structure, with the placement of joint labels;
+  - the levels of abstraction: the aspect level, the sub-levels and the premise;
+  - the reading report;
+- the structure request, through the ChatGPT route and through the MCP route for Claude;
+- the store, and the app's actions to create, list and open an exploration;
+- three prepared examples on the public fixtures;
+- the style tokens;
+- the view, in English and Italian, in paper and blueprint, with:
+  - its guide, structure, card, source, index and "how it was read";
+  - the sub-level in place;
+  - the movable joint labels;
+- retiring "take this part apart" from the disassembly player, from the bridge and from the core;
+- `docs/product.md`, updated with the members, the aspects and the levels (X2);
+- tests.
+
+Not included:
+- run, reassemble and the parts store;
+- the local route for exploration (a later phase, with its own gate);
+- several sources in one exploration;
+- sub-assemblies, and long sources split across requests;
+- a third drawn level (components stay inside their role);
+- storing moved labels;
+- AI-assisted discovery of sources;
+- repositories and PDF documents as exploration sources;
+- choosing among several traces by more than their coverage (the learner can pick another one, X13);
+- telling a partial trace from a partial extraction (research, open question). The reading report shows the facts, and the entry rule does not use them;
+- views A, B and C, and D's "detail" control;
+- any new dependency.
+
+## Preconditions
+
+- **P-20261103-lab-mode is set aside** (owner, 2026-11-05). Its plan is `blocked`, its pull request stays open and unmerged, and this plan depends neither on it nor on `feature/guided-reading`.
+- **Branch.** `feature/exploration`, from `origin/main` (the local `main` is updated first).
+  - Push, pull request and merge only on the owner's confirmation when reached.
+  - If the lab-mode PR is merged later, its guided view's own "take apart" goes with X19's rule.
+- **The untracked copies are removed by the owner before X2.**
+  - About 50 untracked files named "… 2.ts", "… 2.tsx" and "… 2.css" sit in `src/` and `tests/`, copies made by a sync tool.
+  - `tsc` includes both folders, and `npx tsc --noEmit` fails today on them (for example `tests/split-pane.test 2.tsx`). So `npm run check` cannot pass while they exist.
+  - Deleting them is the owner's action.
+- **No new dependency.** Zod, React, hand-written SVG, `Element.animate` and the existing markdown renderer are enough.
+- **Private material stays out.** Tests, fixtures and examples use the public fixtures only. Gate results on private sources are described by structure only.
+- **Usage on Claude and OpenAI is the owner's choice** (2026-11-05), within each run's stated cost:
+  - Claude runs use the owner's plan;
+  - ChatGPT runs go through the gate's budget ledger.
+  
+  A private source goes to OpenAI only after the owner confirms it for that run, as `--private-to-chatgpt` requires. A private source goes to Claude only as this conversation already does.
+
+## Tasks
+
+### Phase `gate`
+
+**X1. The structure-first request on Claude and OpenAI, until it passes.** Private harness `.local/experiments/exploration/gate/`.
+- **Done under v4:**
+  - **Run 0** (2026-11-05, [research section 7](../../research/R-20261104-exploration-experience.md#7-the-gate-first-run-2026-11-05-plan-x1)). Claude was 6/6 valid, but criteria 2 and 3 failed. ChatGPT (`gpt-6.1-sol`) was 3/3 valid on the public sources.
+  - **R1** (section 8), on both routes and six sources. The forced bond and the runbook's entry were fixed. Still failing: the explainer had too many blocks, and the README had no pipeline nucleus.
+  - **The abstraction study** (section 9) on the explainer, Claude only: four principles, all valid. The owner judged the top-down one in E.
+- **The routes**, unchanged:
+  - **Claude:** fresh agents with no context of the analysis, one per source, each given only the request and returning only the JSON;
+  - **OpenAI:** the app's ChatGPT route, through the private runner `gate/chatgpt.mjs`, inside Electron with the app's own session.
+- **A1, the abstraction run.** The request is R2's rules plus the top-down principle, MEMBERS, aspects and the whole (`gate/abstraction.mjs`, approach `dall-alto`), with one change: a source with a single concern names no aspects (`[]`).
+  - It runs on both routes and all six sources.
+  - The answers are checked with `node gate/check.mjs <run> --view` and loaded into prototype E for the owner.
+  - **At most one more revision, A2**, which changes the rules, not the sources or the schema's shape. Then the stop.
+- **Costs, stated before each run:**
+  - Claude: six agents on the owner's plan.
+  - ChatGPT: three public requests, plus three private ones. The private sources go to OpenAI only on the owner's confirmation for that run.
+  - The ledger has used 6 public and 3 private requests (run 0 and R1). v5 raises its budget to 15 public and 12 private, enough for A1 and A2 with one retry each.
+- **Pass criteria:**
+  1. every answer is valid;
+  2. no bond the owner judges forced;
+  3. the README's two nuclei are found, as nuclei of roles or as aspects;
+  4. each trace is one the source really walks;
+  5. points inside their part ≥ 90%;
+  6. the view reads in E: the owner does not judge the aspects, the roles or the layers too fragmented. Roles per aspect and members per role are recorded beside the explainer's top-down result;
+  7. aspects only where the source has several concerns, and none the owner judges forced. A short argument (Mill) may have none;
+  8. the premise rule finds the source's starting point, or nothing when the source states none. The owner judges it.
+  
+  The owner judges 2, 4, 6, 7 and 8 by looking in E. A route passes on its own: if only one passes, the plan goes on with that one and the other waits.
+- Also recorded:
+  - per source, route and run: time, size, the shape metrics;
+  - the longest source that passed on each route, which sets the request limit of X7;
+  - the comparison with today's extractor: forced joints, coverage, nuclei.
+- Evidence: a section of the research per run, by structure only for the private sources.
+- **A1 ran on 2026-11-06** ([research section 10](../../research/R-20261104-exploration-experience.md#10-the-gate-run-a1-2026-11-06-plan-v5-x1)).
+  - Criterion 1: Claude 6/6 valid. ChatGPT 5/6 at first (the runbook bonded a procedure to a part), then 6/6 after one repair sent as the app does.
+  - Criterion 3 is met on both routes. Criterion 5: 91–100%.
+  - Criteria 2, 4, 6, 7 and 8 wait for the owner's look in NB.
+  - Ledger: 9/15 public, 7/12 private.
+  - **The owner's look (2026-11-06):**
+    - on the README, ChatGPT mixes the problem with the application's architecture, and Claude is closer, but three bodies are expected: the problem, the application with its components, the project pipeline;
+    - the explainer should approach the hand extraction;
+    - the other sources were not commented on.
+  - **A2 is prepared** (research section 10): the problem apart from what answers it, and a whiteboard grain.
+  - **A2 ran on the README only** (owner, 2026-11-06), on both routes.
+    - Both answers are valid. On Claude, criterion 5 fails at 79%.
+    - The problem became the premise, with product and project process as two aspects. The owner judges it.
+    - The other sources follow one at a time.
+    - Ledger: 9/15 public, 8/12 private.
+  - **The owner's rule on labels:** a joint's label always names a relation, never a bare count. It belongs to X4 (layout) and X15 (labels).
+- **Gate.** If A2 still fails on both routes, stop, and revise the plan toward a two-request extraction: the roles with their members first, then the links and traces between the accepted roles.
+- **Passed (owner, 2026-11-06).** The owner judged criteria 2, 4, 6, 7 and 8 on A1 and A2 and closed the gate: "vanno bene A2 … ho valutato tutto".
+  - Both routes pass.
+  - The request X7 ports is A2's.
+  - Accepted residual: on the README's A2, Claude kept 79% of points inside their part (criterion 5). "How it was read" shows that measure to the learner.
+  - The A2 rules ran on the README only. The other sources are checked again in X20.3 and X20.4, on explorations the app generates.
+
+### Phase `core`
+
+**X2. The structure contract** (`src/core/exploration.ts`).
+- `explorationSchema`, `schemaVersion: 1`, holds:
+  - `id`, `revision`, `kind` (prepared or generated);
+  - `generation` (provider, runtime, model, createdAt, as for disassemblies);
+  - `title`, `language`, `whole`;
+  - one `source`;
+  - `start`;
+  - `aspects`: id, name (none, or 2–4);
+  - `parts`: id, kind, `on`, `aspect` (an aspect id, or none), name, role, cites, points (text, mark, cites), members (id, name, does, cites);
+  - `links`: from, to, class (bond, prerequisite, reference, group), label, basis (declared, interpreted), cites;
+  - `traces`: question, steps (text, parts, cites).
+  
+  Citations are `{ from, to }` line ranges of the source. No quote is stored.
+- Limits come from the gate's request:
+  - name 48, role 110, point 130, label 28, member "does" 90, whole 160;
+  - at most 40 parts, 4 points, 14 members per part, 4 aspects, 3 traces, 8 steps.
+- `checkExploration(x)` returns findings with exact paths, for repair. It checks:
+  - unique ids, and member ids unique within their part;
+  - every cite in range, members' cites included;
+  - every annotation on a part;
+  - bonds only between parts;
+  - prerequisites only from a prerequisite;
+  - traces through real parts, never through a member;
+  - start is a part;
+  - 2–4 points for parts and prerequisites;
+  - members only on parts and prerequisites;
+  - every part's aspect is one of the aspects; aspects only as none or 2–4.
+  
+  Points outside their part are reported as a measure, not as an error.
+- `docs/product.md`, section "The structure of a source", gains members, aspects, the whole and the derived levels.
+- Acceptance (unit tests):
+  - each rule has a failing case with its path, on small hand-written cases;
+  - a valid hand-written case passes, with and without aspects;
+  - a disassembly file is rejected;
+  - an exploration file is rejected by `validateDisassembly`.
+
+- **Done (2026-11-06):** `src/core/exploration.ts` (`explorationSchema`, `checkExploration`, `validateExploration`, `pointsInside`, `EXPLORATION_LIMITS`); `tests/exploration.test.ts` with the shared case `tests/explorations.ts`, 14 tests; `docs/product.md` gains "Levels of abstraction". Kinds and classes are stored in English (`prerequisite`, `bond`, `declared`). Automated test only.
+
+**X3. The detector** (`src/core/exploration-shape.ts`).
+- `shapeOf(x)` returns:
+  - the nuclei (connected components of the bonds between parts), largest with the start first, then in source order;
+  - each nucleus's layers;
+  - the loose parts, the prerequisites (with the part they open), the annotations (with their part), the pieces aside;
+  - each trace's coverage of the main nucleus, and the chosen trace: the one that covers most (ties in source order);
+  - the entry with its reason, as a code.
+- **Layers** follow the flow: the longest path from the parts nothing enters, when the bonds form no cycle. Otherwise, breadth-first from the start.
+- **Entry rule**, with named constants:
+  - no nucleus → the source;
+  - the chosen trace covering ≥ 0.6 of the main nucleus → the trace;
+  - otherwise → the layers.
+  
+  Two nuclei of similar size (≥ 0.6) are reported in the reason.
+- With aspects, a nucleus takes the name of the aspect most of its roles belong to.
+- Acceptance (unit tests on small hand-written cases):
+  - with three traces, the one covering most is chosen, whatever its position;
+  - a cyclic nucleus layers from its start;
+  - an acyclic chain layers along its flow;
+  - two components give two nuclei;
+  - a part with no bond is loose;
+  - each entry branch is reached;
+  - the result is deterministic.
+
+- **Done (2026-11-06):** `src/core/exploration-shape.ts` (`shapeOf`, `nucleusName`, `ENTRY_RULE`); `tests/exploration-shape.test.ts`, 10 tests. Automated test only.
+
+**X4. The source index and the layout** (`src/core/source-index.ts`, `src/core/exploration-layout.ts`).
+- **The index:**
+  - read from Markdown headings, ignoring code fences;
+  - at most two depths;
+  - a lone first-level heading on top is the title;
+  - text before the first section becomes an opening section;
+  - each section knows its extent and its own lines.
+  
+  Plain text with no heading gives no index, and the view hides the column.
+- **The layout** positions:
+  - each open nucleus's layers as rows, with a labelled strip per layer and an optional empty strip for the next layer;
+  - closed nuclei as islands;
+  - the premise (X5) on a row of its own at the top, in a band of its own, aligned so it never moves between steps (owner, 2026-11-06);
+  - prerequisites above the part they open, below the premise, never overlapping;
+  - node heights that grow with the members shown inside them.
+  
+  Spacing is E's, as named constants. The whole has wider gaps than the sub-level.
+- **Joint labels**, placed by the same function:
+  - each label starts at its joint's midpoint;
+  - it tries positions around the midpoint, nearest first, and takes the first that covers no block and no label already placed;
+  - otherwise it stays on the midpoint;
+  - a label has an offset from its midpoint, so a moved label follows its joint when the layout changes;
+  - each label carries the joint's way on screen (→ ← ↓ ↑), from the block that acts to the one acted on;
+  - a lit label (X15) is placed first, at its own size, and the others go around it.
+- Positions are numbers, so the renderer only draws.
+- Acceptance (unit tests):
+  - headings inside fences are ignored;
+  - the opening section appears only when it has text;
+  - no two nodes overlap;
+  - every visible part is placed;
+  - strips cover their rows;
+  - with a premise, every other block lies below the premise's band, and the premise's position is the same at every step;
+  - the empty strip counts the parts of the next layer;
+  - on the three prepared examples and a crowded hand-written case, no label covers another, and none covers a block where a free position exists;
+  - a joint drawn right to left carries ←, one drawn downward ↓.
+
+- **Done (2026-11-06):** `src/core/source-index.ts` (`sourceIndex`, `sectionAt`) and `src/core/exploration-layout.ts` (`layoutOf`, `jointGeometry`, `placeLabels`, `SPACING`); `tests/source-index.test.ts` and `tests/exploration-layout.test.ts`, 14 tests. The opening section has no title in the core: the renderer names it. Automated test only.
+
+**X5. The levels of abstraction** (`src/core/exploration-levels.ts`), pure functions of the stored exploration.
+- `aspectLevel(x)`, when `x` names at least two aspects:
+  - one block per aspect, in the source order of its first role, whose members are its roles; roles with no aspect go to one "other" block;
+  - bonds between roles of different aspects become one bond between the aspects. It keeps each bond (which role does what to which), is declared when any of them is, and keeps their cites. Its label is the first bond's and how many more ("fornisce gli esiti +1"), never a bare count (owner, 2026-11-06);
+  - group links are dropped;
+  - prerequisites point at the aspect of the part they open, and annotations follow their part to its aspect.
+- `subLevel(x, aspect)`:
+  - the aspect's roles, their annotations and the links among them;
+  - no prerequisite (owner, 2026-11-06): they stay on the whole, where they open the level.
+- **Every block is drawn** (`levelShape`): in a sub-level, roles with no bond among them join the first layer. A level with no bond at all is laid out in rows of three, in source order. The aspect level takes the same rule when no bond joins its aspects (the README, A1).
+- `premiseOf(x, index)`:
+  - the earliest-cited prerequisite, when no part opens in its top section of the source (with no index: when it comes before every part);
+  - otherwise none.
+  
+  It is the guide's first step, alone.
+- Acceptance (unit tests on small hand-written cases):
+  - two aspects with three cross bonds give one aspect bond holding all three, labelled by the first and "+2", declared when one of them is;
+  - aspects with no bond between them are all drawn;
+  - a prerequisite of a role points at that role's aspect;
+  - fewer than two aspects give no aspect level;
+  - a sub-level holds the aspect's roles and annotations and no prerequisite;
+  - a sub-level with no bond places every role;
+  - a prerequisite in a section that also opens a part is not a premise;
+  - the result is deterministic.
+
+- **Done (2026-11-06):** `src/core/exploration-levels.ts` (`aspectLevel`, `subLevel`, `levelShape`, `premiseOf`, `OTHER_ASPECT`); `tests/exploration-levels.test.ts`, 14 tests. A trace's steps are mapped onto aspects at the aspect level and filtered to the aspect's roles in a sub-level, for X13. Automated test only.
+
+**X6. The reading report** (`src/core/reading-report.ts`).
+- **A verdict for every counted line.** Counted lines exclude blank lines, headings and code-fence markers. The verdicts:
+  - main nucleus;
+  - another aspect;
+  - prerequisite;
+  - annotation;
+  - aside;
+  - only in the source's question;
+  - not extracted.
+  
+  An annotation outranks its part, and a part outranks a trace. A member's lines take its role's verdict.
+- **Groups by top section**, with used and counted lines.
+- **The readings**, as codes and numbers (the renderer writes the words):
+  - coverage, and the sections left out entirely;
+  - shape: nuclei and sizes, aspects, roles and members, prerequisites, annotations, pieces aside;
+  - basis: declared and interpreted counts, and the interpreted links;
+  - entry, with the trace's coverage;
+  - order: the share of dependent pairs whose dependency comes first in the document, and the number of sections the main nucleus spans.
+- A section a trace walks counts as read, and is marked with the trace.
+- No accuracy score.
+- Acceptance (unit tests):
+  - the counts add up to the counted lines;
+  - a section cited only by a trace is not "not extracted";
+  - a line cited only by a member takes its role's verdict;
+  - the order agreement is 1 for a chain written in flow order and 0 for the reverse;
+  - the interpreted links are listed apart.
+
+- **Done (2026-11-06):** `src/core/reading-report.ts` (`readingReport`, `countedLines`, `VERDICTS`); `tests/reading-report.test.ts`, 9 tests. Automated test only.
+
+### Phase `generation`
+
+**X7. The structure request** (`src/core/exploration-generation.ts`).
+- **The request:**
+  - the instructions of the request that passed X1 (A1 or A2), ported in their rules;
+  - the JSON schema, with members, aspects and the whole;
+  - the source in `formatSourceBlock` form.
+- `acceptExploration(raw, input)`:
+  - parses the answer and maps ranges to `{ from, to }`;
+  - runs `checkExploration`;
+  - returns findings for one repair request;
+  - limits texts with the existing shortening step.
+- A source above X1's limit is refused before the request, with a finding that names the limit.
+- Acceptance (unit tests):
+  - a valid answer becomes a valid exploration, with its members and aspects;
+  - a bad member cite yields a repair finding with its path;
+  - an over-long source is refused;
+  - the instructions and the schema are stable (snapshot).
+
+**X8. The store and the app's actions** (`src/desktop/`).
+- **Storage.** An `ExplorationStore`, one directory per exploration, as the disassembly store does. Invalid files are counted, never shown.
+- **The generator** gains `explore(request)`:
+  - it runs on the ChatGPT route, with progress and cancel; the local route is refused for exploration with a code, until its own phase;
+  - one repair at most;
+  - it saves only after the final check.
+- **IPC.** Preload and main expose:
+  - `explorations:list`;
+  - `explorations:find`;
+  - `exploration:start`.
+- Acceptance (unit tests with a fake completer):
+  - an answer is checked, repaired once and saved;
+  - a second failure saves nothing and reports the findings;
+  - cancel stops the request;
+  - the store round-trips;
+  - an invalid file is skipped and counted.
+
+**X9. Claude writes an exploration** (`src/mcp/`, `src/desktop/incoming.ts`).
+- Two tools, beside the disassembly tools:
+  - `start_exploration` replies with the instructions, the JSON schema and the numbered source (X7's request);
+  - `submit_exploration` hands the answer to the app through the local entry point.
+- The app runs `acceptExploration`:
+  - findings go back to the assistant for one repair;
+  - a valid exploration is saved with `generation.provider: 'assistant'` and opened.
+- The tool descriptions steer "take apart" and "explore" to exploration. The disassembly tools stay for now.
+- The Claude Desktop extension is rebuilt by its existing script. Publishing it is an external action, outside this approval.
+- Acceptance (unit tests, as the existing MCP tests do):
+  - start returns the request;
+  - a valid submission is saved and opened;
+  - an invalid one returns findings with paths;
+  - a second invalid one saves nothing;
+  - the local entry point stays off unless the learner turns it on.
+
+**X10. Three prepared examples** (`src/fixtures/explorations/`), on the public fixtures `importer-signals`, `mill-harm` and `atlas-release`.
+- Hand-written, original, in English and Italian.
+- They are the app's first content and the tests' material.
+- The importer (code) names aspects and members, so it opens on the aspect level with sub-levels.
+- Mill is the argument case: one concern, so no aspects. Its supports are bonds and its limit an annotation, and it opens on the roles.
+- Acceptance (unit tests):
+  - all six files are valid (X2);
+  - their shapes, levels and reading reports are recorded (nuclei, aspects, premise, entry, coverage), so a change in the detector, the levels or the report shows (X3, X5, X6).
+
+### Phase `style`
+
+**X11. Tokens for exploration** (`src/renderer/styles.css`, paper and blueprint; the view's own rules go in a new `src/renderer/exploration.css`, which uses tokens only).
+- Role colors:
+  - main nucleus;
+  - another aspect;
+  - prerequisite;
+  - annotation;
+  - aside;
+  - the guide's step.
+- Stroke styles: declared links solid, interpreted links dashed.
+- The leader line, and the dashed leader of a moved joint label.
+- The layer strip in three states: seen, active, next.
+- The sub-level: its frame, the beam to its block, the faded whole, the highlighted block.
+- Four aspect hues, each a tone and a wash, in paper and blueprint (from the colour study).
+- A lit joint: the accent, a flowing dash, a lit label; the joints stepped back.
+- Motion: one duration and one easing as tokens, off under "reduce motion".
+- Reading typography for the card and the source: body font, measure, line height. Monospace stays for code and member names only.
+- No sheet frame around the window.
+- Acceptance:
+  - `tests/theme.test.ts` gains the new pairs, and both themes reach WCAG AA for every text pair, the faded whole's text excepted (it is not meant to be read until it is back);
+  - a role is never told by color alone: each also has a label or a shape, checked in the view tests.
+
+### Phase `view`
+
+**X12. The view and its shared state** (`src/renderer/exploration/`).
+- **State:**
+  - the guide (`whole` or `question`) and its position;
+  - what is explored, the selected point or link, and the selected section;
+  - the open sub-level, the role selected in it, the roles showing their components, and the selected component;
+  - the moved labels, and the chosen block whose joints are lit;
+  - which panels are folded;
+  - whether "how it was read" is open.
+- **Panels**, as in prototype NB (`nb.html`): index | structure, guide step, card | source.
+  - Each is a card panel with its own header.
+  - The index and the source fold to a rail.
+  - Below 900 px, one panel at a time is chosen by tabs, and the leader line is hidden.
+  - The app bar holds the work's title, with its whole as the subtitle.
+- **The structure** draws X4's layout in SVG and HTML:
+  - nodes as buttons with their name;
+  - a role's or an aspect's members glimpsed on hover;
+  - strips;
+  - annotations as a badge on their part;
+  - islands for closed nuclei.
+  
+  It opens on the aspect level when the exploration has one (X5), otherwise on the roles. Each aspect's hue (X11) marks its block and its roles: a wash and a stripe on the left.
+- **The source** uses `SourceDocument`, with a gutter colored by role.
+- **The leader line** joins the selection to its lines, and follows when the source or the structure scrolls.
+- A click on a line selects the narrowest part that cites it, or else its section.
+- Acceptance (component tests on the prepared examples):
+  - the importer opens on its aspects, Mill on its roles;
+  - selecting a part highlights exactly its lines;
+  - selecting a point highlights exactly the point's lines;
+  - a click on a cited line selects its part;
+  - folding a panel keeps the state;
+  - an aspect's roles carry its hue in the sub-level, and a prerequisite never takes one.
+
+**X13. The guides.**
+- **"The whole source":**
+  - the premise first, alone, when X5 finds one. It keeps its own band above the rest at every later step, and every other block, prerequisites included, sits below it;
+  - then one layer of the main nucleus at a time, then each other nucleus whole. At the aspect level these are the aspect level's own nuclei and layers;
+  - a change of aspect announced in a banner, which names the only reference that touches the new nucleus, if any;
+  - a prerequisite appears one layer before the part it opens;
+  - the new parts are listed as "entering now".
+- **"All the layers"** shows the whole level at once, at any point, and returns to the guide's step.
+- **"A question of the source":**
+  - the chosen trace first. When the source walks several, the others are listed by their question and can be chosen;
+  - the question, the step's sentence and its parts lit;
+  - at the aspect level, a step lights the aspects that hold its parts; in an open sub-level, it lights its roles;
+  - at the end, "now the whole source", with the parts visited outlined.
+- **The step strip** sits between the structure and the card: the question or layer, the sentence, round arrows.
+- **Exploring off the guide** dims the strip and shows "back to the step", which restores the step and the source's position.
+- Keyboard:
+  - arrows step;
+  - Escape returns.
+- Acceptance (component tests):
+  - every layer and step is reached, the premise first;
+  - "all the layers" shows every part of every nucleus, and returns to the step;
+  - the banner appears at a change of nucleus;
+  - exploring leaves the guide's position unchanged;
+  - "back to the step" restores it;
+  - a question's step lights the aspects of its parts;
+  - the source view (no nucleus) has no guide.
+
+**X14. The sub-level in place.**
+- **Opening.** An aspect's toggle, a click on one of its roles in the card, or "open «X»: n roles" lifts the aspect's sub-level (X5) out under its block.
+  - The whole keeps every position and fades.
+  - The opened block stays highlighted.
+  - A beam joins the block to the sub-level.
+- **Motion.** The sub-level grows out of its block's rectangle and plays back into it on closing. It uses FLIP with `Element.animate`, about 0.3 s, as in the lab's stage. Under "reduce motion" nothing moves.
+- **Inside.**
+  - All the aspect's roles show at once, without prerequisites.
+  - A click on a role selects it and shows its components in place.
+  - A component has its own card, its cited lines and a leader line.
+- **Orientation.**
+  - While it is open, the step strip says "inside «X»" and offers "close and return to the step". The guide waits on its step.
+  - Touching another aspect moves the sub-level there.
+  - A source line of another aspect's role moves it to that role.
+  - Changing guide closes it.
+- **Closing** returns the selection to what it was before opening, on the same step.
+- Keyboard: Escape closes the sub-level before it returns from exploring.
+- Acceptance (component tests on the importer):
+  - opening and closing leave every position of the whole identical;
+  - the step after closing is the step before opening;
+  - the sub-level holds the aspect's roles and no prerequisite;
+  - touching another aspect moves the sub-level;
+  - a line of another aspect's role opens that role;
+  - a component lights exactly its lines;
+  - with "reduce motion" (a stubbed `matchMedia`) no animation is started.
+  
+  The motion itself is checked in X20.2, since the test environment has no layout.
+
+**X15. Joints and their labels.**
+- Each joint's label is a short tag placed by X4, above its joint, on the whole and in the sub-level.
+- **Who does what** (owner, 2026-11-06):
+  - the label holds the verb and an arrow the way the joint runs, drawn in the hue of the block that acts;
+  - pointing at a label marks its two blocks, "chi" on the one that acts and "a chi" on the one acted on;
+  - the full sentence, who → what → whom, is in the tooltip and in the card.
+- **A chosen block lights its joints:**
+  - its joints flow in the accent and their labels light;
+  - a joint that stands for several bonds lists their verbs, bulleted, each with its arrow;
+  - the blocks at their other end are outlined, and every other joint and label steps back;
+  - choosing the block again restores the view.
+- **Moving.**
+  - The reader drags it with the pointer.
+  - A focused tag also moves with the arrow keys; while a tag has focus, the arrows move it and do not step the guide.
+  - A dashed leader ties it to its joint's midpoint whenever it is away from it.
+  - A double click, or Home, puts it back.
+- A moved tag keeps its place while the exploration stays open, across steps and sub-levels. It is not stored.
+- Moving a tag changes no selection and nothing in the structure.
+- Acceptance (component tests):
+  - a pointer drag moves the tag and the leader's end;
+  - the leader appears only when the tag is away;
+  - a double click puts it back;
+  - a drag does not change the card;
+  - a moved tag keeps its place after a step;
+  - the arrow keys move a focused tag and leave the guide's step unchanged;
+  - choosing a block lights exactly its joints, and choosing it again lights none;
+  - pointing at a label marks its acting block "chi" and the other "a chi";
+  - a label's arrow matches its joint's way.
+
+**X16. The card and the index.**
+- **The card:**
+  - the name and kind, and its aspect in a sub-level;
+  - the lead;
+  - the points with their marks (→ = ⚠), each selectable;
+  - the annotations;
+  - folded, with their count (owner, 2026-11-06: the explanation leads): a role's components, or an aspect's roles, each selectable;
+  - folded, with its count: "why it is linked", each joint with its basis and its bonds as who → what → whom, selectable;
+  - the cited lines, folded.
+- **A component's card:** what it does, its role, the other components of the role, its lines.
+- **A section no part cites** shows its own card: "not extracted", and its lines.
+- **The index:**
+  - sections in order;
+  - one dot per part, filled once on screen;
+  - the sections the guide touches now marked;
+  - subsections open under the selected section;
+  - "not extracted", and a trace's question where it walks.
+  
+  On a narrow window it opens on request.
+- Acceptance (component tests):
+  - the components or roles and "why it is linked" are folded when a card opens;
+  - a point, a link and a component light their own lines;
+  - a section with no part shows "not extracted";
+  - a section a trace walks shows its question;
+  - the dots follow the guide.
+
+**X17. "How it was read".**
+- A button in the bar opens it in place of the three columns, and the same button returns.
+- **Content:**
+  - who extracted (prepared, or the model and route);
+  - the number of lines and the share in the map;
+  - the grid, one row per section and one cell per line, where a cell opens its line;
+  - the legend with counts;
+  - the five readings in words, with the interpreted links listed and selectable.
+- Acceptance (component tests):
+  - the counts equal X6's;
+  - a cell opens its line in the view;
+  - an interpreted link opens on the card;
+  - the texts exist in both languages.
+
+**X18. A source opens as an exploration** (`App.tsx`, `Library.tsx`, `Studio.tsx`, `i18n`).
+- The library lists explorations and prepared examples beside disassemblies, with what each is.
+- A new source's primary action is "explore", with the route and model chosen as today. Generating a disassembly stays as a secondary action.
+- Progress, cancel and a failure with its findings follow the existing generation screen.
+- Interface text is in English and Italian, out of `src/core`.
+- Acceptance:
+  - `i18n.test` passes;
+  - a component test opens a prepared exploration from the library;
+  - a generation with a fake route ends in the view;
+  - an old disassembly still opens in its player.
+
+**X19. Retire taking a part apart during use.**
+- Removed:
+  - the "take apart" action from the disassembly player (`TakeApart`, `takeApart`, its progress and its error);
+  - `expandPart` from the bridge and the preload;
+  - the `disassembly:expand` handler;
+  - `expandPart`, `acceptExpansion`, the expansion request and their tests from the core.
+- Kept: the `expansions` field of the disassembly contract, so stored disassemblies stay valid and the levels already taken apart still open. Their origin line stays.
+- No stored file changes.
+- Acceptance:
+  - `npm run check` passes with the expansion tests removed;
+  - a component test shows a part with no sub-parts and no "take apart" action;
+  - a stored disassembly with expansions still loads and opens its levels;
+  - no IPC channel named `disassembly:expand` remains (static check in a test).
+
+### Phase `verify`
+
+**X20. Checked and witnessed.**
+1. `npm run check` and `npm run build` on macOS; CI on macOS and Windows after the owner confirms a push.
+2. Integration on the built app (`npm start`) with a scratch data folder, at 1280×800, in both themes and both languages, recorded as a witnessed flow:
+   - the three prepared examples;
+   - both guides, the premise first;
+   - opening, moving and closing a sub-level, with its motion, and with "reduce motion";
+   - moving a joint label, choosing a block and reading its lit joints;
+   - exploring and returning;
+   - the index;
+   - "how it was read".
+3. One generation end to end on a public fixture through each route that passed X1, recorded as integration checks:
+   - ChatGPT in the app;
+   - Claude through MCP, in Claude Desktop or Claude Code.
+4. **The owner's look**, on their device, at explorations of their own sources generated by the app. Their judgement is recorded:
+   - Is the way in right, and is the premise the source's starting point?
+   - Do the aspects and roles sum the source up, or is anything forced?
+   - Does the sub-level keep them oriented?
+   - Does "how it was read" tell them how far to trust the map?
+
+## Verification strategy
+
+- **Runners:** `npm run check` (TypeScript and Vitest) and `npm run build`, from the adapter.
+  - On the owner's machine, Vitest also collects the tests of a private working copy, `.local/worktrees/guided-source-object-prototype`. It is ignored by git, absent in CI, and its tests fail.
+  - So the local check is `npm run typecheck` plus `npx vitest run --dir tests`.
+  - The test configuration is not changed for it.
+- **Pure core:** X2–X7 are unit-tested on public fixtures and small hand-written cases.
+- **Renderer:** X12–X19 have component tests, as the disassembly player does today. Motion and real layout are not visible in the test environment, so the states are tested there and the motion is witnessed in X20.2.
+- **Model:** the gate (X1) is the only evidence of what a model returns. A passing unit test with a fake completer proves the pipeline, not the extraction.
+- **Product flow:** proved only by X20.2 and X20.3, and its usefulness only by X20.4.
+- **Routes:** each route is claimed only after its own X1 result and its own X20.3 run. The adapter's open question on ChatGPT inference is answered by those runs, or stays open.
+
+## Risks
+
+- **A2's rules ran on one source.** The owner passed the gate on A1 for all six sources and A2 for the README. X20.3 and X20.4 judge A2 on the app's own generations.
+- **Forced aspects.** The top-down principle asks for 2–4 aspects, and a short or single-concern source may get invented ones. The request allows none, criterion 7 checks it, and Mill is the public case.
+- **Bigger answers.** With members, the explainer's answer holds about a hundred components. Time and size per source are recorded in A1, and the request limit of X7 may come out lower than R1's.
+- **Rules can overfit the sources.** "Making ≠ working" comes from one README, and the top-down principle was chosen on one explainer. Each rule is written for any subject, and the public argument (Mill) checks that it does not break an argument.
+- **Too little connection.** An extractor allowed not to connect may split one mechanism into loose parts, because citing every link is work. X1 measures it against today's extractor, and "how it was read" shows it to the learner.
+- **Prerequisite versus bond** is the model's judgement. Mislabelled, it hides a bond or forces an order, and it decides the premise. The owner's look in X1 and X20.4 is the check.
+- **The question guide at the aspect level is not prototyped.** E dropped the trace at the aspect level; X13 lights aspects and sub-level roles for a step. The owner judges it in X20.4, and it can fall back to the roles level if it does not read.
+- **The sub-level covers part of the whole.** It opens under its block and hides the faded rows below it. The owner accepted this in E. Positions never change, and closing shows them again.
+- **Moved labels are lost when the exploration closes.** Accepted for this version (decision 12).
+- **The thresholds are fitted to three sources** (0.6 for traces and for similar nuclei). They are named constants, and the reading report states the numbers behind the choice.
+- **One request bounds the source.** Long sources are refused in this version. The limit comes from X1, per route, not from a guess.
+- **Hosted models cost per run.** Each run uses six Claude agents and up to six ChatGPT requests. The ledger and a stated cost before each run keep this visible.
+- **Private sources leave the device.** On the ChatGPT route this needs the owner's confirmation per run. The app says which route produced each exploration.
+- **Two Claude paths differ.** Fresh agents in the gate and the assistant in Claude Desktop are both Claude, but not the same setup. X20.3 runs the real MCP path.
+- **Two documents for one source** (a disassembly and an exploration) can confuse the library. X18 labels each, and the exploration is the default.
+- **Everything up front costs one long wait before the view.** It replaces many short waits inside it. The generation screen shows progress and can be cancelled; X1 records the time per source.
+- **Removing "take apart" leaves disassemblies shallow.** Generated disassemblies have one level unless they were taken apart before. That is accepted: exploration is the default, and the disassembly player is kept for reading what exists.
+- **The style drifts toward the prototypes' generic look** if X11 is skipped or done after the view. The phase order puts tokens first.
+- **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
+
+## Approval
+
+Record:
+- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v6".
+- **Timestamp:** 2026-11-06T15:04:33Z.
+- **Approved version:** 6.
+- **Plan digest:** SHA-256 `3d0b158fb993099e100b2a673ed0f82acce449fda20574ca01b1857c850fad1c` of this file before this record was added.
+- **Authorized scope:** as listed below under "v6 authorizes".
+
+History:
+- v2 was approved on 2026-11-05T16:56:08Z; void after v3.
+- v3 was approved on 2026-11-05T17:00:57Z (SHA-256 `db6e4967…0a18`). Its X1 ran once and stopped at the gate. Void after v4.
+- v4 was approved on 2026-11-05T17:45:12Z (SHA-256 `874755f4…d997d6`). Its X1 ran R1 and the abstraction study. Void after v5.
+- v5 was approved on 2026-11-06T11:21:02Z by Simone Riggi ("Approve P-20261105-exploration v5"), SHA-256 `47da2401756a7cc3ce8bfe840a2b1b328d0021c501c3a607db7a490c23dc5c5c`. Its X1 ran A1 and A2 and passed. Void since v6's approval: v6 changes X4, X5, X11, X12, X15 and X16.
+
+v6 authorizes:
+- tasks X2–X20 as written, in phase order (X1 is passed);
+- creating the branch `feature/exploration` from an updated `origin/main`, and moving this plan's uncommitted documents onto it when the owner asks for a commit.
+
+v6 does not authorize:
+- push, pull request and merge;
+- publishing the Claude Desktop extension;
+- sending a private source to OpenAI;
+- deleting the untracked "… 2" copies (the owner's action, needed before X2);
+- any new dependency.
+
+Each needs its own confirmation when reached.
+
+Approve with exactly:
+
+```text
+Approve P-20261105-exploration v6
+```
+
+Approval records approval only. Implementation starts with a later, separate command, for example `implement P-20261105-exploration v6 --phase core`.
