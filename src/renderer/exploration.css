@@ -1,0 +1,76 @@
+/* The exploration view's own rules (plan P-20261105-exploration X11). Tokens only: every colour, stroke, duration and
+   size below is a token of styles.css, so paper and blueprint, and "reduce motion", come from there. A role is never told
+   by colour alone: each kind also has a shape (dashed prerequisite, flagged annotation, plain aside) or a label.
+   There is no sheet frame around the window: the panels sit on the page's own background. */
+
+.xp { background: var(--bg); color: var(--ink); }
+.xp-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--x-r-panel); box-shadow: 0 1px 2px var(--shadow); min-width: 0; min-height: 0; }
+
+/* ---------- blocks: a role's ink on its ground; the shape repeats the kind */
+.xp-node { --role: var(--x-main); --role-soft: var(--x-main-soft);
+  background: var(--role-soft); color: var(--ink); border: 1px solid var(--role); border-radius: var(--x-r-card); box-shadow: 0 1px 2px var(--shadow);
+  transition: opacity var(--x-dur) var(--x-ease), box-shadow var(--x-dur) var(--x-ease), transform var(--x-dur) var(--x-ease); }
+.xp-node[data-role="other"] { --role: var(--x-other); --role-soft: var(--x-other-soft); }
+.xp-node[data-role="prerequisite"] { --role: var(--x-prereq); --role-soft: var(--x-prereq-soft); border-style: dashed; }
+.xp-node[data-role="annotation"] { --role: var(--x-note); --role-soft: var(--x-note-soft); border-inline-start-width: 4px; }
+.xp-node[data-role="aside"] { --role: var(--x-aside); --role-soft: var(--x-aside-soft); box-shadow: none; }
+.xp-node .xp-kind { color: var(--role); font: 500 11px/1.2 var(--f-mono); letter-spacing: .04em; text-transform: uppercase; }
+.xp-node .xp-member { font-family: var(--f-mono); }
+/* the guide's step: what this step adds */
+.xp-node.xp-step { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--x-step); }
+.xp-node.xp-sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+
+/* an aspect's hue: the tone draws, the wash fills; selection keeps its own ring */
+.xp [data-tone="a1"] { --tone: var(--a1); --wash: var(--a1-wash); }
+.xp [data-tone="a2"] { --tone: var(--a2); --wash: var(--a2-wash); }
+.xp [data-tone="a3"] { --tone: var(--a3); --wash: var(--a3-wash); }
+.xp [data-tone="a4"] { --tone: var(--a4); --wash: var(--a4-wash); }
+.xp-node[data-tone] { background: var(--wash); border-color: var(--tone); box-shadow: inset 3px 0 var(--tone), 0 1px 2px var(--shadow); }
+.xp-node[data-tone] .xp-kind { color: var(--tone); }
+.xp-node[data-tone].xp-sel { box-shadow: inset 3px 0 var(--tone), 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+
+/* ---------- joints: the stroke carries the basis */
+.xp-edge { fill: none; stroke: var(--x-aside); stroke-width: 1.4; transition: opacity var(--x-dur) var(--x-ease), stroke var(--x-dur) var(--x-ease); }
+.xp-edge[data-basis="interpreted"] { stroke-dasharray: var(--x-dash-interpreted); }
+.xp-edge[data-class="prerequisite"] { stroke: var(--x-prereq); }
+.xp-edge[data-class="reference"], .xp-edge[data-class="group"] { stroke: var(--x-aside); stroke-dasharray: var(--x-dash-leader); }
+.xp-label { background: var(--surface); color: var(--muted); border: 1px solid var(--line); border-radius: var(--x-r-pill); padding: 2px 9px; font-size: 11.5px;
+  transition: opacity var(--x-dur) var(--x-ease), background var(--x-dur) var(--x-ease), color var(--x-dur) var(--x-ease); }
+.xp-label .xp-way[data-tone] { color: var(--tone); font-weight: 700; }
+/* a label the reader moved keeps a dashed leader to its joint */
+.xp-label-leader { stroke: var(--x-leader); stroke-width: 1; stroke-dasharray: var(--x-dash-leader); }
+/* the leader from a selection to its lines in the source: thin, above the blocks, only for the current selection */
+.xp-leader { fill: none; stroke: var(--x-leader); stroke-width: 1; }
+
+/* a lit joint: the chosen block's joints flow in the accent, their labels lit; every other joint steps back */
+.xp-edge.xp-hot { stroke: var(--x-lit); stroke-width: 2.4; opacity: 1; stroke-dasharray: var(--x-dash-flow); animation: xp-flow var(--x-flow) linear infinite; }
+.xp-edge.xp-cold, .xp-leader.xp-cold { opacity: var(--x-cold); }
+.xp-label.xp-hot { background: var(--x-lit); color: var(--x-lit-ink); border-color: var(--x-lit); font-weight: 500; }
+.xp-label.xp-hot .xp-way[data-tone] { color: inherit; }
+.xp-label.xp-cold { opacity: var(--x-cold-label); }
+@keyframes xp-flow { to { stroke-dashoffset: -24; } }
+
+/* ---------- the layer strip: seen, active, next */
+.xp-strip { fill: var(--x-strip-seen); color: var(--x-strip-ink); }
+.xp-strip[data-state="active"] { fill: var(--x-strip-active); stroke: var(--x-lit); color: var(--x-strip-active-ink); }
+.xp-strip[data-state="next"] { fill: var(--x-strip-next); stroke: var(--line); stroke-dasharray: var(--x-dash-leader); }
+.xp-strip-label { fill: currentColor; font: 500 10.5px/1 var(--f-mono); letter-spacing: .04em; }
+.xp-strip[data-state="premise"] { fill: var(--x-prereq-soft); stroke: var(--x-prereq); color: var(--x-prereq); }
+
+/* ---------- the sub-level: a frame over the faded whole, a beam to its block */
+.xp-whole { transition: opacity var(--x-dur) var(--x-ease); }
+.xp-whole.xp-faded { opacity: var(--x-faded); }
+.xp-node.xp-opened { opacity: 1; box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--tone, var(--x-lit)); }
+.xp-beam { fill: var(--tone, var(--x-lit)); fill-opacity: var(--x-beam); stroke: var(--tone, var(--x-lit)); stroke-width: 1; }
+.xp-sub { background: var(--surface); border: 1px solid var(--tone, var(--x-lit)); border-radius: var(--x-r-panel); box-shadow: 0 18px 48px var(--shadow);
+  transition: transform var(--x-dur) var(--x-ease), opacity var(--x-dur) var(--x-ease); }
+.xp-sub-head { background: var(--wash, var(--surface)); border-bottom: 1px solid var(--line); border-radius: var(--x-r-panel) var(--x-r-panel) 0 0; }
+.xp-sub-body { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
+
+/* ---------- reading: the card and the source in the body font; monospace for code and member names only */
+.xp-card { font: var(--x-read-size)/var(--x-read-leading) var(--x-read); max-width: var(--x-measure); }
+.xp-source { font: var(--x-source-size)/var(--x-source-leading) var(--x-read); }
+.xp-source .xp-code, .xp-card code { font-family: var(--f-mono); }
+.xp-source .xp-line.xp-hl { background: var(--hl); }
+.xp-basis { border-radius: var(--x-r-pill); padding: 0 8px; background: var(--x-main-soft); color: var(--x-main); }
+.xp-basis[data-basis="interpreted"] { background: var(--x-prereq-soft); color: var(--x-prereq); }

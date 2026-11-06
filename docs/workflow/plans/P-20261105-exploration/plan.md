@@ -3,9 +3,9 @@ id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
 version: 6
 state: implementing
-current_task: X11
-last_evidence: Phase generation done on feature/exploration (2026-11-06) - X7-X10, 27 new unit tests; tsc passes; npx vitest run --dir tests 39 files 551 tests passed; npm run build passes
-next_action: implement P-20261105-exploration v6 --phase style (X11)
+current_task: X12
+last_evidence: Phase style done on feature/exploration (2026-11-06) - X11 tokens and exploration.css; tsc passes; npx vitest run --dir tests 39 files 556 tests passed; npm run build passes
+next_action: implement P-20261105-exploration v6 --phase view (X12-X19)
 approval: approved
 ---
 
@@ -560,6 +560,10 @@ Not included:
 - Acceptance:
   - `tests/theme.test.ts` gains the new pairs, and both themes reach WCAG AA for every text pair, the faded whole's text excepted (it is not meant to be read until it is back);
   - a role is never told by color alone: each also has a label or a shape, checked in the view tests.
+- **Done (2026-11-06):** the tokens in `src/renderer/styles.css`, in both themes: the role inks and grounds (`--x-main`, `--x-other`, `--x-prereq`, `--x-note`, `--x-aside`, `--x-step`), the layer strip, the lit joint, the leader, the four aspect hues with their washes (`--a1`…`--a4`, the colour study's values), and, shared, the dashes, fading, motion and reading type. Under "reduce motion" `--x-dur` and `--x-flow` are `0ms`.
+  - `src/renderer/exploration.css` holds the view's rules under the `xp-` classes the view phase will use. It is imported by `main.tsx`; nothing renders it yet.
+  - The shapes that repeat each kind are in the stylesheet: dashed prerequisite, flagged annotation, plain aside. The check that no role is told by colour alone stays with the view tests (X12–X16), where the roles are drawn.
+  - `tests/theme.test.ts` gains the exploration pairs (WCAG AA in both themes), 3:1 for the strokes and hues as graphics, and a check that `exploration.css` uses tokens only and that motion stops; 5 new tests. Automated test only: nothing is visible until the view.
 
 ### Phase `view`
 

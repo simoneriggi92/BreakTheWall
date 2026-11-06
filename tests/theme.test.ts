@@ -21,6 +21,12 @@ const PAIRS: [string, string][] = [
   ['good', 'surface'], ['good', 'good-soft'], ['bad', 'surface'], ['bad', 'bad-soft'], ['amber', 'surface'], ['amber', 'amber-soft'], ['purple', 'surface'],
   ['code-ink', 'code-bg'], ['code-dim', 'code-bg'],
   ...['mechanism', 'argument', 'story', 'ok', 'fail', 'active'].flatMap(x => [[x, 'bg'], [x, 'surface']] as [string, string][]),
+  // Exploration (X11): a role's ink on its ground and on the panels, the text on it; the aspect hues on their wash;
+  // the layer strip's labels; the lit label. The faded whole is not a pair: it is not meant to be read until it is back.
+  ...['x-main', 'x-other', 'x-prereq', 'x-note', 'x-aside', 'x-step'].flatMap(x => [[x, `${x}-soft`], [x, 'surface'], [x, 'bg'], ['ink', `${x}-soft`]] as [string, string][]),
+  ...['a1', 'a2', 'a3', 'a4'].flatMap(x => [[x, `${x}-wash`], [x, 'surface'], ['ink', `${x}-wash`]] as [string, string][]),
+  ['x-strip-ink', 'x-strip-seen'], ['x-strip-ink', 'x-strip-next'], ['x-strip-active-ink', 'x-strip-active'], ['x-prereq', 'x-prereq-soft'],
+  ['x-lit-ink', 'x-lit'], ['muted', 'surface'],
 ];
 
 describe('paper and blueprint themes', () => {
@@ -33,6 +39,12 @@ describe('paper and blueprint themes', () => {
     const paper = tokens(':root, :root[data-theme="paper"]'); const blueprint = tokens(':root[data-theme="blueprint"]');
     expect(Object.keys(blueprint).sort()).toEqual(Object.keys(paper).sort());
   });
+  it.each([[':root, :root[data-theme="paper"]'], [':root[data-theme="blueprint"]']])('%s draws the exploration\'s strokes at 3:1 or more (X11)', selector => {
+    // Graphics: the leader, a joint's stroke and the lit joint, against the panels; each aspect's tone against the panels.
+    const t = tokens(selector);
+    const failing = ['x-leader', 'x-aside', 'x-lit', 'x-prereq', 'a1', 'a2', 'a3', 'a4'].flatMap(fg => ['bg', 'surface'].filter(bg => contrast(t[fg], t[bg]) < 3).map(bg => `${fg}/${bg}`));
+    expect(failing).toEqual([]);
+  });
   it.each([[':root, :root[data-theme="paper"]'], [':root[data-theme="blueprint"]']])('%s draws the mark at 3:1 or more against the backgrounds (D25)', selector => {
     // Graphics, not text: WCAG's non-text contrast, for the bars that carry the mark's shape. The terracotta piece keeps the
     // owner's #D96B4B (3.0:1 on paper): logos are exempt, and it is never text or the only cue. The link is decorative.
@@ -42,3 +54,24 @@ describe('paper and blueprint themes', () => {
   });
 });
 
+
+describe('the exploration stylesheet (X11)', () => {
+  const css = readFileSync('src/renderer/exploration.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  it('uses tokens only: no literal colour, and no duration or easing of its own', () => {
+    const own = css.replace(/var\(--[a-z0-9-]+/g, 'var(');
+    expect(own.match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi)).toBeNull();
+    expect(own.match(/\b\d*\.?\d+m?s\b|cubic-bezier|\bease(-in|-out)?\b/g)).toBeNull();
+  });
+  it('reads every token it uses from styles.css', () => {
+    const defined = new Set([...readFileSync('src/renderer/styles.css', 'utf8').matchAll(/(--[a-z0-9-]+):/g)].map(m => m[1]));
+    // --role, --role-soft, --tone and --wash are set inside exploration.css itself, from tokens
+    const local = new Set([...css.matchAll(/(--[a-z0-9-]+):/g)].map(m => m[1]));
+    const used = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1]))];
+    expect(used.filter(x => !defined.has(x) && !local.has(x))).toEqual([]);
+  });
+  it('stops the motion under "reduce motion"', () => {
+    const styles = readFileSync('src/renderer/styles.css', 'utf8');
+    const reduce = styles.slice(styles.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduce.slice(0, reduce.indexOf('}'))).toMatch(/--x-dur: 0ms; --x-flow: 0ms;/);
+  });
+});
