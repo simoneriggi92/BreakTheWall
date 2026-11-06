@@ -2,10 +2,8 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge, ProgressKey } from '../src/core/bridge';
-import { divisible, linesOf, validateDisassembly, type Disassembly } from '../src/core/disassembly';
-import { expandPart as expandPart2 } from '../src/core/disassembly-generation';
-import { carryOver, trayOrder, type DisassemblyState } from '../src/core/disassembly-state';
-import { failure, type ExpansionRequest, type ExpansionResult, type GenerationProgress, type StudioSettings } from '../src/core/provider';
+import { divisible, validateDisassembly, type Disassembly } from '../src/core/disassembly';
+import { trayOrder } from '../src/core/disassembly-state';
 import { App } from '../src/renderer/App';
 import { DisassemblyPlayer } from '../src/renderer/disassembly/DisassemblyPlayer';
 import { Sheet } from '../src/renderer/disassembly/Sheet';
@@ -13,7 +11,7 @@ import { labelBeside, layoutDisassembly } from '../src/core/layout';
 import { PreferencesProvider } from '../src/renderer/preferences';
 import { atlas, fixture, mill, PUBLIC_FIXTURES, story } from './disassemblies';
 import { loadPreparedDisassemblies } from '../src/fixtures/disassemblies';
-import { deepDisassembly, generatedFrom, splitAnswer } from './disassembly-drafts';
+import { deepDisassembly, generatedFrom, splitAnswer, takenApart } from './disassembly-drafts';
 
 /** An in-memory bridge with the same contract as the preload; `locale` sets the interface language. */
 function memoryBridge(locale = 'it-IT') {
@@ -436,68 +434,32 @@ describe('labels on a running line', () => {
   });
 });
 
-describe('taking a part apart on demand (D14)', () => {
-  /** A desktop bridge whose host takes a part apart with a scripted answer, saves v2 and moves the progress, as the real host does. */
-  async function desktopWith(d: Disassembly) {
-    const { bridge, saved } = memoryBridge('it-IT');
-    const listeners: ((p: GenerationProgress) => void)[] = [];
-    const expandPart = vi.fn(async (request: ExpansionRequest): Promise<ExpansionResult> => {
-      listeners.forEach(l => l({ phase: 'structure', repairing: false, received: 0, requests: 1 }));
-      const next = await validateDisassembly(expandPart_(d, request.part));
-      const before = saved.get(`${d.id}:${d.revision}`) as DisassemblyState | undefined;
-      const moved = before && carryOver(d, next, before);
-      if (moved) saved.set(`${d.id}:${next.revision}`, moved);
-      return { ok: true, disassembly: next, moved: !!moved, stats: { requests: 1, repairs: 0, sentChars: 1, receivedChars: 1, ms: 1 } };
-    });
-    const expandPart_ = (x: Disassembly, part: string) => expandPart2(x, part, splitAnswer(x, part), { provider: 'chatgpt', model: 'strong', createdAt: '2026-10-26T12:00:00.000Z' });
-    const settings: StudioSettings = { version: 1, provider: 'chatgpt', chatgptModel: 'strong' };
-    bridge.studio = {
-      pickSources: async () => ({ sources: [], errors: [] }), accountStatus: async () => ({ state: 'signed-out', storage: true }), signIn: async () => ({ ok: false, failure: failure('unsupported') }),
-      cancelSignIn: async () => {}, signOut: async () => ({ state: 'signed-out', storage: true }), listModels: async () => ({ ok: true, models: [] }),
-      generate: async () => ({ ok: false, failure: failure('unsupported') }), cancelGeneration: async () => {},
-      onGenerationProgress: listener => { listeners.push(listener); return () => { listeners.splice(listeners.indexOf(listener), 1); }; },
-      listLessons: async () => ({ lessons: [], skipped: 0 }), listDisassemblies: async () => ({ disassemblies: [d], skipped: 0 }), expandPart,
-      openUsageSettings: async () => {}, getSettings: async () => settings, saveSettings: async next => next,
-      discoverLocal: async () => [], connectLocal: async () => ({ ok: false, failure: failure('local-address') }), checkLocalFormat: async () => ({ ok: false, failure: failure('local-address') }),
-    };
-    return { bridge, expandPart };
-  }
-
-  it('offers the action on a part with enough lines, says why a small part stops, and opens the new level with the progress kept', async () => {
+describe('taking a part apart during use is retired (P-20261105-exploration X19)', () => {
+  const meta = { provider: 'chatgpt' as const, model: 'strong', createdAt: '2026-10-26T12:00:00.000Z' };
+  it('shows a part with no sub-parts and no "take apart" action, even on a generated disassembly in the desktop app', async () => {
     const d = await validateDisassembly(generatedFrom(fixture(PUBLIC_FIXTURES[4])));
     const leaf = d.parts.find(p => !p.parts && divisible(d, p))!;
-    const small = d.parts.find(p => !p.parts && !divisible(d, p))!;
-    const { bridge, expandPart } = await desktopWith(d);
-    render(<App bridge={bridge} prepared={[]} disassemblies={[]}/>);
-    await user().click(await screen.findByRole('button', { name: (name: string) => name.includes(d.title) }));
-    await screen.findByRole('group', { name: /Cosa fare con lo smontaggio/ });
-    await user().click(plate(new RegExp(`^\\d+\\. ${small.name} · `)));
-    expect(side().getByText(new RegExp(`Questo pezzo non si smonta oltre: cita ${linesOf(d, small.cites).size} righe, ne servono almeno 6`))).toBeInTheDocument();
-    await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
-    await user().type(side().getByLabelText(/I tuoi appunti/), 'resta');
-    expect(side().getByText('Una richiesta a ChatGPT · strong, con le sole righe di questo pezzo.')).toBeInTheDocument();
-    await user().click(side().getByRole('button', { name: 'Smonta questo pezzo' }));
-    expect(expandPart).toHaveBeenCalledWith({ disassemblyId: d.id, revision: 'v1', part: leaf.id, route: { provider: 'chatgpt', model: 'strong' } });
-    const crumbs = await screen.findByRole('navigation', { name: 'Livelli dello smontaggio' });
-    expect(await within(crumbs).findByText(leaf.name)).toHaveAttribute('aria-current', 'location');
-    expect(plate(/^1\. .* 1 · /)).toBeInTheDocument();
-    await user().click(within(crumbs).getByRole('button', { name: d.whole.name }));
-    await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
-    expect(side().getByLabelText(/I tuoi appunti/)).toHaveValue('resta');
-    expect(side().getByRole('button', { name: /Apri il sottoassieme · 3 pezzi/ })).toBeInTheDocument();
-  });
-
-  it('does not offer the action on a prepared disassembly', async () => {
-    const d = await validateDisassembly(fixture(PUBLIC_FIXTURES[4]));
-    const leaf = d.parts.find(p => !p.parts && divisible(d, p))!;
-    const { bridge } = await desktopWith(d);
+    const { bridge } = memoryBridge('it-IT');
+    bridge.studio = { getSettings: async () => ({ version: 1, provider: 'chatgpt', chatgptModel: 'strong' }), onGenerationProgress: () => () => {} } as unknown as DesktopBridge['studio'];
     await play(d, bridge);
     await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
+    expect(side().getByRole('heading', { name: new RegExp(leaf.name) })).toBeInTheDocument();
     expect(side().queryByRole('button', { name: 'Smonta questo pezzo' })).not.toBeInTheDocument();
     expect(side().queryByText(/non si smonta oltre/)).not.toBeInTheDocument();
   });
-});
 
+  it('still opens the levels of a stored disassembly with expansions', async () => {
+    const d = await validateDisassembly(generatedFrom(fixture(PUBLIC_FIXTURES[4])));
+    const leaf = d.parts.find(p => !p.parts && divisible(d, p))!;
+    const stored = await validateDisassembly(takenApart(d, leaf.id, splitAnswer(d, leaf.id), meta));
+    expect(stored.expansions).toEqual([{ part: leaf.id, ...meta }]);
+    await play(stored);
+    await user().click(plate(new RegExp(`^\\d+\\. ${leaf.name} · `)));
+    await user().click(side().getByRole('button', { name: /Apri il sottoassieme · 3 pezzi/ }));
+    const crumbs = await screen.findByRole('navigation', { name: 'Livelli dello smontaggio' });
+    expect(within(crumbs).getByText(leaf.name)).toHaveAttribute('aria-current', 'location');
+  });
+});
 
 describe('workbench reading and cognitive landmarks', () => {
   it('keeps the note and the source view across modes', async () => {

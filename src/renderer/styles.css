@@ -17,7 +17,23 @@
   --f-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --f-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
   --radius: 12px;
+  /* Exploration (plan P-20261105-exploration X11): a role's ink and its soft ground; the guide's step; the layer strip in
+     three states; the lit joint; the four aspect hues, each a tone and a wash (from the colour study). Values only:
+     the view's rules are in exploration.css, which uses these tokens and nothing else. */
+  --x-main: #1f5f99; --x-main-soft: #e1e7ee; --x-other: #5f4a8f; --x-other-soft: #e9e3f0; --x-prereq: #8a5a0f; --x-prereq-soft: #f3e6cc;
+  --x-note: #a8261e; --x-note-soft: #f5ddd7; --x-aside: #4c5866; --x-aside-soft: #ece6d8; --x-step: #2d6e45; --x-step-soft: #dfeadc;
+  --x-strip-seen: #ece6d8; --x-strip-active: #e1e7ee; --x-strip-next: #fbf8f1; --x-strip-ink: #4c5866; --x-strip-active-ink: #1f5f99;
+  --x-lit: #1f5f99; --x-lit-ink: #ffffff; --x-leader: #4c5866;
+  --a1: #315f8b; --a1-wash: #e6edf6; --a2: #326d63; --a2-wash: #e2eee7; --a3: #945139; --a3-wash: #f3e6dc; --a4: #6e5295; --a4-wash: #ede6f4;
   color-scheme: light;
+}
+/* The same in both themes: strokes, fading, motion and reading type. Motion stops under "reduce motion" (below). */
+:root {
+  --x-dash-interpreted: 6 4; --x-dash-leader: 3 3; --x-dash-flow: 7 5;
+  --x-faded: .3; --x-cold: .16; --x-cold-label: .22; --x-beam: .07;
+  --x-dur: 320ms; --x-flow: 900ms; --x-ease: cubic-bezier(.2, .8, .2, 1);
+  --x-read: var(--f-body); --x-read-size: 15px; --x-read-leading: 1.6; --x-measure: 64ch; --x-source-size: 13.5px; --x-source-leading: 1.65;
+  --x-r-panel: 20px; --x-r-card: 14px; --x-r-pill: 999px;
 }
 :root[data-theme="blueprint"] {
   --bg: #0f2c4f; --surface: #13365f; --sunk: #0c2542; --ink: #e9f1f9; --muted: #b2c6db; --line: #3a6290;
@@ -30,9 +46,15 @@
   --mechanism: #8ec5ff; --argument: #ffb092; --story: #9fe2b4; --ok: #9fe2b4; --fail: #ff8f85; --active: #ffd27d;
   --hl: rgba(142, 197, 255, .16); --excluded: rgba(233, 241, 249, .07); --missing: rgba(255, 143, 133, .18);
   --grid: rgba(233, 241, 249, .06); --grid-major: rgba(233, 241, 249, .12); --shadow: rgba(0, 0, 0, .35); --backdrop: rgba(5, 15, 30, .6);
+  --x-main: #8ec5ff; --x-main-soft: #1c4775; --x-other: #cdb8f5; --x-other-soft: #2b2f60; --x-prereq: #ffd27d; --x-prereq-soft: #3a3a2c;
+  --x-note: #ff9a91; --x-note-soft: #4a2a3c; --x-aside: #b2c6db; --x-aside-soft: #0c2542; --x-step: #9fe2b4; --x-step-soft: #17453c;
+  --x-strip-seen: #0c2542; --x-strip-active: #1c4775; --x-strip-next: #13365f; --x-strip-ink: #b2c6db; --x-strip-active-ink: #e9f1f9;
+  --x-lit: #8ec5ff; --x-lit-ink: #0b2340; --x-leader: #b2c6db;
+  --a1: #9dcaff; --a1-wash: #1c3e60; --a2: #91dcc7; --a2-wash: #1c4548; --a3: #ffc0a4; --a3-wash: #4e373e; --a4: #d2baf7; --a4-wash: #3b3960;
   color-scheme: dark;
 }
 @media (prefers-reduced-motion: reduce) {
+  :root { --x-dur: 0ms; --x-flow: 0ms; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 * { box-sizing: border-box; }

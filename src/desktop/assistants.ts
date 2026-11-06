@@ -1,6 +1,11 @@
 import { sep } from 'node:path';
 import { DisassemblyError, validateDisassembly, type Disassembly } from '../core/disassembly';
+import { ExplorationError, type Exploration } from '../core/exploration';
+import { acceptExploration, generatedExplorationId, sourceFindings } from '../core/exploration-generation';
+import { importSource } from '../core/source';
 import type { DisassemblyStore } from './disassembly-store';
+import type { ExplorationStore } from './exploration-store';
+import type { ExploreInput } from './incoming';
 
 /**
  * How the "Use with Claude" panel connects an assistant (P-20261028-mcp-integration M4). The MCP server and the
@@ -38,4 +43,17 @@ export async function saveFromAssistant(store: Pick<DisassemblyStore, 'find' | '
   const stored = await store.find(d.id, d.revision);
   if (stored && JSON.stringify(stored) !== JSON.stringify(d)) throw new DisassemblyError([{ path: 'id', message: `${d.id} is already saved` }]);
   return stored ?? store.save(d);
+}
+
+/**
+ * An exploration an assistant wrote (plan P-20261105-exploration X9): the source is imported as a paste, so its id and
+ * line numbers are the ones the assistant read; the answer passes `acceptExploration`, as on the ChatGPT route, and is
+ * saved with the assistant's origin. A refusal throws the findings for the assistant's one repair.
+ */
+export async function exploreFromAssistant(store: Pick<ExplorationStore, 'save'>, input: ExploreInput, now = new Date()): Promise<Exploration> {
+  const source = await importSource({ kind: 'paste', title: input.source.title.trim() || 'From your assistant', text: input.source.text });
+  const over = sourceFindings(source);
+  if (over.length) throw new ExplorationError(over);
+  const meta = { id: generatedExplorationId(now), createdAt: now.toISOString(), provider: 'assistant' as const, model: input.client.trim().slice(0, 200) || 'assistant' };
+  return store.save(acceptExploration(input.answer, { source, language: input.language, meta }));
 }

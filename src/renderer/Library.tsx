@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Plus } from 'lucide-react';
 import type { DesktopBridge } from '../core/bridge';
 import type { Disassembly } from '../core/disassembly';
+import type { Exploration } from '../core/exploration';
 import type { IncomingSource } from '../core/provider';
 import { restoreDisassemblyState, type DisassemblyState } from '../core/disassembly-state';
 import type { Lesson } from '../core/lesson';
@@ -21,11 +22,13 @@ interface Props {
   draft: StudioDraft; setDraft: (update: (draft: StudioDraft) => StudioDraft) => void;
   onOpen: (id: string) => void; onOpenDisassembly: (id: string) => void; onCreated: (disassembly: Disassembly) => void;
   incoming?: IncomingSource[]; onIncomingTaken?: (count: number) => void;
+  /** Explorations, prepared and saved (X18): listed first, since exploration is the default. */
+  explorations?: Exploration[]; onOpenExploration?: (id: string) => void; onExplored?: (exploration: Exploration) => void;
 }
 type Resume = { kind: 'lesson'; lesson: Lesson; state: LearnerState } | { kind: 'disassembly'; disassembly: Disassembly; state: DisassemblyState };
 const touched = (state: DisassemblyState) => state.path.length > 0 || !!state.selected || Object.keys(state.runs).length > 0 || Object.keys(state.notes).length > 0 || Object.keys(state.reassembly.placements).length > 0;
 
-export function Library({ lessons, generated, disassemblies, bridge, error, skipped, draft, setDraft, onOpen, onOpenDisassembly, onCreated, incoming = [], onIncomingTaken }: Props) {
+export function Library({ lessons, generated, disassemblies, bridge, error, skipped, draft, setDraft, onOpen, onOpenDisassembly, onCreated, incoming = [], onIncomingTaken, explorations = [], onOpenExploration, onExplored }: Props) {
   const { t, language } = usePreferences();
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -64,13 +67,14 @@ export function Library({ lessons, generated, disassemblies, bridge, error, skip
   }, [lessons, generated, disassemblies, bridge]);
   // Examples in the interface language come first; the other language is one click away.
   const shown = disassemblies.filter(x => otherLanguage || x.language === language || x.kind === 'generated');
-  const hidden = disassemblies.length - shown.length;
+  const shownExplorations = explorations.filter(x => otherLanguage || x.language === language || x.kind === 'generated');
+  const hidden = disassemblies.length - shown.length + explorations.length - shownExplorations.length;
   const other = language === 'it' ? 'en' : 'it';
   const legacy = [...generated, ...lessons];
 
   if (creating) return <main id="main" className="library creation-page">
     <button className="text-button" disabled={busy} onClick={() => setCreating(false)}><ArrowLeft size={16}/>{t.library.back}</button>
-    <Studio studio={bridge.studio} draft={draft} setDraft={setDraft} onCreated={onCreated} onBusyChange={setBusy} incoming={incoming} onIncomingTaken={onIncomingTaken}/>
+    <Studio studio={bridge.studio} draft={draft} setDraft={setDraft} onCreated={onCreated} onExplored={onExplored} onBusyChange={setBusy} incoming={incoming} onIncomingTaken={onIncomingTaken}/>
     <p className="draft-note">{t.library.draftNote}</p>
   </main>;
 
@@ -80,6 +84,10 @@ export function Library({ lessons, generated, disassemblies, bridge, error, skip
     {resume && <section className="resume-section" aria-labelledby="resume-heading"><span className="eyebrow" id="resume-heading">{t.library.resumeEyebrow}</span>{resume.kind === 'lesson'
       ? <button className="resume-card" onClick={() => onOpen(resume.lesson.id)}><span className="card-symbol"><Icon name={resume.lesson.icon} size={27}/></span><span className="resume-copy"><strong>{resume.lesson.title}</strong><small>{t.library.resumeStep(resume.lesson.pages.findIndex(x => x.id === resume.state.pageId) + 1, resume.lesson.pages.length, resume.lesson.pages.find(x => x.id === resume.state.pageId)?.title ?? '')}</small></span><span className="resume-action">{t.library.resume}<ArrowRight size={18}/></span></button>
       : <button className="resume-card" onClick={() => onOpenDisassembly(resume.disassembly.id)}><span className="card-symbol"><PartIcon name={resume.disassembly.parts[0].icon} size={27}/></span><span className="resume-copy"><strong lang={resume.disassembly.language}>{resume.disassembly.title}</strong><small>{t.library.resumeDisassembly(resume.disassembly.whole.name)}</small></span><span className="resume-action">{t.library.resume}<ArrowRight size={18}/></span></button>}</section>}
+    {explorations.length > 0 && <section className="library-section" aria-labelledby="explorations-heading"><div className="library-section-head"><h2 id="explorations-heading">{t.x.library.title}</h2><span className="pill">{t.x.library.pill}</span></div>
+      <p className="library-disclosure">{t.x.library.note}</p>
+      <div className="lesson-cards">{shownExplorations.map(item => <ExplorationCard key={item.id} x={item} onOpen={id => onOpenExploration?.(id)}/>)}</div>
+    </section>}
     <section className="library-section" aria-labelledby="disassemblies-heading"><div className="library-section-head"><h2 id="disassemblies-heading">{t.library.disassemblies}</h2><span className="pill">{t.library.disassembliesPill}</span></div>
       <p className="library-disclosure">{t.library.disassembliesNote}</p>
       <div className="lesson-cards">{shown.map(item => <DisassemblyCard key={item.id} d={item} onOpen={onOpenDisassembly}/>)}</div>
@@ -106,4 +114,13 @@ function DisassemblyCard({ d, onOpen }: { d: Disassembly; onOpen: (id: string) =
     <span className="micro" title={d.generation ? originText(t, d.generation) : undefined}>{d.generation?.provider === 'assistant' ? t.d.tagAssistant : d.kind === 'generated' ? t.d.tagGenerated : t.d.tag}{d.language !== language ? ` · ${t.library.contentLanguage(t.languageNames[d.language])}` : ''}</span></span>
     <h3 lang={d.language}>{d.title}</h3><p lang={d.language}>{d.question ?? d.whole.does}</p>
     <span className="card-bottom"><span>{t.library.disassemblyCounts(d.parts.length, d.runs.length)}</span><ArrowRight size={18}/></span></button>;
+}
+
+function ExplorationCard({ x, onOpen }: { x: Exploration; onOpen: (id: string) => void }) {
+  const { t, language } = usePreferences();
+  const roles = x.parts.filter(p => p.kind === 'part').length;
+  return <button className="lesson-card exploration-card" onClick={() => onOpen(x.id)}><span className="card-head"><span className="card-symbol"><Icon name="book" size={25}/></span>
+    <span className="micro" title={x.generation ? originText(t, x.generation) : undefined}>{x.generation?.provider === 'assistant' ? t.x.library.assistant : x.kind === 'generated' ? t.x.library.generated : t.x.library.prepared}{x.language !== language ? ` · ${t.library.contentLanguage(t.languageNames[x.language])}` : ''}</span></span>
+    <h3 lang={x.language}>{x.title}</h3><p lang={x.language}>{x.whole}</p>
+    <span className="card-bottom"><span>{t.x.library.counts(roles, x.aspects.length)}</span><ArrowRight size={18}/></span></button>;
 }

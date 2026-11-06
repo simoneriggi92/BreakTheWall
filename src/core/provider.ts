@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { jointTypeSchema, partIconSchema, partKindSchema, type Disassembly } from './disassembly';
+import type { Exploration } from './exploration';
 import { idSchema, sourceSchema, type Lesson } from './lesson';
 import type { ImportErrorCode, ImportErrorParams, LearningGoal, UserSource } from './source';
 
@@ -18,7 +19,8 @@ export type RecoveryAction = 'sign-in' | 'enable-plan' | 'retry' | 'usage-settin
 export type FailureReason = 'local-not-a-server' | 'local-timeout' | 'local-stopped' | 'local-no-template' | 'local-unreadable'
   | 'sign-in-busy' | 'sign-in-denied' | 'sign-in-other-app' | 'sign-in-no-code' | 'sign-in-no-identity' | 'sign-in-other-account'
   | 'session-rejected' | 'models-format' | 'stream-unreadable' | 'sign-in-port' | 'sign-in-timeout' | 'sign-in-cancelled'
-  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified' | 'question-language' | 'part-not-divisible' | 'draft-changed' | 'local-window';
+  | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified' | 'question-language' | 'draft-changed' | 'local-window'
+  | 'exploration-local' | 'exploration-too-long';
 /** `message` stays Italian for logs and tests; the interface words the failure from `reason` or `code`. */
 export interface ProviderFailure { code: FailureCode; reason?: FailureReason; message: string; action?: RecoveryAction; issues?: string[]; requestId?: string }
 
@@ -149,10 +151,9 @@ export interface Suggestion { question: string; kind: typeof BREAKDOWN_KINDS[num
 export interface SuggestionRequest { sources: UserSource[]; language: 'it' | 'en'; priorKnowledge: string; route: GenerationRoute; avoid: string[] }
 export type SuggestionResult = { ok: true; suggestions: Suggestion[] } | { ok: false; failure: ProviderFailure };
 export type GenerationResult = { ok: true; disassembly: Disassembly; stats: GenerationStats } | { ok: false; failure: ProviderFailure; stats?: GenerationStats };
-/** Take one part of a saved generated disassembly apart, through one route. */
-export interface ExpansionRequest { disassemblyId: string; revision: string; part: string; route: GenerationRoute }
-/** `disassembly` is the new revision; `moved` says whether the learner's progress followed it. */
-export type ExpansionResult = { ok: true; disassembly: Disassembly; moved: boolean; stats: PhaseStats } | { ok: false; failure: ProviderFailure; stats?: PhaseStats };
+/** Explore one source through one route (plan P-20261105-exploration X8). The local route is refused until its own phase. */
+export interface ExplorationRequest { source: UserSource; language: 'it' | 'en'; route: GenerationRoute }
+export type ExplorationResult = { ok: true; exploration: Exploration; stats: PhaseStats } | { ok: false; failure: ProviderFailure; stats?: PhaseStats };
 export type PickError = { name: string; message: string; code?: ImportErrorCode | 'not-a-file' | 'unreadable' | 'truncated'; params?: ImportErrorParams };
 export interface PickedSources { sources: UserSource[]; errors: PickError[] }
 
@@ -185,6 +186,8 @@ export interface StudioBridge {
   onIncomingSource?(listener: (incoming: IncomingSource) => void): () => void;
   /** Disassemblies an AI assistant wrote and the host saved (level B); the renderer validates them again before opening. */
   onAssistantDisassembly?(listener: (disassembly: unknown) => void): () => void;
+  /** Explorations an AI assistant wrote and the host checked and saved (X9); the renderer validates them again before opening. */
+  onAssistantExploration?(listener: (exploration: unknown) => void): () => void;
   assistantSetup?(): Promise<AssistantSetup>;
   /** Opens the bundled Claude Desktop extension, which Claude Desktop offers to install. */
   addToClaudeDesktop?(): Promise<{ ok: boolean }>;
@@ -194,8 +197,11 @@ export interface StudioBridge {
   /** Saved generated disassemblies; the renderer validates them again before showing them. */
   listDisassemblies?(): Promise<{ disassemblies: unknown[]; skipped: number }>;
   findDisassembly?(key: { id: string; revision: string }): Promise<unknown | null>;
-  /** Takes one part apart and saves the new revision; absent in the browser preview. */
-  expandPart?(request: ExpansionRequest): Promise<ExpansionResult>;
+  /** Saved explorations; the renderer validates them again before showing them (X8). */
+  listExplorations?(): Promise<{ explorations: unknown[]; skipped: number }>;
+  findExploration?(key: { id: string; revision: string }): Promise<unknown | null>;
+  /** Reads one source's structure in one request and saves it; progress arrives as a generation's, cancel stops it. */
+  startExploration?(request: ExplorationRequest): Promise<ExplorationResult>;
   openUsageSettings(): Promise<void>;
   getSettings(): Promise<StudioSettings>;
   saveSettings(settings: StudioSettings): Promise<StudioSettings>;

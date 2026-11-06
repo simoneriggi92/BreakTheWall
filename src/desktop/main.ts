@@ -13,7 +13,7 @@ import { idSchema } from '../core/lesson';
 import { failure, localModelSchema, ProviderError, type GenerationProgress, type PickedSources } from '../core/provider';
 import { importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
 import { appFilePath, LIBRARY_DRAWN } from './app-files';
-import { claudeCodeCommand, saveFromAssistant, unpackedPath } from './assistants';
+import { claudeCodeCommand, exploreFromAssistant, saveFromAssistant, unpackedPath } from './assistants';
 import { ChatGPTAccount } from './chatgpt/account';
 import { AUTH } from './chatgpt/oauth';
 import { DraftStore } from './generation-draft';
@@ -23,6 +23,7 @@ import { checkFormat, detectServer, discoverServers, localCompleter } from './lo
 import { SettingsStore } from './settings-store';
 import { runSquirrel, squirrelAction } from './squirrel';
 import { DisassemblyStore } from './disassembly-store';
+import { ExplorationStore } from './exploration-store';
 import { LessonStore } from './lesson-store';
 import { hostIdFile, SafeStorageVault } from './secure-files';
 
@@ -47,7 +48,7 @@ function trustedSender(event: Electron.IpcMainInvokeEvent) {
 }
 
 /** Import, account and generation operations. Tokens and file paths never cross into the renderer. */
-function registerStudio(userData: string, lessons: LessonStore, disassemblies: DisassemblyStore, progress: ProgressStore) {
+function registerStudio(userData: string, lessons: LessonStore, disassemblies: DisassemblyStore) {
   const account = new ChatGPTAccount({
     vault: new SafeStorageVault(join(userData, 'credentials', 'chatgpt.bin'), safeStorage),
     hostId: hostIdFile(join(userData, 'credentials', 'agent-host.json')),
@@ -56,9 +57,9 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     log: message => console.info(`[chatgpt] ${message}`),
   });
   const localFetch = globalThis.fetch.bind(globalThis);
-  // Taking a part apart moves the learner's progress to the new revision, through the same store the player uses.
   // A failed or cancelled generation keeps what was accepted next to the saved disassemblies (D21).
-  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, disassemblies, undefined, (previous, next) => progress.carry(previous, next), new DraftStore(join(userData, 'generation-draft.json')));
+  const explorations = new ExplorationStore(join(userData, 'explorations'));
+  const generator = new Generator({ chatgpt: account, local: target => localCompleter(localFetch, target) }, disassemblies, undefined, new DraftStore(join(userData, 'generation-draft.json')), explorations);
   const settings = new SettingsStore(join(userData, 'settings.json'));
   // Host-side text (file dialog, sign-in page) follows the same setting as the interface.
   const language = async () => resolveLanguage((await settings.read()).language, systemLocale());
@@ -116,9 +117,9 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     try { return await generator.generate(input, progressTo(event)); }
     catch (error) { return asFailure(error); }
   });
-  ipcMain.handle('disassembly:expand', async (event, input: unknown) => {
+  ipcMain.handle('exploration:start', async (event, input: unknown) => {
     trustedSender(event);
-    try { return await generator.expand(input, progressTo(event)); }
+    try { return await generator.explore(input, progressTo(event)); }
     catch (error) { return asFailure(error); }
   });
   ipcMain.handle('settings:get', event => { trustedSender(event); return settings.read(); });
@@ -156,11 +157,17 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     const id = idSchema.safeParse((key as { id?: unknown })?.id); const revision = idSchema.safeParse((key as { revision?: unknown })?.revision);
     return id.success && revision.success ? (await disassemblies.find(id.data, revision.data)) ?? null : null;
   });
+  ipcMain.handle('explorations:list', event => { trustedSender(event); return explorations.list(); });
+  ipcMain.handle('explorations:find', async (event, key: unknown) => {
+    trustedSender(event);
+    const id = idSchema.safeParse((key as { id?: unknown })?.id); const revision = idSchema.safeParse((key as { revision?: unknown })?.revision);
+    return id.success && revision.success ? (await explorations.find(id.data, revision.data)) ?? null : null;
+  });
   ipcMain.handle('account:usage-settings', async event => { trustedSender(event); await shell.openExternal('https://chatgpt.com/#settings'); });
 
   // What an AI assistant hands over (texts for Studio, saved disassemblies) waits here until the window's renderer
   // listens, then goes to it.
-  const waiting: { channel: 'studio:incoming' | 'studio:disassembly'; payload: unknown }[] = [];
+  const waiting: { channel: 'studio:incoming' | 'studio:disassembly' | 'studio:exploration'; payload: unknown }[] = [];
   const ready = new Set<Electron.WebContents>();
   const deliver = () => {
     const contents = BrowserWindow.getAllWindows()[0]?.webContents;
@@ -199,6 +206,13 @@ function registerStudio(userData: string, lessons: LessonStore, disassemblies: D
     save: async input => {
       const saved = await saveFromAssistant(disassemblies, input);
       waiting.push({ channel: 'studio:disassembly', payload: saved });
+      present();
+      return { id: saved.id, title: saved.title };
+    },
+    // X9: checked with the app's own rules, stored like any generated exploration, then opened.
+    explore: async input => {
+      const saved = await exploreFromAssistant(explorations, input);
+      waiting.push({ channel: 'studio:exploration', payload: saved });
       present();
       return { id: saved.id, title: saved.title };
     },
@@ -269,7 +283,7 @@ void app.whenReady().then(async () => {
     async key => preparedDisassemblies.find(x => x.id === key.disassemblyId && x.revision === key.revision) ?? disassemblies.find(key.disassemblyId, key.revision));
   ipcMain.handle('progress:load', (event, key: unknown) => { trustedSender(event); return store.load(progressKeySchema.parse(key)); });
   ipcMain.handle('progress:save', (event, input: unknown) => { trustedSender(event); return store.save(progressStateSchema.parse(input)); });
-  registerStudio(userData, lessons, disassemblies, store);
+  registerStudio(userData, lessons, disassemblies);
   createWindow();
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
 }).catch(error => { console.error('Desktop initialization failed:', error.message); app.quit(); });

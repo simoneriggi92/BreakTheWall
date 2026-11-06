@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { ArrowRight, ArrowUp, Hammer, Link2 } from 'lucide-react';
-import { DISASSEMBLY_LIMITS, divisible, linesOf, pagesOf, sectionCoverage, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
-import type { GenerationProgress, GenerationRoute, ProviderFailure } from '../../core/provider';
+import { ArrowRight, ArrowUp, Link2 } from 'lucide-react';
+import { pagesOf, sectionCoverage, type Cite, type Disassembly, type Joint, type Part } from '../../core/disassembly';
 import type { Messages } from '../i18n/it';
 import { renderMarkdown } from '../markdown';
-import { failureText, usePreferences } from '../preferences';
+import { usePreferences } from '../preferences';
 import { PartIcon } from './Sheet';
 
 /** "release-runbook.md · p. 12 · l. 40–52": the file only when there are several, the page only when the source has pages. */
@@ -33,14 +32,14 @@ interface Props {
   focus?: Cite; onFocus: (c: Cite) => void; onEnter: (id: string) => void;
   note: string; onNote: (value: string) => void;
   /** Taking this part apart, when the disassembly allows it. */
-  takeApart?: ReactNode; active?: boolean;
+  active?: boolean;
   /** Where the disassembly comes from, shown with the whole: prepared, generated, or written by the learner's assistant. */
   origin?: string;
   /** The whole's orientation: plate numbers of the top level, and selecting one of its parts. */
   numberOf?: (id: string) => number | undefined; onSelect?: (id: string) => void;
 }
 /** The open part: role, marked points, lens, metaphor with its limit, critique, joints in words, citations and notes. */
-export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, takeApart, active = true, origin, numberOf, onSelect }: Props) {
+export function PartCard({ d, part, owner, above, onUp, joints, level, number, focus, onFocus, onEnter, note, onNote, active = true, origin, numberOf, onSelect }: Props) {
   const { t } = usePreferences();
   const heading = useRef<HTMLHeadingElement>(null);
   const opened = useRef<Part | undefined>(undefined);
@@ -85,7 +84,6 @@ export function PartCard({ d, part, owner, above, onUp, joints, level, number, f
     </div>
     {part.parts && <button className="primary open-sub" onClick={() => onEnter(part.id)}>{part.relevant === false ? t.d.openClosed(part.parts.length) : t.d.openSub(part.parts.length)}<ArrowRight size={15}/></button>}
     {part.parts && part.relevant === false && <p className="micro plain">{t.d.closedNote}</p>}
-    {!part.parts && takeApart}
     <label className="part-note">{t.d.notes}<textarea rows={3} maxLength={4000} value={note} placeholder={t.d.notesPlaceholder} onChange={e => onNote(e.target.value)}/></label>
   </section>;
 }
@@ -118,27 +116,4 @@ function Orientation({ d, numberOf, onSelect, onFocus, why }: { d: Disassembly; 
         </li>)}</ul></div>;
     })}
   </>;
-}
-
-/**
- * "Take this part apart": one request with only the part's lines. A part with too few lines says why it stops here,
- * so the learner sees that the source, not the app, sets the depth.
- */
-export function TakeApart({ d, part, route, progress, problem, onRun, onCancel }: {
-  d: Disassembly; part: Part; route?: GenerationRoute; progress?: GenerationProgress; problem?: ProviderFailure; onRun: () => void; onCancel: () => void;
-}) {
-  const { t } = usePreferences();
-  const x = t.d.expand;
-  if (!divisible(d, part)) return <p className="micro plain take-apart">{x.leaf(linesOf(d, part.cites).size, DISASSEMBLY_LIMITS.minLinesToSplit)}</p>;
-  if (progress) return <div className="generating take-apart">
-    <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{x.running}{progress.shortening ? ` · ${x.shortening}` : progress.repairing ? ` · ${x.repairing}` : ''}</span><button className="subtle" onClick={onCancel}>{x.cancel}</button></div>
-    <p className="micro plain">{x.requests(progress.requests)}</p>
-  </div>;
-  const where = route && (route.provider === 'local' ? x.local(route.model) : `ChatGPT · ${route.model}`);
-  return <div className="take-apart">
-    <button className="subtle" disabled={!route} onClick={onRun}><Hammer size={15}/>{x.action}</button>
-    <p className="micro plain">{where ? x.cost(where) : x.noRoute}</p>
-    {problem && <div className={problem.code === 'cancelled' ? 'notice' : 'error-banner'} role="alert"><div><p>{failureText(t, problem)}</p>
-      {problem.issues && <details className="issue-details"><summary>{t.generate.technical}</summary><ul className="issue-list">{problem.issues.map((issue, i) => <li key={i}>{issue}</li>)}</ul></details>}</div></div>}
-  </div>;
 }
