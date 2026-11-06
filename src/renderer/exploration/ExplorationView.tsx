@@ -42,7 +42,9 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
   const n0 = m.shape.nuclei[0];
   const ghost = s.guide.kind === 'whole' && !s.all && step && !('premise' in step) && step.layer !== undefined && step.layer + 1 < (n0?.depth ?? 0)
     ? { nucleus: 0, layer: step.layer + 1, count: n0.ids.filter(i => n0.layer.get(i) === step.layer! + 1).length } : null;
-  const topHeight = (id: string) => m.aspects ? heightOf(membersOf(m, id).length, false) : heightOf(membersOf(m, id).length, s.opened.includes(id));
+  // at the aspect level only an aspect's block opens a sub-level; a prerequisite's components show in place, as on the roles
+  const isAspect = (id: string) => m.aspects && m.parts.get(id)?.kind === 'part';
+  const topHeight = (id: string) => heightOf(membersOf(m, id).length, !isAspect(id) && s.opened.includes(id));
   const L = layoutOf(m.level, m.shape, {
     bands: true, ghost, premise: m.premise?.id ?? null, spacing: SPACING.whole, heightOf: topHeight, visible: id => view.vis.has(id),
     open: new Set(m.shape.nuclei.map((_, i) => i).filter(i => i === 0 || s.all || m.shape.nuclei[i].ids.some(j => view.vis.has(j)))),
@@ -70,10 +72,15 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
   const closeSub = useCallback(() => {
     const el = panel.current;
     if (!el || reduced() || typeof el.animate !== 'function' || !from.current) return dispatch({ type: 'close' });
-    el.animate([{ transform: 'none', opacity: 1 }, { transform: from.current, opacity: 0.2 }], { duration: DURATION * 0.8, easing: EASE, fill: 'forwards' }).onfinish = () => dispatch({ type: 'close' });
+    // a window in the background pauses its animations: the sub-level closes when the motion ends, or after its
+    // duration at the latest, never twice
+    let done = false;
+    const finish = () => { if (!done) { done = true; dispatch({ type: 'close' }); } };
+    el.animate([{ transform: 'none', opacity: 1 }, { transform: from.current, opacity: 0.2 }], { duration: DURATION * 0.8, easing: EASE, fill: 'forwards' }).onfinish = finish;
+    setTimeout(finish, DURATION + 80);
   }, [dispatch]);
   const onNode = (id: string) => {
-    if (s.sub) { if (membersOf(m, id).length && m.aspects) return openSub(id); }
+    if (s.sub) { if (membersOf(m, id).length && isAspect(id)) return openSub(id); }
     dispatch({ type: 'choose', id });
   };
   const roles = useMemo(() => x.parts.filter(p => p.kind === 'part'), [x]);
@@ -119,7 +126,7 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
     : sub ? (s.member && s.subSel === s.member.part ? { kind: 'member', level: sub, part: s.member.part, id: s.member.id }
       : s.subSel ? { kind: 'part', level: sub, id: s.subSel, aspect: s.sub, members: 'components' } : { kind: 'part', level: m, id: s.sub!, members: 'roles' })
     : s.member && s.member.part === focus ? { kind: 'member', level: m, part: s.member.part, id: s.member.id }
-    : focus ? { kind: 'part', level: m, id: focus, members: m.aspects ? 'roles' : 'components' } : null;
+    : focus ? { kind: 'part', level: m, id: focus, members: isAspect(focus) ? 'roles' : 'components' } : null;
   const cardPart = card?.kind === 'part' ? card.level.parts.get(card.id) : null;
   const cites: ExplorationCite[] = card?.kind === 'section' ? [{ from: m.index[card.index].line, to: m.index[card.index].end }]
     : card?.kind === 'member' ? card.level.parts.get(card.part)!.members.find(c => c.id === card.id)!.cites
@@ -164,6 +171,13 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
     if (s.grow) {
       // FLIP: the sub-level starts on its block's rectangle and plays to its own place
       if (!reduced() && typeof el.animate === 'function') el.animate([{ transform: from.current, opacity: 0.35 }, { transform: 'none', opacity: 1 }], { duration: DURATION, easing: EASE });
+      // the sub-level opens under its block, often below the stage's edge: bring it into view
+      // from layout offsets, which its growing transform does not change
+      const box = stage.current, graph = el.offsetParent as HTMLElement | null;
+      if (box && graph) box.scrollTo?.({ top: Math.max(0, graph.offsetTop + el.offsetTop - 12), behavior: reduced() ? 'auto' : 'smooth' });
+      // a level wider than the panel opens on its first block, centred
+      const inner = el.querySelector<HTMLElement>('.xp-sub-body'), first = inner?.querySelector<HTMLElement>('.xp-node');
+      if (inner && first) inner.scrollLeft = Math.max(0, first.offsetLeft + first.offsetWidth / 2 - inner.clientWidth / 2);
       dispatch({ type: 'grown' });
     }
   });
@@ -281,9 +295,9 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
           <div ref={stage} className="xp-stage">
             <Graph level={m} layout={L} levelKey="top" visible={id => view.vis.has(id)} tone={m.tone} hot={hot} litJoint={litJoint} moved={s.moved} className={sub ? 'xp-lifted' : ''}
               onMove={(key, offset) => dispatch({ type: 'move', key, offset })} names={names} notes={notesOf(m)} stripState={stripState} nodeState={topState}
-              members={id => membersOf(m, id).length ? { list: membersOf(m, id), open: !m.aspects && s.opened.includes(id), sel: s.member?.part === id ? s.member.id : null, noun: m.aspects ? 'roles' : 'components', lifted: m.aspects ? s.sub === id : false } : null}
-              onNode={onNode} onToggle={id => m.aspects ? (s.sub === id ? closeSub() : openSub(id)) : dispatch({ type: 'components', id })}
-              onMember={(id, c) => m.aspects ? openSub(id, c) : dispatch({ type: 'member', part: id, id: c })}
+              members={id => membersOf(m, id).length ? { list: membersOf(m, id), open: !isAspect(id) && s.opened.includes(id), sel: s.member?.part === id ? s.member.id : null, noun: isAspect(id) ? 'roles' : 'components', lifted: isAspect(id) && s.sub === id } : null}
+              onNode={onNode} onToggle={id => isAspect(id) ? (s.sub === id ? closeSub() : openSub(id)) : dispatch({ type: 'components', id })}
+              onMember={(id, c) => isAspect(id) ? openSub(id, c) : dispatch({ type: 'member', part: id, id: c })}
               onIsland={i => { const at = m.steps.findIndex(st => !('premise' in st) && st.nucleus === i); if (at >= 0) dispatch({ type: 'guide', guide: 'whole' }); if (at >= 0) dispatch({ type: 'goto', at }); }}>
               {subPanel}
             </Graph>

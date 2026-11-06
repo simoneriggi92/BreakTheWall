@@ -107,6 +107,21 @@ describe('the view and its shared state (X12)', () => {
   });
 });
 
+describe('a prerequisite with components at the aspect level (found in X20.3)', () => {
+  it('shows its components in place and opens no sub-level', async () => {
+    const x = await bakery();
+    x.parts.find(p => p.id === 'staling')!.members = [{ id: 'water-loss', name: 'Water loss', does: 'dries the crumb', cites: [{ from: 4, to: 4 }] }];
+    await view(await validateExploration(x));
+    const toggle = within(node('staling')).getByRole('button', { name: 'Componenti · 1' });
+    expect(toggle).toHaveTextContent('1 componente');
+    await user().click(toggle);
+    expect(sub()).toBeNull();
+    expect(within(node('staling')).getByRole('button', { name: 'Water loss' })).toBeInTheDocument();
+    await user().click(within(node('staling')).getByRole('button', { name: 'Water loss' }));
+    expect(cardTitle()).toBe('Water loss');
+  });
+});
+
 describe('the guides (X13)', () => {
   it('reaches every step of the whole source, the premise first and alone', async () => {
     const x = byId('importer-signals-map'), m = modelOf(x); await view(x);
@@ -236,6 +251,9 @@ describe('the sub-level in place (X14)', () => {
     await view(byId('importer-signals-map'));
     await openSignals();
     expect(animate).toHaveBeenCalled();
+    // a window in the background pauses its animations: the playback never finishes, and the sub-level still closes
+    await user().click(screen.getByRole('button', { name: '✕ Chiudi e torna al passo' }));
+    await vi.waitFor(() => expect(sub()).toBeNull(), { timeout: 1500 });
     delete (window as { matchMedia?: unknown }).matchMedia;
   });
 });

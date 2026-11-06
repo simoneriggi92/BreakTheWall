@@ -76,7 +76,7 @@
 .xp-basis[data-basis="interpreted"] { background: var(--x-prereq-soft); color: var(--x-prereq); }
 
 /* ---------- layout (X12): the app bar, then index | structure, step, card | source; one panel at a time when narrow */
-.xp { height: 100vh; display: grid; grid-template-rows: auto auto minmax(0, 1fr); }
+.xp { height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
 .xp-bar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; }
 .xp-title { display: flex; flex-direction: column; min-width: 0; flex: 1; padding-inline-start: 16px; border-inline-start: 1px solid var(--line); }
 .xp-title h1 { font: 400 20px/1.25 var(--f-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -149,14 +149,14 @@
 .xp-beam-svg { pointer-events: none; overflow: visible; }
 
 /* ---------- the step strip, between the structure and the card */
-.xp-step-strip { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--x-main-soft);
+.xp-step-strip { display: flex; gap: 12px; align-items: flex-start; padding: 8px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--x-main-soft);
   transition: opacity var(--x-dur) var(--x-ease); }
 .xp-step-strip.xp-paused { background: var(--bg); outline: 1px dashed var(--line); }
 .xp-step-strip.xp-inside { background: var(--wash, var(--surface)); }
 .xp-step-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .xp-step-head { display: flex; gap: 10px; align-items: baseline; }
 .xp-q { font-weight: 600; } .xp-count { color: var(--muted); font: 11px/1.4 var(--f-mono); }
-.xp-step-text { font: var(--x-read-size)/var(--x-read-leading) var(--x-read); }
+.xp-step-text { font: 14px/1.5 var(--x-read); }
 .xp-banner { color: var(--x-other); font-size: 13.5px; }
 .xp-away { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
 .xp-away button { border: 1px solid var(--line); border-radius: var(--x-r-pill); background: var(--surface); padding: 2px 10px; }

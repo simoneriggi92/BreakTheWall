@@ -4,8 +4,8 @@ title: Exploration - the structure of a source, read by the app and explored by 
 version: 6
 state: implementing
 current_task: X20
-last_evidence: Phase view done on feature/exploration (2026-11-06) - X12-X19; tsc passes; npx vitest run --dir tests 41 files 586 tests passed; npm run build passes; seen in the browser preview (paper, blueprint, phone width), no console errors
-next_action: implement P-20261105-exploration v6 --phase verify (X20); CI after a confirmed push, X20.3 runs and X20.4 need the owner
+last_evidence: X20.1 local checks (tsc; vitest --dir tests 41 files 587 tests; build); X20.2 built app over DevTools 80/80; X20.3 ChatGPT in the app on the public importer (1 request, 125 s, saved and opened); three fixes from X20.2-X20.3
+next_action: owner - CI on the pushed branch (X20.1), witness X20.2, X20.3 through Claude over MCP, and judge their own sources (X20.4)
 approval: approved
 ---
 
@@ -814,6 +814,45 @@ Not included:
    - Do the aspects and roles sum the source up, or is anything forced?
    - Does the sub-level keep them oriented?
    - Does "how it was read" tell them how far to trust the map?
+- **X20.1 (2026-11-06):**
+  - local: `npm run typecheck` passes, `npx vitest run --dir tests` 41 files and 586 tests pass, and `npm run build` passes.
+  - `npm run check` fails only on the tests of the private working copy `.local/worktrees/guided-source-object-prototype` (7 files; 0 failures outside it), as the verification strategy expects.
+  - CI on macOS and Windows: not run, since it waits for a push the owner confirms.
+- **X20.2 (2026-11-06), automated on the built app.** The app is driven over the DevTools protocol, with a scratch data folder and the script in the scratchpad: paper and blueprint, Italian and English, 1280×800, prepared examples only. 80/80 checks pass:
+  - the three examples open and the page does not scroll;
+  - the whole-source guide starts with the premise alone and reaches every step;
+  - a question's guide lights its aspects;
+  - the sub-level:
+    - grows out of its block with an animation, and none under "reduce motion";
+    - leaves every position of the whole identical;
+    - comes into view with its head and first role, and opens a component's card;
+    - closes back to the same step;
+  - exploring pauses the guide and "back to the step" restores it;
+  - the index opens a section;
+  - "how it was read" has its counts, grid and five readings, and a cell opens its line;
+  - a real pointer drag moves a label 60×42 px, with its dashed leader, and a double click puts it back;
+  - choosing Mill's principle lights exactly its three joints, and choosing it again lights none;
+  - there are no console errors.
+- **Found and fixed in X20.2:**
+  - in a window that is not in front, Chromium pauses animations, so closing the sub-level waited for a motion that never ended. Closing now also happens after its duration (unit test added);
+  - the sub-level opened below the structure's visible edge. It is now scrolled into view, head first, with a level wider than the panel centred on its first block.
+- **X20.3, ChatGPT in the app (2026-11-06, run on the owner's go-ahead, "Yes, run it").**
+  - The built app was driven through Studio over the DevTools protocol, in the owner's own data folder: the public importer source pasted, no question, "Esplora la fonte" on `gpt-6.1-sol`.
+  - **The run:** one request, no repair, about 15,000 characters received in 125 s. The answer passed `acceptExploration`, was saved (`explorations/`, with origin ChatGPT · gpt-6.1-sol) and opened in the view, with no console errors.
+  - **The shape:**
+    - three aspects, one of them the problem ("Perché il silenzio è ambiguo"), as A2 asks for a problem the source develops;
+    - 8 roles, 17 components, one prerequisite as the premise, 5 annotations, 10 links (1 interpreted), one trace (7 steps);
+    - "How it was read": 179 lines, 96% in the map, entry by the source's question, the logic follows the chapters.
+  - **Found and fixed:**
+    - at the aspect level, a prerequisite with components was drawn as an aspect ("1 ruolo") and its toggle tried to open a sub-level. Only an aspect's block opens one now; a prerequisite's components open in place (unit test added);
+    - a long generated "whole" widened the window by 3 px, because the view's outer grid column grew to its bar's content. The column is now `minmax(0, 1fr)`.
+    
+    After both fixes, 80/80 checks pass again.
+  - The exploration's title is its source's title ("night-importer.md"): the request asks for no title. The owner can judge whether a title should be asked for.
+  - **Still to run:** X20.3 through Claude over MCP, which needs a Claude client connected to this build's MCP server.
+- **Left for the owner's look (X20.2 witnessed, X20.4):**
+  - at 1280×800 the structure has about 260 px of height under the guide, the step strip and the card;
+  - the importer enters, at the aspect level, by its morning-catalogue question.
 
 ## Verification strategy
 
