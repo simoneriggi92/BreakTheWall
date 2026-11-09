@@ -79,18 +79,26 @@
 .xp { height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
 .xp-bar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; }
 .xp-title { display: flex; flex-direction: column; min-width: 0; flex: 1; padding-inline-start: 16px; border-inline-start: 1px solid var(--line); }
-.xp-title h1 { font: 400 20px/1.25 var(--f-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xp-meta { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the bar (X27): the title stronger, and the sentence that sums up the source readable, on up to two lines */
+.xp-title h1 { font: 500 21px/1.25 var(--f-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xp-meta { color: var(--ink); font-size: 14.5px; line-height: 1.4; margin-top: 2px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .xp-tag { color: var(--muted); font: 500 11px/1.4 var(--f-mono); letter-spacing: .04em; border: 1px solid var(--line); border-radius: var(--x-r-pill); padding: 1px 8px; white-space: nowrap; }
 .xp-how { border: 1px solid var(--line); border-radius: var(--x-r-pill); background: var(--surface); padding: 6px 14px; font-weight: 500; }
 .xp-how.xp-on, .xp-guide button[aria-pressed="true"], .xp-tabs button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .xp-tabs { display: none; }
-.xp-body { position: relative; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); gap: 16px; padding: 0 16px 16px; grid-template-columns: minmax(0, 1fr) minmax(320px, 34%); }
-.xp-body.xp-with-index { grid-template-columns: 248px minmax(0, 1fr) minmax(320px, 34%); }
-.xp-body.xp-idx-closed.xp-with-index { grid-template-columns: 56px minmax(0, 1fr) minmax(320px, 34%); }
-.xp-body.xp-src-closed { grid-template-columns: minmax(0, 1fr) 56px; }
-.xp-body.xp-with-index.xp-src-closed { grid-template-columns: 248px minmax(0, 1fr) 56px; }
-.xp-body.xp-with-index.xp-idx-closed.xp-src-closed { grid-template-columns: 56px minmax(0, 1fr) 56px; }
+/* the columns (X23): the index's and the source's widths are shares the learner sets with the separators between them */
+.xp-body { position: relative; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0 16px 16px;
+  --xi: .2; --xs: .34; --xc: .3;
+  --xi-w: max(200px, calc(var(--xi) * 100%)); --xs-w: max(300px, calc(var(--xs) * 100%));
+  grid-template-columns: minmax(0, 1fr) 16px var(--xs-w); }
+.xp-body.xp-with-index { grid-template-columns: var(--xi-w) 16px minmax(0, 1fr) 16px var(--xs-w); }
+.xp-body.xp-idx-closed.xp-with-index { grid-template-columns: 56px 16px minmax(0, 1fr) 16px var(--xs-w); }
+.xp-body.xp-src-closed { grid-template-columns: minmax(0, 1fr) 16px 56px; }
+.xp-body.xp-with-index.xp-src-closed { grid-template-columns: var(--xi-w) 16px minmax(0, 1fr) 16px 56px; }
+.xp-body.xp-with-index.xp-idx-closed.xp-src-closed { grid-template-columns: 56px 16px minmax(0, 1fr) 16px 56px; }
+.xp-split { display: flex; justify-content: center; min-width: 0; }
+.xp-split > .splitter-vertical { width: 12px; }
+.xp-structure-panel > .splitter-horizontal { background: var(--surface); border-top: 1px solid var(--line); }
 .xp-body .xp-panel { display: flex; flex-direction: column; overflow: hidden; }
 .xp-head { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 10px 8px 18px; border-bottom: 1px solid var(--line); }
 .xp-head h2 { flex: 1; font: 500 15px/1.3 var(--f-display); }
@@ -101,7 +109,7 @@
 .xp-structure-panel { min-width: 0; }
 .xp-guide { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 14px; }
 .xp-guide button, .xp-tabs button { border: 1px solid var(--line); border-radius: var(--x-r-pill); background: var(--surface); padding: 4px 12px; font-size: 13px; }
-.xp-stage { position: relative; flex: 1 1 50%; min-height: 260px; overflow: auto; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
+.xp-stage { position: relative; flex: 1 1 50%; min-height: 120px; overflow: auto; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; }
 
 /* ---------- the drawing */
 .xp-graph { position: relative; }
@@ -137,9 +145,14 @@
 .xp-label.xp-many { white-space: normal; max-width: 220px; border-radius: var(--x-r-card); padding: 5px 10px; text-align: left; }
 .xp-bonds { margin: 0; padding: 0 0 0 14px; }
 .xp-label-dot { fill: var(--x-leader); }
-.xp-tray { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 14px; }
 .xp-chip { border: 1px solid var(--line); border-radius: var(--x-r-pill); background: var(--surface); padding: 2px 10px; font-size: 12.5px; }
 .xp-chip[aria-pressed="true"] { border-color: var(--ink); }
+/* the pieces aside (X25): a band at the foot of the structure column, set off from the drawing and the card */
+.xp-aside-band { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 18px 12px; border-top: 1px dashed var(--x-aside); background: var(--sunk); }
+.xp-aside-band > b { color: var(--x-aside); font-size: 13px; }
+.xp-aside-hint { color: var(--muted); font-size: 12px; }
+.xp-aside-band .xp-chip { border-color: var(--x-aside); background: var(--x-aside-soft); color: var(--ink); }
+.xp-aside-band .xp-chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .xp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 
 /* ---------- the sub-level */
@@ -168,7 +181,7 @@
 .xp-nav.xp-wide { font-weight: 500; }
 
 /* ---------- the card */
-.xp-structure-panel > .xp-card { max-height: 30%; overflow: auto; padding: 14px 20px 18px; max-width: none; }
+.xp-structure-panel > .xp-card { flex: 0 0 auto; height: calc(var(--xc) * 100%); min-height: 0; overflow: auto; padding: 14px 20px 18px; max-width: none; }
 .xp-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .xp-card-head h3 { font: 500 17px/1.3 var(--f-display); }
 .xp-card[data-tone] .xp-card-head h3 { border-inline-start: 3px solid var(--tone); padding-inline-start: 8px; }
@@ -176,6 +189,12 @@
 .xp-points { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .xp-points button { display: flex; gap: 8px; width: 100%; text-align: left; border: 0; background: transparent; padding: 3px 6px; border-radius: 8px; }
 .xp-points button[aria-pressed="true"] { background: var(--hl); }
+/* an aspect's roles (X24): the block's overview, each opening in the sub-level */
+.xp-roles { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.xp-roles button { display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: baseline; width: 100%; text-align: left; border: 0; background: transparent; padding: 3px 6px; border-radius: 8px; color: inherit; font: inherit; }
+.xp-roles button::before { content: "•"; color: var(--tone, var(--x-main)); font-weight: 700; }
+.xp-roles button > span { min-width: 0; }
+.xp-roles button:hover { background: var(--hl); }
 .xp-points i { font-style: normal; color: var(--x-main); width: 1em; flex: none; } .xp-points i[data-mark="caveat"] { color: var(--x-note); }
 .xp-note { border: 1px solid var(--x-note); color: var(--x-note); background: var(--x-note-soft); border-radius: var(--x-r-pill); padding: 2px 10px; margin: 0 6px 6px 0; }
 .xp-card details > summary { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; padding: 4px 0; }
@@ -209,9 +228,22 @@
 .xp-dot[data-tone] { border-color: var(--tone); }
 .xp-dot.xp-in { background: var(--x-main); } .xp-dot.xp-in[data-tone] { background: var(--tone); } .xp-dot.xp-in[data-role="prerequisite"] { background: var(--x-prereq); }
 .xp-dot.xp-sel { outline: 2px solid var(--ink); outline-offset: 1px; }
+/* the index's legend (X26): at the panel's foot, drawn with the index's own marks */
+.xp-index { flex: 1; min-height: 0; }
+.xp-legend { flex: none; border-top: 1px solid var(--line); padding: 8px 14px 10px; font-size: 12px; color: var(--muted); max-height: 45%; overflow: auto; }
+.xp-legend summary { cursor: pointer; font: 500 11px/1.6 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+.xp-legend .xp-hint { margin: 4px 0 6px; }
+.xp-legend ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.xp-legend li { display: flex; align-items: center; gap: 8px; }
+.xp-legend-mark { flex: none; min-width: 18px; display: inline-flex; justify-content: center; }
+.xp-legend-mark small { font: 10.5px/1.4 var(--f-mono); }
+.xp-legend-now { width: 14px; height: 10px; border-radius: 3px; background: var(--x-main-soft); box-shadow: inset 3px 0 0 var(--x-main); }
 .xp-source { flex: 1; min-height: 0; overflow: auto; }
 .xp-source .source-document { height: 100%; overflow: auto; padding: 12px 16px 24px; font: var(--x-source-size)/var(--x-source-leading) var(--x-read); }
 .xp-source [data-from] { cursor: pointer; }
+/* the raw lines (X22): the player's "Righe", filling the column */
+.xp-source .xp-lines { height: 100%; }
+.xp-head .xp-views { flex: none; }
 .xp-source [data-role="main"] { box-shadow: inset 3px 0 var(--x-main); }
 .xp-source [data-role="prerequisite"] { box-shadow: inset 3px 0 var(--x-prereq); }
 .xp-source [data-role="annotation"] { box-shadow: inset 3px 0 var(--x-note); }
@@ -242,7 +274,8 @@
 @media (max-width: 899px) {
   .xp-tabs { display: flex; gap: 4px; margin: 0 12px 12px; padding: 4px; border-radius: var(--x-r-pill); background: var(--sunk); }
   .xp-tabs button { flex: 1; }
-  .xp-body, .xp-body.xp-with-index, .xp-body.xp-src-closed, .xp-body.xp-with-index.xp-src-closed { grid-template-columns: minmax(0, 1fr); padding: 0 12px 12px; }
+  .xp-body, .xp-body.xp-with-index, .xp-body.xp-src-closed, .xp-body.xp-with-index.xp-src-closed, .xp-body.xp-idx-closed.xp-with-index, .xp-body.xp-with-index.xp-idx-closed.xp-src-closed { grid-template-columns: minmax(0, 1fr); padding: 0 12px 12px; }
+  .xp-split, .xp-structure-panel > .splitter-horizontal { display: none; }
   .xp-body:not(.xp-tab-index) .xp-index-panel, .xp-body:not(.xp-tab-structure) .xp-structure-panel, .xp-body:not(.xp-tab-source) .xp-source-panel { display: none; }
   .xp-tab-structure .xp-card-lines { display: block; }
   .xp-head .xp-icon { display: none; }

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DesktopBridge } from '../src/core/bridge';
@@ -39,7 +39,7 @@ function meeting(cites: ExplorationCite[]) {
 const exactly = (cites: ExplorationCite[]) => expect(marked().sort()).toEqual(meeting(cites).sort());
 const positions = () => top().map(n => `${n.dataset.id}:${n.style.left},${n.style.top}`);
 
-afterEach(() => { vi.restoreAllMocks(); delete (Element.prototype as { animate?: unknown }).animate; });
+afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); delete (Element.prototype as { animate?: unknown }).animate; });
 
 describe('the view and its shared state (X12)', () => {
   it('opens the importer on its aspects and Mill on its roles', async () => {
@@ -155,10 +155,14 @@ describe('the guides (X13)', () => {
   it('leaves the guide where it is while exploring, and "back to the step" restores it', async () => {
     const x = byId('mill-harm-map'); await view(x);
     await user().click(screen.getByRole('button', { name: 'Passo successivo' }));
+    // the step's own part is not leaving the guide (X28); a part from an earlier layer is
     await user().click(node('principle'));
+    expect(strip()).not.toHaveClass('xp-paused');
+    expect(strip()).not.toHaveTextContent('Esplori fuori dalla guida');
+    await user().click(node('utility'));
     expect(count()).toBe('livello 2 di 4');
     expect(strip()).toHaveClass('xp-paused');
-    expect(cardTitle()).toBe('Il principio del danno');
+    expect(cardTitle()).toBe('L’utilità come fondamento');
     await user().click(screen.getByRole('button', { name: '↩ Torna al passo' }));
     expect(strip()).not.toHaveClass('xp-paused');
     expect(count()).toBe('livello 2 di 4');
@@ -378,19 +382,6 @@ describe('the card explains the selection (X21)', () => {
     fireEvent.pointerUp(el, { clientX: 10 + dx, clientY: 10, pointerId: 1 });
   };
 
-  it('gives an aspect its name and the way into its roles, and no list of them', async () => {
-    const x = byId('importer-signals-map'); await view(x);
-    await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
-    await user().click(node('signals'));
-    expect(cardTitle()).toBe('Il giro e i segnali che lascia');
-    const roles = x.parts.filter(p => p.kind === 'part' && p.aspect === 'signals');
-    const text = document.querySelector('.xp-card')!.textContent!.replaceAll('Il giro e i segnali che lascia', '').replace(/Le righe citate[\s\S]*$/, '');
-    for (const r of roles) expect(text).not.toContain(r.name);
-    expect(document.querySelector('.xp-card .xp-lead')).toBeNull();
-    expect(card().getByRole('button', { name: /Apri «Il giro e i segnali che lascia»: 5 ruoli/ })).toBeInTheDocument();
-    expect(document.querySelectorAll('.xp-card details')).toHaveLength(0);
-  });
-
   it('gives a role what it does and every point, with no fold', async () => {
     const x = await mill();
     await user().click(node('region'));
@@ -462,6 +453,147 @@ describe('the card explains the selection (X21)', () => {
     await mill();
     await user().click(node('region'));
     expect(document.querySelector('.xp-card .xp-card-lines')).toHaveTextContent('Le righe citate');
+  });
+});
+
+describe('the polish of the view (X22–X26)', () => {
+  const importer = async () => { const x = byId('importer-signals-map'); await view(x); return x; };
+  const lines = () => document.querySelector<HTMLElement>('.xp-source .xp-lines');
+
+  it('X22: switches the source between the document and its numbered lines, which mark, colour and answer as the document does', async () => {
+    const x = byId('mill-harm-map'); await view(x);
+    await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
+    const views = within(screen.getByRole('group', { name: 'Come mostrare la fonte' }));
+    expect(views.getByRole('button', { name: 'Documento' })).toHaveAttribute('aria-pressed', 'true');
+    await user().click(views.getByRole('button', { name: 'Righe' }));
+    expect(views.getByRole('button', { name: 'Righe' })).toHaveAttribute('aria-pressed', 'true');
+    expect(lines()).not.toBeNull();
+    expect(lines()!.querySelectorAll('li')).toHaveLength(x.source.text.split('\n').length);
+    await user().click(node('region'));
+    const region = x.parts.find(p => p.id === 'region')!;
+    exactly(region.cites);
+    expect(lines()!.querySelector(`li[data-from="${region.cites[0].from}"]`)).toHaveAttribute('data-role', 'main');
+    const principle = x.parts.find(p => p.id === 'principle')!;
+    await user().click(lines()!.querySelector<HTMLElement>(`li[data-from="${principle.cites[0].from}"]`)!);
+    expect(cardTitle()).toBe(principle.name);
+  });
+
+  it('X22: keeps the view when the source folds, and offers no choice for code', async () => {
+    await view(byId('mill-harm-map'));
+    await user().click(screen.getByRole('button', { name: 'Righe' }));
+    await user().click(screen.getByRole('button', { name: 'Riduci: Fonte' }));
+    await user().click(screen.getByRole('button', { name: 'Apri: Fonte' }));
+    expect(screen.getByRole('button', { name: 'Righe' })).toHaveAttribute('aria-pressed', 'true');
+    const x = byId('mill-harm-map'); (x.source as { language?: string }).language = 'typescript';
+    cleanup(); await view(x);
+    expect(screen.queryByRole('group', { name: 'Come mostrare la fonte' })).toBeNull();
+    expect(lines()).not.toBeNull();
+  });
+
+  it('X23: resizes the card, the index and the source from the keyboard, within bounds, and keeps the sizes', async () => {
+    await importer();
+    const card = screen.getByRole('separator', { name: 'Altezza della scheda' });
+    expect(card).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(card).toHaveAttribute('aria-valuenow', '30');
+    card.focus();
+    await user().keyboard('{ArrowUp}{ArrowUp}');
+    expect(card).toHaveAttribute('aria-valuenow', '40');
+    expect(Number(document.querySelector<HTMLElement>('.xp-body')!.style.getPropertyValue('--xc'))).toBeCloseTo(0.4);
+    await user().keyboard('{End}');
+    expect(card).toHaveAttribute('aria-valuenow', '70');
+    await user().keyboard('{Home}');
+    expect(card).toHaveAttribute('aria-valuenow', '15');
+    fireEvent.doubleClick(card);
+    expect(card).toHaveAttribute('aria-valuenow', '30');
+    const index = screen.getByRole('separator', { name: 'Larghezza dell’indice' });
+    index.focus(); await user().keyboard('{ArrowRight}');
+    expect(index).toHaveAttribute('aria-valuenow', '25');
+    const source = screen.getByRole('separator', { name: 'Larghezza della fonte' });
+    source.focus(); await user().keyboard('{ArrowLeft}');
+    expect(source).toHaveAttribute('aria-valuenow', '39');
+    cleanup(); await importer();
+    expect(screen.getByRole('separator', { name: 'Larghezza dell’indice' })).toHaveAttribute('aria-valuenow', '25');
+    localStorage.clear();
+  });
+
+  it('X23: hides a folded column’s separator', async () => {
+    await importer();
+    await user().click(screen.getByRole('button', { name: 'Riduci: Fonte' }));
+    expect(screen.queryByRole('separator', { name: 'Larghezza della fonte' })).toBeNull();
+    await user().click(screen.getByRole('button', { name: 'Riduci: Indice della fonte' }));
+    expect(screen.queryByRole('separator', { name: 'Larghezza dell’indice' })).toBeNull();
+    expect(screen.getByRole('separator', { name: 'Altezza della scheda' })).toBeInTheDocument();
+  });
+
+  it('X24: gives an aspect its roles, open, and a role opens in the sub-level', async () => {
+    const x = await importer();
+    await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
+    await user().click(node('signals'));
+    expect(cardTitle()).toBe('Il giro e i segnali che lascia');
+    const list = card().getByRole('list', { name: 'I ruoli di «Il giro e i segnali che lascia»' });
+    const roles = x.parts.filter(p => p.kind === 'part' && p.aspect === 'signals');
+    expect(within(list).getAllByRole('button')).toHaveLength(roles.length);
+    for (const r of roles) expect(within(list).getByRole('button', { name: new RegExp(r.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toHaveTextContent(r.role);
+    expect(list.closest('details')).toBeNull();
+    expect(card().getByRole('button', { name: /Apri «Il giro e i segnali che lascia»: 5 ruoli/ })).toBeInTheDocument();
+    await user().click(within(list).getByRole('button', { name: /L’interruttore di pausa/ }));
+    expect(sub()).not.toBeNull();
+    expect(cardTitle()).toBe('L’interruttore di pausa');
+  });
+
+  it('X25: puts the pieces aside in a band at the foot of the structure column', async () => {
+    const x = await importer();
+    const band = screen.getByRole('group', { name: 'A parte' });
+    expect(band.parentElement!.lastElementChild).toBe(band);
+    expect(band.closest('.xp-stage')).toBeNull();
+    expect(band).toHaveTextContent('fuori dal meccanismo');
+    const ref = x.parts.find(p => p.id === 'glossary')!;
+    await user().click(within(band).getByRole('button', { name: ref.name }));
+    expect(cardTitle()).toBe(ref.name);
+  });
+
+  it('X26: builds the index legend from the exploration, and folds it', async () => {
+    const x = await importer();
+    const legend = document.querySelector<HTMLDetailsElement>('.xp-legend')!;
+    expect(legend.open).toBe(true);
+    for (const a of x.aspects) expect(legend).toHaveTextContent(a.name);
+    expect(legend.querySelectorAll('.xp-dot[data-tone]')).toHaveLength(x.aspects.length);
+    expect(legend).toHaveTextContent('prerequisito');
+    expect(legend).toHaveTextContent('la sezione che la domanda della fonte attraversa');
+    expect(legend).not.toHaveTextContent('meccanismo');
+    await user().click(within(legend).getByText('Legenda'));
+    expect(legend.open).toBe(false);
+  });
+
+  it('X26: names the mechanism when there are no aspects, and no question when no trace walks a section', async () => {
+    const x = await bakery(); x.traces = []; x.aspects = []; x.parts.forEach(p => { delete p.aspect; });
+    await view(await validateExploration(x));
+    const legend = document.querySelector<HTMLDetailsElement>('.xp-legend')!;
+    expect(legend).toHaveTextContent('meccanismo');
+    expect(legend).not.toHaveTextContent('domanda della fonte');
+  });
+});
+
+describe('the bar and the strip (X27, X28)', () => {
+  it('X27: shows the whole sentence as the description, on hover too', async () => {
+    const x = byId('importer-signals-map'); await view(x);
+    const meta = document.querySelector('.xp-bar .xp-meta')!;
+    expect(meta).toHaveTextContent(x.whole);
+    expect(meta).toHaveAttribute('title', x.whole);
+    expect(document.querySelector('.xp-bar h1')).toHaveAttribute('title', x.title);
+  });
+
+  it('X28: names the premise at its step without repeating its sentence, and its chip opens the card', async () => {
+    const x = byId('importer-signals-map'); await view(x);
+    await user().click(screen.getByRole('button', { name: 'Tutta la fonte' }));
+    const premise = modelOf(x).premise!;
+    expect(strip()).toHaveTextContent('Il punto di partenza della fonte');
+    expect(strip()).not.toHaveTextContent(premise.role);
+    await user().click(within(strip()).getByRole('button', { name: premise.name }));
+    expect(cardTitle()).toBe(premise.name);
+    expect(card().getByText(premise.role)).toBeInTheDocument();
+    expect(strip()).not.toHaveTextContent('Esplori fuori dalla guida');
+    expect(strip()).not.toHaveClass('xp-paused');
   });
 });
 

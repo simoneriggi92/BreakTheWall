@@ -1,11 +1,11 @@
 ---
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
-version: 7
+version: 9
 state: implementing
 current_task: X20
-last_evidence: X21 (2026-11-09) tsc; vitest --dir tests 41 files 596 tests; build; built app over DevTools 61/61 (four cards, paper and blueprint, it and en, real click and drag on labels, Tab and Enter, fallback lines). Earlier X20.1-X20.3 as recorded
-next_action: owner - look at the four cards (X21 screenshots), then CI (X20.1), witness X20.2, X20.3 through Claude over MCP, X20.4
+last_evidence: X27-X28 (2026-11-09) tsc; vitest --dir tests 41 files 608 tests; build; built app over DevTools 125/125 (with X22-X26: bar on two lines, premise chip, no off-guide note for the step's own part). X21 and X20.1-X20.3 as recorded
+next_action: owner - look at polish and clarity, then commit and push to PR 47 on request; then CI (X20.1), witness X20.2, X20.3 through Claude over MCP, X20.4
 approval: approved
 ---
 
@@ -99,6 +99,35 @@ v7 adds one phase, `card`, with one task, **X21**:
 - the cited lines become a fallback, shown only while the source column is hidden.
 
 X16 is superseded where X21 says otherwise. No other task changes. The contract and the request are untouched: the visible cuts come first, before any prompt is changed.
+
+## What changes from v7
+
+v7 was approved on 2026-11-09 and X21 is implemented and pushed (commit 1ad37b5, PR 47). Looking at the app the same day, the owner found five things, which v8 adds as phase `polish`:
+- **X22.** The source column showed the Markdown rendered only. The disassembly player has two buttons for it, "Documento" (rendered) and "Righe" (raw, numbered), and the owner wants them back here.
+- **X23.** The card, the index and the source could not be made larger or smaller, as the disassembly player's panes can. The card's height is fixed at 30%.
+- **X24.** The aspect card cut by X21 confused the owner: a name and "Apri … 4 ruoli", nothing on what is inside. X21's own rule did not hold here, because at the aspect level the roles are not drawn until the aspect is opened, so the list of roles was the block's only overview, not a copy.
+- **X25.** The "A parte" tray sits inside the drawing, between the graph and the guide, in the middle of the navigation. The owner chose to move it to the bottom of the structure column, in the aside colour ("A. Fascia in fondo al pannello").
+- **X26.** The index's dots carry four signs (aspect hue, filled, ring, outline), and the one-line hint explains one of them. The owner asked for a legend at the bottom.
+
+On the points, the owner asked why some cards have a bulleted list and others not. It follows the data: roles and prerequisites carry points, while aspects, annotations, references and procedures have none. It is intended, and v8 leaves it, except that X24 gives the aspect its roles.
+
+X21 is superseded only on the aspect card (X24). No other task changes, and the contract and the request are untouched.
+
+## What changes from v8
+
+v8 was approved on 2026-11-09, and X22–X26 are implemented and checked (not yet committed). Looking at the app the same day, on a generated exploration of one of their own sources, the owner found two more things, which v9 adds as phase `clarity`:
+- **X27.** In the bar, the title and the description are hard to read. The title is 20 px on one line. The description (the exploration's `whole`, the sentence that sums up the source) is 13 px, in the muted colour, on one line and cut with an ellipsis, so a long sentence is lost halfway.
+- **X28.** The guide's strip repeats the card. At the premise step, the strip shows the premise's sentence, and the card shows the same sentence once the premise is selected. Choosing the very part the step puts forward also shows "Esplori fuori dalla guida", though the reader has not left the guide.
+
+**The owner asked whether a popover next to the block would be better than the card.** It is not adopted, for four reasons:
+- it covers neighbouring blocks, joints and labels (the problem X21 fixed for the hover peek);
+- long content does not fit (the aspect's roles, the points, a link's bonds);
+- it collides with the sub-level, which also opens under its block;
+- the leader line to the source would start from a moving point, and on a narrow window or with the keyboard, managing focus gets hard.
+
+The hover peek already gives a short sentence next to the block. Instead, each surface keeps one job: the strip says where the reader is, and the card says what it means.
+
+**Not in v9:** generated explorations still take the source's file name as their title, because the request asks for no title. That needs a change to the request, and stays a separate decision.
 
 ## Evidence
 
@@ -222,6 +251,8 @@ Included:
 - retiring "take this part apart" from the disassembly player, from the bridge and from the core;
 - `docs/product.md`, updated with the members, the aspects and the levels (X2);
 - the card explaining only the selected element, and the link card (X21);
+- the source's two views, resizable panes, the aspect card's roles, the "A parte" band and the index legend (X22–X26);
+- a readable bar, and a guide strip that does not repeat the card (X27, X28);
 - tests.
 
 Not included:
@@ -238,6 +269,10 @@ Not included:
 - views A, B and C, and D's "detail" control;
 - an aspect's own central idea: the contract gives an aspect only an id and a name, and adding one changes the contract and the gated request. It is decided after the owner sees the cut card (X21);
 - rewriting the request or the prompts to change the card's text;
+- points for aspects, annotations, references or procedures (they would need a different request);
+- storing pane sizes per exploration (they are kept per device, as the player's are);
+- a popover for the card next to the selected block (see "What changes from v8");
+- asking the model for an exploration title;
 - any new dependency.
 
 ## Preconditions
@@ -927,6 +962,139 @@ Not included:
   - **Found and fixed on the built app:** a block's hover peek (`.xp-peek`, above the labels) kept the hover while the pointer moved down onto the block's own joint label, so the click went to the block. The peek no longer takes the pointer (`pointer-events: none`, static check added).
   - **Left for the owner's look:** the 16 screenshots (four cards × two themes × two languages), and the thin aspect card.
 
+### Phase `polish`
+
+From the owner's look at the app on 2026-11-09, after X21. X22–X26 do not depend on one another, except that X25 and X23 both change the structure column's rows, so X23 goes after X25.
+
+**X22. The source's two views** (`Panels.tsx` `SourcePanel`, `ExplorationView.tsx`, `state.ts`, `exploration.css`).
+- The source column's head gets the two buttons of the disassembly player's `SourcePane`: "Documento" (rendered, today's view) and "Righe" (the raw text with numbered lines). They reuse its strings (`t.d.viewLabel`, `t.d.views`) and its rule: a source that is not prose (`isProse`, `src/renderer/markdown.ts`) shows only "Righe", and offers no choice.
+- The view lives in the view state, and is kept when a panel folds.
+- **"Righe" behaves as "Documento" does:**
+  - the selection's lines are marked, and the first is scrolled into view inside the column only;
+  - the leader line runs from the card to the first marked line;
+  - each line's gutter has the colour of the narrowest part that cites it;
+  - a click on a line opens its part (`pickLine`).
+- Acceptance (component tests):
+  - the two buttons switch the view, and the pressed one says which;
+  - in "Righe", a chosen part marks exactly its lines, and a click on a line opens its part;
+  - a code source shows "Righe" and no buttons;
+  - the view survives folding and reopening the column.
+
+**X23. Panes the learner can resize** (`SplitPane.tsx`, `ExplorationView.tsx`, `exploration.css`).
+- The player's `Splitter` (role `separator`; the pointer, the arrow keys, and Home or End for the smallest or largest size; a double click restores the initial size) goes in three places:
+  - between the structure and the card, horizontal: the card grows upward or shrinks downward;
+  - between the index and the structure, and between the structure and the source, vertical.
+- `PANES` gains three keys for the exploration (card, index, source), each with its initial, smallest and largest share. The sizes are kept per device in local storage, as the player's are, and anything unreadable falls back to the defaults.
+- A folded index or source keeps its rail and hides its separator. On a narrow window there are no separators, as in the player.
+- Acceptance (component tests):
+  - the arrow keys change a pane's share by the player's step, within its bounds, and `aria-valuenow` says it;
+  - Home and End reach the bounds, and a double click restores the initial size;
+  - the sizes survive a remount, and an unreadable stored value falls back;
+  - folding a column hides its separator.
+
+**X24. The aspect card gives its roles** (`Panels.tsx`, `ExplorationView.tsx`, `exploration.css`).
+- The aspect card opens with its roles as a bulleted list, "name — what it does", open and not folded, in the source's order.
+- A click on a role opens the sub-level with that role selected (`openSub(aspect, role)`, as a role chosen elsewhere is).
+- "Apri «…»" stays under the list, and the annotations stay.
+- No lead made of the roles' names: the list replaces it.
+- Acceptance (component tests):
+  - the importer's "Il giro e i segnali che lascia" card lists its five roles with what each does;
+  - a click on one opens the sub-level with that role's card;
+  - the list is open, not folded.
+
+**X25. "A parte" at the bottom of the structure column** (`ExplorationView.tsx`, `exploration.css`, `x-it.ts`, `x-en.ts`).
+- The tray leaves the drawing and becomes a band at the bottom of the structure column, under the card. It is set off by a dashed top border and the sunk background.
+- Its chips take the aside colour (`--x-aside`, `--x-aside-soft`), the same as the aside dots in the index and the aside blocks.
+- Its label says what it is: "A parte · fuori dal meccanismo" / "Aside · outside the mechanism".
+- A chip still opens its card, and the band shows only when the exploration has pieces aside.
+- Acceptance (component tests and a static CSS check):
+  - the band is the structure column's last child, and no tray is left inside the stage;
+  - a chip opens its card;
+  - the chips use the aside tokens.
+
+**X26. A legend for the index** (`Panels.tsx` `IndexPanel`, `exploration.css`, `x-it.ts`, `x-en.ts`).
+- At the bottom of the index, built from the open exploration, it shows only the signs that occur in it:
+  - each aspect's hue with its name, or the main colour as "mechanism" when there are no aspects;
+  - the prerequisite colour;
+  - the aside ring;
+  - filled for "already shown by the guide", and empty for "not yet";
+  - the outline of the selected part;
+  - "? question" for a section the source's question walks;
+  - the marked section for "touched by the current step";
+  - "not extracted".
+- It can be folded, as the other folding parts are. The hint at the top keeps only "in its order".
+- Acceptance (component tests):
+  - Mill's legend has no aspect entries and has the prerequisite entry;
+  - the importer's legend names its two aspects with their tones;
+  - "? question" appears only when a trace walks a section;
+  - the legend folds and opens.
+
+**For the whole phase,** on the built app, with the X21 DevTools script extended (paper and blueprint, Italian and English, 1280×800 and a narrow window, no console errors):
+- the two views of the source;
+- a real drag on each separator, and the arrow keys on a focused separator;
+- the aspect card's roles opening the sub-level;
+- the band at the bottom;
+- the legend.
+
+Screenshots go to the owner.
+
+- **Done (2026-11-09):**
+  - **X22.** `SourcePanel` has two views, chosen in the column's head with the player's buttons and strings. The view is kept in `ViewState.sourceView` and survives folding.
+    - "Righe" is `SourceLines`: the player's `source-text` list, where each line carries `data-from` and `data-to`. So the same code marks the selection, colours the gutters, answers a click and anchors the leader line.
+    - A source that is not prose shows its lines and no buttons.
+  - **X23.** `PANES` gains `xCard` (0.3, 0.15–0.7), `xIndex` (0.2, 0.14–0.34) and `xSource` (0.34, 0.24–0.55), and `Splitter` now takes any arrow as `grows`.
+    - The view sets `--xc`, `--xi` and `--xs` on its body. The grid has a 16 px column between panels, holding a separator only while the panel next to it is open.
+    - The card's height is its share of the structure column, and the stage's minimum height is 120 px instead of 260.
+    - On a narrow window the separators are hidden.
+  - **X24.** The aspect card lists its roles, "name — what it does", in source order, each a button that opens the sub-level on that role (`openSub`). Found on the built app: the bullet sat beside the second line of a wrapped role, so it is now drawn in the button, on the first line.
+  - **X25.** The tray left the stage. It is now a band, the structure column's last child, with a dashed top border in the aside colour, the sunk background, and chips in `--x-aside` and `--x-aside-soft`. Its label reads "A parte · fuori dal meccanismo" / "Set apart · outside the mechanism". A chip closes an open sub-level before opening its card.
+  - **X26.** `IndexLegend`, at the index panel's foot, can be folded and lists only the signs present, drawn with the index's own marks. The top hint keeps "nel suo ordine".
+  - **Tests:** 8 component tests (X22 ×2, X23 ×2, X24, X25, X26 ×2) and 2 static CSS checks. The X21 aspect test is replaced by X24's, and `split-pane.test.tsx` has the new defaults. `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 605 tests, and `npm run build` passes.
+  - **Built app:** the DevTools script was extended. 117/117 checks pass in paper and blueprint, Italian and English, at 1280×800 and 760 px, with no console errors:
+    - the source in "Righe", with the focus in view, the leader line, the coloured gutters and a click on a line;
+    - real drags on the three separators (card +80 px, index +60 px, source +60 px), Home, and a double click restoring them;
+    - the aspect card's five roles, and one opening the sub-level;
+    - the band at the column's foot, and the legend at the index's foot with both aspects;
+    - no separators on a narrow window.
+  - **Found, outside this phase:** two settings saved within a few milliseconds (theme, then language) make the second `SettingsStore.write` fail on its `rename`, because both use the same `.pending` file, and the renderer logs an unhandled rejection. The script now waits between them. The store is not changed here.
+
+### Phase `clarity`
+
+From the owner's look on 2026-11-09, after X22–X26. X27 and X28 are independent.
+
+**X27. A readable bar** (`exploration.css`, `ExplorationView.tsx`).
+- **The title:** a little stronger (weight 500, 21 px), still on one line, with the full title shown on hover.
+- **The description:**
+  - 14.5 px, in the text's full colour (`--ink`), with the hierarchy kept by size and weight, not by a faded colour;
+  - up to two lines, cut only after the second; the full sentence on hover and as the accessible description.
+- On a narrow window it stays hidden, as today.
+- Acceptance:
+  - a static CSS check: the description uses `--ink`, two lines, no `white-space: nowrap`;
+  - a component test: the description carries the full `whole` as its title;
+  - on the built app: a long generated `whole` shows on two lines at 1280×800, with no sideways scroll, in both themes.
+
+**X28. The strip says where the reader is; the card says what it means** (`ExplorationView.tsx`, `x-it.ts`, `x-en.ts`).
+- At the premise step, the strip shows the step's name and count ("Il punto di partenza della fonte · prima di tutto"). It shows the premise's name as a chip, as the other steps show the parts entering, and no longer shows its sentence. The sentence and the points stay on the card.
+- "Esplori fuori dalla guida" shows only when the explored part is not the one the step puts forward. Choosing that part selects it, and the guide stays where it is.
+- The other strips are unchanged:
+  - a question's step keeps its own text (the question's step, not a part's sentence);
+  - "all the layers" and the sub-level keep their lines.
+- Acceptance (component tests):
+  - at the premise step, the strip does not contain the premise's sentence and has a chip with its name; the chip selects the premise, and the card shows its sentence;
+  - choosing the step's own part shows no "fuori dalla guida", while choosing another part does;
+  - Mill and the importer keep their guide tests.
+
+**For the phase,** on the built app with the DevTools script: the bar at 1280×800 in both themes, the premise step with and without the premise chosen, and no console errors.
+
+- **Done (2026-11-09):**
+  - **X27.** The title is 21 px at weight 500, with the full title on hover. The description is a paragraph at 14.5 px in `--ink`, clamped to two lines, with the full `whole` as its title.
+  - **X28.** `stepPart` is the part the step puts forward (`guided`), and "away" holds only when the explored part is another one, for the note and for the strip's paused look. The premise step shows "la premessa:" / "the premise:" with a chip; its sentence stays on the card.
+  - **Tests:** 2 component tests (X27, X28) and a static CSS check. The X13 guide test now explores an earlier layer's part to leave the guide, and checks that the step's own part does not. `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 608 tests, and `npm run build` passes.
+  - **Built app:** the DevTools script of X22–X26 was extended. 125/125 checks pass in paper and blueprint, Italian and English, with no console errors:
+    - the importer's description on two lines with its full text on hover, and no sideways scroll;
+    - the premise chip opening its card, with a strip that does not repeat the sentence, shows no "away" note and is not paused.
+  - **Found and kept as is:** with "Tutti i livelli" on and the whole-source guide, no part is put forward, so the card stays empty until a block is chosen. That was already so, and a script check had assumed a selection; the script now chooses one.
+
 ## Verification strategy
 
 - **Runners:** `npm run check` (TypeScript and Vitest) and `npm run build`, from the adapter.
@@ -962,16 +1130,21 @@ Not included:
 - **The aspect card becomes thin** (X21): a name, a tag and the button to open its roles. It shows a gap in the data, since an aspect has no idea of its own, and it is not filled with a derived sentence, which would be a copy again. The owner judges it, and an aspect field is a separate decision.
 - **Labels carry two gestures** (X21): click and drag. The 4 px threshold separates them, and both are tested in jsdom and with a real pointer.
 - **The keyboard loses a compact list of links** (X21): links are reached by Tab through the labels instead. X21's run on the built app checks that path.
+- **Two views of the source double the line logic** (X22). The marking, the gutter colour, the click and the leader line must work on both. Both are tested on the same cases, and the leader line is checked on the built app.
+- **More separators, less drawing** (X23, X25). The band and a taller card take height from the drawing. The separator gives it back, and the initial shares keep today's layout at 1280×800.
+- **The aspect card can grow long** (X24). An aspect has at most 14 roles (the contract's limit), each with its sentence. The card scrolls, as it does today.
+- **A two-line description takes height** from the bar (X27). The bar grows by one line at most, and the panels below shrink by that much.
+- **The premise step shows less text** (X28). A reader who does not choose the premise sees only its name. The chip is the way to the sentence, and the guide's first step still lights the premise in the drawing.
 - **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
 
 ## Approval
 
 Record:
-- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v7".
-- **Timestamp:** 2026-11-09T16:16:35Z.
-- **Approved version:** 7.
-- **Plan digest:** SHA-256 `c3e741ea36bd354cc64e526d01ec80fa74353ef2342ce2b21202cc5443d7cb16` of this file before this record was added.
-- **Authorized scope:** as listed below under "v7 authorizes".
+- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v9".
+- **Timestamp:** 2026-11-09T17:13:12Z.
+- **Approved version:** 9.
+- **Plan digest:** SHA-256 `0f87623f5525ab18281c43215e669678b8f9dfc4c153960169b79b5e3dacf483` of this file before this record was added.
+- **Authorized scope:** as listed below under "v9 authorizes".
 
 History:
 - v2 was approved on 2026-11-05T16:56:08Z; void after v3.
@@ -979,19 +1152,21 @@ History:
 - v4 was approved on 2026-11-05T17:45:12Z (SHA-256 `874755f4…d997d6`). Its X1 ran R1 and the abstraction study. Void after v5.
 - v5 was approved on 2026-11-06T11:21:02Z by Simone Riggi ("Approve P-20261105-exploration v5"), SHA-256 `47da2401756a7cc3ce8bfe840a2b1b328d0021c501c3a607db7a490c23dc5c5c`. Its X1 ran A1 and A2 and passed. Void since v6's approval: v6 changes X4, X5, X11, X12, X15 and X16.
 - v6 was approved on 2026-11-06T15:04:33Z by Simone Riggi ("Approve P-20261105-exploration v6"), SHA-256 `3d0b158fb993099e100b2a673ed0f82acce449fda20574ca01b1857c850fad1c`. It authorized X2–X20 and the branch `feature/exploration`. X2–X19 and X20.1–X20.3 (ChatGPT) are done under it. Void since v7's approval: v7 adds X21 and supersedes part of X16.
+- v7 was approved on 2026-11-09T16:16:35Z by Simone Riggi ("Approve P-20261105-exploration v7"), SHA-256 `c3e741ea36bd354cc64e526d01ec80fa74353ef2342ce2b21202cc5443d7cb16`. It authorized X21 and what was left of X20. X21 is done under it (commit 1ad37b5). Void since v8's approval: v8 adds X22–X26 and supersedes X21 on the aspect card.
+- v8 was approved on 2026-11-09T16:51:32Z by Simone Riggi ("Approve P-20261105-exploration v8"), SHA-256 `ce8ca03b55c568db28a4f78010de97766e20420cc1b52260f7458e19164d3d60`. It authorized X22–X26 and what was left of X20. X22–X26 are done under it (not yet committed). Void since v9's approval: v9 adds X27–X28.
 
-Review: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Two findings were resolved before this version:
-- filtering out points with no mark was dropped, so all points stay;
-- choosing a label got a 4 px threshold between click and drag.
+Review:
+- v7: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Dropping the points with no mark was given up, and the 4 px threshold was added.
+- v8: each task comes from the owner's own look and words on 2026-11-09. The places to reuse were checked in the code, and the owner chose the band's placement.
+- v9: both tasks come from the owner's look on 2026-11-09. The causes were found in the code (the bar's CSS, the strip's premise text and its "away" condition). The popover the owner asked about was weighed and not adopted, for the reasons in "What changes from v8"; the owner then asked for v9 as proposed.
 
-The remaining risks are under Risks (the thin aspect card, two gestures on a label, the keyboard path).
+v9 authorizes:
+- committing X22–X26 as they stand;
+- X27–X28, in phase `clarity`, on `feature/exploration`, and adding them to PR 47 when the owner asks for a push;
+- what is left of X20, as v6 wrote it.
 
-v7 authorizes:
-- X21, in phase `card`, on `feature/exploration`;
-- what is left of X20, as v6 wrote it: X20.1 CI, X20.2 witnessed, X20.3 through Claude over MCP, and X20.4, with X21's card in the owner's look.
-
-v7 does not authorize:
-- push, pull request and merge;
+v9 does not authorize:
+- merge;
 - publishing the Claude Desktop extension;
 - sending a private source to OpenAI;
 - changing the exploration contract or its request;
@@ -1002,7 +1177,7 @@ Each needs its own confirmation when reached.
 Approve with exactly:
 
 ```text
-Approve P-20261105-exploration v7
+Approve P-20261105-exploration v9
 ```
 
-Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v7 --phase card`.
+Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v9 --phase clarity`.

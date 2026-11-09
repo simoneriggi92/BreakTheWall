@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, type CSSProperties } from 'react';
 import { ArrowLeft, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { firstLine, type Exploration, type ExplorationCite, type ExplorationLink } from '../../core/exploration';
 import { layoutOf, SPACING, type Layout, type Strip } from '../../core/exploration-layout';
 import type { LevelLink } from '../../core/exploration-levels';
+import { Splitter, usePaneSizes } from '../disassembly/SplitPane';
 import { Brand } from '../icons';
+import { isProse } from '../markdown';
 import { originText, PreferencesMenu, usePreferences } from '../preferences';
 import { Graph, heightOf, type NodeState, type StripState } from './Graph';
 import { citing, crossing, guided, modelOf, sectionOf, shown, standIn, type Model, type Shaped } from './model';
@@ -173,7 +175,7 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
   const notesOf = (level: Shaped) => (id: string) => [...level.parts.values()].filter(p => p.kind === 'annotation' && p.on === id);
 
   // ---------- the sub-level, under its block, over the faded whole
-  const stage = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null), column = useRef<HTMLElement>(null);
   const subBlock = s.sub ? L.pos[s.sub] : undefined;
   const subLayout: Layout | null = sub ? layoutOf(sub.level, sub.shape, {
     bands: (sub.shape.nuclei[0]?.depth ?? 0) > 1, spacing: SPACING.sub, heightOf: id => heightOf(membersOf(sub, id).length, s.opened.includes(id)),
@@ -264,20 +266,24 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
     const at = Math.max(0, m.steps.findIndex(st => !('premise' in st) && st.nucleus === 0 && st.layer === n0.depth - 1));
     dispatch({ type: 'whole-after-question', at, visited: walked });
   };
-  const stepStrip = m.steps.length ? <div className={`xp-step-strip ${s.explore && !s.sub ? 'xp-paused' : ''} ${sub ? 'xp-inside' : ''}`} data-tone={sub ? m.tone(sub.aspect) ?? undefined : undefined} role="region" aria-label={xt.step.label}>
+  // the strip says where the reader is (X28): choosing the part the step itself puts forward is not leaving the guide
+  const stepPart = guided(m, s.guide, view);
+  const away = !!s.explore && s.explore !== stepPart;
+  const stepStrip = m.steps.length ? <div className={`xp-step-strip ${away && !s.sub ? 'xp-paused' : ''} ${sub ? 'xp-inside' : ''}`} data-tone={sub ? m.tone(sub.aspect) ?? undefined : undefined} role="region" aria-label={xt.step.label}>
     <div className="xp-step-main">
       <div className="xp-step-head"><span className="xp-q">{stripHead[0]}</span>{stripHead[1] && <span className="xp-count">{stripHead[1]}</span>}</div>
       {sub ? <p className="xp-step-text">{xt.step.insideText}</p>
         : s.all ? <p className="xp-step-text">{xt.step.allText}</p>
         : <>
           {question && <p className="xp-step-text">{question.steps[s.guide.at].text}</p>}
-          {!question && step && 'premise' in step && <p className="xp-step-text">{m.premise!.role}</p>}
+          {!question && step && 'premise' in step && <span className="xp-chips"><span className="xp-hint">{xt.step.premiseIs}</span>
+            <button className="xp-chip" aria-pressed={focus === m.premise!.id} onClick={() => dispatch({ type: 'explore', id: m.premise!.id })}>{m.premise!.name}</button></span>}
           {banner && <p className="xp-banner" role="status">{banner}</p>}
           {!question && step && !('premise' in step) && entering.length > 0 && <span className="xp-chips"><span className="xp-hint">{s.guide.at === (m.premise ? 1 : 0) ? xt.step.startFrom : xt.step.entering}</span>
             {entering.map(p => <button key={p!.id} className="xp-chip" aria-pressed={focus === p!.id} onClick={() => dispatch({ type: 'explore', id: p!.id })}>{p!.name}</button>)}</span>}
           {question && m.level.traces.length > 1 && <span className="xp-chips"><span className="xp-hint">{xt.step.otherQuestions}</span>
             {m.level.traces.map((tr, i) => i === (s.guide as { trace: number }).trace ? null : <button key={i} className="xp-chip" onClick={() => dispatch({ type: 'guide', guide: 'question', trace: i })}>{tr.question}</button>)}</span>}
-          {s.explore && <div className="xp-away">{xt.step.away(names(s.explore))}<button onClick={() => dispatch({ type: 'back' })}>{xt.step.backToStep}</button></div>}
+          {away && <div className="xp-away">{xt.step.away(names(s.explore!))}<button onClick={() => dispatch({ type: 'back' })}>{xt.step.backToStep}</button></div>}
         </>}
     </div>
     <div className="xp-step-nav">{sub ? <button className="xp-nav xp-wide" onClick={closeSub}>{xt.step.closeSub}</button>
@@ -291,24 +297,45 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
 
   const aside = m.shape.aside.concat(m.shape.loose).filter(p => p.kind !== 'annotation');
   const origin = x.generation ? originText(t, x.generation) : xt.library.prepared;
-  const panelHead = (title: string, fold?: 'index' | 'source') => <div className="xp-head"><h2>{title}</h2>
+  // the source's two views (X22), as the disassembly player offers them; a source that is not prose has only its lines
+  const views = (fold?: 'index' | 'source') => fold === 'source' && !s.folded.source && isProse(x.source) ? <span className="source-views xp-views" role="group" aria-label={t.d.viewLabel}>
+    {(['document', 'lines'] as const).map(v => <button key={v} className="cite" aria-pressed={s.sourceView === v} onClick={() => dispatch({ type: 'source-view', view: v })}>{t.d.views[v]}</button>)}</span> : null;
+  // ---------- panes the learner resizes (X23), kept per device as the player's are; none on a narrow window
+  const panes = usePaneSizes();
+  const paneStyle = { '--xi': panes.sizes.xIndex, '--xs': panes.sizes.xSource, '--xc': panes.sizes.xCard } as CSSProperties;
+  const across = (x: number, from: 'left' | 'right') => {
+    const el = body.current; if (!el) return undefined;
+    const r = el.getBoundingClientRect(), pad = 16, w = r.width - 2 * pad;
+    return w > 0 ? (from === 'left' ? x - r.left - pad : r.right - pad - x) / w : undefined;
+  };
+  const splitter = (pane: 'xIndex' | 'xSource' | 'xCard') => <Splitter pane={pane} orientation={pane === 'xCard' ? 'horizontal' : 'vertical'}
+    grows={pane === 'xIndex' ? 'ArrowRight' : pane === 'xSource' ? 'ArrowLeft' : 'ArrowUp'} value={panes.sizes[pane]} label={xt.panes[pane]}
+    onChange={v => panes.set(pane, v)} onReset={() => panes.reset(pane)}
+    fromPointer={(x, y) => {
+      if (pane !== 'xCard') return across(x, pane === 'xIndex' ? 'left' : 'right');
+      const r = column.current?.getBoundingClientRect();
+      return r && r.height > 0 ? (r.bottom - y) / r.height : undefined;
+    }}/>;
+
+  const panelHead = (title: string, fold?: 'index' | 'source') => <div className="xp-head"><h2>{title}</h2>{views(fold)}
     {fold && <button className="xp-icon" aria-label={s.folded[fold] ? xt.unfold(title) : xt.fold(title)} aria-expanded={!s.folded[fold]} onClick={() => dispatch({ type: 'fold', panel: fold })}>
       {fold === 'index' ? (s.folded.index ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>) : (s.folded.source ? <PanelRightOpen size={18}/> : <PanelRightClose size={18}/>)}</button>}</div>;
 
   return <div className="xp" lang={x.language}>
     <header className="xp-bar">
       <button className="brand-button" onClick={goHome} aria-label={xt.back}><Brand/></button>
-      <div className="xp-title"><h1>{x.title}</h1><span className="xp-meta">{x.whole}</span></div>
+      <div className="xp-title"><h1 title={x.title}>{x.title}</h1><p className="xp-meta" title={x.whole}>{x.whole}</p></div>
       <span className="xp-tag" title={origin}>{origin}</span>
       <button className={`xp-how ${s.report ? 'xp-on' : ''}`} aria-pressed={s.report} onClick={() => dispatch({ type: 'report', on: !s.report })}>{s.report ? xt.howBack : xt.how}</button>
       <PreferencesMenu/>
     </header>
     <div className="xp-tabs" role="group" aria-label={xt.tabs}>{(['index', 'structure', 'source'] as const).map(k => <button key={k} aria-pressed={s.tab === k} onClick={() => dispatch({ type: 'tab', tab: k })}>{xt.panels[k]}</button>)}</div>
-    <main id="main" ref={body} className={`xp-body xp-tab-${s.tab} ${s.folded.index ? 'xp-idx-closed' : ''} ${s.folded.source ? 'xp-src-closed' : ''} ${m.index.length ? 'xp-with-index' : ''}`}>
+    <main id="main" ref={body} style={paneStyle} className={`xp-body xp-tab-${s.tab} ${s.folded.index ? 'xp-idx-closed' : ''} ${s.folded.source ? 'xp-src-closed' : ''} ${m.index.length ? 'xp-with-index' : ''}`}>
       {s.report ? <Report m={m} onLine={pickLine} onLink={openLink}/> : <>
         {m.index.length > 0 && <section className="xp-panel xp-index-panel">{panelHead(xt.panels.index, 'index')}
           {!s.folded.index && <><p className="xp-hint">{xt.panels.indexHint}</p><IndexPanel m={m} view={view} selected={selectedPart} section={s.section} now={now} onSection={pickSection}/></>}</section>}
-        <section className="xp-panel xp-structure-panel">{panelHead(xt.panels.structure)}{guideBar}
+        {m.index.length > 0 && <div className="xp-split xp-split-index">{!s.folded.index && splitter('xIndex')}</div>}
+        <section ref={column} className="xp-panel xp-structure-panel">{panelHead(xt.panels.structure)}{guideBar}
           <div ref={stage} className="xp-stage">
             <Graph level={m} layout={L} levelKey="top" visible={id => view.vis.has(id)} tone={m.tone} hot={hot} litJoint={litJoint} moved={s.moved} className={sub ? 'xp-lifted' : ''}
               onMove={(key, offset) => dispatch({ type: 'move', key, offset })} names={names} notes={notesOf(m)} stripState={stripState} nodeState={topState}
@@ -320,17 +347,22 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
               {subPanel}
             </Graph>
             {graphHeight && <div aria-hidden="true" style={{ height: Math.max(0, graphHeight - L.height - 30) }}/>}
-            {aside.length > 0 && <div className="xp-tray"><b>{xt.structure.aside}</b>{aside.map(p => <button key={p.id} className="xp-chip" data-role="aside" aria-pressed={focus === p.id} onClick={() => dispatch({ type: 'explore', id: p.id })}>{p.name}</button>)}</div>}
           </div>
           {stepStrip}
+          {splitter('xCard')}
           <Card m={m} target={card} tone={cardTone} pick={s.pick} sub={s.sub}
             onPoint={i => dispatch({ type: 'pick', pick: i === null ? null : { point: i } })} onUnpick={() => dispatch({ type: 'pick', pick: null })}
             onNote={id => sub ? dispatch({ type: 'sub-select', id }) : dispatch({ type: 'explore', id })}
             onBackToRole={() => dispatch({ type: 'member', part: card?.kind === 'member' ? card.part : '', id: null })}
+            onRole={(aspect, role) => openSub(aspect, role)}
             onToggleSub={id => s.sub === id ? closeSub() : openSub(id)}/>
+          {/* the pieces aside (X25): out of the drawing and the guide, at the column's foot, in the aside colour */}
+          {aside.length > 0 && <div className="xp-aside-band" role="group" aria-label={xt.structure.aside}><b>{xt.structure.aside}</b><span className="xp-aside-hint">{xt.structure.asideHint}</span>
+            <span className="xp-chips">{aside.map(p => <button key={p.id} className="xp-chip" data-role="aside" aria-pressed={focus === p.id} onClick={() => { if (s.sub) closeSub(); dispatch({ type: 'explore', id: p.id }); }}>{p.name}</button>)}</span></div>}
         </section>
+        <div className="xp-split xp-split-source">{!s.folded.source && splitter('xSource')}</div>
         <section className="xp-panel xp-source-panel">{panelHead(xt.panels.source, 'source')}
-          {!s.folded.source && <SourcePanel m={m} cites={cites} onLine={pickLine}/>}</section>
+          {!s.folded.source && <SourcePanel m={m} cites={cites} view={s.sourceView} onLine={pickLine}/>}</section>
       </>}
       <svg ref={wire} className="xp-wires" aria-hidden="true"/>
     </main>
