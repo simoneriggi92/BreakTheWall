@@ -1,0 +1,830 @@
+{
+ "schemaVersion": 1,
+ "id": "atlas-release-map-en",
+ "revision": "v1",
+ "kind": "prepared",
+ "title": "Atlas Reader: releasing to staging",
+ "language": "en",
+ "whole": "How one commit becomes an image known by its digest and reaches staging, and when to roll it back.",
+ "source": {
+  "id": "runbook",
+  "title": "release-runbook.md",
+  "origin": "original-prepared",
+  "revision": "v1",
+  "text": "# Atlas Reader: Releasing the Web Client to Staging\n\n**Purpose:** Release a new version of the Atlas Reader web client to the existing staging environment\n**Not covered:** Creating clusters, namespaces, registries, DNS records, certificates, or access policies\n**Current operating mode:** Releases are started by hand; staging is live, production is frozen\n**Owner:** Platform team (fictional example written for the Break the Wall evaluation set)\n\n## 1. What a release is\n\nA release never copies files onto a server. The pipeline:\n\n1. checks out one exact commit of the `reader-web` repository;\n2. installs dependencies from the lockfile and runs the checks;\n3. builds one container image that contains only the compiled assets and the web server;\n4. pushes that image to the internal registry;\n5. writes the image digest into a release record (`release.json`);\n6. updates the staging deployment to that digest;\n7. waits for the rollout and checks the health endpoint;\n8. keeps the previous digest available for rollback.\n\nThe digest is the identity of a release. Tags such as `staging-142` are labels for people;\ntwo builds can never share a digest, but a tag can be moved.\n\n## 2. Pipelines\n\n| Pipeline | What it does | Output |\n| --- | --- | --- |\n| `reader-web / check` | Install, lint, type check, unit tests, production build | `check-report.html` |\n| `reader-web / image` | Build and push the container image | `release.json` |\n| `reader-web / deploy-staging` | Roll the staging deployment to the recorded digest | `rollout.json` |\n\nThe three pipelines form one chain. `deploy-staging` depends on `image`, which depends on\n`check`, and all three must use the same commit. Nothing runs on a schedule or on push.\n\n## 3. Before you start\n\n- [ ] The change is merged into `main`.\n- [ ] You know the full commit SHA you expect to release.\n- [ ] No other staging release is running or waiting.\n- [ ] Testers know a release is about to happen.\n- [ ] You have read the change for configuration, API contract or routing changes.\n- [ ] You have written down which smoke tests you will run and what would make you roll back.\n\nIf the change also needs a new environment variable, add it to the staging configuration\nfirst and review it with a second person. The image must not contain environment-specific values.\n\n## 4. Running the chain\n\nOpen `reader-web / deploy-staging` and choose **Run with dependencies**.\n\n1. Select branch `main`.\n2. Check that the resolved commit equals the SHA you wrote down.\n3. Keep \"reuse previous builds\" switched off, so the chain runs on this commit.\n4. Start the run.\n\nIf the run dialog cannot show one commit for the whole chain, run the three pipelines one at a\ntime and compare the commit in each run. Never deploy a `release.json` produced from a different\ncommit than the one you checked.\n\n## 5. What `check` verifies\n\nThe `check` pipeline fails if any of these fails:\n\n- dependencies install exactly from the lockfile (no updates during install);\n- the linter reports no errors;\n- the type checker passes;\n- unit tests pass;\n- the production build completes;\n- the built bundle contains no development endpoints and no `localhost` URLs;\n- every route listed in `routes.json` has a page in the build output.\n\nA failure here means the source is not releasable. Nothing outside the build server has changed.\n\n## 6. What `image` produces\n\nThe `image` pipeline builds the container in two stages. The first stage compiles the client; the\nsecond stage copies only the compiled assets and the web server configuration into a small runtime\nimage. The runtime image:\n\n- runs as a non-root user;\n- listens on port 8080;\n- contains no package manager cache, no source files and no test files;\n- serves `/healthz` with status `200` once the server is ready.\n\nAfter pushing, the pipeline writes `release.json`:\n\n```json\n{\n  \"commit\": \"full SHA\",\n  \"image\": \"registry.internal/reader-web\",\n  \"tag\": \"staging-<build number>\",\n  \"digest\": \"sha256:...\",\n  \"built_at\": \"ISO timestamp\"\n}\n```\n\nCheck that the commit is the one you expected and that the digest is present. If `release.json`\nis missing, the image may exist in the registry but it is not approved for deployment.\n\n## 7. What `deploy-staging` does\n\nThe deploy pipeline reads `release.json` and changes exactly one thing: the image of the `web`\ncontainer in the `reader-web` deployment of the `staging` namespace, set by digest.\n\nIt does not change replicas, resource limits, environment variables, probes or the service.\nIf any of those must change, that is a separate, reviewed configuration change.\n\nThe rollout replaces pods one at a time. For a short period old and new pods run together; this\nis expected. The pipeline waits until:\n\n- all replicas run the new digest;\n- every new pod reports ready;\n- `/healthz` answers `200` through the staging ingress.\n\nThen it writes `rollout.json` with the previous digest, the new digest and the time of each step.\n\n## 8. Smoke tests\n\nFrom the staging network, with the browser cache disabled:\n\n- [ ] the home page loads and shows the current build number in the footer;\n- [ ] a deep link loads directly and after a refresh;\n- [ ] a missing asset returns `404`, not the home page;\n- [ ] HTML responses are sent with `Cache-Control: no-store`;\n- [ ] hashed assets are sent with a long, immutable cache lifetime;\n- [ ] signing in and opening a document works;\n- [ ] the browser console shows no new errors;\n- [ ] the server logs show no repeated errors after the rollout.\n\n## 9. Rollback\n\n### 9.1 When\n\nRoll back when an acceptance check fails and a fix cannot be released within the agreed window:\n\n- the rollout does not finish;\n- pods restart repeatedly or stay not ready;\n- the running digest differs from the one in `release.json`;\n- a smoke test fails;\n- users report a regression in a core flow.\n\n### 9.2 How\n\n1. Tell the testers that staging is being rolled back.\n2. Open the `rollout.json` of the failed release and find the previous digest.\n3. Run `reader-web / deploy-staging` with **Deploy recorded release** and choose the previous\n   `release.json`.\n4. Do not rebuild the old commit. A rebuild produces a new image; rollback means redeploying the\n   exact digest that was running before.\n5. Wait for the rollout checks, then repeat the smoke tests.\n6. Write down the failed digest, the restored digest, the reason and the times.\n\n### 9.3 What rollback does not undo\n\nRedeploying the previous image does not undo:\n\n- data written by the new version;\n- messages already sent to other services;\n- changes to shared configuration made for the release.\n\nIf a release changes stored data, its rollback must be designed and reviewed before the release.\n\n## 10. When a pipeline fails\n\n| Where it failed | What it means | What to do |\n| --- | --- | --- |\n| `check` | The source is not releasable; nothing else changed | Fix the source and start again |\n| `image`, before the push | No new image exists | Fix the build and run `image` again |\n| `image`, after the push but before `release.json` | An image exists but is not approved | Run `image` again; never deploy the orphan image by hand |\n| `deploy-staging`, before the rollout starts | Staging is unchanged | Fix the input and run the deploy again |\n| `deploy-staging`, during the rollout | Staging may run old and new pods | Check which digest each pod runs before rerunning or rolling back |\n| `deploy-staging`, after the rollout, on the health check | The new version is running but unhealthy | Roll back unless a fix is ready within the window |\n\n## 11. Production\n\nThis runbook covers staging only. Production releases are frozen until the production checklist is\napproved; do not reuse these steps for production.",
+  "sha256": "07a539c5ce6d872b7bae4477573f6dd93d2f8775c1fcf88e6c4f70dd974e5738",
+  "language": "en"
+ },
+ "start": "run",
+ "aspects": [
+  {
+   "id": "chain",
+   "name": "The release chain"
+  },
+  {
+   "id": "operator",
+   "name": "What the person releasing does"
+  }
+ ],
+ "parts": [
+  {
+   "id": "identity",
+   "kind": "prerequisite",
+   "name": "A release is an image, known by its digest",
+   "role": "Nothing is copied to a server: one image is built, recorded by digest and deployed.",
+   "cites": [
+    {
+     "from": 8,
+     "to": 22
+    }
+   ],
+   "points": [
+    {
+     "text": "Eight steps, from one exact commit to a kept previous digest",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 12,
+       "to": 19
+      }
+     ]
+    },
+    {
+     "text": "Two builds never share a digest; a tag can be moved",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 21,
+       "to": 22
+      }
+     ]
+    }
+   ],
+   "members": []
+  },
+  {
+   "id": "prepare",
+   "kind": "prerequisite",
+   "name": "Before you start",
+   "role": "The checks to make, and what to write down, before starting a release.",
+   "cites": [
+    {
+     "from": 35,
+     "to": 45
+    }
+   ],
+   "points": [
+    {
+     "text": "Know the full commit SHA you expect to release",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 38,
+       "to": 38
+      }
+     ]
+    },
+    {
+     "text": "Decide the smoke tests, and what would make you roll back",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 42,
+       "to": 42
+      }
+     ]
+    },
+    {
+     "text": "A new variable goes into staging configuration, never the image",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 44,
+       "to": 45
+      }
+     ]
+    }
+   ],
+   "members": []
+  },
+  {
+   "id": "run",
+   "kind": "part",
+   "aspect": "operator",
+   "name": "Running the chain",
+   "role": "Started by hand on deploy-staging, with its dependencies, on the commit you wrote down.",
+   "cites": [
+    {
+     "from": 47,
+     "to": 58
+    }
+   ],
+   "points": [
+    {
+     "text": "The resolved commit must equal the SHA written down",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 52,
+       "to": 52
+      }
+     ]
+    },
+    {
+     "text": "“Reuse previous builds” stays off",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 53,
+       "to": 53
+      }
+     ]
+    },
+    {
+     "text": "Never deploy a release.json from another commit",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 56,
+       "to": 58
+      }
+     ]
+    }
+   ],
+   "members": []
+  },
+  {
+   "id": "check",
+   "kind": "part",
+   "aspect": "chain",
+   "name": "check: is the source releasable?",
+   "role": "Installs, lints, type checks, tests and builds; any failure stops the release.",
+   "cites": [
+    {
+     "from": 60,
+     "to": 72
+    }
+   ],
+   "points": [
+    {
+     "text": "A failure means the source is not releasable",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 72,
+       "to": 72
+      }
+     ]
+    },
+    {
+     "text": "Nothing outside the build server has changed yet",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 72,
+       "to": 72
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "lockfile",
+     "name": "lockfile install",
+     "does": "dependencies exactly as locked, no updates",
+     "cites": [
+      {
+       "from": 64,
+       "to": 64
+      }
+     ]
+    },
+    {
+     "id": "linter",
+     "name": "linter",
+     "does": "no errors",
+     "cites": [
+      {
+       "from": 65,
+       "to": 65
+      }
+     ]
+    },
+    {
+     "id": "type-checker",
+     "name": "type checker",
+     "does": "must pass",
+     "cites": [
+      {
+       "from": 66,
+       "to": 66
+      }
+     ]
+    },
+    {
+     "id": "unit-tests",
+     "name": "unit tests",
+     "does": "must pass",
+     "cites": [
+      {
+       "from": 67,
+       "to": 67
+      }
+     ]
+    },
+    {
+     "id": "bundle-scan",
+     "name": "bundle scan",
+     "does": "no development endpoints, no localhost URLs",
+     "cites": [
+      {
+       "from": 69,
+       "to": 69
+      }
+     ]
+    },
+    {
+     "id": "routes-json",
+     "name": "routes.json",
+     "does": "every route listed has a built page",
+     "cites": [
+      {
+       "from": 70,
+       "to": 70
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "image",
+   "kind": "part",
+   "aspect": "chain",
+   "name": "image: one container, recorded",
+   "role": "Builds the runtime image in two stages, pushes it and records its digest.",
+   "cites": [
+    {
+     "from": 74,
+     "to": 98
+    }
+   ],
+   "points": [
+    {
+     "text": "Only compiled assets and the server config reach the runtime",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 76,
+       "to": 78
+      }
+     ]
+    },
+    {
+     "text": "Without release.json, an image is not approved for deployment",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 97,
+       "to": 98
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "runtime-image",
+     "name": "runtime image",
+     "does": "non-root, port 8080, no caches, sources or tests",
+     "cites": [
+      {
+       "from": 78,
+       "to": 82
+      }
+     ]
+    },
+    {
+     "id": "healthz",
+     "name": "/healthz",
+     "does": "answers 200 once the server is ready",
+     "cites": [
+      {
+       "from": 83,
+       "to": 83
+      }
+     ]
+    },
+    {
+     "id": "registry",
+     "name": "internal registry",
+     "does": "holds the pushed image",
+     "cites": [
+      {
+       "from": 15,
+       "to": 15
+      },
+      {
+       "from": 90,
+       "to": 90
+      }
+     ]
+    },
+    {
+     "id": "release-json",
+     "name": "release.json",
+     "does": "commit, image, tag, digest and build time",
+     "cites": [
+      {
+       "from": 85,
+       "to": 95
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "deploy",
+   "kind": "part",
+   "aspect": "chain",
+   "name": "deploy-staging: one change, by digest",
+   "role": "Sets the web container’s image to the recorded digest, then waits for the rollout.",
+   "cites": [
+    {
+     "from": 100,
+     "to": 115
+    }
+   ],
+   "points": [
+    {
+     "text": "Replicas, limits, variables, probes and service stay as they are",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 105,
+       "to": 106
+      }
+     ]
+    },
+    {
+     "text": "Old and new pods run together for a while: expected",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 108,
+       "to": 109
+      }
+     ]
+    },
+    {
+     "text": "Done when every replica runs the digest, is ready and healthy",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 111,
+       "to": 113
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "web-container",
+     "name": "web container",
+     "does": "the one thing changed, in the staging namespace",
+     "cites": [
+      {
+       "from": 102,
+       "to": 103
+      }
+     ]
+    },
+    {
+     "id": "rollout-json",
+     "name": "rollout.json",
+     "does": "previous digest, new digest, time of each step",
+     "cites": [
+      {
+       "from": 115,
+       "to": 115
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "staging-only",
+   "kind": "annotation",
+   "on": "deploy",
+   "name": "Staging only",
+   "role": "Production is frozen until its checklist is approved; these steps are not for it.",
+   "cites": [
+    {
+     "from": 5,
+     "to": 5
+    },
+    {
+     "from": 174,
+     "to": 177
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "smoke",
+   "kind": "part",
+   "aspect": "operator",
+   "name": "The smoke tests",
+   "role": "A short list, from the staging network, that the release really works.",
+   "cites": [
+    {
+     "from": 117,
+     "to": 128
+    }
+   ],
+   "points": [
+    {
+     "text": "Browser cache disabled, from the staging network",
+     "mark": "keeps",
+     "cites": [
+      {
+       "from": 119,
+       "to": 119
+      }
+     ]
+    },
+    {
+     "text": "Pages, deep links, 404s and cache headers are checked",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 121,
+       "to": 125
+      }
+     ]
+    },
+    {
+     "text": "No new errors in the console or the server logs",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 127,
+       "to": 128
+      }
+     ]
+    }
+   ],
+   "members": []
+  },
+  {
+   "id": "rollback",
+   "kind": "part",
+   "aspect": "operator",
+   "name": "Rolling back",
+   "role": "When a check fails and no fix fits the window, redeploy the exact previous digest.",
+   "cites": [
+    {
+     "from": 130,
+     "to": 151
+    }
+   ],
+   "points": [
+    {
+     "text": "Triggers: unfinished rollout, restarts, wrong digest, failed smoke test",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 136,
+       "to": 140
+      }
+     ]
+    },
+    {
+     "text": "Never rebuild the old commit: a rebuild is a new image",
+     "mark": "caveat",
+     "cites": [
+      {
+       "from": 148,
+       "to": 149
+      }
+     ]
+    },
+    {
+     "text": "Write down both digests, the reason and the times",
+     "mark": "step",
+     "cites": [
+      {
+       "from": 151,
+       "to": 151
+      }
+     ]
+    }
+   ],
+   "members": [
+    {
+     "id": "deploy-recorded",
+     "name": "Deploy recorded release",
+     "does": "runs deploy-staging on an earlier release.json",
+     "cites": [
+      {
+       "from": 146,
+       "to": 147
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "not-undone",
+   "kind": "annotation",
+   "on": "rollback",
+   "name": "What rollback does not undo",
+   "role": "Data written, messages sent and shared configuration stay; design those rollbacks first.",
+   "cites": [
+    {
+     "from": 153,
+     "to": 161
+    }
+   ],
+   "points": [],
+   "members": []
+  },
+  {
+   "id": "pipelines",
+   "kind": "reference",
+   "name": "The three pipelines",
+   "role": "What each pipeline does and what it produces.",
+   "cites": [
+    {
+     "from": 24,
+     "to": 30
+    }
+   ],
+   "points": [],
+   "members": []
+  }
+ ],
+ "links": [
+  {
+   "from": "run",
+   "to": "check",
+   "class": "bond",
+   "label": "starts the chain",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 49,
+     "to": 54
+    }
+   ]
+  },
+  {
+   "from": "check",
+   "to": "image",
+   "class": "bond",
+   "label": "lets the image build",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 32,
+     "to": 33
+    }
+   ]
+  },
+  {
+   "from": "image",
+   "to": "deploy",
+   "class": "bond",
+   "label": "hands over release.json",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 32,
+     "to": 33
+    },
+    {
+     "from": 102,
+     "to": 103
+    }
+   ]
+  },
+  {
+   "from": "deploy",
+   "to": "smoke",
+   "class": "bond",
+   "label": "is then tested",
+   "basis": "interpreted",
+   "cites": [
+    {
+     "from": 115,
+     "to": 119
+    }
+   ]
+  },
+  {
+   "from": "smoke",
+   "to": "rollback",
+   "class": "bond",
+   "label": "a failure triggers it",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 134,
+     "to": 134
+    },
+    {
+     "from": 139,
+     "to": 139
+    }
+   ]
+  },
+  {
+   "from": "deploy",
+   "to": "rollback",
+   "class": "bond",
+   "label": "a failed rollout triggers",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 136,
+     "to": 138
+    }
+   ]
+  },
+  {
+   "from": "identity",
+   "to": "image",
+   "class": "prerequisite",
+   "label": "names it by digest",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 21,
+     "to": 22
+    }
+   ]
+  },
+  {
+   "from": "identity",
+   "to": "rollback",
+   "class": "prerequisite",
+   "label": "why the exact digest",
+   "basis": "declared",
+   "cites": [
+    {
+     "from": 19,
+     "to": 19
+    },
+    {
+     "from": 148,
+     "to": 149
+    }
+   ]
+  },
+  {
+   "from": "prepare",
+   "to": "run",
+   "class": "prerequisite",
+   "label": "readies the run",
+   "basis": "interpreted",
+   "cites": [
+    {
+     "from": 37,
+     "to": 42
+    }
+   ]
+  }
+ ],
+ "traces": [
+  {
+   "question": "How does a commit reach staging?",
+   "steps": [
+    {
+     "text": "Start deploy-staging with its dependencies on the commit you wrote down.",
+     "parts": [
+      "run"
+     ],
+     "cites": [
+      {
+       "from": 49,
+       "to": 54
+      }
+     ]
+    },
+    {
+     "text": "check verifies the source; a failure stops everything.",
+     "parts": [
+      "check"
+     ],
+     "cites": [
+      {
+       "from": 62,
+       "to": 72
+      }
+     ]
+    },
+    {
+     "text": "image builds and pushes the container and writes release.json.",
+     "parts": [
+      "image"
+     ],
+     "cites": [
+      {
+       "from": 76,
+       "to": 85
+      }
+     ]
+    },
+    {
+     "text": "deploy-staging sets the digest and waits for a healthy rollout.",
+     "parts": [
+      "deploy"
+     ],
+     "cites": [
+      {
+       "from": 102,
+       "to": 115
+      }
+     ]
+    },
+    {
+     "text": "The smoke tests confirm it from the staging network.",
+     "parts": [
+      "smoke"
+     ],
+     "cites": [
+      {
+       "from": 119,
+       "to": 128
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "question": "A pipeline failed: what does it mean, and what now?",
+   "steps": [
+    {
+     "text": "In check: the source is not releasable; fix it and start again.",
+     "parts": [
+      "check"
+     ],
+     "cites": [
+      {
+       "from": 167,
+       "to": 167
+      }
+     ]
+    },
+    {
+     "text": "In image before the push: no image exists; run image again.",
+     "parts": [
+      "image"
+     ],
+     "cites": [
+      {
+       "from": 168,
+       "to": 168
+      }
+     ]
+    },
+    {
+     "text": "In image after the push: an orphan image; never deploy it by hand.",
+     "parts": [
+      "image"
+     ],
+     "cites": [
+      {
+       "from": 169,
+       "to": 169
+      }
+     ]
+    },
+    {
+     "text": "During the rollout: check which digest each pod runs first.",
+     "parts": [
+      "deploy"
+     ],
+     "cites": [
+      {
+       "from": 171,
+       "to": 171
+      }
+     ]
+    },
+    {
+     "text": "On the health check: roll back unless a fix is ready in time.",
+     "parts": [
+      "deploy",
+      "rollback"
+     ],
+     "cites": [
+      {
+       "from": 172,
+       "to": 172
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

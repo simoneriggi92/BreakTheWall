@@ -6,6 +6,9 @@ import { validateLesson, type Lesson } from '../core/lesson';
 import { canVisit, initialState, navigate, restoreState, solved, submit, type LearnerState, type RestoredState } from '../core/state';
 import { validateDisassembly, type Disassembly } from '../core/disassembly';
 import { loadPreparedDisassemblies } from '../fixtures/disassemblies';
+import { validateExploration, type Exploration } from '../core/exploration';
+import { loadPreparedExplorations } from '../fixtures/explorations';
+import { ExplorationView } from './exploration/ExplorationView';
 import { DisassemblyPlayer } from './disassembly/DisassemblyPlayer';
 import { AssistantsMenu } from './Assistants';
 import { Brand } from './icons';
@@ -20,16 +23,18 @@ import { StudyTools, type ToolTab } from './StudyTools';
  * `prepared` lessons are shown as earlier paths. The desktop app passes none: prepared disassemblies replaced them,
  * and saved generated lessons come from the store.
  */
-export function App({ bridge = window.breakTheWall ?? browserBridge, prepared, disassemblies }: { bridge?: DesktopBridge; prepared?: Lesson[]; disassemblies?: Disassembly[] }) {
-  return <PreferencesProvider bridge={bridge}><Shell bridge={bridge} prepared={prepared} preparedDisassemblies={disassemblies}/></PreferencesProvider>;
+export function App({ bridge = window.breakTheWall ?? browserBridge, prepared, disassemblies, explorations }: { bridge?: DesktopBridge; prepared?: Lesson[]; disassemblies?: Disassembly[]; explorations?: Exploration[] }) {
+  return <PreferencesProvider bridge={bridge}><Shell bridge={bridge} prepared={prepared} preparedDisassemblies={disassemblies} preparedExplorations={explorations}/></PreferencesProvider>;
 }
 
-function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBridge; prepared?: Lesson[]; preparedDisassemblies?: Disassembly[] }) {
+function Shell({ bridge, prepared, preparedDisassemblies, preparedExplorations }: { bridge: DesktopBridge; prepared?: Lesson[]; preparedDisassemblies?: Disassembly[]; preparedExplorations?: Exploration[] }) {
   const { t } = usePreferences();
   const lessons = prepared ?? [];
   const [disassemblies, setDisassemblies] = useState<Disassembly[]>(preparedDisassemblies ?? []);
   const [generatedDisassemblies, setGeneratedDisassemblies] = useState<Disassembly[]>([]);
-  const [selected, setSelected] = useState<{ kind: 'lesson' | 'disassembly'; id: string }>();
+  const [explorations, setExplorations] = useState<Exploration[]>(preparedExplorations ?? []);
+  const [generatedExplorations, setGeneratedExplorations] = useState<Exploration[]>([]);
+  const [selected, setSelected] = useState<{ kind: 'lesson' | 'disassembly' | 'exploration'; id: string }>();
   // Errors and notices are kept as codes and worded at render time, so they follow a language switch.
   const [error, setError] = useState<keyof typeof t.shell>();
   const [runtime, setRuntime] = useState<'desktop' | 'browser'>();
@@ -47,6 +52,24 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
       rememberLesson(item.id); setSelected({ kind: 'disassembly', id: item.id });
     }).catch(() => {});
   }), [bridge]);
+  // An exploration the assistant wrote (X9) joins the library and opens, once it validates here too.
+  useEffect(() => bridge.studio?.onAssistantExploration?.(raw => {
+    void validateExploration(raw).then(item => {
+      if (item.kind !== 'generated') return;
+      setGeneratedExplorations(list => [item, ...list.filter(x => x.id !== item.id)]);
+      rememberLesson(item.id); setSelected({ kind: 'exploration', id: item.id });
+    }).catch(() => {});
+  }), [bridge]);
+  useEffect(() => {
+    let active = true;
+    void bridge.studio?.listExplorations?.().then(async result => {
+      const checked = await Promise.allSettled(result.explorations.map(x => validateExploration(x)));
+      if (!active) return;
+      setGeneratedExplorations(checked.flatMap(x => x.status === 'fulfilled' && x.value.kind === 'generated' ? [x.value] : []));
+      setSkipped(n => n + result.skipped + checked.filter(x => x.status === 'rejected').length);
+    }).catch(() => { if (active) setError('generatedUnreadable'); });
+    return () => { active = false; };
+  }, [bridge]);
   useEffect(() => {
     let active = true;
     void bridge.studio?.listLessons().then(async result => {
@@ -65,25 +88,31 @@ function Shell({ bridge, prepared, preparedDisassemblies }: { bridge: DesktopBri
   }, [bridge]);
   useEffect(() => {
     let active = true;
+    if (!preparedExplorations) void loadPreparedExplorations().then(data => { if (active) setExplorations(data); }).catch(() => { if (active) setError('examplesInvalid'); });
     if (!preparedDisassemblies) void loadPreparedDisassemblies().then(data => { if (active) setDisassemblies(data); }).catch(() => { if (active) setError('examplesInvalid'); });
     void bridge.getRuntime().then(info => { if (active) setRuntime(info.mode); }).catch(() => { if (active) setError('desktopUnavailable'); });
     return () => { active = false; };
-  }, [bridge, preparedDisassemblies]);
+  }, [bridge, preparedDisassemblies, preparedExplorations]);
   const open = (id: string) => { rememberLesson(id); setSelected({ kind: 'lesson', id }); };
   const openDisassembly = (id: string) => { rememberLesson(id); setSelected({ kind: 'disassembly', id }); };
+  const openExploration = (id: string) => { rememberLesson(id); setSelected({ kind: 'exploration', id }); };
+  const allExplorations = [...generatedExplorations, ...explorations];
+  const exploration = selected?.kind === 'exploration' ? allExplorations.find(x => x.id === selected.id) : undefined;
+  const explored = (item: Exploration) => { setGeneratedExplorations(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); openExploration(item.id); };
   const allDisassemblies = [...generatedDisassemblies, ...disassemblies];
   const lesson = selected?.kind === 'lesson' ? [...generated, ...lessons].find(x => x.id === selected.id) : undefined;
   const disassembly = selected?.kind === 'disassembly' ? allDisassemblies.find(x => x.id === selected.id) : undefined;
   const created = (item: Disassembly) => { setGeneratedDisassemblies(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); openDisassembly(item.id); };
-  // A part taken apart is a new revision of the same disassembly; the player reopens on it, with progress moved by the host.
-  const expanded = (next: Disassembly) => setGeneratedDisassemblies(list => list.map(x => x.id === next.id ? next : x));
   const runtimeLabel = runtime === 'desktop' ? t.common.desktopRuntime : runtime === 'browser' ? t.common.browserRuntime : '';
-  return <><a href="#main" className="skip-link">{t.common.skip}</a>{disassembly
-    ? <DisassemblyPlayer key={`${disassembly.id}:${disassembly.revision}`} d={disassembly} bridge={bridge} goHome={() => setSelected(undefined)} onExpanded={expanded}
+  return <><a href="#main" className="skip-link">{t.common.skip}</a>{exploration
+    ? <ExplorationView key={`${exploration.id}:${exploration.revision}`} x={exploration} goHome={() => setSelected(undefined)}/>
+    : disassembly
+    ? <DisassemblyPlayer key={`${disassembly.id}:${disassembly.revision}`} d={disassembly} bridge={bridge} goHome={() => setSelected(undefined)}
         versions={disassembly.family ? allDisassemblies.filter(x => x.family === disassembly.family && x.id !== disassembly.id) : []} openVersion={openDisassembly}/>
     : lesson
     ? <Player key={lesson.id} lesson={lesson} bridge={bridge} runtime={runtimeLabel} goHome={() => setSelected(undefined)}/>
     : <><header className="topbar library-top"><Brand/><span className="runtime"><span className="status-dot"/>{runtimeLabel || t.common.opening}</span><AssistantsMenu studio={bridge.studio}/><PreferencesMenu/></header><Library lessons={lessons} generated={generated} disassemblies={allDisassemblies} bridge={bridge} error={error ? t.shell[error] : ''} skipped={skipped} draft={draft} setDraft={setDraft} onOpen={open} onOpenDisassembly={openDisassembly} onCreated={created}
+        explorations={allExplorations} onOpenExploration={openExploration} onExplored={explored}
         incoming={incoming} onIncomingTaken={n => setIncoming(list => list.slice(n))}/></>}
   </>;
 }

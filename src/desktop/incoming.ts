@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { z } from 'zod';
 import { DisassemblyError } from '../core/disassembly';
+import { ExplorationError } from '../core/exploration';
 import { SourceImportError } from '../core/source';
 
 /**
@@ -70,6 +71,12 @@ const openSchema = z.strictObject({
 });
 const helloSchema = z.strictObject({ v: z.literal(INCOMING_PROTOCOL), type: z.literal('hello') });
 const saveSchema = z.strictObject({ v: z.literal(INCOMING_PROTOCOL), type: z.literal('save'), disassembly: z.unknown() });
+/** An exploration an assistant wrote (plan P-20261105-exploration X9): the app checks the answer against the source itself. */
+const exploreSchema = z.strictObject({
+  v: z.literal(INCOMING_PROTOCOL), type: z.literal('explore'),
+  source: z.strictObject({ title: z.string().max(1000), text: z.string() }), language: z.enum(['it', 'en']), client: z.string().max(200), answer: z.string(),
+});
+export type ExploreInput = Omit<z.infer<typeof exploreSchema>, 'v' | 'type'>;
 
 export type IncomingReply =
   | { ok: true; app: 'break-the-wall'; version: string; protocol: number }
@@ -82,6 +89,8 @@ export interface IncomingHandlers {
   open(input: { title?: string; text: string; question?: string }): Promise<{ title: string; lines: number }>;
   /** Checks a disassembly written by an assistant, stores it and opens it; throws DisassemblyError when it is refused (M7). */
   save?(disassembly: unknown): Promise<{ id: string; title: string }>;
+  /** Checks an assistant's exploration answer with the app's own rules, stores it and opens it; throws ExplorationError with the findings (X9). */
+  explore?(input: ExploreInput): Promise<{ id: string; title: string }>;
 }
 
 /** One request line → one answer. Never throws: anything unexpected becomes an error answer. */
@@ -108,6 +117,18 @@ export async function answer(line: string, handlers: IncomingHandlers): Promise<
     catch (error) {
       if (error instanceof DisassemblyError) return { ok: false, code: 'invalid', message: error.findings.slice(0, 10).map(x => `${x.path}: ${x.message}`).join('; ') };
       return { ok: false, code: 'unavailable', message: 'The app could not save the disassembly.' };
+    }
+  }
+  if (type === 'explore' && handlers.explore) {
+    const explore = exploreSchema.safeParse(message);
+    if (!explore.success) return { ok: false, code: 'bad-request', message: 'An explore request needs the source, the language, the client and the answer.' };
+    const { v: _, type: __, ...input } = explore.data;
+    try { return { ok: true, saved: true, ...await handlers.explore(input) }; }
+    catch (error) {
+      // The findings travel as data, so the assistant gets every path for its one repair.
+      if (error instanceof ExplorationError) return { ok: false, code: 'invalid', message: error.findings.slice(0, 10).map(x => `${x.path}: ${x.message}`).join('; '), params: { findings: error.findings.slice(0, 25) } };
+      if (error instanceof SourceImportError) return { ok: false, code: error.code, message: error.message, params: { ...error.params } };
+      return { ok: false, code: 'unavailable', message: 'The app could not save the exploration.' };
     }
   }
   return { ok: false, code: 'unknown-type', message: `Unknown request type ${JSON.stringify(type)}.` };

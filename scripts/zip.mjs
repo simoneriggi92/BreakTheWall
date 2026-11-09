@@ -60,7 +60,10 @@ export function mcpbManifest(version, prompts = []) {
     server: { type: 'node', entry_point: 'server/index.js', mcp_config: { command: 'node', args: ['${__dirname}/server/index.js'] } },
     tools: [
       { name: 'open_in_break_the_wall', description: 'Open a text in Break the Wall Studio.' },
-      { name: 'start_disassembly', description: 'Write a Break the Wall disassembly yourself, checked by the app phase by phase.' },
+      { name: 'start_exploration', description: 'Explore a text: write its structure yourself, checked and saved by Break the Wall.' },
+      { name: 'submit_exploration', description: 'Submit the structure; the accepted exploration is saved and opened in Break the Wall.' },
+      { name: 'read_source', description: 'Read one page of a long numbered source.' },
+      { name: 'start_disassembly', description: 'Write a Break the Wall disassembly with runs yourself, checked by the app phase by phase.' },
       { name: 'submit_structure', description: 'Submit the structure of the disassembly.' },
       { name: 'submit_part', description: 'Submit the content of one top-level part.' },
       { name: 'submit_runs', description: 'Submit the runs; the finished disassembly is saved and opened in Break the Wall.' },

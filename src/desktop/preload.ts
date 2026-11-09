@@ -44,13 +44,21 @@ const studio = Object.freeze<StudioBridge>({
     void ipcRenderer.invoke('incoming:ready');
     return () => { ipcRenderer.removeListener('studio:disassembly', handler); };
   },
+  onAssistantExploration: listener => {
+    const handler = (_event: unknown, exploration: unknown) => listener(exploration);
+    ipcRenderer.on('studio:exploration', handler);
+    void ipcRenderer.invoke('incoming:ready');
+    return () => { ipcRenderer.removeListener('studio:exploration', handler); };
+  },
   assistantSetup: () => ipcRenderer.invoke('assistants:setup'),
   addToClaudeDesktop: () => ipcRenderer.invoke('assistants:add-desktop'),
   copyClaudeCodeCommand: () => ipcRenderer.invoke('assistants:copy-command'),
   listLessons: () => ipcRenderer.invoke('lessons:list'),
   listDisassemblies: () => ipcRenderer.invoke('disassemblies:list'),
   findDisassembly: key => ipcRenderer.invoke('disassemblies:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),
-  expandPart: request => ipcRenderer.invoke('disassembly:expand', request),
+  listExplorations: () => ipcRenderer.invoke('explorations:list'),
+  findExploration: key => ipcRenderer.invoke('explorations:find', { id: String(key?.id ?? ''), revision: String(key?.revision ?? '') }),
+  startExploration: request => ipcRenderer.invoke('exploration:start', request),
   openUsageSettings: () => ipcRenderer.invoke('account:usage-settings'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: settings => ipcRenderer.invoke('settings:save', settings),

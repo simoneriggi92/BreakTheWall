@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ClipboardPaste, Cpu, FileText, KeyRound, LogOut, RefreshCw, Sparkles, Trash2, TriangleAlert, X } from 'lucide-react';
 import type { Disassembly } from '../core/disassembly';
+import type { Exploration } from '../core/exploration';
 import { buildStructureInput, defaultContentLanguage, type ContentLanguage } from '../core/disassembly-generation';
 import { detectLanguage } from '../core/generation';
 import { resumable, RUNTIME_NAMES, type AccountStatus, type DraftState, type FormatCheck, type GenerationProgress, type GenerationRoute, type GenerationSetup, type IncomingSource, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioSettings, type Suggestion } from '../core/provider';
@@ -26,7 +27,7 @@ function importText(t: Messages, n: (x: number) => string, error: Pick<PickError
 }
 
 /** Source workspace → optional question → account and generation. Nothing leaves the device before "Genera lo smontaggio". */
-export function Studio({ studio, draft, setDraft, onCreated, onBusyChange, incoming = [], onIncomingTaken }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (disassembly: Disassembly) => void; onBusyChange?: (busy: boolean) => void; incoming?: IncomingSource[]; onIncomingTaken?: (count: number) => void }) {
+export function Studio({ studio, draft, setDraft, onCreated, onExplored, onBusyChange, incoming = [], onIncomingTaken }: { studio?: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; onCreated: (disassembly: Disassembly) => void; onExplored?: (exploration: Exploration) => void; onBusyChange?: (busy: boolean) => void; incoming?: IncomingSource[]; onIncomingTaken?: (count: number) => void }) {
   const { t, n: fmt, language: interfaceLanguage } = usePreferences();
   const language = draft.language ?? defaultContentLanguage(draft.outcome, interfaceLanguage);
   // A question the app reads as another language would be stored next to content it does not match.
@@ -121,7 +122,7 @@ export function Studio({ studio, draft, setDraft, onCreated, onBusyChange, incom
         {languageClash && <p className="field-error">{t.studio.questionLanguage(t.languageNames[asked])}</p>}
         <div className="creation-controls"><button className="subtle" onClick={() => setStep(0)}><ArrowLeft size={16}/>{t.studio.material}</button><button className="primary" disabled={!goal.success} onClick={() => setStep(2)}>{t.studio.toGeneration}<ArrowRight size={16}/></button></div>
       </div>
-      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{t.studio.sourcesCount(draft.sources.length)}</span><p>{draft.outcome.trim() || t.studio.wholeSource}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>{t.studio.editGoal}</button></div><Generate studio={studio} routes={routes} sources={draft.sources} goal={goal.success ? goal.data : undefined} language={language} languageClash={languageClash} onCreated={onCreated} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
+      {step === 2 && <><div className="generation-summary"><span><Icon name="book" size={16}/>{t.studio.sourcesCount(draft.sources.length)}</span><p>{draft.outcome.trim() || t.studio.wholeSource}</p><button className="text-button" disabled={busy} onClick={() => setStep(1)}><ArrowLeft size={14}/>{t.studio.editGoal}</button></div><Generate studio={studio} routes={routes} sources={draft.sources} goal={goal.success ? goal.data : undefined} language={language} languageClash={languageClash} onCreated={onCreated} onExplored={onExplored} onBusyChange={value => { setBusy(value); onBusyChange?.(value); }}/></>}
     </div>
   </section>;
 }
@@ -213,11 +214,12 @@ function Suggestions({ studio, draft, setDraft, language, route }: { studio: Stu
   </div>;
 }
 
-function Generate({ studio, routes, sources, goal, language, languageClash, onCreated, onBusyChange }: { studio?: StudioBridge; routes: Routes; sources: UserSource[]; goal?: { outcome: string; priorKnowledge: string }; language: ContentLanguage; languageClash: boolean; onCreated: (disassembly: Disassembly) => void; onBusyChange: (value: boolean) => void }) {
+function Generate({ studio, routes, sources, goal, language, languageClash, onCreated, onExplored, onBusyChange }: { studio?: StudioBridge; routes: Routes; sources: UserSource[]; goal?: { outcome: string; priorKnowledge: string }; language: ContentLanguage; languageClash: boolean; onCreated: (disassembly: Disassembly) => void; onExplored?: (exploration: Exploration) => void; onBusyChange: (value: boolean) => void }) {
   const { t, n: fmt, settings, update: updateSettings } = usePreferences();
   const { status, setStatus, models, provider, planReady, chatgptModel, contentModel, local, setup } = routes;
   const [problem, setProblem] = useState<ProviderFailure>();
   const [running, setRunning] = useState(false);
+  const [exploring, setExploring] = useState(false);
   const [progress, setProgress] = useState<GenerationProgress>({ phase: 'structure', repairing: false, received: 0, requests: 0 });
   // A failed or cancelled generation keeps what was accepted; Studio offers to finish it (D21).
   const [kept, setKept] = useState<DraftState>();
@@ -245,6 +247,18 @@ function Generate({ studio, routes, sources, goal, language, languageClash, onCr
       else { setProblem(result.failure); await readDraft(); if (result.failure.action === 'sign-in') setStatus(await studio.accountStatus()); }
     } finally { setRunning(false); onBusyChange(false); }
   };
+  // Exploration (X18): one request on the ChatGPT route reads the whole source; it is the primary action when the host offers it.
+  const canExplore = !!studio.startExploration && !!onExplored;
+  const exploreBlock = sources.length !== 1 ? t.x.studio.oneSource : provider === 'local' ? t.reasons['exploration-local'] : '';
+  const explore = async () => {
+    if (!studio.startExploration || !setup || exploreBlock) return;
+    setProblem(undefined); setRunning(true); setExploring(true); setProgress({ phase: 'structure', repairing: false, received: 0, requests: 0 }); onBusyChange(true);
+    try {
+      const result = await studio.startExploration({ source: sources[0], language, route: setup.structure });
+      if (result.ok) onExplored?.(result.exploration);
+      else { setProblem(result.failure); if (result.failure.action === 'sign-in') setStatus(await studio.accountStatus()); }
+    } finally { setRunning(false); setExploring(false); onBusyChange(false); }
+  };
   const m = t.generate.missing;
   const missing = [!sources.length && m.source, !goal && m.goal, languageClash && m.language,
     provider === 'chatgpt' ? (!planReady ? m.chatgpt : !chatgptModel && m.model) : !local && m.local].filter(Boolean);
@@ -257,6 +271,8 @@ function Generate({ studio, routes, sources, goal, language, languageClash, onCr
   const phase = progress.phase === 'runs' && progress.preview ? t.generate.runsPreparing
     : progress.phase === 'content' ? t.generate.phases.content(Math.min((progress.part ?? 0) + 1, progress.parts ?? 1), progress.parts ?? 1) : t.generate.phases[progress.phase];
   const pass = progress.shortening ? t.generate.shortening : progress.repairing ? t.generate.repairing : '';
+  const runningText = exploring ? t.x.studio.exploring : phase;
+  const exploreMissing = [!sources.length && m.source, provider === 'chatgpt' ? (!planReady ? m.chatgpt : !chatgptModel && m.model) : false].filter(Boolean);
 
   return <div className="studio-step">
     <span className="step-label"><span className="step-number">3</span><Icon name="lightbulb" size={18}/>{t.generate.title}</span>
@@ -284,10 +300,10 @@ function Generate({ studio, routes, sources, goal, language, languageClash, onCr
         : t.generate.sentChatgpt}</p><pre tabIndex={0}>{sent}</pre></> : <p className="micro plain">{t.generate.sentEmpty}</p>}
     </details>
     {running ? <div className="generating">
-        <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{phase}{pass ? ` · ${pass}` : ''}</span><button className="subtle" onClick={() => void studio.cancelGeneration()}>{t.generate.cancel}</button></div>
+        <div className="generating-head"><span className="spinner" aria-hidden="true"/><span role="status">{runningText}{pass ? ` · ${pass}` : ''}</span><button className="subtle" onClick={() => void studio.cancelGeneration()}>{t.generate.cancel}</button></div>
         <progress max={100} value={phasePercent(progress)} aria-label={t.generate.progress}/>
         <p className="micro plain">{t.generate.progressText(progress.requests, progress.received ? fmt(progress.received) : '')}</p>
-        {progress.preview && <GenerationPreview preview={progress.preview} language={language}/>}
+        {!exploring && progress.preview && <GenerationPreview preview={progress.preview} language={language}/>}
       </div>
       : canResume ? <div className="kept-draft" role="group" aria-label={t.generate.kept(draft.parts, draft.kept, draft.runs)}>
           <p>{t.generate.kept(draft.parts, draft.kept, draft.runs)}</p>
@@ -296,7 +312,9 @@ function Generate({ studio, routes, sources, goal, language, languageClash, onCr
           <p className="micro plain">{t.generate.resumeHint}</p>
         </div>
       : <>{draft && <p className="micro plain">{t.generate.draftElsewhere(draft.title ?? '')}</p>}
-        <button className="primary generate-button" disabled={!!missing.length} onClick={() => void generate()}><Sparkles size={17}/>{t.generate.generate}</button></>}
+        {canExplore && <><p className="micro plain">{t.x.studio.exploreHint}</p>{exploreBlock && <p className="notice" role="status">{exploreBlock}</p>}
+          <button className="primary explore-button" disabled={!!exploreMissing.length || !!exploreBlock} onClick={() => void explore()}><Sparkles size={17}/>{t.x.studio.explore}</button></>}
+        <button className={`${canExplore ? 'subtle' : 'primary'} generate-button`} disabled={!!missing.length} onClick={() => void generate()}>{!canExplore && <Sparkles size={17}/>}{canExplore ? t.x.studio.disassemble : t.generate.generate}</button></>}
     {!running && kept?.setAside && <p className="notice" role="status">{t.generate.draftSetAside}</p>}
     {!running && missing.length > 0 && <p className="micro plain">{t.generate.stillNeeded(missing.join(', '))}</p>}
     {shown && <div className={shown.code === 'cancelled' ? 'notice' : 'error-banner'} role="alert"><div><p>{failureText(t, shown)}</p>{shown.issues && <details className="issue-details"><summary>{t.generate.technical}</summary><ul className="issue-list">{shown.issues.map((x, i) => <li key={i}>{x}</li>)}</ul></details>}{shown.requestId && <p className="micro plain">{t.generate.request(shown.requestId)}</p>}</div>{action(shown)}</div>}

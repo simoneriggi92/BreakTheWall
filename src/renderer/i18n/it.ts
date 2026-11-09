@@ -1,4 +1,5 @@
 import type { ImportErrorParams } from '../../core/source';
+import { xIt } from './x-it';
 
 /** Italian interface text. The English catalog must have exactly the same shape: the type checker enforces it. */
 export const it = {
@@ -187,13 +188,6 @@ export const it = {
     reasons: { context: 'contesto', 'outside-question': 'fuori dalla domanda', repetition: 'ripetizione', detail: 'dettaglio', secrets: 'contiene segreti', generated: 'generato' },
     states: { ok: 'fatto', active: 'in corso', failed: 'fallito', restored: 'ripristinato' },
     tag: 'Smontaggio preparato', tagGenerated: 'Smontaggio generato', tagAssistant: 'Scritto dal tuo assistente',
-    expand: {
-      action: 'Smonta questo pezzo', cost: (route: string) => `Una richiesta a ${route}, con le sole righe di questo pezzo.`,
-      running: 'Smonto il pezzo…', repairing: 'seconda passata: correggo ciò che i controlli hanno trovato', shortening: 'accorcio i testi troppo lunghi',
-      requests: (n: number) => `${n} ${n === 1 ? 'richiesta inviata' : 'richieste inviate'}`, cancel: 'Annulla',
-      leaf: (n: number, min: number) => `Questo pezzo non si smonta oltre: cita ${n} ${n === 1 ? 'riga' : 'righe'}, ne servono almeno ${min}.`,
-      noRoute: 'Scegli un modello in «Smonta una tua fonte» per smontare i pezzi.', local: (model: string) => `il modello locale ${model}`,
-    },
     otherVersion: (language: string) => `Questo smontaggio esiste anche in ${language}. I progressi restano separati per ogni versione.`, openVersion: 'Apri quella versione',
     widenSource: 'Allarga la fonte a tutta l’area', narrowSource: 'Ripristina disegno e fonte',
     panes: { source: 'Larghezza della fonte' },
@@ -307,9 +301,10 @@ export const it = {
     'sign-in-invalid-client': 'La registrazione dell’app non è valida. Accedi di nuovo.',
     'sign-in-refused': 'Il server di accesso ha rifiutato la richiesta. Riprova o accedi di nuovo.',
     'identity-unverified': 'Il token di identità non ha superato la verifica. Accedi di nuovo.',
-    'part-not-divisible': 'Questo pezzo cita troppe poche righe per essere smontato ancora.',
     'question-language': 'La domanda è in un’altra lingua rispetto al contenuto scelto: cambia la lingua del contenuto o riscrivi la domanda.',
     'draft-changed': 'Le fonti, la domanda o la lingua non sono più quelle della generazione interrotta: ricomincia da capo.',
+    'exploration-local': 'L’esplorazione di una fonte non usa ancora un modello locale: scegli ChatGPT o il tuo assistente Claude.',
+    'exploration-too-long': 'Questa fonte è troppo lunga per essere esplorata in una sola richiesta: seleziona la parte che vuoi esplorare.',
   },
   accountNotices: {
     'plan-not-authorized': 'Accesso riuscito, ma l’uso del piano ChatGPT non è stato autorizzato.',
@@ -325,5 +320,6 @@ export const it = {
     lessonReferences: 'I riferimenti dei progressi non corrispondono alla lezione. Copia conservata; sessione riavviata.',
     lessonEmpty: 'File vuoto conservato; sessione riavviata.',
   },
+  x: xIt,
 };
 export type Messages = typeof it;

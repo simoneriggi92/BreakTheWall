@@ -662,3 +662,40 @@ describe('a disassembly written by the assistant (P-20261028-mcp-integration M5,
   });
 });
 
+
+describe('exploring a source from Studio (P-20261105-exploration X18)', () => {
+  /** The host's answer: the prepared Mill exploration, as if the route had read the pasted source. */
+  async function explored() {
+    const { loadPreparedExplorations } = await import('../src/fixtures/explorations');
+    const x = structuredClone((await loadPreparedExplorations()).find(e => e.id === 'mill-harm-map')!);
+    return { ...x, id: 'x-new', kind: 'generated' as const, generation: { provider: 'chatgpt' as const, model: 'model-a', createdAt: '2026-11-06T10:00:00.000Z' } };
+  }
+  it('makes "explore" the primary action and ends a generation with a fake route in the view', async () => {
+    const { bridge, studio } = desktop();
+    const answer = await explored();
+    studio.startExploration = vi.fn(async () => ({ ok: true as const, exploration: answer, stats: { requests: 1, repairs: 0, sentChars: 1, receivedChars: 1, ms: 1 } }));
+    const { user, studio: region } = await prepare(bridge, '');
+    await user.click(region.getByRole('button', { name: /Continua/ }));
+    await user.click(await region.findByRole('button', { name: /Accedi con ChatGPT/ }));
+    const explore = await region.findByRole('button', { name: 'Esplora la fonte' });
+    expect(explore).toHaveClass('primary');
+    expect(region.getByRole('button', { name: 'Genera invece uno smontaggio' })).toHaveClass('subtle');
+    await waitFor(() => expect(explore).toBeEnabled());
+    await user.click(explore);
+    expect(studio.startExploration).toHaveBeenCalledWith(expect.objectContaining({ language: 'it', route: { provider: 'chatgpt', model: 'model-a' } }));
+    expect(await screen.findByRole('heading', { level: 1, name: answer.title })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Scheda' })).toBeInTheDocument();
+  });
+
+  it('shows the failure and its findings when the host refuses the exploration', async () => {
+    const { bridge, studio } = desktop();
+    studio.startExploration = vi.fn(async () => ({ ok: false as const, failure: failure('invalid-output', { issues: ['exploration · links[0].cls: A bond joins two parts'] }) }));
+    const { user, studio: region } = await prepare(bridge, '');
+    await user.click(region.getByRole('button', { name: /Continua/ }));
+    await user.click(await region.findByRole('button', { name: /Accedi con ChatGPT/ }));
+    const explore = await region.findByRole('button', { name: 'Esplora la fonte' });
+    await waitFor(() => expect(explore).toBeEnabled());
+    await user.click(explore);
+    expect(await region.findByText(/links\[0\]\.cls: A bond joins two parts/)).toBeInTheDocument();
+  });
+});
