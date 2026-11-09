@@ -327,17 +327,14 @@ describe('joints and their labels (X15)', () => {
 });
 
 describe('the card and the index (X16)', () => {
-  it('folds the roles or components and "why it is linked" when a card opens; a link lights its own lines', async () => {
+  it('lights a point’s and a component’s own lines', async () => {
     const x = byId('mill-harm-map'); await view(x);
     await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
     await user().click(node('region'));
-    const folds = [...document.querySelectorAll<HTMLDetailsElement>('.xp-card details.xp-fold')];
-    expect(folds.map(d => d.querySelector('summary')!.textContent)).toEqual(['Componenti · 4', 'Perché è collegata · 2']);
-    expect(folds.every(d => !d.open)).toBe(true);
-    const link = x.links.find(l => l.from === 'region' && l.to === 'free')!;
-    await user().click(card().getByRole('button', { name: /La regione della libertà → Che cosa rende libera una società/ }));
-    exactly(link.cites);
-    await user().click(card().getByRole('button', { name: /libertà di associazione/ }));
+    await user().click(card().getAllByRole('button', { name: /Punto della scheda/ })[0]);
+    exactly(x.parts.find(p => p.id === 'region')!.points[0].cites);
+    await user().click(within(node('region')).getByRole('button', { name: 'Componenti · 4' }));
+    await user().click(within(node('region')).getByRole('button', { name: 'libertà di associazione' }));
     expect(cardTitle()).toBe('libertà di associazione');
     exactly(x.parts.find(p => p.id === 'region')!.members.find(m => m.id === 'combination')!.cites);
   });
@@ -371,6 +368,103 @@ describe('the card and the index (X16)', () => {
   });
 });
 
+describe('the card explains the selection (X21)', () => {
+  const label = (from: string, to: string, scope = '.xp-stage > .xp-graph') => document.querySelector<HTMLElement>(`${scope} > .xp-label[data-joint="${from}>${to}"]`)!;
+  const offset = (el: HTMLElement) => el.dataset.offset!;
+  const mill = async () => { const x = byId('mill-harm-map'); await view(x); await user().click(screen.getByRole('button', { name: 'Tutti i livelli' })); return x; };
+  const release = (el: HTMLElement, dx: number) => {
+    fireEvent.pointerDown(el, { clientX: 10, clientY: 10, pointerId: 1 });
+    fireEvent.pointerMove(el, { clientX: 10 + dx, clientY: 10, pointerId: 1 });
+    fireEvent.pointerUp(el, { clientX: 10 + dx, clientY: 10, pointerId: 1 });
+  };
+
+  it('gives an aspect its name and the way into its roles, and no list of them', async () => {
+    const x = byId('importer-signals-map'); await view(x);
+    await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
+    await user().click(node('signals'));
+    expect(cardTitle()).toBe('Il giro e i segnali che lascia');
+    const roles = x.parts.filter(p => p.kind === 'part' && p.aspect === 'signals');
+    const text = document.querySelector('.xp-card')!.textContent!.replaceAll('Il giro e i segnali che lascia', '').replace(/Le righe citate[\s\S]*$/, '');
+    for (const r of roles) expect(text).not.toContain(r.name);
+    expect(document.querySelector('.xp-card .xp-lead')).toBeNull();
+    expect(card().getByRole('button', { name: /Apri «Il giro e i segnali che lascia»: 5 ruoli/ })).toBeInTheDocument();
+    expect(document.querySelectorAll('.xp-card details')).toHaveLength(0);
+  });
+
+  it('gives a role what it does and every point, with no fold', async () => {
+    const x = await mill();
+    await user().click(node('region'));
+    const region = x.parts.find(p => p.id === 'region')!;
+    expect(document.querySelector('.xp-card .xp-lead')).toHaveTextContent(region.role);
+    expect(card().getAllByRole('button', { name: /Punto della scheda/ })).toHaveLength(region.points.length);
+    expect(document.querySelectorAll('.xp-card details')).toHaveLength(0);
+    expect(card().queryByText(/Perché è collegata|Componenti ·/)).toBeNull();
+  });
+
+  it('opens a link’s own card from its label, by click or Enter, and Escape returns to the part', async () => {
+    const x = await mill();
+    const link = x.links.find(l => l.from === 'region' && l.to === 'free')!;
+    await user().click(label('region', 'free'));
+    expect(cardTitle()).toBe('La regione della libertà → Che cosa rende libera una società');
+    expect(card().getByText('legame')).toBeInTheDocument();
+    expect(card().getByText('dichiarato')).toBeInTheDocument();
+    // one bond between the joint's own ends: the head names them, the lead says the relation
+    expect(document.querySelector('.xp-card .xp-lead')).toHaveTextContent(link.label);
+    expect(document.querySelector('.xp-card .xp-bonds')).toBeNull();
+    expect(label('region', 'free')).toHaveAttribute('aria-pressed', 'true');
+    exactly(link.cites);
+    fireEvent.keyDown(label('region', 'free'), { key: 'Escape' });
+    expect(cardTitle()).toBe('La regione della libertà');
+    expect(label('region', 'free')).toHaveAttribute('aria-pressed', 'false');
+    label('principle', 'region').focus();
+    fireEvent.keyDown(label('principle', 'region'), { key: 'Enter' });
+    expect(cardTitle()).toBe('Il principio del danno → La regione della libertà');
+    await user().click(card().getByRole('button', { name: '← Il principio del danno' }));
+    expect(cardTitle()).toBe('Il principio del danno');
+  });
+
+  it('tells a click from a drag by 4 px', async () => {
+    await mill();
+    const before = offset(label('region', 'free')), title = cardTitle();
+    release(label('region', 'free'), 3);
+    expect(cardTitle()).toBe('La regione della libertà → Che cosa rende libera una società');
+    expect(offset(label('region', 'free'))).toBe(before);
+    fireEvent.keyDown(window, { key: 'Escape' }); fireEvent.keyDown(window, { key: 'Escape' });
+    expect(cardTitle()).toBe(title);
+    const other = offset(label('utility', 'principle'));
+    release(label('utility', 'principle'), 5);
+    expect(offset(label('utility', 'principle'))).not.toBe(other);
+    expect(cardTitle()).toBe(title);
+  });
+
+  it('opens a link inside a sub-level on its card, at that level', async () => {
+    const x = byId('importer-signals-map'); await view(x);
+    await user().click(within(node('signals')).getByRole('button', { name: /Sottolivello/ }));
+    await user().click(label('round', 'outcomes', '.xp-sub .xp-graph'));
+    expect(cardTitle()).toMatch(/→/);
+    exactly(x.links.find(l => l.from === 'round' && l.to === 'outcomes')!.cites);
+    expect(sub()).not.toBeNull();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(sub()).not.toBeNull();
+    expect(cardTitle()).toBe(x.parts.find(p => p.id === 'round')!.name);
+  });
+
+  it('gives a component what it does and its role as the way back, and no other components', async () => {
+    await mill();
+    await user().click(within(node('region')).getByRole('button', { name: 'Componenti · 4' }));
+    await user().click(within(node('region')).getByRole('button', { name: 'libertà di associazione' }));
+    expect(card().queryByText(/altri componenti/)).toBeNull();
+    await user().click(card().getByRole('button', { name: 'Torna al ruolo: La regione della libertà' }));
+    expect(cardTitle()).toBe('La regione della libertà');
+  });
+
+  it('keeps the cited lines on the card for when the source is hidden', async () => {
+    await mill();
+    await user().click(node('region'));
+    expect(document.querySelector('.xp-card .xp-card-lines')).toHaveTextContent('Le righe citate');
+  });
+});
+
 describe('"how it was read" (X17)', () => {
   it('counts as the reading report does, and a cell opens its line', async () => {
     const x = byId('mill-harm-map'); await view(x);
@@ -387,9 +481,12 @@ describe('"how it was read" (X17)', () => {
     const x = byId('importer-signals-map'); await view(x);
     await user().click(screen.getByRole('button', { name: 'Come è stata letta' }));
     await user().click(screen.getByRole('button', { name: /Il silenzio, il guasto difficile → pone la domanda 3/ }));
-    expect(cardTitle()).toBe('Il silenzio, il guasto difficile');
-    // at the aspect level the link to a role is the joint to the role's aspect
-    expect(card().getByRole('button', { pressed: true, name: /Il giro e i segnali che lascia/ })).toBeInTheDocument();
+    // at the aspect level the link to a role is the joint to the role's aspect, and it opens on its own card (X21)
+    expect(cardTitle()).toBe('Il silenzio, il guasto difficile → Il giro e i segnali che lascia');
+    // the joint is declared, since two of its three links are; the interpreted one is marked on its bond
+    expect(card().getAllByText('dichiarato')).toHaveLength(1);
+    expect(within(card().getByText(/pone la domanda 3/).closest('li')!).getByText('interpretato')).toBeInTheDocument();
+    expect(document.querySelector('.xp-stage > .xp-graph > .xp-label[data-joint="silence>signals"]')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('speaks English too', async () => {

@@ -1,6 +1,6 @@
 import type { xIt } from './x-it';
 
-/** The exploration's text (plan P-20261105-exploration, X12–X18), with the same shape as the Italian catalog. */
+/** The exploration's text (plan P-20261105-exploration, X12–X18, X21), with the same shape as the Italian catalog. */
 export const xEn: typeof xIt = {
   view: 'Exploration', back: 'Back to your library', how: 'How it was read', howBack: '← Back to the source',
   panels: { index: 'Index of the source', structure: 'Structure', source: 'Source', indexHint: 'in its own order · ● already in view' },
@@ -26,17 +26,16 @@ export const xEn: typeof xIt = {
     ghost: (k: number, n: number) => `layer ${k} · ${n} ${n === 1 ? 'part' : 'parts'} · opens with →`,
     island: (n: number) => `${n} parts · closed`, roles: (n: number) => `${n} ${n === 1 ? 'role' : 'roles'}`, components: (n: number) => `${n} ${n === 1 ? 'component' : 'components'}`,
     aside: 'Set apart', who: 'who', whom: 'to whom',
-    labelHint: 'drag to move the label; the arrow keys move it from the keyboard; a double click or Home puts it back',
+    labelHint: 'click or Enter to read the link; drag to move the label; the arrow keys move it from the keyboard; a double click or Home puts it back',
     sub: '▼ sub-level', subHint: 'touch a role for its components', close: '✕ close', closeTitle: 'Close the sub-level',
     openSub: (name: string, n: number) => `Open "${name}": ${n} ${n === 1 ? 'role' : 'roles'}`, toggleSub: (name: string) => `Sub-level of "${name}"`,
   },
-  kinds: { part: 'part', prerequisite: 'prerequisite', annotation: 'annotation', reference: 'reference', procedure: 'procedure', role: 'role', aspect: 'aspect', component: 'component', section: 'section' },
+  kinds: { part: 'part', prerequisite: 'prerequisite', annotation: 'annotation', reference: 'reference', procedure: 'procedure', role: 'role', aspect: 'aspect', component: 'component', section: 'section', link: 'link' },
   card: {
     label: 'Card', in: (name: string) => `in: ${name}`, on: (name: string) => `on: ${name}`, of: (name: string) => `of: ${name}`,
     open: (name: string, n: number) => `Open "${name}": ${n} ${n === 1 ? 'role' : 'roles'} ▾`, close: (name: string) => `Close "${name}" ▴`,
-    roles: (n: number) => `Roles · ${n}`, components: (n: number) => `Components · ${n}`, why: (n: number) => `Why it is linked · ${n}`,
-    noLinks: 'No link the source supports.', lines: 'The cited lines', declared: 'declared', interpreted: 'interpreted',
-    backToRole: (name: string) => `← the role: ${name}`, otherComponents: (name: string, list: string) => `The other components of "${name}": ${list}`, none: 'none',
+    components: (n: number) => `Components · ${n}`, lines: 'The cited lines', declared: 'declared', interpreted: 'interpreted',
+    backToRole: (name: string) => `Back to the role: ${name}`, backTo: (name: string) => `← ${name}`,
     lines_: (a: number, b: number) => `lines ${a}–${b}`, notExtracted: 'No part cites it: the extraction left it out.',
     notExtractedHint: 'If it matters to understand the source, it is a gap in the extraction; if it is framing (credits, links, a table of contents), that is right.', sectionLines: 'The section’s lines',
     point: 'Point of the card',

@@ -9,7 +9,8 @@ import type { Shaped, Tone } from './model';
  * One level drawn (plan P-20261105-exploration X12, X15): blocks as buttons, the layer strips, islands for closed
  * nuclei, the joints with their basis in the stroke, and each joint's label: a short tag with an arrow the way the
  * joint runs, in the hue of the block that acts. Pointing at a label marks "who" and "to whom"; a chosen block lights
- * its joints; a label can be dragged or moved with the arrow keys, tied to its joint by a dashed leader.
+ * its joints; a label can be dragged or moved with the arrow keys, tied to its joint by a dashed leader, and a click or
+ * Enter on it chooses its link (X21).
  */
 export type NodeState = { sel?: boolean; near?: boolean; fresh?: boolean; lit?: boolean; done?: boolean; quiet?: boolean; opened?: boolean; faded?: boolean; premise?: boolean };
 export type Members = { list: { id: string; name: string; does: string }[]; open: boolean; sel?: string | null; noun: 'roles' | 'components'; lifted?: boolean };
@@ -21,6 +22,8 @@ export const heightOf = (members: number, open: boolean) => open && members ? NO
 
 /** A label's key: the level it belongs to and its joint, so a moved label keeps its place across steps and sub-levels. */
 export const labelKey = (level: string, l: Pick<LevelLink, 'from' | 'to' | 'class'>) => `${level}|${l.from}>${l.to}|${l.class}`;
+/** A release this close to where the pointer went down is a click, not a move (X21): a tremor must not eat the click. */
+export const CLICK_SLOP = 4;
 const verbs = (l: LevelLink) => l.labels && l.labels.length > 1 ? l.labels : [l.label];
 const sizeOf = (l: LevelLink, lit: boolean) => {
   const list = lit && verbs(l).length > 1, longest = list ? Math.max(...verbs(l).map(v => v.length)) + 4 : l.label.length + 2;
@@ -44,6 +47,9 @@ interface Props {
   litJoint?: (l: LevelLink) => boolean;
   moved: Record<string, [number, number]>;
   onMove: (key: string, offset: [number, number] | null) => void;
+  /** The link chosen on its label, if any; a click or Enter on a label chooses its link. */
+  chosen?: (l: LevelLink) => boolean;
+  onJoint?: (l: LevelLink) => void;
   onNode: (id: string) => void;
   onToggle: (id: string) => void;
   onMember: (id: string, member: string) => void;
@@ -122,6 +128,7 @@ export function Graph(p: Props) {
       const key = labelKey(p.levelKey, l), g = geometry.get(l)!, off = offsets.get(key) ?? [0, 0], state = hotOf(l), { list } = sizeOf(l, state === 'hot');
       return <Label key={`label-${key}`} l={l} way={g.way} at={[g.mid[0] + off[0], g.mid[1] + off[1]]} off={off} list={list} state={state} faded={faded(l.from) && faded(l.to)}
         tone={p.tone(l.from)} names={p.names} hint={x.structure.labelHint}
+        chosen={!!p.chosen?.(l)} onChoose={() => p.onJoint?.(l)}
         onMove={o => p.onMove(key, o)} onPoint={on => setPointing(on ? l : null)}/>;
     })}
     {p.children}
@@ -134,9 +141,10 @@ function Arrowed({ text, way, tone }: { text: string; way: Way; tone: Tone | nul
   return way === '←' || way === '↑' ? <>{arrow} {text}</> : <>{text} {arrow}</>;
 }
 
-function Label({ l, way, at, off, list, state, faded, tone, names, hint, onMove, onPoint }: {
+function Label({ l, way, at, off, list, state, faded, tone, names, hint, chosen, onChoose, onMove, onPoint }: {
   l: LevelLink; way: Way; at: [number, number]; off: [number, number]; list: boolean; state: string; faded: boolean; tone: Tone | null;
-  names: (id: string) => string; hint: string; onMove: (offset: [number, number] | null) => void; onPoint: (on: boolean) => void;
+  names: (id: string) => string; hint: string; chosen: boolean; onChoose: () => void;
+  onMove: (offset: [number, number] | null) => void; onPoint: (on: boolean) => void;
 }) {
   const [drag, setDrag] = useState<{ x: number; y: number; from: [number, number]; now: [number, number] } | null>(null);
   const shownOff = drag?.now ?? off, place = drag ? [at[0] - off[0] + drag.now[0], at[1] - off[1] + drag.now[1]] : at;
@@ -147,16 +155,23 @@ function Label({ l, way, at, off, list, state, faded, tone, names, hint, onMove,
     setDrag({ x: e.clientX, y: e.clientY, from: off, now: off });
   };
   const move = (e: PointerEvent<HTMLDivElement>) => { if (drag) setDrag({ ...drag, now: [drag.from[0] + e.clientX - drag.x, drag.from[1] + e.clientY - drag.y] }); };
-  const up = () => { if (!drag) return; const now = drag.now; setDrag(null); if (now[0] !== drag.from[0] || now[1] !== drag.from[1]) onMove(now); };
+  // within the slop the release is a click: it chooses the link and leaves the label where it was
+  // a cancelled pointer never chooses
+  const up = (cancelled: boolean) => {
+    if (!drag) return;
+    const now = drag.now; setDrag(null);
+    if (Math.hypot(now[0] - drag.from[0], now[1] - drag.from[1]) > CLICK_SLOP) onMove(now); else if (!cancelled) onChoose();
+  };
   // while a label has focus, the arrows move it and never step the guide
   const key = (e: KeyboardEvent<HTMLDivElement>) => {
     const by: Record<string, [number, number]> = { ArrowLeft: [-8, 0], ArrowRight: [8, 0], ArrowUp: [0, -8], ArrowDown: [0, 8] };
     if (by[e.key]) { e.preventDefault(); e.stopPropagation(); onMove([shownOff[0] + by[e.key][0], shownOff[1] + by[e.key][1]]); }
     else if (e.key === 'Home') { e.preventDefault(); e.stopPropagation(); onMove(null); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onChoose(); }
   };
-  return <div className={`xp-label ${state ? `xp-${state}` : ''} ${list ? 'xp-many' : ''} ${drag ? 'xp-drag' : ''} ${faded ? 'xp-whole xp-faded' : ''}`} data-joint={`${l.from}>${l.to}`} data-offset={`${Math.round(shownOff[0])},${Math.round(shownOff[1])}`}
-    role="note" tabIndex={0} title={[...who, hint].join('\n')} aria-label={who.join('; ')} style={{ left: place[0], top: place[1] }}
-    onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onClick={e => e.stopPropagation()} onDoubleClick={e => { e.stopPropagation(); onMove(null); }}
+  return <div className={`xp-label ${state ? `xp-${state}` : ''} ${list ? 'xp-many' : ''} ${drag ? 'xp-drag' : ''} ${faded ? 'xp-whole xp-faded' : ''} ${chosen ? 'xp-chosen' : ''}`} data-joint={`${l.from}>${l.to}`} data-offset={`${Math.round(shownOff[0])},${Math.round(shownOff[1])}`}
+    role="button" aria-pressed={chosen} tabIndex={0} title={[...who, hint].join('\n')} aria-label={who.join('; ')} style={{ left: place[0], top: place[1] }}
+    onPointerDown={down} onPointerMove={move} onPointerUp={() => up(false)} onPointerCancel={() => up(true)} onClick={e => e.stopPropagation()} onDoubleClick={e => { e.stopPropagation(); onMove(null); }}
     onPointerEnter={() => onPoint(true)} onPointerLeave={() => onPoint(false)} onFocus={() => onPoint(true)} onBlur={() => onPoint(false)} onKeyDown={key}>
     {list ? <ul className="xp-bonds">{verbs(l).map((v, i) => <li key={i}><Arrowed text={v} way={way} tone={tone}/></li>)}</ul> : <Arrowed text={l.label} way={way} tone={tone}/>}
   </div>;

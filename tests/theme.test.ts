@@ -69,6 +69,15 @@ describe('the exploration stylesheet (X11)', () => {
     const used = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1]))];
     expect(used.filter(x => !defined.has(x) && !local.has(x))).toEqual([]);
   });
+  it('shows the card’s lines only while the source column is hidden (X21)', () => {
+    expect(css).toMatch(/\.xp-card-lines \{ display: none;/);
+    expect(css).toMatch(/\.xp-src-closed \.xp-card-lines \{ display: block; \}/);
+    const narrow = css.slice(css.indexOf('@media (max-width: 899px)'));
+    expect(narrow).toMatch(/\.xp-tab-structure \.xp-card-lines \{ display: block; \}/);
+  });
+  it('never lets a block’s peek hold the pointer over a joint label (X21)', () => {
+    expect(css).toMatch(/\.xp-peek \{ pointer-events: none; \}/);
+  });
   it('stops the motion under "reduce motion"', () => {
     const styles = readFileSync('src/renderer/styles.css', 'utf8');
     const reduce = styles.slice(styles.indexOf('@media (prefers-reduced-motion: reduce)'));

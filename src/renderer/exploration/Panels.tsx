@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { Cite } from '../../core/disassembly';
 import { firstLine, type ExplorationCite, type ExplorationPart } from '../../core/exploration';
-import type { LevelLink } from '../../core/exploration-levels';
 import type { Section } from '../../core/source-index';
 import { SourceDocument } from '../disassembly/SourceDocument';
 import { usePreferences } from '../preferences';
@@ -23,16 +22,27 @@ export type CardTarget =
   | { kind: 'member'; level: Shaped; part: string; id: string }
   | { kind: 'section'; index: number };
 
+/** The cited lines, kept on the card only for when the source column is hidden (X21); CSS shows them then. */
+function Lines({ text, cites, title }: { text: string; cites: ExplorationCite[]; title: string }) {
+  return <div className="xp-card-lines"><h4>{title}</h4><Excerpt text={text} cites={cites}/></div>;
+}
+
 /**
- * The card (X16): name and kind, the lead, the points with their marks, the annotations, then folded: the roles or
- * components, "why it is linked" with each joint's bonds as who → what → whom, and the cited lines.
+ * The card (X16, X21) explains only what is selected, and repeats nothing already on screen: the structure draws the
+ * roles, the components and the joints, and the source column shows the lines.
+ * - an aspect: its name, the way into its roles, its annotations;
+ * - a role or another part: what it does for the whole, its points, its annotations;
+ * - a link, chosen on its label: its ends, its basis and its bonds as who → what → whom;
+ * - a component: what it does, and its role as the way back.
+ * Name, kind and position stay, because they orient.
  */
-export function Card({ m, target, tone, pick, onPoint, onLink, onNote, onMember, onBackToRole, sub, onToggleSub }: {
+export function Card({ m, target, tone, pick, onPoint, onUnpick, onNote, onBackToRole, sub, onToggleSub }: {
   m: Model; target: CardTarget | null; tone: Tone | null; pick: { point: number } | { link: Link } | null;
-  onPoint: (i: number | null) => void; onLink: (l: LevelLink) => void; onNote: (id: string) => void; onMember: (part: string, id: string) => void; onBackToRole: () => void;
+  onPoint: (i: number | null) => void; onUnpick: () => void; onNote: (id: string) => void; onBackToRole: () => void;
   sub: string | null; onToggleSub: (id: string) => void;
 }) {
   const { t } = usePreferences(), x = t.x;
+  const text = m.x.source.text;
   const name = (level: Shaped, id: string) => level.parts.get(id)?.name ?? m.all.get(id)?.name ?? id;
   if (!target) return <section className="xp-card" aria-label={x.card.label}/>;
   if (target.kind === 'section') {
@@ -40,45 +50,50 @@ export function Card({ m, target, tone, pick, onPoint, onLink, onNote, onMember,
     return <section className="xp-card" aria-label={x.card.label}>
       <div className="xp-card-head"><h3>{s.title || x.index.opening}</h3><span className="xp-tag">{x.kinds.section}</span><span className="xp-tag">{x.card.lines_(s.line, s.end)}</span></div>
       <p className="xp-lead">{x.card.notExtracted}</p><p className="xp-hint">{x.card.notExtractedHint}</p>
-      <details open><summary>{x.card.sectionLines}</summary><Excerpt text={m.x.source.text} cites={[{ from: s.line, to: s.end }]}/></details>
+      <details open><summary>{x.card.sectionLines}</summary><Excerpt text={text} cites={[{ from: s.line, to: s.end }]}/></details>
     </section>;
   }
   if (target.kind === 'member') {
     const role = target.level.parts.get(target.part)!, c = role.members.find(y => y.id === target.id)!;
-    const others = role.members.filter(y => y.id !== c.id).map(y => y.name).join(' · ') || x.card.none;
     return <section className="xp-card" data-tone={tone ?? undefined} aria-label={x.card.label}>
-      <div className="xp-card-head"><h3>{c.name}</h3><span className="xp-tag">{x.kinds.component}</span><span className="xp-tag">{x.card.of(role.name)}</span></div>
+      <div className="xp-card-head"><h3>{c.name}</h3><span className="xp-tag">{x.kinds.component}</span>
+        <button className="xp-tag xp-tag-back" title={x.card.backToRole(role.name)} aria-label={x.card.backToRole(role.name)} onClick={onBackToRole}>{x.card.of(role.name)}</button></div>
       <p className="xp-lead">{c.does}</p>
-      <button className="xp-rel" onClick={onBackToRole}>{x.card.backToRole(role.name)}</button>
-      <p className="xp-hint">{x.card.otherComponents(role.name, others)}</p>
-      <details open><summary>{x.card.lines}</summary><Excerpt text={m.x.source.text} cites={c.cites}/></details>
+      <Lines text={text} cites={c.cites} title={x.card.lines}/>
     </section>;
   }
   const { level, id } = target, p = level.parts.get(id);
   if (!p) return <section className="xp-card" aria-label={x.card.label}/>;
-  const links = level.level.links.filter(l => l.class !== 'group' && (l.from === id || l.to === id));
-  const notes = level.parts.size ? [...level.parts.values()].filter(q => q.kind === 'annotation' && q.on === id) : [];
-  const kind = p.kind === 'part' ? (target.members === 'roles' ? x.kinds.aspect : x.kinds.role) : x.kinds[p.kind];
-  const point = pick && 'point' in pick ? pick.point : null, link = pick && 'link' in pick ? pick.link : undefined;
-  const bonds = (l: LevelLink) => l.bonds?.length ? l.bonds : [{ from: l.from, label: l.label, to: l.to }];
+  const chosen = pick && 'link' in pick ? level.level.links.find(l => sameLink(pick.link, l)) : undefined;
+  if (chosen) {
+    // a joint that stands for several links marks those the extractor interpreted: the joint is declared if any one is
+    const bonds = chosen.bonds?.length ? chosen.bonds : [{ from: chosen.from, label: chosen.label, to: chosen.to, basis: chosen.basis }];
+    const mixed = new Set(bonds.map(b => b.basis)).size > 1;
+    // one bond between the joint's own ends: the head already names them, so only the relation is left to say
+    const single = bonds.length === 1 && bonds[0].from === chosen.from && bonds[0].to === chosen.to;
+    return <section className="xp-card xp-link-card" data-tone={tone ?? undefined} aria-label={x.card.label}>
+      <div className="xp-card-head"><h3>{name(level, chosen.from)} → {name(level, chosen.to)}</h3><span className="xp-tag">{x.kinds.link}</span>
+        <span className="xp-basis" data-basis={chosen.basis}>{chosen.basis === 'declared' ? x.card.declared : x.card.interpreted}</span></div>
+      {single ? <p className="xp-lead">{bonds[0].label}</p> : <ul className="xp-bonds">{bonds.map((b, i) => <li key={i}><b>{name(level, b.from)}</b> → {b.label} → <b>{name(level, b.to)}</b>{mixed && b.basis === 'interpreted' && <> <span className="xp-basis" data-basis="interpreted">{x.card.interpreted}</span></>}</li>)}</ul>}
+      <button className="xp-rel xp-back" onClick={onUnpick}>{x.card.backTo(name(level, chosen.from))}</button>
+      <Lines text={text} cites={chosen.cites} title={x.card.lines}/>
+    </section>;
+  }
+  const notes = [...level.parts.values()].filter(q => q.kind === 'annotation' && q.on === id);
+  const aspect = target.members === 'roles';
+  const kind = p.kind === 'part' ? (aspect ? x.kinds.aspect : x.kinds.role) : x.kinds[p.kind];
+  const point = pick && 'point' in pick ? pick.point : null;
   return <section className="xp-card" data-tone={tone ?? undefined} aria-label={x.card.label}>
     <div className="xp-card-head"><h3>{p.name}</h3><span className="xp-tag">{kind}</span>
       {target.aspect && <span className="xp-tag">{x.card.in(name(m, target.aspect))}</span>}
       {p.on && <span className="xp-tag">{x.card.on(name(level, p.on))}</span>}</div>
-    <p className="xp-lead">{p.role}</p>
-    {target.members === 'roles' && p.members.length > 0 && <button className="xp-open-level" onClick={() => onToggleSub(id)}>{sub === id ? x.card.close(p.name) : x.card.open(p.name, p.members.length)}</button>}
+    {/* an aspect's own lead would only list its roles' names: the roles are one click away */}
+    {!aspect && <p className="xp-lead">{p.role}</p>}
+    {aspect && p.members.length > 0 && <button className="xp-open-level" onClick={() => onToggleSub(id)}>{sub === id ? x.card.close(p.name) : x.card.open(p.name, p.members.length)}</button>}
     {p.points.length > 0 && <ul className="xp-points">{p.points.map((q, i) => <li key={i}><button aria-pressed={point === i} data-point={i} aria-label={`${x.card.point}: ${q.text}`} onClick={() => onPoint(point === i ? null : i)}>
       <i data-mark={q.mark ?? ''}>{q.mark ? MARK[q.mark] : '·'}</i>{q.text}</button></li>)}</ul>}
     {notes.length > 0 && <div className="xp-notes-list">{notes.map(n => <button key={n.id} className="xp-note" onClick={() => onNote(n.id)}>⚠ {n.name}</button>)}</div>}
-    {p.members.length > 0 && <details className="xp-fold"><summary>{target.members === 'roles' ? x.card.roles(p.members.length) : x.card.components(p.members.length)}</summary>
-      <div className="xp-mlist">{p.members.map(c => <button key={c.id} className="xp-rel" onClick={() => onMember(id, c.id)}><b>{c.name}</b> — {c.does}</button>)}</div></details>}
-    {links.length > 0
-      ? <details className="xp-fold"><summary>{x.card.why(links.length)}</summary>{links.map(l => <button key={`${l.from}>${l.to}>${l.class}`} className={`xp-rel ${sameLink(link, l) ? 'xp-on' : ''}`} aria-pressed={sameLink(link, l)} onClick={() => onLink(l)}>
-          <span className="xp-rel-ends">{name(level, l.from)} → {name(level, l.to)}</span>
-          <span className="xp-basis" data-basis={l.basis}>{l.basis === 'declared' ? x.card.declared : x.card.interpreted}</span>
-          <ul className="xp-bonds">{bonds(l).map((b, i) => <li key={i}><b>{name(level, b.from)}</b> → {b.label} → <b>{name(level, b.to)}</b></li>)}</ul></button>)}</details>
-      : <p className="xp-hint">{x.card.noLinks}</p>}
-    <details><summary>{x.card.lines}</summary><Excerpt text={m.x.source.text} cites={p.cites}/></details>
+    <Lines text={text} cites={p.cites} title={x.card.lines}/>
   </section>;
 }
 

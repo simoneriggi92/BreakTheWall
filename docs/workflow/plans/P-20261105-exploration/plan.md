@@ -1,11 +1,11 @@
 ---
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
-version: 6
+version: 7
 state: implementing
 current_task: X20
-last_evidence: X20.1 local checks (tsc; vitest --dir tests 41 files 587 tests; build); X20.2 built app over DevTools 80/80; X20.3 ChatGPT in the app on the public importer (1 request, 125 s, saved and opened); three fixes from X20.2-X20.3
-next_action: owner - CI on the pushed branch (X20.1), witness X20.2, X20.3 through Claude over MCP, and judge their own sources (X20.4)
+last_evidence: X21 (2026-11-09) tsc; vitest --dir tests 41 files 596 tests; build; built app over DevTools 61/61 (four cards, paper and blueprint, it and en, real click and drag on labels, Tab and Enter, fallback lines). Earlier X20.1-X20.3 as recorded
+next_action: owner - look at the four cards (X21 screenshots), then CI (X20.1), witness X20.2, X20.3 through Claude over MCP, X20.4
 approval: approved
 ---
 
@@ -88,6 +88,17 @@ v5 was approved on 2026-11-06 and its gate ran A1 on six sources and both routes
 - **The frame is prototype NB**, whose panels fold; D's "space" control is not built (X12).
 
 No task is added or renumbered.
+
+## What changes from v6
+
+v6 was approved on 2026-11-06 and X2–X20.3 are implemented on `feature/exploration`. Looking at the card on 2026-11-09, the owner found that it mostly repeats other surfaces: names already in the structure, relations already drawn as joint labels, lines already open in the source. Their rule: *if this sentence leaves the card, is an explanation lost, or only a copy of something already on screen?* The name, the kind and where the element sits stay, because they orient.
+
+v7 adds one phase, `card`, with one task, **X21**:
+- the card explains only the selected element, with one content per kind of selection (aspect, role, link, component);
+- a link gets its own card, opened by choosing its joint label;
+- the cited lines become a fallback, shown only while the source column is hidden.
+
+X16 is superseded where X21 says otherwise. No other task changes. The contract and the request are untouched: the visible cuts come first, before any prompt is changed.
 
 ## Evidence
 
@@ -210,6 +221,7 @@ Included:
   - the movable joint labels;
 - retiring "take this part apart" from the disassembly player, from the bridge and from the core;
 - `docs/product.md`, updated with the members, the aspects and the levels (X2);
+- the card explaining only the selected element, and the link card (X21);
 - tests.
 
 Not included:
@@ -224,6 +236,8 @@ Not included:
 - choosing among several traces by more than their coverage (the learner can pick another one, X13);
 - telling a partial trace from a partial extraction (research, open question). The reading report shows the facts, and the entry rule does not use them;
 - views A, B and C, and D's "detail" control;
+- an aspect's own central idea: the contract gives an aspect only an id and a name, and adding one changes the contract and the gated request. It is decided after the owner sees the cut card (X21);
+- rewriting the request or the prompts to change the card's text;
 - any new dependency.
 
 ## Preconditions
@@ -854,6 +868,65 @@ Not included:
   - at 1280×800 the structure has about 260 px of height under the guide, the step strip and the card;
   - the importer enters, at the aspect level, by its morning-catalogue question.
 
+### Phase `card`
+
+**X21. The card explains the selection** (`Panels.tsx`, `Graph.tsx`, `ExplorationView.tsx`, `state.ts`, `exploration.css`, `x-it.ts`, `x-en.ts`). From the owner's look of 2026-11-09.
+- **The rule:** a sentence stays on the card only if removing it loses an explanation, not a copy of something on screen. The name, the kind tag and the position tags ("in:", "su:", "di:") stay.
+- **What each card shows:**
+
+  | Selection | Stays | Leaves |
+  |---|---|---|
+  | Aspect | name, "aspetto", open/close its roles, its annotations | the lead made of its roles' names, the roles fold, the links fold, "no links" |
+  | Role, prerequisite, other parts | name, tags, the lead, **all** its points with their marks, its annotations | the components fold, "why it is linked", "no links" |
+  | Link (new) | "A → B", "legame", declared or interpreted, its bonds as who → what → whom, a way back to A | the other links of the part |
+  | Component | name, "componente", what it does, "di: role" as the way back to the role | "the other components", the separate back button |
+  | Section not extracted | unchanged | — |
+
+- **Points are all kept.** A point with no mark is not a copy by itself, and this is the only cut that would remove generated content instead of a repeated surface. It is looked at again on real cases (1 of 13 points in the prepared examples, 3 of 27 in X20.3's generation).
+- **The cited lines are a fallback.** They show on the card only while the source column is hidden: folded, or on a narrow window outside the source tab. Otherwise the source column shows them, and the card does not repeat them.
+- **Choosing a link.** "Why it is linked" was the only way to choose a link inside the view, so the joint label becomes choosable:
+  - a pointer released within **4 px** of where it went down is a click and chooses the link; beyond 4 px it is a drag and moves the label, as today. A move within the threshold is not stored. Without a threshold, a 1 px tremor would make a click a move, and the choice would fail silently;
+  - Enter or Space on a focused label chooses it, and the arrow keys and Home keep moving it;
+  - the label is a button, pressed while its link is chosen;
+  - choosing a label selects its `from` end at the level that draws it (the whole, or the sub-level), then the link, as a link opened from "how it was read" does;
+  - Escape with a link chosen returns to its part's card, and leaves the guide alone.
+- Acceptance (component tests):
+  - an aspect's card (importer) has no lead of role names and no list of roles, and opens its roles;
+  - a role's card (Mill `region`) has no folds, and shows every point;
+  - a click on a joint label shows the link card with its ends, its basis and its bonds, and lights exactly its lines; Enter does the same; Escape returns to the part's card;
+  - a release 3 px from the start chooses the link and leaves the label in place; a release 5 px away moves the label and chooses nothing;
+  - a component's card has no "other components", and "di: role" returns to the role;
+  - an interpreted link opened from "how it was read" lands on its link card;
+  - a static check in `theme.test.ts` finds the fallback rule for the card's lines, since the test environment applies no CSS;
+  - the Italian and English catalogs keep equal keys.
+- **On the built app,** with the DevTools script of X20.2 extended to the four cards:
+  - a real click on a label chooses it and a real drag does not;
+  - Tab reaches the labels and Enter opens them, replacing the list of links as the keyboard path;
+  - the card's lines show with the source folded, at 1280×800 and on a narrow window;
+  - paper and blueprint, Italian and English, no console errors.
+  
+  Screenshots of the four cards go to the owner's look.
+- **Done (2026-11-09):**
+  - **The card** (`Panels.tsx`) has one branch per selection. An aspect's card has no lead and no list; a role's card has no folds and keeps every point; a component's "di: role" tag is the button back to the role; the section card is unchanged.
+  - **The link card** opens when a link is picked:
+    - its head names the ends, with "legame" and its basis;
+    - a single bond between the joint's own ends shows only its relation, as the lead, since the head names the ends (found on the built app);
+    - a joint that stands for several links lists them as who → what → whom.
+  - **Bonds keep their basis.** `LevelBond` in `exploration-levels.ts` now carries each link's basis, so a joint declared by one link marks the interpreted ones. The importer's aspect joint "Il silenzio → Il giro" is declared by two links of three, and its third, opened from "how it was read", is marked "interpretato" on its own bond.
+  - **Labels** (`Graph.tsx`): `CLICK_SLOP` = 4 px. A cancelled pointer never chooses. Labels are buttons, pressed while chosen, with the `xp-chosen` ring. Escape lets a chosen link go first, also with a label focused (`state.ts`, `ExplorationView.tsx`).
+  - **Removed:** the strings `roles`, `why`, `noLinks`, `otherComponents` and `none`, and the CSS `.xp-fold` and `.xp-rel-ends`. `backToRole` is now the accessible name of the "di:" button.
+  - **Tests:** 8 new component tests in the X21 block, the X16 fold test replaced by one on a point's and a component's lines, the report's interpreted link updated, and 2 static CSS checks. `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 596 tests, and `npm run build` passes.
+  - **Built app** (`npm run build`, Electron over the DevTools protocol, scratch data folder, script in the scratchpad): 61/61 checks pass in paper and blueprint, Italian and English, at 1280×800, covering:
+    - the four cards;
+    - a real click on a label choosing its link, and a real 40×24 px drag moving it and choosing nothing;
+    - Escape;
+    - Tab reaching a label and Enter opening it;
+    - a component's card;
+    - the card's lines showing with the source folded and on a 760 px window, and hidden otherwise;
+    - no sideways scroll and no console errors.
+  - **Found and fixed on the built app:** a block's hover peek (`.xp-peek`, above the labels) kept the hover while the pointer moved down onto the block's own joint label, so the click went to the block. The peek no longer takes the pointer (`pointer-events: none`, static check added).
+  - **Left for the owner's look:** the 16 screenshots (four cards × two themes × two languages), and the thin aspect card.
+
 ## Verification strategy
 
 - **Runners:** `npm run check` (TypeScript and Vitest) and `npm run build`, from the adapter.
@@ -886,32 +959,42 @@ Not included:
 - **Everything up front costs one long wait before the view.** It replaces many short waits inside it. The generation screen shows progress and can be cancelled; X1 records the time per source.
 - **Removing "take apart" leaves disassemblies shallow.** Generated disassemblies have one level unless they were taken apart before. That is accepted: exploration is the default, and the disassembly player is kept for reading what exists.
 - **The style drifts toward the prototypes' generic look** if X11 is skipped or done after the view. The phase order puts tokens first.
+- **The aspect card becomes thin** (X21): a name, a tag and the button to open its roles. It shows a gap in the data, since an aspect has no idea of its own, and it is not filled with a derived sentence, which would be a copy again. The owner judges it, and an aspect field is a separate decision.
+- **Labels carry two gestures** (X21): click and drag. The 4 px threshold separates them, and both are tested in jsdom and with a real pointer.
+- **The keyboard loses a compact list of links** (X21): links are reached by Tab through the labels instead. X21's run on the built app checks that path.
 - **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
 
 ## Approval
 
 Record:
-- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v6".
-- **Timestamp:** 2026-11-06T15:04:33Z.
-- **Approved version:** 6.
-- **Plan digest:** SHA-256 `3d0b158fb993099e100b2a673ed0f82acce449fda20574ca01b1857c850fad1c` of this file before this record was added.
-- **Authorized scope:** as listed below under "v6 authorizes".
+- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v7".
+- **Timestamp:** 2026-11-09T16:16:35Z.
+- **Approved version:** 7.
+- **Plan digest:** SHA-256 `c3e741ea36bd354cc64e526d01ec80fa74353ef2342ce2b21202cc5443d7cb16` of this file before this record was added.
+- **Authorized scope:** as listed below under "v7 authorizes".
 
 History:
 - v2 was approved on 2026-11-05T16:56:08Z; void after v3.
 - v3 was approved on 2026-11-05T17:00:57Z (SHA-256 `db6e4967…0a18`). Its X1 ran once and stopped at the gate. Void after v4.
 - v4 was approved on 2026-11-05T17:45:12Z (SHA-256 `874755f4…d997d6`). Its X1 ran R1 and the abstraction study. Void after v5.
 - v5 was approved on 2026-11-06T11:21:02Z by Simone Riggi ("Approve P-20261105-exploration v5"), SHA-256 `47da2401756a7cc3ce8bfe840a2b1b328d0021c501c3a607db7a490c23dc5c5c`. Its X1 ran A1 and A2 and passed. Void since v6's approval: v6 changes X4, X5, X11, X12, X15 and X16.
+- v6 was approved on 2026-11-06T15:04:33Z by Simone Riggi ("Approve P-20261105-exploration v6"), SHA-256 `3d0b158fb993099e100b2a673ed0f82acce449fda20574ca01b1857c850fad1c`. It authorized X2–X20 and the branch `feature/exploration`. X2–X19 and X20.1–X20.3 (ChatGPT) are done under it. Void since v7's approval: v7 adds X21 and supersedes part of X16.
 
-v6 authorizes:
-- tasks X2–X20 as written, in phase order (X1 is passed);
-- creating the branch `feature/exploration` from an updated `origin/main`, and moving this plan's uncommitted documents onto it when the owner asks for a commit.
+Review: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Two findings were resolved before this version:
+- filtering out points with no mark was dropped, so all points stay;
+- choosing a label got a 4 px threshold between click and drag.
 
-v6 does not authorize:
+The remaining risks are under Risks (the thin aspect card, two gestures on a label, the keyboard path).
+
+v7 authorizes:
+- X21, in phase `card`, on `feature/exploration`;
+- what is left of X20, as v6 wrote it: X20.1 CI, X20.2 witnessed, X20.3 through Claude over MCP, and X20.4, with X21's card in the owner's look.
+
+v7 does not authorize:
 - push, pull request and merge;
 - publishing the Claude Desktop extension;
 - sending a private source to OpenAI;
-- deleting the untracked "… 2" copies (the owner's action, needed before X2);
+- changing the exploration contract or its request;
 - any new dependency.
 
 Each needs its own confirmation when reached.
@@ -919,7 +1002,7 @@ Each needs its own confirmation when reached.
 Approve with exactly:
 
 ```text
-Approve P-20261105-exploration v6
+Approve P-20261105-exploration v7
 ```
 
-Approval records approval only. Implementation starts with a later, separate command, for example `implement P-20261105-exploration v6 --phase core`.
+Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v7 --phase card`.

@@ -121,6 +121,8 @@
 .xp-member.xp-on { background: var(--ink); color: var(--surface); }
 .xp-peek { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 6; width: 240px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--x-r-card); box-shadow: 0 10px 30px var(--shadow); flex-direction: column; gap: 2px; font-size: 12px; }
 .xp-node:hover > .xp-peek { display: flex; }
+/* the peek only shows: it never holds the hover, so a joint label under it stays clickable (found in X21) */
+.xp-peek { pointer-events: none; }
 .xp-peek span { font-family: var(--f-mono); }
 .xp-island { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 8px 12px; text-align: left; border: 1px dashed var(--x-other); background: var(--x-other-soft); border-radius: var(--x-r-card); }
 .xp-badge { position: absolute; top: -11px; left: 10px; padding: 0 7px; border-radius: var(--x-r-pill); font: 600 10px/16px var(--f-body); letter-spacing: .04em; }
@@ -128,7 +130,8 @@
 .xp-badge[data-badge="whom"] { background: var(--surface); color: var(--x-lit); border: 1px solid var(--x-lit); }
 .xp-node.xp-who { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--x-lit); }
 .xp-node.xp-whom { outline: 2px dashed var(--x-lit); outline-offset: 3px; }
-.xp-label { position: absolute; transform: translate(-50%, -50%); z-index: 3; cursor: grab; white-space: nowrap; user-select: none; touch-action: none; }
+.xp-label { position: absolute; transform: translate(-50%, -50%); z-index: 3; cursor: pointer; white-space: nowrap; user-select: none; touch-action: none; }
+.xp-label.xp-chosen { outline: 2px solid var(--x-lit); outline-offset: 2px; z-index: 5; }
 .xp-label.xp-drag { cursor: grabbing; box-shadow: 0 8px 22px var(--shadow); }
 .xp-label.xp-hot { z-index: 4; }
 .xp-label.xp-many { white-space: normal; max-width: 220px; border-radius: var(--x-r-card); padding: 5px 10px; text-align: left; }
@@ -175,12 +178,17 @@
 .xp-points button[aria-pressed="true"] { background: var(--hl); }
 .xp-points i { font-style: normal; color: var(--x-main); width: 1em; flex: none; } .xp-points i[data-mark="caveat"] { color: var(--x-note); }
 .xp-note { border: 1px solid var(--x-note); color: var(--x-note); background: var(--x-note-soft); border-radius: var(--x-r-pill); padding: 2px 10px; margin: 0 6px 6px 0; }
-.xp-fold { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
-.xp-fold > summary, .xp-card details > summary { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; padding: 4px 0; }
+.xp-card details > summary { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; padding: 4px 0; }
 .xp-rel { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 8px; }
-.xp-rel:hover, .xp-rel.xp-on { background: var(--hl); }
-.xp-rel-ends { font-weight: 500; margin-inline-end: 8px; }
-.xp-rel .xp-bonds { list-style: none; padding: 0; color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.xp-rel:hover { background: var(--hl); }
+.xp-link-card .xp-bonds { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 3px; }
+.xp-link-card .xp-back { width: auto; color: var(--muted); padding: 3px 8px; }
+.xp-tag-back { cursor: pointer; font: inherit; }
+.xp-tag-back:hover { background: var(--hl); }
+/* the card's lines are a fallback (X21): the source column shows them, so the card does only while that column is hidden */
+.xp-card-lines { display: none; margin-top: 8px; }
+.xp-src-closed .xp-card-lines { display: block; }
+.xp-card-lines h4 { color: var(--muted); font: 500 12px/1.6 var(--x-read); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 4px; }
 .xp-open-level { margin: 0 0 8px; border: 1px solid var(--tone, var(--x-lit)); color: var(--ink); background: var(--wash, var(--surface)); border-radius: var(--x-r-pill); padding: 4px 12px; font-weight: 500; }
 .xp-excerpt { border-inline-start: 2px solid var(--line); padding-inline-start: 10px; color: var(--muted); font: 12.5px/1.6 var(--x-read); }
 .xp-ln em { display: inline-block; min-width: 2.6em; font-style: normal; font-family: var(--f-mono); font-size: 11px; }
@@ -236,6 +244,7 @@
   .xp-tabs button { flex: 1; }
   .xp-body, .xp-body.xp-with-index, .xp-body.xp-src-closed, .xp-body.xp-with-index.xp-src-closed { grid-template-columns: minmax(0, 1fr); padding: 0 12px 12px; }
   .xp-body:not(.xp-tab-index) .xp-index-panel, .xp-body:not(.xp-tab-structure) .xp-structure-panel, .xp-body:not(.xp-tab-source) .xp-source-panel { display: none; }
+  .xp-tab-structure .xp-card-lines { display: block; }
   .xp-head .xp-icon { display: none; }
   .xp-wires { display: none; }
   .xp-meta, .xp-tag { display: none; }

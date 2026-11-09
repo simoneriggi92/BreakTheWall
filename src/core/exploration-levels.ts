@@ -7,7 +7,8 @@ import type { Section } from './source-index';
  * level and each aspect's sub-level are derived, never stored, so one document serves every level; each level has the
  * shape of an exploration, so the same detector and layout draw it.
  */
-export type LevelBond = { from: string; to: string; label: string };
+/** One link of the source inside a joint of a derived level, with its own basis. */
+export type LevelBond = { from: string; to: string; label: string; basis: ExplorationLink['basis'] };
 /** A derived joint keeps the bonds it stands for: which role does what to which. */
 export type LevelLink = ExplorationLink & { bonds?: LevelBond[]; labels?: string[] };
 export type Level = Pick<Exploration, 'aspects' | 'start'> & { parts: ExplorationPart[]; links: LevelLink[]; traces: Trace[] };
@@ -41,7 +42,7 @@ export function aspectLevel(x: Pick<Exploration, 'aspects' | 'parts' | 'links' |
     const from = toAspect(l.from), to = toAspect(l.to);
     if (from === to) continue;
     const k = `${from}>${to}>${l.class}`, a = agg.get(k) ?? { from, to, cls: l.class, declared: false, cites: [], bonds: [] };
-    a.declared ||= l.basis === 'declared'; a.cites.push(...l.cites); a.bonds.push({ from: l.from, to: l.to, label: l.label });
+    a.declared ||= l.basis === 'declared'; a.cites.push(...l.cites); a.bonds.push({ from: l.from, to: l.to, label: l.label, basis: l.basis });
     agg.set(k, a);
   }
   // a joint that stands for several bonds says the first and how many more, never a bare count (owner, 2026-11-06)

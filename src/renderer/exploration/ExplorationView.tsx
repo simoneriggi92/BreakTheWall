@@ -9,7 +9,7 @@ import { Graph, heightOf, type NodeState, type StripState } from './Graph';
 import { citing, crossing, guided, modelOf, sectionOf, shown, standIn, type Model, type Shaped } from './model';
 import { Card, IndexPanel, SourcePanel, type CardTarget } from './Panels';
 import { Report } from './Report';
-import { initialState, reduce, type Action, type ViewState } from './state';
+import { initialState, reduce, type Action, type Link, type ViewState } from './state';
 
 /** The motion of the sub-level (X14), as the tokens set it; "reduce motion" stops it. */
 const reduced = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -121,6 +121,21 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
     dispatch({ type: 'pick', pick: { link: { from: l.from, to, class: l.class } } });
   };
 
+  // a joint label chooses its link (X21): its tail is selected at the level that draws it, then the link is picked
+  const linkOf = (l: LevelLink): Link => ({ from: l.from, to: l.to, class: l.class });
+  const chosenLink = s.pick && 'link' in s.pick ? s.pick.link : null;
+  const isChosen = (l: LevelLink) => !!chosenLink && chosenLink.from === l.from && chosenLink.to === l.to && chosenLink.class === l.class;
+  const chooseTop = (l: LevelLink) => {
+    if (s.sub) dispatch({ type: 'close' });
+    dispatch({ type: 'explore', id: l.from });
+    dispatch({ type: 'pick', pick: { link: linkOf(l) } });
+  };
+  const chooseSub = (l: LevelLink) => {
+    if (s.subSel !== l.from) dispatch({ type: 'sub-select', id: l.from });
+    else if (s.member) dispatch({ type: 'member', part: l.from, id: null });
+    dispatch({ type: 'pick', pick: { link: linkOf(l) } });
+  };
+
   // ---------- the card and the lines it shows
   const card: CardTarget | null = s.section !== null ? { kind: 'section', index: s.section }
     : sub ? (s.member && s.subSel === s.member.part ? { kind: 'member', level: sub, part: s.member.part, id: s.member.id }
@@ -142,15 +157,17 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (e.defaultPrevented || el?.closest?.('input, textarea, select, .xp-label, dialog')) return;
-      if (e.key === 'Escape') { e.preventDefault(); if (s.sub) closeSub(); else dispatch({ type: 'escape' }); return; }
+      if (e.defaultPrevented || el?.closest?.('input, textarea, select, dialog')) return;
+      // Escape lets a chosen link go first, back to its part's card; a focused label keeps every other key
+      if (e.key === 'Escape') { e.preventDefault(); if (s.sub && !(s.pick && 'link' in s.pick)) closeSub(); else dispatch({ type: 'escape' }); return; }
+      if (el?.closest?.('.xp-label')) return;
       if (!m.steps.length || s.report) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); dispatch({ type: 'step', by: 1 }); }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); dispatch({ type: 'step', by: -1 }); }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [m, s.sub, s.report, closeSub, dispatch]);
+  }, [m, s.sub, s.pick, s.report, closeSub, dispatch]);
 
   const names = (id: string) => m.all.get(id)?.name ?? m.parts.get(id)?.name ?? id;
   const notesOf = (level: Shaped) => (id: string) => [...level.parts.values()].filter(p => p.kind === 'annotation' && p.on === id);
@@ -194,7 +211,7 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
           nodeState={id => ({ sel: id === s.subSel, near: !!s.subSel && sub.level.links.some(l => (l.from === s.subSel && l.to === id) || (l.to === s.subSel && l.from === id)) })}
           members={id => membersOf(sub, id).length ? { list: membersOf(sub, id), open: s.opened.includes(id), sel: s.member?.part === id ? s.member.id : null, noun: 'components' } : null}
           onNode={id => dispatch({ type: 'sub-select', id, components: membersOf(sub, id).length > 0 })} onToggle={id => dispatch({ type: 'components', id })}
-          onMember={(id, c) => dispatch({ type: 'member', part: id, id: c })}/>
+          onMember={(id, c) => dispatch({ type: 'member', part: id, id: c })} chosen={isChosen} onJoint={chooseSub}/>
       </div>
     </div></> : null;
   const graphHeight = sub && subLayout ? top + subLayout.height + 140 : undefined;
@@ -295,6 +312,7 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
           <div ref={stage} className="xp-stage">
             <Graph level={m} layout={L} levelKey="top" visible={id => view.vis.has(id)} tone={m.tone} hot={hot} litJoint={litJoint} moved={s.moved} className={sub ? 'xp-lifted' : ''}
               onMove={(key, offset) => dispatch({ type: 'move', key, offset })} names={names} notes={notesOf(m)} stripState={stripState} nodeState={topState}
+              chosen={l => !sub && isChosen(l)} onJoint={chooseTop}
               members={id => membersOf(m, id).length ? { list: membersOf(m, id), open: !isAspect(id) && s.opened.includes(id), sel: s.member?.part === id ? s.member.id : null, noun: isAspect(id) ? 'roles' : 'components', lifted: isAspect(id) && s.sub === id } : null}
               onNode={onNode} onToggle={id => isAspect(id) ? (s.sub === id ? closeSub() : openSub(id)) : dispatch({ type: 'components', id })}
               onMember={(id, c) => isAspect(id) ? openSub(id, c) : dispatch({ type: 'member', part: id, id: c })}
@@ -306,9 +324,8 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
           </div>
           {stepStrip}
           <Card m={m} target={card} tone={cardTone} pick={s.pick} sub={s.sub}
-            onPoint={i => dispatch({ type: 'pick', pick: i === null ? null : { point: i } })} onLink={l => dispatch({ type: 'pick', pick: { link: l } })}
+            onPoint={i => dispatch({ type: 'pick', pick: i === null ? null : { point: i } })} onUnpick={() => dispatch({ type: 'pick', pick: null })}
             onNote={id => sub ? dispatch({ type: 'sub-select', id }) : dispatch({ type: 'explore', id })}
-            onMember={(part, id) => card?.kind === 'part' && card.members === 'roles' ? openSub(part, id) : dispatch({ type: 'member', part, id })}
             onBackToRole={() => dispatch({ type: 'member', part: card?.kind === 'member' ? card.part : '', id: null })}
             onToggleSub={id => s.sub === id ? closeSub() : openSub(id)}/>
         </section>

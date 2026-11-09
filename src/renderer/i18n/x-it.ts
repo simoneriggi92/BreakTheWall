@@ -1,4 +1,4 @@
-/** Testi dell'esplorazione (piano P-20261105-exploration, X12–X18). Le funzioni ricevono numeri e testi già composti. */
+/** Testi dell'esplorazione (piano P-20261105-exploration, X12–X18, X21). Le funzioni ricevono numeri e testi già composti. */
 export const xIt = {
   view: 'Esplorazione', back: 'Torna alla libreria', how: 'Come è stata letta', howBack: '← Torna alla fonte',
   panels: { index: 'Indice della fonte', structure: 'Struttura', source: 'Fonte', indexHint: 'nel suo ordine · ● già in vista' },
@@ -24,17 +24,16 @@ export const xIt = {
     ghost: (k: number, n: number) => `livello ${k} · ${n} ${n === 1 ? 'parte' : 'parti'} · si apre con →`,
     island: (n: number) => `${n} parti · chiusa`, roles: (n: number) => `${n} ${n === 1 ? 'ruolo' : 'ruoli'}`, components: (n: number) => `${n} ${n === 1 ? 'componente' : 'componenti'}`,
     aside: 'A parte', who: 'chi', whom: 'a chi',
-    labelHint: 'trascina per spostare l’etichetta; con le frecce la sposti da tastiera; doppio clic o Home la rimette al suo posto',
+    labelHint: 'clic o Invio per leggere il legame; trascina per spostare l’etichetta; con le frecce la sposti da tastiera; doppio clic o Home la rimette al suo posto',
     sub: '▼ sottolivello', subHint: 'tocca un ruolo per i suoi componenti', close: '✕ chiudi', closeTitle: 'Chiudi il sottolivello',
     openSub: (name: string, n: number) => `Apri «${name}»: ${n} ${n === 1 ? 'ruolo' : 'ruoli'}`, toggleSub: (name: string) => `Sottolivello di «${name}»`,
   },
-  kinds: { part: 'parte', prerequisite: 'prerequisito', annotation: 'annotazione', reference: 'riferimento', procedure: 'procedura', role: 'ruolo', aspect: 'aspetto', component: 'componente', section: 'sezione' },
+  kinds: { part: 'parte', prerequisite: 'prerequisito', annotation: 'annotazione', reference: 'riferimento', procedure: 'procedura', role: 'ruolo', aspect: 'aspetto', component: 'componente', section: 'sezione', link: 'legame' },
   card: {
     label: 'Scheda', in: (name: string) => `in: ${name}`, on: (name: string) => `su: ${name}`, of: (name: string) => `di: ${name}`,
     open: (name: string, n: number) => `Apri «${name}»: ${n} ${n === 1 ? 'ruolo' : 'ruoli'} ▾`, close: (name: string) => `Chiudi «${name}» ▴`,
-    roles: (n: number) => `Ruoli · ${n}`, components: (n: number) => `Componenti · ${n}`, why: (n: number) => `Perché è collegata · ${n}`,
-    noLinks: 'Nessun legame sostenuto dalla fonte.', lines: 'Le righe citate', declared: 'dichiarato', interpreted: 'interpretato',
-    backToRole: (name: string) => `← il ruolo: ${name}`, otherComponents: (name: string, list: string) => `Gli altri componenti di «${name}»: ${list}`, none: 'nessuno',
+    components: (n: number) => `Componenti · ${n}`, lines: 'Le righe citate', declared: 'dichiarato', interpreted: 'interpretato',
+    backToRole: (name: string) => `Torna al ruolo: ${name}`, backTo: (name: string) => `← ${name}`,
     lines_: (a: number, b: number) => `righe ${a}–${b}`, notExtracted: 'Nessuna parte la cita: l’estrazione l’ha lasciata fuori.',
     notExtractedHint: 'Se conta per capire la fonte è un buco dell’estrazione; se è contorno (crediti, link, indice) è giusto così.', sectionLines: 'Le righe della sezione',
     point: 'Punto della scheda',

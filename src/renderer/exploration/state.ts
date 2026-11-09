@@ -117,7 +117,7 @@ export function reduce(m: Model, s: ViewState, a: Action): ViewState {
     case 'fold': return { ...s, folded: { ...s.folded, [a.panel]: !s.folded[a.panel] } };
     case 'tab': return { ...s, tab: a.tab };
     case 'report': return { ...s, report: a.on };
-    // Escape closes the sub-level first, then returns from exploring, then leaves "all the layers"
-    case 'escape': return s.report ? { ...s, report: false } : s.sub ? reduce(m, s, { type: 'close' }) : s.explore || s.pick || s.section !== null ? reduce(m, s, { type: 'back' }) : s.all ? { ...s, all: false } : s;
+    // Escape lets a chosen link go first (X21), then closes the sub-level, then returns from exploring, then leaves "all the layers"
+    case 'escape': return s.report ? { ...s, report: false } : s.pick && 'link' in s.pick ? { ...s, pick: null } : s.sub ? reduce(m, s, { type: 'close' }) : s.explore || s.pick || s.section !== null ? reduce(m, s, { type: 'back' }) : s.all ? { ...s, all: false } : s;
   }
 }
