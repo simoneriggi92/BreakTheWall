@@ -21,13 +21,13 @@
 
 <p align="center"><a href="#try-the-alpha"><strong>Try the alpha</strong></a> · <a href="#how-it-works">How it works</a> · <a href="#roadmap">Roadmap</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 
-<p align="center"><strong>1 · Explore a source</strong></p>
+<p align="center"><strong>1 · Claude writes the structure, Break the Wall checks it</strong> · <a href="#use-with-claude">Use with Claude</a></p>
 
-![Demo: the library opens on its explorations; the Larkspur importer opens at its aspect level; an aspect's card lists its roles and one opens the aspect in place, down to its roles; a joint label is clicked and its link card says the source declares it, with its lines lit in the source; the source's own question is followed step by step; the source is read line by line; "How it was read" shows coverage, basis and order; the theme switches from blueprint to paper; Mill's harm principle opens on its roles, layer by layer, its card explaining the selected role](docs/images/demo.gif)
+![Demo with Claude: Use with Claude turned on in the app; in Claude Code the request is typed; Claude explains how a browser checks an HTTPS certificate and explores the explanation with Break the Wall; the app refuses the first structure because one role's text is three characters too long, and Claude fixes it; the exploration opens in the app marked as written by your assistant, with its roles, a role's card and a link's card](docs/images/claude-explores.gif)
 
-<p align="center"><strong>2 · Claude writes the structure, Break the Wall checks it</strong> · <a href="#use-with-claude">Use with Claude</a></p>
+<p align="center"><strong>2 · Explore the source</strong></p>
 
-![Demo with Claude: Use with Claude turned on in the app; in Claude Code the request is typed; Claude explains how a browser checks an HTTPS certificate and explores the explanation with Break the Wall; the app refuses the first structure because one role's text is three characters too long, and Claude fixes it; the exploration opens in the app marked as written by your assistant, with its roles, a role's card and a link's card](docs/images/claude.gif)
+![Demo: the library opens on its explorations; the Larkspur importer opens at its aspect level; an aspect's card lists its roles and one opens the aspect in place, down to its roles; a joint label is clicked and its link card says the source declares it, with its lines lit in the source; the source's own question is followed step by step; the source is read line by line; "How it was read" shows coverage, basis and order; the theme switches from blueprint to paper; Mill's harm principle opens on its roles, layer by layer, its card explaining the selected role](docs/images/explore-a-source.gif)
 
 > [!NOTE]
 > **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared explorations work without an account. Exploring your own text or Markdown uses ChatGPT (experimental) or [Claude Desktop and Claude Code](#use-with-claude), which write the structure themselves. PDF documents and repositories as sources are on the [roadmap](#roadmap).
@@ -238,7 +238,7 @@ Lessons created before disassemblies stay readable, with their progress, under "
 
 Break the Wall works with **Claude Desktop** and **Claude Code** through a local MCP server that ships inside the app. You install nothing else.
 
-The second demo at the top of this page comes from a real run in Claude Code (2.1.319, Sonnet), on 2026-11-09:
+The first demo at the top of this page comes from a real run in Claude Code (2.1.319, Sonnet), on 2026-11-09:
 - **The run:** 7 turns, 67 seconds, about $0.29 on the user's plan.
 - **One refusal:** the app refused the first structure, because one role's text had 113 characters for a limit of 110. Claude fixed it, and the second was accepted.
 - **How the GIF is made:** the terminal is redrawn from the run's transcript, with each result summarized. The app frames show the exploration Claude wrote in that run.
