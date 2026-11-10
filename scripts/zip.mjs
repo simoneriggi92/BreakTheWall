@@ -52,7 +52,7 @@ export function mcpbManifest(version, prompts = []) {
     name: 'break-the-wall',
     display_name: 'Break the Wall',
     version,
-    description: 'Open a text from Claude in Break the Wall, the desktop app that takes it apart into parts you can explore, run and reassemble.',
+    description: 'Explore a text from Claude with Break the Wall, the desktop app that reads its structure and lets you explore how it holds together, down to its source lines.',
     author: { name: 'Simone Riggi', url: 'https://github.com/simoneriggi92' },
     homepage: 'https://github.com/simoneriggi92/BreakTheWall',
     license: 'Apache-2.0',
