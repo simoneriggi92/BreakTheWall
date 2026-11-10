@@ -51,6 +51,19 @@ describe('the structure request (X7)', () => {
     expect(longTexts(raw, fs)).toEqual([{ path: 'parts[1].name', text: 'x'.repeat(60), length: 60, limit: 48 }]);
   });
 
+  it('names a text over its limit and a structural finding in one refusal, so one repair can fix both (X40)', async () => {
+    const answer = toAnswer(await bakery());
+    answer.parts[1].name = 'x'.repeat(60);
+    answer.start = 'staling';
+    const raw = JSON.stringify(answer), fs = refused(() => acceptExploration(raw, ready));
+    expect(fs).toEqual([
+      { path: 'parts[1].name', message: 'Text has 60 characters; at most 48' },
+      { path: 'start', message: 'The start is a part of kind "part"; staling is a prerequisite' },
+    ]);
+    // A mix means the draft is wrong, not only long: the ChatGPT route sends a full repair, not a shorten request.
+    expect(longTexts(raw, fs)).toBeUndefined();
+  });
+
   it('refuses an answer that is not JSON or not in the answer shape', () => {
     expect(refused(() => acceptExploration('{"start":', ready))).toEqual([{ path: '', message: 'The answer is not complete JSON' }]);
     expect(refused(() => acceptExploration('{}', ready)).length).toBeGreaterThan(0);

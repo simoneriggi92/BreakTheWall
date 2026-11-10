@@ -1,11 +1,11 @@
 ---
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
-version: 13
+version: 14
 state: implementing
 current_task: X20
-last_evidence: X35-X39 (2026-11-10) first readers written down; Claude's press-Enter exploration (run 2 of 2, accepted first try) prepared and first in the library; README, second GIF, still image and social card on it; tsc, vitest --dir tests 41 files 610 tests, build, brand; built app 12/12
-next_action: owner - open and merge the pull request of feature/app-copy (phases copy and focus); upload the social preview by hand; then X20.4
+last_evidence: X40 (2026-11-10) one refusal names schema and structural findings together; new test red on the old code, green on the fix; tsc, vitest --dir tests 41 files 611 tests, build
+next_action: owner - open and merge the pull request of fix/all-findings; then X20.4
 approval: approved
 ---
 
@@ -183,6 +183,15 @@ v13 adds phase `focus` (X35–X39):
 
 The importer, Atlas and Mill stay in the library, and Mill stays named in the README as the proof that the same view reads an argument.
 
+## What changes from v13
+
+Phase `focus` is done and merged (PR 50, then PR 51 for the README's second GIF). Its first Claude run found a defect (see X36's record):
+- **What happened:** the first refusal named only three texts over their limit. The second refusal named a start that was a prerequisite. With one repair, nothing was saved.
+- **The cause:** `acceptExploration` (`src/core/exploration-generation.ts`) checks in stages: the answer's shape (`wireZod`), then the contract's schema with its text limits (`explorationSchema`), then the structural rules (`checkExploration`). It throws at the first stage that fails. So a schema finding hides every structural finding.
+- **Who meets it:** every route that uses the function. That is Claude through MCP (`src/desktop/assistants.ts`) and ChatGPT (`src/desktop/generator.ts`), and both allow one repair.
+
+The owner asked on 2026-11-10 to fix it after the LinkedIn post: "Prima aggiorniamo la repo, pushiamo e pubblico su Linkedin, poi sistemiamo il bug", then "procediamo con il fix adesso". v14 adds phase `checks` (X40).
+
 ## Evidence
 
 - [Research R-20261104-exploration-experience](../../research/R-20261104-exploration-experience.md):
@@ -263,6 +272,7 @@ The importer, Atlas and Mill stay in the library, and Mill stays named in the RE
 - **Claude and OpenAI first, local models later** (2026-11-05): local models still have limitations, so the product is built on ChatGPT and on Claude's MCP first.
 - **Usefulness is the owner's judgement.**
 - **Developers first, identity unchanged** (2026-11-10): the README, the GIFs and the post lead with technical text, and the loop stays one for every subject. "Non cambiamo la narrazione… però quando comunichiamo tramite post e anche readme mostriamo nei GIF o nelle demo qualcosa sul documento tecnico".
+- **Fix the checks after the post** (2026-11-10): "poi sistemiamo il bug", "procediamo con il fix adesso".
 - **A mainstream topic for the demo, in English** (2026-11-10): "utilizza l'argomento cosa succede quando premi invio su un indirizzo e mi raccomando, tutto deve essere in lingua inglese".
 
 ## Decisions this plan takes, to confirm at approval
@@ -315,6 +325,7 @@ Included:
 - a readable bar, and a guide strip that does not repeat the card (X27, X28);
 - the README, its still image, the social card and the two GIFs, presenting the exploration (X29–X32);
 - the app's own text, its metadata and the contributor pages, saying the exploration (X33, X34);
+- one refusal naming every finding the answer's shape lets the app find (X40);
 - developers recorded as the first readers; a prepared English exploration of what happens when you press Enter on an address, written by Claude in a real run and listed first; the README naming its first readers; the second GIF, the still image and the social card on the new exploration (X35–X39);
 - tests.
 
@@ -1424,6 +1435,39 @@ Developers are the first readers, and what the project shows leads with a techni
     - **Waiting for the owner's read** before it is kept (X36's rule).
   - **X37, in part:** the subtitle, the "Why" opening and "How it works" are written; the GIF and image captions wait for X38–X39.
 
+### Phase `checks`
+
+One refusal names every finding, so the single repair can fix them all (owner, 2026-11-10). The work goes on a new branch from `main`, `fix/all-findings`.
+
+**X40. The checks report together** (`src/core/exploration-generation.ts`, `tests/exploration-generation.test.ts`).
+- **When the answer's shape parses** (`wireZod`), `acceptExploration` maps it and runs both checks on the mapped draft:
+  - the contract's schema, with its findings worded as today (a length stays "Text has N characters; at most M");
+  - `checkExploration`, with its findings at their paths in the answer (`answerPath`), as today.
+
+  It refuses with the schema findings first, then the structural ones, with no finding twice. It accepts only when both are empty.
+- **Safe to run early.** The answer's shape already guarantees what `checkExploration` reads: ids, kinds, arrays, cites and links. So the structural rules do not depend on the text limits.
+- **Unchanged:**
+  - an answer that is not JSON, or not in the answer's shape, is refused as today, since its structure cannot be read;
+  - the cap of 15 schema findings;
+  - the routes' repair budget and their messages.
+- **The ChatGPT route's shorten request** stays correct with no change. `longTexts` already returns nothing when any finding is not a length, so a refusal that mixes lengths and structure gets a full repair, not a shorten request that could fix only the lengths.
+- **Tests** (`tests/exploration-generation.test.ts`):
+  - an answer with a role over its limit and a prerequisite as the start gets one refusal that names both (`parts[i].role` as a length, and `start`);
+  - `longTexts` returns nothing for that refusal;
+  - the existing tests pass unchanged: the length-only refusal still names one finding.
+- Acceptance: the tests above pass, and `npm run typecheck`, `npx vitest run --dir tests` and `npm run build` pass. The MCP and ChatGPT routes need no change, since both call `acceptExploration`.
+
+- **Done (2026-11-10),** on `fix/all-findings`; committed and pushed on the owner's request:
+  - **`acceptExploration`:** once the answer's shape parses, it runs the contract's schema and `checkExploration` on the mapped draft. It refuses with the worded schema findings, then the structural ones in answer paths, with no finding twice. The other stages are unchanged.
+  - **Test:** a name over its limit plus a prerequisite as the start gets one refusal with `parts[1].name` ("Text has 60 characters; at most 48") and `start`, and `longTexts` returns nothing for it.
+
+    Run against the old code, the test fails. It passes with the fix.
+  - **Checks:**
+    - `npm run typecheck` passes;
+    - `npx vitest run --dir tests` runs 41 files and 611 tests;
+    - `npm run build` passes.
+  - **Not run:** no model run, since v14 authorizes none. Whether the longer first refusal helps a real repair will show in the next Claude or ChatGPT generation.
+
 ## Verification strategy
 
 - **Runners:** `npm run check` (TypeScript and Vitest) and `npm run build`, from the adapter.
@@ -1474,16 +1518,17 @@ Developers are the first readers, and what the project shows leads with a techni
 - **A public demo can carry a factual error** (X36). Claude's explanation is the source. The owner reads it before it is kept; a run with an error is discarded, never patched, since every cite points to its lines.
 - **A Claude-written example can read as staged** (X36, X38). The fixture, the README and the plan say that Claude wrote it in one run and that nothing was edited, and the run's record is in this plan.
 - **A focus can drift into a mode** (X35). The adapter now says that the readers choose examples and never a mode, so a later plan proposing a feature "for runbooks" meets that rule.
+- **A longer first refusal** (X40). One refusal can now name schema and structural findings together. The model has more to fix in its one repair, but it no longer meets a finding it was never told about.
 - **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
 
 ## Approval
 
 Record:
-- **Approver:** Simone Riggi (owner), in chat: "Approve v13".
-- **Timestamp:** 2026-11-10T15:41:14Z.
-- **Approved version:** 13.
-- **Plan digest:** SHA-256 `3e5b8f04c811b57e4abc02d8a4cccd471cd8a42f1bd0cb861ad5cb8bda7b4cbf` of this file before this record was added.
-- **Authorized scope:** as listed below under "v13 authorizes".
+- **Approver:** Simone Riggi (owner), in chat: "Approve v14".
+- **Timestamp:** 2026-11-10T16:32:41Z.
+- **Approved version:** 14.
+- **Plan digest:** SHA-256 `7796fd9aa6df5c8148f5961f4f4b693be7d0f3b9181b4706d5ca6ae349898de1` of this file before this record was added.
+- **Authorized scope:** as listed below under "v14 authorizes".
 
 History:
 - v2 was approved on 2026-11-05T16:56:08Z; void after v3.
@@ -1496,6 +1541,7 @@ History:
 - v9 was approved on 2026-11-09T17:13:12Z by Simone Riggi ("Approve P-20261105-exploration v9"), SHA-256 `0f87623f5525ab18281c43215e669678b8f9dfc4c153960169b79b5e3dacf483`. It authorized committing X22–X26, X27–X28 and what was left of X20. Done under it: commit 9fd7221, pushed to PR 47. Void since v10's approval: v10 adds X29–X32.
 - v10 was approved on 2026-11-09T17:37:47Z by Simone Riggi ("Approve P-20261105-exploration v10"), SHA-256 `28e7757162cd6b324815dc0b6fbdee4651f1c67ccf4a73f48bba009c311b686f`. It authorized X29–X32 and one headless Claude Code run. Done under it, on the owner's instruction, on the branch `feature/present-exploration` cut from `main` after PR 47 was merged: commit b63274c, PR 49. Void since v11's approval: v11 adds X33–X34.
 - v11 was approved on 2026-11-10T15:08:19Z by Simone Riggi ("Approve P-20261105-exploration v11"), SHA-256 `5501e3bc07f7d329b5ec1609674ca459f91012e97c05631ef31b2c853672d226`. It authorized X33–X34 and what was left of X20. X33–X34 are done under it, on `feature/app-copy`, not yet committed. Void since v13's approval: v13 adds X35–X39. (A v12 draft was written and replaced before approval.)
+- v13 was approved on 2026-11-10T15:41:14Z by Simone Riggi ("Approve v13"), SHA-256 `3e5b8f04c811b57e4abc02d8a4cccd471cd8a42f1bd0cb861ad5cb8bda7b4cbf`. It authorized X35–X39, two Claude Code runs, and committing X33–X39. Done under it: commits 20c5580 and fc9a53e, merged in PR 50, and the README fix in PR 51. Void since v14's approval: v14 adds X40.
 
 Review:
 - v7: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Dropping the points with no mark was given up, and the 4 px threshold was added.
@@ -1504,19 +1550,16 @@ Review:
 - v10: the owner asked for the README and the GIFs on 2026-11-09, and chose PR 47 and a real Claude run. The local media pipeline was found in `.local/media` (its README, the storyboards, and the earlier run's transcript and replay), and the MCP server was found to read `BTW_USER_DATA_DIR`.
 - v11: the owner asked on 2026-11-10 to fix the app's own text. The strings were found by searching the catalogs, the metadata and the contributor pages for the old loop's words, and checked one by one: those truly about disassemblies stay.
 - v12 (draft, not approved) and v13: the owner decided on 2026-11-10, after an outside analysis shared in chat, that developers are the first readers and that the identity stays; reading v12, they chose a mainstream demo topic in English. What the project shows was checked: the Claude GIF (HTTPS) is already a public technical topic; the second GIF, the still image, the social card, the library's order and the README's opening are not. The library's order was checked to be the fixture list's; the prepared-exploration test fixes the list and the sources, and is changed in X36. A prepared file was checked to need kind `prepared`, no `generation` and an `original-prepared` source.
+- v14: the defect was found in X36's first run. The cause was read in `acceptExploration` and `checkExploration`. Both routes were checked to call the function, and the ChatGPT route's shorten rule (`longTexts`) was checked to send a mixed refusal to a full repair.
 
-v13 authorizes:
-- up to two headless Claude Code runs on the owner's plan, with the setup and prompt of X36 (about $0.30–1 each, judging by X32);
-- committing X33–X34 and X35–X39 on `feature/app-copy` (or on a new branch from `main` if that branch is merged first), and a push when the owner asks;
-- adding the "First readers" paragraph to `docs/product.md` and one sentence to `AGENTS.md` (X35);
+v14 authorizes:
+- X40, in phase `checks`, on `fix/all-findings` from `main`, with a commit and a push when the owner asks;
 - what is left of X20, as v6 wrote it.
 
-v13 does not authorize:
+v14 does not authorize:
 - merge;
-- uploading GitHub's social preview, publishing the extension or a release;
-- rewriting other sections of `docs/product.md`, or the identity line;
-- changing the exploration contract or its request;
-- an Italian version of the new exploration, or any other new prepared exploration or model run;
+- changing the disassembly route's checks, the exploration contract or its request;
+- any model run;
 - any new dependency.
 
 Each needs its own confirmation when reached.
@@ -1524,7 +1567,7 @@ Each needs its own confirmation when reached.
 Approve with exactly:
 
 ```text
-Approve P-20261105-exploration v13
+Approve P-20261105-exploration v14
 ```
 
-Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v13 --phase focus`.
+Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v14 --phase checks`.
