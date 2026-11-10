@@ -5,7 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Break the Wall has one loop for every subject: **disassemble → run → reassemble**, with every part tied to its source.
+        Break the Wall reads the structure of a source and lets you explore how it holds together, with every block and link tied to its source lines.
+        Exploring is the core; running and reassembling come later. There is one loop for every subject.
         It is not a course, a chatbot, a summarizer or a flashcard app, and it has no subject-specific modes.
         Please read the [product definition](https://github.com/simoneriggi92/BreakTheWall/blob/main/docs/product.md) before proposing.
   - type: textarea
@@ -25,12 +26,16 @@ body:
   - type: dropdown
     id: step
     attributes:
-      label: Which step of the loop it serves
+      label: Which part of the exploration it serves
       options:
-        - Disassemble (parts, joints, sources)
-        - Run (scenarios, load tests, new cases)
-        - Reassemble
+        - The structure (aspects, roles, components, joints)
+        - The guides
+        - The card
+        - The source and its index
+        - How it was read
         - Generation and sources
+        - Claude (MCP)
+        - Disassemblies (earlier loop)
         - Something else
     validations:
       required: true

@@ -121,8 +121,14 @@ describe('rendered language', () => {
     expect(document.documentElement.dataset.theme).toBe('blueprint');
     expect(host.saved.at(-1)).toEqual({ version: 1, provider: 'local', language: 'en', theme: 'blueprint' });
   });
-  it.each([['en-US', 'START WITH A SOURCE', 'Take the text apart.', 'Turn a wall of text into parts you can inspect, test and put back together.'],
-    ['it-IT', 'PARTI DA UNA FONTE', 'Smonta il testo.', 'Trasforma un muro di testo in parti da esaminare, mettere alla prova e ricomporre.']])('shows the identity in the header and the home opening (%s, D25–D26)', async (locale, eyebrow, tagline, line) => {
+  it('says the exploration, not the old loop, in the library opening and in "Use with Claude" (X33)', () => {
+    for (const [c, words] of [[en, /disassembl|reassembl|put back together/i], [italian, /smontaggi|ricompo|riassembl/i]] as const) {
+      for (const text of [c.library.subtitle, c.assistants.intro, c.assistants.promptHint, c.assistants.connectOn]) expect(text).not.toMatch(words);
+    }
+  });
+
+  it.each([['en-US', 'START WITH A SOURCE', 'Take the text apart.', 'Explore how a text holds together: its aspects, its roles and the links between them, down to every source line.'],
+    ['it-IT', 'PARTI DA UNA FONTE', 'Smonta il testo.', 'Esplora come si regge un testo: i suoi aspetti, i suoi ruoli e i legami tra loro, fino a ogni riga della fonte.']])('shows the identity in the header and the home opening (%s, D25–D26)', async (locale, eyebrow, tagline, line) => {
     render(<App bridge={bridge(locale)} prepared={[await sample()]}/>);
     const heading = await screen.findByRole('heading', { level: 1, name: tagline });
     const brand = document.querySelector('.topbar .brand')!;

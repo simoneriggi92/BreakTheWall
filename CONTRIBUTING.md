@@ -1,12 +1,12 @@
 # Contributing to Break the Wall
 
-Thank you for your interest. Break the Wall is an alpha, and contributions of every size help: a bug report, a translation fix, a new prepared disassembly, a layout improvement, or a step on the [roadmap](README.md#roadmap).
+Thank you for your interest. Break the Wall is an alpha, and contributions of every size help: a bug report, a translation fix, a new prepared exploration, a layout improvement, or a step on the [roadmap](README.md#roadmap).
 
 Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md). Questions and ideas are welcome in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions); security problems go to the private channel in [SECURITY.md](SECURITY.md).
 
 ## What the project is, and is not
 
-Break the Wall takes material apart into source-linked parts, lets the learner run the mechanism, and asks them to reassemble it: **disassemble → run → reassemble**. It is not a course, a chatbot, a summarizer or a flashcard app, and review is opt-in. There is one loop for every subject: only the kind of joint changes (mechanism, argument, story).
+Break the Wall reads the structure of a source and lets the learner explore how it holds together: its aspects, its roles and their components, the links the source states (each with its basis), and the questions the source walks, every one tied to its lines. **Exploring is the core**; running a link under load and reassembling come later. It is not a course, a chatbot, a summarizer or a flashcard app, and review is opt-in. There is one loop for every subject: the way in is chosen from the source's shape, never from its genre.
 
 Please judge a proposal against this before writing code. Subject-specific modes and features that turn the app into a study tracker will be declined. The [product definition](docs/product.md) explains the reasoning.
 
@@ -15,8 +15,8 @@ Please judge a proposal against this before writing code. Subject-specific modes
 - **Report a bug.** Open an issue with what you did, what you expected and what happened, your macOS and Node versions, and a screenshot when it is visual. Never attach private documents or credentials.
 - **Suggest an improvement.** Open an issue first for anything larger than a small fix, so we can agree on the approach before you spend time on it.
 - **Improve the interface text.** Every string exists in Italian and English (`src/renderer/i18n/it.ts` and `en.ts`); both catalogs must change together.
-- **Write a prepared disassembly.** Prepared examples live in `src/fixtures/disassemblies/`. Their sources must be original or in the public domain, and the file must pass the host checks (`npm run check` validates every fixture).
-- **Pick up a roadmap item.** Repositories and PDF documents as sources are the next large steps, already planned in [the active plan](docs/workflow/plans/P-20261024-disassembly/plan.md) (tasks D11 and D12). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the plan.
+- **Write a prepared exploration.** Prepared explorations live in `src/fixtures/explorations/`, one file per language. Their sources must be original or in the public domain, and the file must pass the exploration checks (`npm run check` validates every fixture). Prepared disassemblies in `src/fixtures/disassemblies/` stay welcome too.
+- **Pick up a roadmap item.** Repositories and PDF documents as sources are the next large steps, already planned in [the disassembly plan](docs/workflow/plans/P-20261024-disassembly/plan.md) (tasks D11 and D12); the exploration follows [its own plan](docs/workflow/plans/P-20261105-exploration/plan.md). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the plan.
 
 ## Set up
 
@@ -28,7 +28,7 @@ npm run dev       # Vite + Electron with reload
 npm run dev:web   # renderer only, in a browser (no generation)
 ```
 
-The prepared disassemblies work without any account. To generate from your own sources you need either a ChatGPT account with plan usage (experimental route) or a local model server such as llama.cpp, LM Studio or Ollama. See [Local development](docs/development.md).
+The prepared explorations and disassemblies work without any account. To explore your own sources you need a ChatGPT account with plan usage (experimental route), or Claude Desktop or Claude Code through the app's MCP server; a local model server such as llama.cpp, LM Studio or Ollama can generate disassemblies. See [Local development](docs/development.md).
 
 ## Before you open a pull request
 

@@ -20,6 +20,12 @@ function recorded(x: Exploration) {
 }
 
 const EXPECTED: Record<string, ReturnType<typeof recorded>> = {
+  'press-enter-map': {
+    // Claude's run (X36): three aspects, the pipeline framing as the premise, one trace that walks the whole navigation
+    nuclei: [11], depth: 4, loose: 0, entry: 'trace', trace: 0, aspects: ['reach', 'exchange', 'render'], premise: 'overview',
+    aspectLevel: { blocks: ['reach', 'exchange', 'render'], joints: 6, entry: 'trace' }, subLevels: [4, 3, 4],
+    coverage: '67/67', leftOut: [], interpreted: 4, points: { points: 38, inside: 38 },
+  },
   'importer-signals-map': {
     // the winter night is the trace that walks every role, so it is the way in
     nuclei: [7], depth: 3, loose: 0, entry: 'trace', trace: 2, aspects: ['signals', 'reading'], premise: 'silence',
@@ -38,15 +44,18 @@ const EXPECTED: Record<string, ReturnType<typeof recorded>> = {
 };
 
 describe('the prepared explorations (X10)', () => {
-  it('are six valid files, in Italian and in English, over the prepared disassemblies\' public sources', async () => {
+  it('are seven valid files: Claude\'s English one first (X36), then six in Italian and English over the prepared disassemblies\' public sources', async () => {
     const all = await loadPreparedExplorations(), sources = (await loadPreparedDisassemblies()).flatMap(d => d.sources);
     expect(all.map(x => `${x.id}:${x.language}`)).toEqual([
+      'press-enter-map-en:en',
       'importer-signals-map:it', 'mill-harm-map:it', 'atlas-release-map:it', 'importer-signals-map-en:en', 'mill-harm-map-en:en', 'atlas-release-map-en:en',
     ]);
     for (const x of all) {
       expect(x.kind).toBe('prepared');
       expect(x.generation).toBeUndefined();
-      expect(sources.some(s => s.id === x.source.id && s.sha256 === x.source.sha256)).toBe(true);
+      if (x.id === 'press-enter-map-en') expect(x.source.origin).toBe('original-prepared');
+      // Claude's explanation is its own source, written in the run; every other file reads a prepared disassembly's source.
+      if (x.id !== 'press-enter-map-en') expect(sources.some(s => s.id === x.source.id && s.sha256 === x.source.sha256)).toBe(true);
     }
   });
 

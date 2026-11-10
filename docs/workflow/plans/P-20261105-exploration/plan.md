@@ -1,11 +1,11 @@
 ---
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
-version: 10
+version: 13
 state: implementing
 current_task: X20
-last_evidence: X29-X32 (2026-11-09) README, still image, social card, demo.gif and claude.gif; X20.3 Claude Code run over MCP (claude-sonnet-5-5, 67 s, one repair, saved and opened); tsc, vitest 41 files 608 tests, build, brand
-next_action: owner - review README and GIFs, push and open the new pull request; upload the social preview by hand; then X20.4 (their own sources)
+last_evidence: X35-X39 (2026-11-10) first readers written down; Claude's press-Enter exploration (run 2 of 2, accepted first try) prepared and first in the library; README, second GIF, still image and social card on it; tsc, vitest --dir tests 41 files 610 tests, build, brand; built app 12/12
+next_action: owner - open and merge the pull request of feature/app-copy (phases copy and focus); upload the social preview by hand; then X20.4
 approval: approved
 ---
 
@@ -137,6 +137,52 @@ The README still presents the disassembly loop (disassemble → run → reassemb
 - **Where:** on PR 47, before the merge, so product and presentation reach `main` together.
 - **claude.gif:** recorded again from a real Claude run on the exploration over MCP ("Facciamo il run vero ora"), not kept, and not removed. That run is also X20.3's missing Claude route.
 
+## What changes from v10
+
+v10 was approved on 2026-11-09, and phase `present` is done and pushed (commit b63274c, PR 49). The README now says the new identity, but the app and its metadata still say the old loop. The owner asked on 2026-11-10 to fix that ("Fixiamo Testi dell'app"). v11 adds phase `copy`:
+- **The library's opening** says "Turn a wall of text into parts you can inspect, test and put back together" (`library.subtitle`, Italian and English). It is the first line a learner reads.
+- **"Use with Claude"** says Claude "writes the disassembly" (`assistants.intro`, `assistants.promptHint`), though `start_exploration` is now the tool Claude uses to take a text apart.
+- **Shared Studio and generation text** names the disassembly where an exploration meets it too:
+  - the content-language hint;
+  - "Sign in with ChatGPT to generate a disassembly";
+  - "No disassembly was saved" in the generic failure reasons (incomplete, refused, invalid output, the local and stream failures, cancelled).
+- **Metadata and contributor pages** still describe the old loop:
+  - `package.json` ("run the mechanism, and reassemble it");
+  - the Claude Desktop extension's description in `scripts/zip.mjs` ("explore, run and reassemble");
+  - `CONTRIBUTING.md` (its first paragraph, and the prepared-example contribution);
+  - the feature request template ("disassemble → run → reassemble").
+
+Text that is truly about disassemblies stays: the player, the disassembly sections, generating a disassembly, and limits that apply only to disassemblies. `docs/product.md` is the owner's product definition, and its later sections are not rewritten here.
+
+This is a phase of this plan, not a new plan. The workflow allows one active plan, and this one stays open on X20.4.
+
+## What changes from v11
+
+v11 was approved on 2026-11-10, and phase `copy` is done on `feature/app-copy` (not yet committed). The same day the owner shared an outside analysis of the product (written by another model, in chat). It found that the pain, and the market, sit with people who read technical text written by AI: design documents, runbooks, the long answer to "how does X work". It ranked understanding a system from its documents first, and reviewing AI-written documents second.
+
+The owner decided (2026-11-10):
+- **The identity does not change.** One loop for every subject; no mode per subject.
+- **Developers are the first readers.** "Il focus sugli sviluppatori, gli utilizzatori principali in questo momento sono gli sviluppatori, perché il problema, il dolore è lì". What the project shows (README, GIFs, the post) leads with technical text, so a reader understands where the app is most useful.
+
+What the project shows today:
+- **The Claude GIF** already explains how a browser checks an HTTPS certificate. It stays.
+- **The still image and the social card** show the Larkspur importer, a technical document. They stay.
+- **The second GIF** opens on the Larkspur importer and ends on Mill's harm principle. Both ask the viewer to learn a context first: a fictional overnight importer, a 19th-century argument.
+- **The library** lists the importer, Mill, then the Atlas release runbook. All three are hand-written for this project and none is a topic a viewer already knows.
+- **The README's opening** says "AI gives you a wall of text" and never says who it is for.
+- **`docs/product.md` and the adapter** say the identity, but not the first readers. Without them, a later feature has no written audience to be judged against.
+
+A v12 draft kept the prepared examples and ended the second GIF on the Atlas runbook. Reading it, the owner found Mill, Atlas and the importer too hard for a demo: "mi sembrano troppo complesse". A viewer should recognise the topic and be struck by its structure, not work to understand the subject. The owner chose **"what happens when you type an address and press Enter"**, and said that everything must be in English. The v12 draft was never approved; v13 replaces it.
+
+v13 adds phase `focus` (X35–X39):
+- the first readers, written down;
+- a new prepared exploration on that topic, written by Claude in a real run, first in the library;
+- the README;
+- the second GIF, entirely on the new exploration;
+- the still image and the social card, which is what LinkedIn shows for the repository's link.
+
+The importer, Atlas and Mill stay in the library, and Mill stays named in the README as the proof that the same view reads an argument.
+
 ## Evidence
 
 - [Research R-20261104-exploration-experience](../../research/R-20261104-exploration-experience.md):
@@ -216,6 +262,8 @@ The README still presents the disassembly loop (disassemble → run → reassemb
 - **The lab-mode pull request is set aside** (2026-11-05): "per ora da parte". This plan does not depend on it.
 - **Claude and OpenAI first, local models later** (2026-11-05): local models still have limitations, so the product is built on ChatGPT and on Claude's MCP first.
 - **Usefulness is the owner's judgement.**
+- **Developers first, identity unchanged** (2026-11-10): the README, the GIFs and the post lead with technical text, and the loop stays one for every subject. "Non cambiamo la narrazione… però quando comunichiamo tramite post e anche readme mostriamo nei GIF o nelle demo qualcosa sul documento tecnico".
+- **A mainstream topic for the demo, in English** (2026-11-10): "utilizza l'argomento cosa succede quando premi invio su un indirizzo e mi raccomando, tutto deve essere in lingua inglese".
 
 ## Decisions this plan takes, to confirm at approval
 
@@ -236,6 +284,10 @@ The README still presents the disassembly loop (disassemble → run → reassemb
 13. **Motion is short and optional.** The sub-level grows out of its block and returns into it in about 0.3 s, and a lit joint's dash flows. Under "reduce motion" nothing moves, and the states are the same.
 14. **Four aspect hues, by the aspect's order.** The request allows at most four aspects, so each has its own hue. The hue says which aspect; rings and outlines say selection; prerequisites, annotations and pieces aside keep their own colours.
 15. **Choosing is a toggle.** A click on a block chooses it and lights its joints; a second click, or "back to the step", lets it go.
+16. **Developers are named once, plainly** (X37). The README's "Why" says in one sentence that the app is built first for developers who read what AI writes, and that it works on any text. The title, the subtitle and the badges name no audience; the subtitle shows it through its examples. The alternative, the examples alone, was weighed: a developer scanning a README for a few seconds may not infer it, and saying it once is more honest than letting it be guessed.
+17. **The audience picks examples, never a mode** (X35). The first readers decide which texts are shown first and which demo is recorded. They never add a feature, a prompt or a view for a subject.
+18. **The demo's exploration is Claude's, kept as the app saved it** (X36). Claude writes the explanation and its structure in a real run through the MCP server, as in X32, and the app checks it. It becomes a prepared exploration: the kind changes from generated to prepared and the run's metadata is dropped, as the contract requires of a prepared file. Nothing in its source or its structure is edited by hand. The fixture's comment, the plan and the README say that Claude wrote it. This keeps the owner's rule of 2026-11-06 (the app's own method, no hand-made structure), keeps the source's licence clean (an original text, unlike an encyclopedia's share-alike text), and shows the product's case: an AI wrote it, and you check it.
+19. **English only** (X36). There is no Italian twin: the owner asked for everything in English. With the interface in Italian, the library shows it under the existing "other language" choice. An Italian version is a later step, if asked.
 
 ## Scope
 
@@ -262,6 +314,8 @@ Included:
 - the source's two views, resizable panes, the aspect card's roles, the "A parte" band and the index legend (X22–X26);
 - a readable bar, and a guide strip that does not repeat the card (X27, X28);
 - the README, its still image, the social card and the two GIFs, presenting the exploration (X29–X32);
+- the app's own text, its metadata and the contributor pages, saying the exploration (X33, X34);
+- developers recorded as the first readers; a prepared English exploration of what happens when you press Enter on an address, written by Claude in a real run and listed first; the README naming its first readers; the second GIF, the still image and the social card on the new exploration (X35–X39);
 - tests.
 
 Not included:
@@ -282,6 +336,10 @@ Not included:
 - storing pane sizes per exploration (they are kept per device, as the player's are);
 - a popover for the card next to the selected block (see "What changes from v8");
 - asking the model for an exploration title;
+- changing the identity line, or any feature, prompt or view for technical text (decision 17);
+- an Italian version of the new exploration (decision 19), and any other new prepared exploration;
+- recording the Claude GIF again;
+- the LinkedIn post, which is the owner's and is not stored in the repository;
 - any new dependency.
 
 ## Preconditions
@@ -1179,11 +1237,192 @@ The README and its media, for the exploration. The media are made with the local
 
     On 2026-11-10 the owner asked for a version in paper, at a larger size, opening wide and zooming point by point. It was made (`.local/media/linkedin/compose-cam.swift`: a camera on the regions recorded after each step, 5 frames a second while anything moves, equal frames merged; 768×432, 49 s, 4.8 MiB). Comparing the two, the owner kept the first, in blueprint.
   - **X30, in paper:** `docs/images/exploration-importer-paper.png` (1440×980) replaces `disassembly-mill-blueprint.png`, which is removed. The social card is in paper too, with the paper wordmark, the new text, and that image; `npm run brand` rendered it. The upload to GitHub is the owner's step.
+  - **Order and names (owner, 2026-11-10):** the Claude demo comes first and the exploration second, as in the earlier README. The GIFs are renamed `claude-explores.gif` and `explore-a-source.gif`, so no cached copy of the old `demo.gif` or `claude.gif` can show the disassembly player again (`main` still serves the old ones until PR 49 is merged).
   - **claude.gif:** reviewed by the owner and kept. Its refused first `submit_exploration` (a real tool error in the run) stays, since it shows the check and the repair.
   - **X29.** The README is rewritten around the exploration; its links and anchors were checked by a script. Two claims were corrected against the code: an exploration's view state is not saved, and the entry point also accepts disassemblies.
   - **Frames:** the key frames of both GIFs were reviewed. They show only public examples, the public topic, and no local path.
   - **Checks:** `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 608 tests, and `npm run build` and `npm run brand` pass.
   - **Found, outside this phase:** the app's own copy still names the old loop. The library hero says "Turn a wall of text into parts you can inspect, test and put back together", and the "Use with Claude" panel says "writing the disassembly". The demo starts on the library's explorations, and the copy is not changed here.
+
+### Phase `copy`
+
+The app's own text and its metadata say the exploration (owner, 2026-11-10). X33 and X34 are independent. They are done on the branch of PR 49 (`feature/present-exploration`), since they finish bringing the identity to every surface; if PR 49 is merged first, they go on a new branch from `main`.
+
+**X33. The interface says the exploration** (`src/renderer/i18n/it.ts`, `en.ts`, `tests/i18n.test.tsx`).
+- **The library's opening:**
+  - the subtitle under "Take the text apart." says the identity: the app reads the source's structure, and the learner explores how it holds together, down to its lines;
+  - "Take the text apart." and the "Take apart a source" button stay: "take apart" is the brand's verb.
+- **"Use with Claude":** the intro and the prompt hint say that Claude explores a text with Break the Wall, writing its structure, which the app checks and opens. A disassembly with runs stays possible on request, and opening a text in Studio stays.
+- **Shared generation text**, said for both results:
+  - the content-language hint says "the result" ("Il risultato");
+  - signing in is asked "to generate";
+  - the generic failure reasons end with "Nothing was saved." ("Non è stato salvato nulla.").
+
+  Reasons that only a disassembly can meet keep their words.
+- Each changed string is changed in both catalogs, with the same meaning and the house style of each language.
+- Acceptance:
+  - `tests/i18n.test.tsx` checks the new opening in Italian and English;
+  - no string in the library's opening or in "Use with Claude" names a disassembly or reassembly;
+  - the catalogs keep equal keys;
+  - the Studio and generation tests that quote a changed reason are updated to the new words.
+
+**X34. Metadata and contributor pages** (`package.json`, `scripts/zip.mjs`, `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/feature_request.yml`).
+- `package.json`'s description, and the extension's description in the manifest, say the exploration. The extension's tool list is unchanged.
+- **`CONTRIBUTING.md`:**
+  - its first paragraph says the core, and that run and reassemble come later;
+  - "Write a prepared exploration" comes first, with `src/fixtures/explorations/`;
+  - prepared disassemblies stay welcome.
+- **The feature request template** asks a feature to serve the exploration loop. Its area choices name the exploration's parts: structure, guides, card, source, "How it was read", generation, Claude. "Disassemblies (earlier loop)" stays as one choice.
+- Acceptance:
+  - the `.mcpb` built by `npm run build` carries the new description;
+  - the template is still valid YAML for GitHub's issue forms;
+  - CONTRIBUTING's links resolve.
+
+**For the phase:**
+- `npm run typecheck`, `npx vitest run --dir tests` and `npm run build` pass;
+- on the built app, the library's opening and "Use with Claude" are read in Italian and English, in paper and blueprint, with no console errors.
+
+- **Done (2026-11-10),** on `feature/app-copy`, cut from `main`. PR 49 was merged at b63274c, before its last commit, so c59dca0 (the README order, the renamed GIFs and v11) is carried here as c699d6f.
+  - **X33.** In both catalogs:
+    - the library's subtitle reads "Explore how a text holds together: its aspects, its roles and the links between them, down to every source line." / "Esplora come si regge un testo: …";
+    - "Use with Claude": its intro, its prompt hint (the `break` prompt now explores, and asks for a topic) and its "on" line ("Nothing is generated here until you start it in Studio", since the Studio button is no longer always "Generate");
+    - the content-language hint, "Sign in with ChatGPT to generate", "cancelled", and the generic failures (incomplete, refused, invalid output, unreadable stream) ending in "Nothing was saved." / "Non è stato salvato nulla.".
+
+    The local-route reasons keep "disassembly", since that route generates only disassemblies.
+  - **Tests:** `tests/i18n.test.tsx` checks the new opening, with a new test that the opening and the panel name no disassembly or reassembly in either language. `tests/studio.test.tsx` quotes the new prompt hint and failure.
+  - **X34:**
+    - `package.json` and the extension's manifest say "reads its structure and lets you explore how it holds together, down to its source lines". The built `.mcpb` carries it.
+    - `CONTRIBUTING.md` says the core, puts "Write a prepared exploration" (`src/fixtures/explorations/`) first, keeps prepared disassemblies, and names Claude through MCP as a route.
+    - The feature request template says the exploration, and its choices name the exploration's parts, with "Disassemblies (earlier loop)". It still parses as YAML.
+  - **Checks:** `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 609 tests, and `npm run build` passes. On the built app (DevTools, scratch data folder), 9/9 checks pass: the opening and the panel in Italian and English, paper and blueprint, with no console errors.
+
+### Phase `focus`
+
+Developers are the first readers, and what the project shows leads with a technical topic anyone recognises (owner, 2026-11-10). The identity, the loop, the contract and the request do not change. Everything in this phase is in English. Order: X35, then X36 (the exploration X37–X39 show), then X37–X39. The work goes on `feature/app-copy`, after phase `copy`, so one pull request brings the text and the focus together; if that branch is merged first, it goes on a new branch from `main`.
+
+**X35. The first readers are written down** (`docs/product.md`, `AGENTS.md`).
+- **`docs/product.md`,** under "Identity", gains one paragraph, "First readers" (owner, 2026-11-10):
+  - developers who read technical text written or explained by AI: design documents, runbooks, release notes, the long answer to "how does X work";
+  - the pain is there: AI writes this text faster than anyone reads it, and a wrong reading has a cost;
+  - the readers pick which examples come first and what the demos show. They never add a mode, a prompt or a view for a subject (decision 17), and the identity line is unchanged.
+- **`AGENTS.md`'s identity bullet** gains one sentence: the first readers are developers reading technical and AI-written text; this chooses examples and demos, never a mode. Features are still judged against the identity.
+- No other section of `docs/product.md` is rewritten.
+- Acceptance: both files say the same thing where they overlap, and the adapter links the new paragraph.
+
+**X36. A prepared exploration anyone recognises** (`src/fixtures/explorations/press-enter-map-en.json`, `src/fixtures/explorations.ts`, `tests/prepared-explorations.test.ts`).
+- **The run.** The setup of X32: the built app on a scratch data folder with "Connect AI assistants" on; Claude Code headless (`claude -p`, the owner's CLI and plan), with this build's MCP server as its only server (`--strict-mcp-config`) and only `start_exploration`, `read_source` and `submit_exploration` allowed. The prompt:
+
+  > Explain in depth, for a developer, what happens between typing an address in a browser and seeing the page. Write the explanation in English. Then explore your explanation with Break the Wall.
+
+  "In depth" asks for a source long enough to have large concerns (X32's 37 lines had none). It does not ask for aspects or any shape: the request decides that.
+- **What is kept.** The owner reads the source before it is kept. At most two runs:
+  - a second run only if the first fails twice at the app's checks, has a factual error the owner finds, or has fewer than two aspects (the aspect level is the view's first screen);
+  - if the second run has fewer than two aspects, it is kept as it is, and the GIF opens on its roles;
+  - nothing in a kept run is edited by hand.
+- **The fixture.** The saved exploration is copied into `press-enter-map-en.json`: kind `prepared`, the `generation` record dropped, the source's origin `original-prepared` (decision 18). It must pass `validateExploration` unchanged otherwise.
+- **First in the library.** The prepared list loads the new exploration first, then the importer, Mill and Atlas in each language, as today. Its comment says who wrote it, in which run, and why it is first.
+- **Tests:**
+  - the list test names seven files, the new one first, and allows the one English-only, Claude-written source beside the prepared disassemblies' sources;
+  - the "same in both languages" test is unchanged: it pairs each Italian file with its English twin;
+  - `EXPECTED` records the new exploration's shape, levels and reading report, as for the other three.
+- Acceptance: the run's model, turns, time, cost and shape are recorded here, as for X32; the tests pass; the library shows it first in English, and under "other language" in Italian.
+
+**X37. The README names its first readers** (`README.md`).
+- **The subtitle** keeps the wall of text and names it with technical examples: AI writes design docs, runbooks and long answers faster than anyone reads them, and Break the Wall reads their structure and lets you explore how they hold together, down to the source lines. The title "Take the text apart." stays.
+- **"Why Break the Wall?"** opens on the developer's case: a long AI answer or a technical document that sounds right and is hard to check. One sentence says it is built first for developers who read what AI writes, and that the same view works on any text (decision 16).
+- **"How it works"** names the prepared explorations: what happens when you press Enter on an address (written by Claude), two technical texts (the Larkspur importer and the Atlas Reader release runbook) and one argument (Mill), the argument showing that any text works.
+- **The second GIF's caption and alt text**, and the still image's alt text, describe the new media (X38, X39).
+- Every other section stays. Nothing claims a test on runbooks beyond what this plan witnessed.
+- Acceptance: the README's links and anchors resolve (the same script as X29); no claim goes past this plan's evidence.
+
+**X38. The second GIF, on the new exploration** (`docs/images/explore-a-source.gif`; storyboard and captions in `.local/media/linkedin`, not committed).
+- The whole storyboard is on the new exploration, with the beats of X31 where its shape allows them:
+  - the library, the new exploration first;
+  - the aspect level, an aspect's card and its roles, the sub-level opened in place;
+  - a component;
+  - a joint label clicked, and the link's card saying whether the source states it or it was inferred, with its lines lit in the source;
+  - the guide's next step;
+  - the pieces in the "A parte" band, if the run has any;
+  - the source read line by line;
+  - "How it was read".
+- The exact moments are chosen on the built app, from what the exploration really shows. A moment that does not read on screen is dropped, not forced.
+- The same frame and pipeline as X31: 1440×860, blueprint, the card's separator at 22%, the theme switched to paper near the end, the end card "a source → its structure → explore it". Captions in English name what is on screen.
+- The file keeps its name, so the README's link does not change. If GitHub serves a cached copy after the merge, the file is renamed in a follow-up commit.
+- Acceptance:
+  - at most about 5 MB, and about 50 s, like X31;
+  - every key frame is reviewed: only public prepared explorations, no local path;
+  - the owner looks at it before it is committed.
+
+**X39. The still image and the social card, on the new exploration** (`docs/images/`, `.github/assets/social-preview.png`).
+- The still image shows the new exploration in paper, at its aspect level with one card open, at 1440×980 like X30. It replaces `exploration-importer-paper.png` under a name that says the new topic, and the README links it.
+- The social card is rendered again with `npm run brand`, on that image, with its wordmark and text unchanged.
+- Uploading the card to GitHub's settings stays the owner's step.
+- Acceptance: `npm run brand` passes; the owner looks at both before commit.
+
+**For the phase:**
+- `npm run typecheck`, `npx vitest run --dir tests` and `npm run build` pass;
+- on the built app, the library shows the new exploration first in English, and under "other language" in Italian; it opens and reads with no console errors, in paper and blueprint.
+
+- **Done (2026-11-10),** on `feature/app-copy`, after phase `copy`; committed and pushed on the owner's request ("pushiamo"):
+  - **X35.** `docs/product.md` has a "First readers" paragraph under "Identity"; `AGENTS.md`'s identity bullet has the same sentence and links it.
+  - **X36, the runs.** The setup and prompt of X36, on this build (Claude Code 2.1.319, `claude-sonnet-5-5`, the owner's plan):
+    - **Run 1** (15:43–15:45Z): a 92-line source, 7 turns, 113 s, $0.40. Refused twice, nothing saved. The first refusal named three `role` texts over 110 characters. The second named a start that was a prerequisite, which the first had not reported.
+    - **Run 2** (15:45–15:47Z): a 135-line source, 6 turns, 117 s, $0.38. Accepted on the first `submit_exploration`.
+      - Shape: three aspects (reaching the server, asking and answering, building the page), 11 roles with 38 points, one prerequisite as the premise, 3 annotations, one reference set apart, 16 links (4 interpreted) and one trace.
+      - Reading report: coverage 67/67, nothing left out.
+    - In both runs Claude first loaded the owner's installed `break` skill, which still names `start_disassembly`. It chose `start_exploration`, as asked.
+    - The owner read run 2's source and kept it ("Sì, tienila"). No factual error was found.
+  - **X36, the file.** `src/fixtures/explorations/press-enter-map-en.json` is run 2's saved file, with four changes:
+    - the id is now `press-enter-map-en`;
+    - the kind is `prepared`;
+    - the source's origin is `original-prepared`;
+    - the `generation` record is dropped.
+
+    The loader lists it first, with a comment on where it came from. `tests/prepared-explorations.test.ts`:
+    - names seven files;
+    - checks that the Claude-written file has its own source;
+    - records its shape (`EXPECTED['press-enter-map']`).
+  - **X37.** The README:
+    - the subtitle names design docs, runbooks and long answers;
+    - "Why" opens on the developer's case and says once that the app is built first for developers;
+    - "How it works" names the new example first, written by Claude and kept as saved, and Mill as the proof for any text;
+    - the language line and the status row say what changed;
+    - the links and anchors resolve.
+  - **X38.** `.local/media/linkedin/record-enter.cjs` (1440×860 at 2×, blueprint, card separator 22%) and `compose-enter.swift` (English captions), with the end card of X31. The storyboard:
+    - the library;
+    - the aspect "Reaching the server" and its roles;
+    - the sub-level, down to TLS and a component;
+    - the inferred link "body is parsed" and its card;
+    - two guide steps;
+    - "Where time goes" in the band set apart;
+    - the source by lines, "How it was read";
+    - the theme switched to paper;
+    - the aspect "Building the page".
+
+    `docs/images/explore-a-source.gif`: 3.8 MB (3,769,670 bytes), 44.7 s, 960×540. The key frames were reviewed: only the prepared explorations, and no local path.
+  - **X39.** `.local/media/still-enter.cjs` captured `docs/images/exploration-press-enter-paper.png` (1440×980, paper, the aspect "Reaching the server" with its card). It replaces `exploration-importer-paper.png`, which is removed. The social card points to it, and `npm run brand` rendered it, with its text unchanged; the app icons came out byte-identical.
+  - **Checks:**
+    - `npm run typecheck` passes;
+    - `npx vitest run --dir tests` runs 41 files and 610 tests;
+    - `npm run build` passes.
+  - **On the built app** (DevTools, scratch data folder), 12/12:
+    - in English, in blueprint and paper, the library lists the new example, the importer, Mill and Atlas in that order; it opens on three aspects and the premise, and the inferred link's card says "interpreted";
+    - in Italian, the example is hidden until "Mostra anche gli esempi in inglese", then listed first, and it opens;
+    - there are no console errors.
+  - **Found, outside this phase:**
+    - **The checks stop at the first stage.** `acceptExploration` stops at schema errors, text limits included, before the structural checks (`src/core/exploration-generation.ts`). A refusal can therefore hide a structural finding, and the single repair cannot fix it. This is what failed run 1.
+    - **The installed `break` skill still names `start_disassembly`.**
+    - **The social card's text** is still "AI gives you a wall of text…", unchanged as planned, while the README's subtitle now names design docs and runbooks.
+
+- **In progress (2026-11-10),** on `feature/app-copy`:
+  - **X35, done.** `docs/product.md` has the "First readers" paragraph under "Identity", and `AGENTS.md`'s identity bullet has the matching sentence with its link.
+  - **X36, the run (first of at most two).**
+    - **Setup:** the built app on a scratch data folder (`.local/media/claude/enter-run`, blueprint, English, "Connect AI assistants" on); Claude Code headless with this build's MCP server only and the three exploration tools allowed; X36's prompt, word for word.
+    - **Result:** model `claude-sonnet-5-5`, 6 turns, 117 s, $0.38. Claude first loaded the owner's own `break` skill, which still names `start_disassembly`, and chose `start_exploration` because the prompt asked to explore. `start_exploration` received a 135-line English source, "From address bar to rendered page". The first `submit_exploration` was accepted, saved and opened.
+    - **Shape:** 3 aspects (reaching the server, asking and answering, building the page), 11 roles with 38 components, one prerequisite as the premise, 3 annotations, one reference set apart ("Where time goes"), 16 links (4 interpreted), one trace of 8 steps.
+    - **Read for errors** before the owner's look: no factual error found. One imprecision: the local checks are listed as HSTS, HTTP cache, then service workers, while a service worker sees the request before the HTTP cache. The list does not claim an order.
+    - **Waiting for the owner's read** before it is kept (X36's rule).
+  - **X37, in part:** the subtitle, the "Why" opening and "How it works" are written; the GIF and image captions wait for X38–X39.
 
 ## Verification strategy
 
@@ -1228,16 +1467,23 @@ The README and its media, for the exploration. The media are made with the local
 - **Public media can leak private content** (X30–X32). Only the prepared public fixtures and a public topic are recorded, the scratch data folder holds nothing else, and every frame is reviewed before commit.
 - **A real model run can fail or cost more than expected** (X32). It is one run, with the app's single repair. If it fails twice, the README says what is witnessed, and the GIF waits.
 - **The README can overstate** (X29). Every claim is checked against the code and this plan's evidence, and run and reassemble are presented as later.
+- **Shared text can turn vague** (X33). "Nothing was saved" is shorter than naming the result. The result is named where the context does not show it, such as the Studio button and the reason for signing in.
+- **Showing one audience can read as narrowing the product** (X37, X38). The identity line, the title and the subtitle name no audience, the library keeps Mill, and the README keeps saying that any text works. Decision 16 names developers once, in "Why".
+- **The README can promise more than is witnessed on technical text** (X37). The prepared examples are hand-written or Claude's, and the owner's own sources are X20.4, still open. The README claims only what the prepared explorations and the Claude runs show.
+- **The run may give no aspect level** (X36). The topic has natural concerns (finding the server, a secure connection, building the page), but the request decides. Decision: one more run at most, then what comes is kept and shown as it is.
+- **A public demo can carry a factual error** (X36). Claude's explanation is the source. The owner reads it before it is kept; a run with an error is discarded, never patched, since every cite points to its lines.
+- **A Claude-written example can read as staged** (X36, X38). The fixture, the README and the plan say that Claude wrote it in one run and that nothing was edited, and the run's record is in this plan.
+- **A focus can drift into a mode** (X35). The adapter now says that the readers choose examples and never a mode, so a later plan proposing a feature "for runbooks" meets that rule.
 - **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
 
 ## Approval
 
 Record:
-- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v10".
-- **Timestamp:** 2026-11-09T17:37:47Z.
-- **Approved version:** 10.
-- **Plan digest:** SHA-256 `28e7757162cd6b324815dc0b6fbdee4651f1c67ccf4a73f48bba009c311b686f` of this file before this record was added.
-- **Authorized scope:** as listed below under "v10 authorizes".
+- **Approver:** Simone Riggi (owner), in chat: "Approve v13".
+- **Timestamp:** 2026-11-10T15:41:14Z.
+- **Approved version:** 13.
+- **Plan digest:** SHA-256 `3e5b8f04c811b57e4abc02d8a4cccd471cd8a42f1bd0cb861ad5cb8bda7b4cbf` of this file before this record was added.
+- **Authorized scope:** as listed below under "v13 authorizes".
 
 History:
 - v2 was approved on 2026-11-05T16:56:08Z; void after v3.
@@ -1248,26 +1494,29 @@ History:
 - v7 was approved on 2026-11-09T16:16:35Z by Simone Riggi ("Approve P-20261105-exploration v7"), SHA-256 `c3e741ea36bd354cc64e526d01ec80fa74353ef2342ce2b21202cc5443d7cb16`. It authorized X21 and what was left of X20. X21 is done under it (commit 1ad37b5). Void since v8's approval: v8 adds X22–X26 and supersedes X21 on the aspect card.
 - v8 was approved on 2026-11-09T16:51:32Z by Simone Riggi ("Approve P-20261105-exploration v8"), SHA-256 `ce8ca03b55c568db28a4f78010de97766e20420cc1b52260f7458e19164d3d60`. It authorized X22–X26 and what was left of X20. X22–X26 are done under it (committed in 9fd7221). Void since v9's approval: v9 adds X27–X28.
 - v9 was approved on 2026-11-09T17:13:12Z by Simone Riggi ("Approve P-20261105-exploration v9"), SHA-256 `0f87623f5525ab18281c43215e669678b8f9dfc4c153960169b79b5e3dacf483`. It authorized committing X22–X26, X27–X28 and what was left of X20. Done under it: commit 9fd7221, pushed to PR 47. Void since v10's approval: v10 adds X29–X32.
+- v10 was approved on 2026-11-09T17:37:47Z by Simone Riggi ("Approve P-20261105-exploration v10"), SHA-256 `28e7757162cd6b324815dc0b6fbdee4651f1c67ccf4a73f48bba009c311b686f`. It authorized X29–X32 and one headless Claude Code run. Done under it, on the owner's instruction, on the branch `feature/present-exploration` cut from `main` after PR 47 was merged: commit b63274c, PR 49. Void since v11's approval: v11 adds X33–X34.
+- v11 was approved on 2026-11-10T15:08:19Z by Simone Riggi ("Approve P-20261105-exploration v11"), SHA-256 `5501e3bc07f7d329b5ec1609674ca459f91012e97c05631ef31b2c853672d226`. It authorized X33–X34 and what was left of X20. X33–X34 are done under it, on `feature/app-copy`, not yet committed. Void since v13's approval: v13 adds X35–X39. (A v12 draft was written and replaced before approval.)
 
 Review:
 - v7: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Dropping the points with no mark was given up, and the 4 px threshold was added.
 - v8: each task comes from the owner's own look and words on 2026-11-09. The places to reuse were checked in the code, and the owner chose the band's placement.
 - v9: both tasks come from the owner's look on 2026-11-09. The causes were found in the code (the bar's CSS, the strip's premise text and its "away" condition). The popover the owner asked about was weighed and not adopted, for the reasons in "What changes from v8"; the owner then asked for v9 as proposed.
 - v10: the owner asked for the README and the GIFs on 2026-11-09, and chose PR 47 and a real Claude run. The local media pipeline was found in `.local/media` (its README, the storyboards, and the earlier run's transcript and replay), and the MCP server was found to read `BTW_USER_DATA_DIR`.
+- v11: the owner asked on 2026-11-10 to fix the app's own text. The strings were found by searching the catalogs, the metadata and the contributor pages for the old loop's words, and checked one by one: those truly about disassemblies stay.
+- v12 (draft, not approved) and v13: the owner decided on 2026-11-10, after an outside analysis shared in chat, that developers are the first readers and that the identity stays; reading v12, they chose a mainstream demo topic in English. What the project shows was checked: the Claude GIF (HTTPS) is already a public technical topic; the second GIF, the still image, the social card, the library's order and the README's opening are not. The library's order was checked to be the fixture list's; the prepared-exploration test fixes the list and the sources, and is changed in X36. A prepared file was checked to need kind `prepared`, no `generation` and an `original-prepared` source.
 
-Owner's instruction after approval (2026-11-09, in chat: "crea poi una nuova PR, la #47 la mergio ora"): PR 47 is merged without phase `present`. X29–X32 are done on a new branch from the updated `main`, and go to a new pull request, which the owner confirmed in the same message. The tasks are unchanged.
-
-v10 authorizes:
-- X29–X32, in phase `present`, on `feature/exploration`, and adding them to PR 47 when the owner asks for a push;
-- one headless Claude Code run with the owner's installed CLI and account, on a public topic, against this build's MCP server and a scratch data folder (X32);
+v13 authorizes:
+- up to two headless Claude Code runs on the owner's plan, with the setup and prompt of X36 (about $0.30–1 each, judging by X32);
+- committing X33–X34 and X35–X39 on `feature/app-copy` (or on a new branch from `main` if that branch is merged first), and a push when the owner asks;
+- adding the "First readers" paragraph to `docs/product.md` and one sentence to `AGENTS.md` (X35);
 - what is left of X20, as v6 wrote it.
 
-v10 does not authorize:
+v13 does not authorize:
 - merge;
-- uploading GitHub's social preview (the owner's step);
-- publishing the Claude Desktop extension or a release;
-- sending a private source to OpenAI or to Anthropic;
+- uploading GitHub's social preview, publishing the extension or a release;
+- rewriting other sections of `docs/product.md`, or the identity line;
 - changing the exploration contract or its request;
+- an Italian version of the new exploration, or any other new prepared exploration or model run;
 - any new dependency.
 
 Each needs its own confirmation when reached.
@@ -1275,7 +1524,7 @@ Each needs its own confirmation when reached.
 Approve with exactly:
 
 ```text
-Approve P-20261105-exploration v10
+Approve P-20261105-exploration v13
 ```
 
-Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v10 --phase present`.
+Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v13 --phase focus`.
