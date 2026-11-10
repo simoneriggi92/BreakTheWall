@@ -1,12 +1,12 @@
 ---
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
-version: 10
-state: implementing
-current_task: X20
+version: 11
+state: awaiting_approval
+current_task: X33
 last_evidence: X29-X32 (2026-11-09) README, still image, social card, demo.gif and claude.gif; X20.3 Claude Code run over MCP (claude-sonnet-5-5, 67 s, one repair, saved and opened); tsc, vitest 41 files 608 tests, build, brand
-next_action: owner - review README and GIFs, push and open the new pull request; upload the social preview by hand; then X20.4 (their own sources)
-approval: approved
+next_action: owner - review and approve v11 (phase copy, X33-X34: the app's own text and metadata say the exploration); PR 49 open with phase present; then X20.4
+approval: pending
 ---
 
 # Exploration
@@ -137,6 +137,25 @@ The README still presents the disassembly loop (disassemble → run → reassemb
 - **Where:** on PR 47, before the merge, so product and presentation reach `main` together.
 - **claude.gif:** recorded again from a real Claude run on the exploration over MCP ("Facciamo il run vero ora"), not kept, and not removed. That run is also X20.3's missing Claude route.
 
+## What changes from v10
+
+v10 was approved on 2026-11-09, and phase `present` is done and pushed (commit b63274c, PR 49). The README now says the new identity, but the app and its metadata still say the old loop. The owner asked on 2026-11-10 to fix that ("Fixiamo Testi dell'app"). v11 adds phase `copy`:
+- **The library's opening** says "Turn a wall of text into parts you can inspect, test and put back together" (`library.subtitle`, Italian and English). It is the first line a learner reads.
+- **"Use with Claude"** says Claude "writes the disassembly" (`assistants.intro`, `assistants.promptHint`), though `start_exploration` is now the tool Claude uses to take a text apart.
+- **Shared Studio and generation text** names the disassembly where an exploration meets it too:
+  - the content-language hint;
+  - "Sign in with ChatGPT to generate a disassembly";
+  - "No disassembly was saved" in the generic failure reasons (incomplete, refused, invalid output, the local and stream failures, cancelled).
+- **Metadata and contributor pages** still describe the old loop:
+  - `package.json` ("run the mechanism, and reassemble it");
+  - the Claude Desktop extension's description in `scripts/zip.mjs` ("explore, run and reassemble");
+  - `CONTRIBUTING.md` (its first paragraph, and the prepared-example contribution);
+  - the feature request template ("disassemble → run → reassemble").
+
+Text that is truly about disassemblies stays: the player, the disassembly sections, generating a disassembly, and limits that apply only to disassemblies. `docs/product.md` is the owner's product definition, and its later sections are not rewritten here.
+
+This is a phase of this plan, not a new plan. The workflow allows one active plan, and this one stays open on X20.4.
+
 ## Evidence
 
 - [Research R-20261104-exploration-experience](../../research/R-20261104-exploration-experience.md):
@@ -262,6 +281,7 @@ Included:
 - the source's two views, resizable panes, the aspect card's roles, the "A parte" band and the index legend (X22–X26);
 - a readable bar, and a guide strip that does not repeat the card (X27, X28);
 - the README, its still image, the social card and the two GIFs, presenting the exploration (X29–X32);
+- the app's own text, its metadata and the contributor pages, saying the exploration (X33, X34);
 - tests.
 
 Not included:
@@ -1179,11 +1199,50 @@ The README and its media, for the exploration. The media are made with the local
 
     On 2026-11-10 the owner asked for a version in paper, at a larger size, opening wide and zooming point by point. It was made (`.local/media/linkedin/compose-cam.swift`: a camera on the regions recorded after each step, 5 frames a second while anything moves, equal frames merged; 768×432, 49 s, 4.8 MiB). Comparing the two, the owner kept the first, in blueprint.
   - **X30, in paper:** `docs/images/exploration-importer-paper.png` (1440×980) replaces `disassembly-mill-blueprint.png`, which is removed. The social card is in paper too, with the paper wordmark, the new text, and that image; `npm run brand` rendered it. The upload to GitHub is the owner's step.
+  - **Order and names (owner, 2026-11-10):** the Claude demo comes first and the exploration second, as in the earlier README. The GIFs are renamed `claude-explores.gif` and `explore-a-source.gif`, so no cached copy of the old `demo.gif` or `claude.gif` can show the disassembly player again (`main` still serves the old ones until PR 49 is merged).
   - **claude.gif:** reviewed by the owner and kept. Its refused first `submit_exploration` (a real tool error in the run) stays, since it shows the check and the repair.
   - **X29.** The README is rewritten around the exploration; its links and anchors were checked by a script. Two claims were corrected against the code: an exploration's view state is not saved, and the entry point also accepts disassemblies.
   - **Frames:** the key frames of both GIFs were reviewed. They show only public examples, the public topic, and no local path.
   - **Checks:** `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 608 tests, and `npm run build` and `npm run brand` pass.
   - **Found, outside this phase:** the app's own copy still names the old loop. The library hero says "Turn a wall of text into parts you can inspect, test and put back together", and the "Use with Claude" panel says "writing the disassembly". The demo starts on the library's explorations, and the copy is not changed here.
+
+### Phase `copy`
+
+The app's own text and its metadata say the exploration (owner, 2026-11-10). X33 and X34 are independent. They are done on the branch of PR 49 (`feature/present-exploration`), since they finish bringing the identity to every surface; if PR 49 is merged first, they go on a new branch from `main`.
+
+**X33. The interface says the exploration** (`src/renderer/i18n/it.ts`, `en.ts`, `tests/i18n.test.tsx`).
+- **The library's opening:**
+  - the subtitle under "Take the text apart." says the identity: the app reads the source's structure, and the learner explores how it holds together, down to its lines;
+  - "Take the text apart." and the "Take apart a source" button stay: "take apart" is the brand's verb.
+- **"Use with Claude":** the intro and the prompt hint say that Claude explores a text with Break the Wall, writing its structure, which the app checks and opens. A disassembly with runs stays possible on request, and opening a text in Studio stays.
+- **Shared generation text**, said for both results:
+  - the content-language hint says "the result" ("Il risultato");
+  - signing in is asked "to generate";
+  - the generic failure reasons end with "Nothing was saved." ("Non è stato salvato nulla.").
+
+  Reasons that only a disassembly can meet keep their words.
+- Each changed string is changed in both catalogs, with the same meaning and the house style of each language.
+- Acceptance:
+  - `tests/i18n.test.tsx` checks the new opening in Italian and English;
+  - no string in the library's opening or in "Use with Claude" names a disassembly or reassembly;
+  - the catalogs keep equal keys;
+  - the Studio and generation tests that quote a changed reason are updated to the new words.
+
+**X34. Metadata and contributor pages** (`package.json`, `scripts/zip.mjs`, `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/feature_request.yml`).
+- `package.json`'s description, and the extension's description in the manifest, say the exploration. The extension's tool list is unchanged.
+- **`CONTRIBUTING.md`:**
+  - its first paragraph says the core, and that run and reassemble come later;
+  - "Write a prepared exploration" comes first, with `src/fixtures/explorations/`;
+  - prepared disassemblies stay welcome.
+- **The feature request template** asks a feature to serve the exploration loop. Its area choices name the exploration's parts: structure, guides, card, source, "How it was read", generation, Claude. "Disassemblies (earlier loop)" stays as one choice.
+- Acceptance:
+  - the `.mcpb` built by `npm run build` carries the new description;
+  - the template is still valid YAML for GitHub's issue forms;
+  - CONTRIBUTING's links resolve.
+
+**For the phase:**
+- `npm run typecheck`, `npx vitest run --dir tests` and `npm run build` pass;
+- on the built app, the library's opening and "Use with Claude" are read in Italian and English, in paper and blueprint, with no console errors.
 
 ## Verification strategy
 
@@ -1228,16 +1287,12 @@ The README and its media, for the exploration. The media are made with the local
 - **Public media can leak private content** (X30–X32). Only the prepared public fixtures and a public topic are recorded, the scratch data folder holds nothing else, and every frame is reviewed before commit.
 - **A real model run can fail or cost more than expected** (X32). It is one run, with the app's single repair. If it fails twice, the README says what is witnessed, and the GIF waits.
 - **The README can overstate** (X29). Every claim is checked against the code and this plan's evidence, and run and reassemble are presented as later.
+- **Shared text can turn vague** (X33). "Nothing was saved" is shorter than naming the result. The result is named where the context does not show it, such as the Studio button and the reason for signing in.
 - **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
 
 ## Approval
 
-Record:
-- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v10".
-- **Timestamp:** 2026-11-09T17:37:47Z.
-- **Approved version:** 10.
-- **Plan digest:** SHA-256 `28e7757162cd6b324815dc0b6fbdee4651f1c67ccf4a73f48bba009c311b686f` of this file before this record was added.
-- **Authorized scope:** as listed below under "v10 authorizes".
+Record: pending for v11.
 
 History:
 - v2 was approved on 2026-11-05T16:56:08Z; void after v3.
@@ -1248,25 +1303,23 @@ History:
 - v7 was approved on 2026-11-09T16:16:35Z by Simone Riggi ("Approve P-20261105-exploration v7"), SHA-256 `c3e741ea36bd354cc64e526d01ec80fa74353ef2342ce2b21202cc5443d7cb16`. It authorized X21 and what was left of X20. X21 is done under it (commit 1ad37b5). Void since v8's approval: v8 adds X22–X26 and supersedes X21 on the aspect card.
 - v8 was approved on 2026-11-09T16:51:32Z by Simone Riggi ("Approve P-20261105-exploration v8"), SHA-256 `ce8ca03b55c568db28a4f78010de97766e20420cc1b52260f7458e19164d3d60`. It authorized X22–X26 and what was left of X20. X22–X26 are done under it (committed in 9fd7221). Void since v9's approval: v9 adds X27–X28.
 - v9 was approved on 2026-11-09T17:13:12Z by Simone Riggi ("Approve P-20261105-exploration v9"), SHA-256 `0f87623f5525ab18281c43215e669678b8f9dfc4c153960169b79b5e3dacf483`. It authorized committing X22–X26, X27–X28 and what was left of X20. Done under it: commit 9fd7221, pushed to PR 47. Void since v10's approval: v10 adds X29–X32.
+- v10 was approved on 2026-11-09T17:37:47Z by Simone Riggi ("Approve P-20261105-exploration v10"), SHA-256 `28e7757162cd6b324815dc0b6fbdee4651f1c67ccf4a73f48bba009c311b686f`. It authorized X29–X32 and one headless Claude Code run. Done under it, on the owner's instruction, on the branch `feature/present-exploration` cut from `main` after PR 47 was merged: commit b63274c, PR 49. It is void once v11 is approved: v11 adds X33–X34.
 
 Review:
 - v7: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Dropping the points with no mark was given up, and the 4 px threshold was added.
 - v8: each task comes from the owner's own look and words on 2026-11-09. The places to reuse were checked in the code, and the owner chose the band's placement.
 - v9: both tasks come from the owner's look on 2026-11-09. The causes were found in the code (the bar's CSS, the strip's premise text and its "away" condition). The popover the owner asked about was weighed and not adopted, for the reasons in "What changes from v8"; the owner then asked for v9 as proposed.
 - v10: the owner asked for the README and the GIFs on 2026-11-09, and chose PR 47 and a real Claude run. The local media pipeline was found in `.local/media` (its README, the storyboards, and the earlier run's transcript and replay), and the MCP server was found to read `BTW_USER_DATA_DIR`.
+- v11: the owner asked on 2026-11-10 to fix the app's own text. The strings were found by searching the catalogs, the metadata and the contributor pages for the old loop's words, and checked one by one: those truly about disassemblies stay.
 
-Owner's instruction after approval (2026-11-09, in chat: "crea poi una nuova PR, la #47 la mergio ora"): PR 47 is merged without phase `present`. X29–X32 are done on a new branch from the updated `main`, and go to a new pull request, which the owner confirmed in the same message. The tasks are unchanged.
-
-v10 authorizes:
-- X29–X32, in phase `present`, on `feature/exploration`, and adding them to PR 47 when the owner asks for a push;
-- one headless Claude Code run with the owner's installed CLI and account, on a public topic, against this build's MCP server and a scratch data folder (X32);
+v11 would authorize:
+- X33–X34, in phase `copy`, on `feature/present-exploration` (PR 49), or on a new branch from `main` if PR 49 is merged first, and a push when the owner asks;
 - what is left of X20, as v6 wrote it.
 
-v10 does not authorize:
+v11 would not authorize:
 - merge;
-- uploading GitHub's social preview (the owner's step);
-- publishing the Claude Desktop extension or a release;
-- sending a private source to OpenAI or to Anthropic;
+- uploading GitHub's social preview, publishing the extension or a release;
+- rewriting `docs/product.md`;
 - changing the exploration contract or its request;
 - any new dependency.
 
@@ -1275,7 +1328,7 @@ Each needs its own confirmation when reached.
 Approve with exactly:
 
 ```text
-Approve P-20261105-exploration v10
+Approve P-20261105-exploration v11
 ```
 
-Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v10 --phase present`.
+Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v11 --phase copy`.
