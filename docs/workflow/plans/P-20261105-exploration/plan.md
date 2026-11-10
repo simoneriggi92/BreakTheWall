@@ -1,11 +1,11 @@
 ---
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
-version: 9
+version: 10
 state: implementing
 current_task: X20
-last_evidence: X27-X28 (2026-11-09) tsc; vitest --dir tests 41 files 608 tests; build; built app over DevTools 125/125 (with X22-X26: bar on two lines, premise chip, no off-guide note for the step's own part). X21 and X20.1-X20.3 as recorded
-next_action: owner - look at polish and clarity, then commit and push to PR 47 on request; then CI (X20.1), witness X20.2, X20.3 through Claude over MCP, X20.4
+last_evidence: X29-X32 (2026-11-09) README, still image, social card, demo.gif and claude.gif; X20.3 Claude Code run over MCP (claude-sonnet-5-5, 67 s, one repair, saved and opened); tsc, vitest 41 files 608 tests, build, brand
+next_action: owner - review README and GIFs, push and open the new pull request; upload the social preview by hand; then X20.4 (their own sources)
 approval: approved
 ---
 
@@ -128,6 +128,14 @@ v8 was approved on 2026-11-09, and X22–X26 are implemented and checked (not ye
 The hover peek already gives a short sentence next to the block. Instead, each surface keeps one job: the strip says where the reader is, and the card says what it means.
 
 **Not in v9:** generated explorations still take the source's file name as their title, because the request asks for no title. That needs a change to the request, and stays a separate decision.
+
+## What changes from v9
+
+v9 was approved on 2026-11-09, and X27–X28 are implemented and pushed to PR 47 (commit 9fd7221). Before PR 47 is merged, the owner asked for the README and the GIFs to reflect the product's new identity, with exploration as the core, for a public post on 2026-11-10. v10 adds phase `present`.
+
+The README still presents the disassembly loop (disassemble → run → reassemble), its exploded view and its runs. Its two GIFs and its still image show the disassembly player. The owner chose two things on 2026-11-09:
+- **Where:** on PR 47, before the merge, so product and presentation reach `main` together.
+- **claude.gif:** recorded again from a real Claude run on the exploration over MCP ("Facciamo il run vero ora"), not kept, and not removed. That run is also X20.3's missing Claude route.
 
 ## Evidence
 
@@ -253,6 +261,7 @@ Included:
 - the card explaining only the selected element, and the link card (X21);
 - the source's two views, resizable panes, the aspect card's roles, the "A parte" band and the index legend (X22–X26);
 - a readable bar, and a guide strip that does not repeat the card (X27, X28);
+- the README, its still image, the social card and the two GIFs, presenting the exploration (X29–X32);
 - tests.
 
 Not included:
@@ -1095,6 +1104,87 @@ From the owner's look on 2026-11-09, after X22–X26. X27 and X28 are independen
     - the premise chip opening its card, with a strip that does not repeat the sentence, shows no "away" note and is not paused.
   - **Found and kept as is:** with "Tutti i livelli" on and the whole-source guide, no part is put forward, so the card stays empty until a block is chosen. That was already so, and a script check had assumed a selection; the script now chooses one.
 
+### Phase `present`
+
+The README and its media, for the exploration. The media are made with the local pipeline in `.local/media`, which is not committed (see its README): Electron storyboards over the built renderer, captions and timing composed by its Swift tools, and the terminal drawn from a real run's transcript. Only the outputs are committed: `docs/images/*.gif`, the still image and `.github/assets/social-preview.png`. X29 can be written while X30–X32 record; X29 links to their files.
+
+**X29. The README presents the exploration** (`README.md`).
+- **Identity**, from `docs/product.md` as revised on 2026-11-05:
+  - Break the Wall reads a source's structure (parts, components, aspects, the links the source states with their basis, the source's own questions) and lets the learner explore how it holds together, in one view with three roles: guide, structure, source;
+  - it is not a course, a chatbot, a summarizer or a flashcard app;
+  - run and reassemble are later additions.
+- **Why** and **How it works:**
+  - the table compares a chat answer with the exploration: levels of abstraction, every link with a declared or interpreted basis, source lines, "how it was read";
+  - the steps: give a source, the app reads its structure and chooses the way in from its shape, then explore.
+- **Features:**
+  - the exploration view: aspects and the sub-level in place, roles with their components, joints and their labels (click for a link's card), the card, the guides and the premise, the source in two views, the index with its legend, the resizable panes, "how it was read", two themes and two languages;
+  - generation: one request on ChatGPT, or Claude through MCP (`start_exploration`, `submit_exploration`), checked by the app; the local route is not offered for exploration;
+  - progress and privacy, kept.
+- **The disassembly:** kept as a short section, "Disassemblies (earlier loop)". Existing disassemblies and their player stay; generating one is the secondary action.
+- **Status and roadmap:**
+  - what is witnessed: the ChatGPT run of X20.3 and the Claude run of X32;
+  - what is not yet witnessed: the owner's own sources (X20.4);
+  - run and reassemble redesigned around the exploration, later.
+- **Kept, updated where they name the old loop:** download, run from source, local models, Use with Claude, tech stack, contributing, license.
+- Every claim matches the code and the plan's evidence; nothing is shown as working before it is checked.
+- Acceptance: the README's links and image paths resolve, and a review against `docs/product.md` and this plan finds no claim the evidence does not support.
+
+**X30. A still image and the social card** (`docs/images/`, `docs/images/brand/social-card.html`, `.github/assets/social-preview.png`).
+- The importer's exploration in blueprint, at 1440×980, captured from the built app: the aspect level, an aspect's card with its roles, the index with its legend, and the source.
+- It replaces `disassembly-mill-blueprint.png` in the README and in the social card's source. `npm run brand` renders the card. GitHub's social preview is uploaded by hand in Settings → General (the owner's step).
+- Acceptance: the image shows no private content (the importer is an original public fixture), and `npm run brand` passes.
+
+**X31. demo.gif on the exploration** (`docs/images/demo.gif`, storyboard in `.local/media/linkedin/record.cjs`).
+- A new storyboard on the prepared examples only:
+  - the library, where explorations come first;
+  - the importer at its aspect level;
+  - an aspect's card and its roles;
+  - the sub-level opening in place;
+  - a role, then a component;
+  - a joint label clicked to its link card, with its lines lit in the source;
+  - the question guide stepping;
+  - the source in "Righe";
+  - "how it was read";
+  - the switch to paper;
+  - Mill on its roles, layer by layer.
+- One caption per scene, kept short, and the same size, pace and end card as before.
+- Acceptance: under 5 MB, no private content, a review of every frame.
+
+**X32. claude.gif from a real Claude run on the exploration** (`docs/images/claude.gif`, `.local/media/claude/`).
+- **The run:**
+  - the built app is started with a scratch data folder and "Connect AI assistants" on;
+  - Claude Code runs headless (`claude -p`, the owner's installed CLI and account), with this build's MCP server (`dist-electron/mcp-server.cjs`, `BTW_USER_DATA_DIR` pointing at the scratch folder) as its only MCP server, and only its tools allowed;
+  - the prompt asks Claude to explain a public topic and explore its explanation with Break the Wall; it calls `start_exploration`, `read_source` if needed, and `submit_exploration`, and the app checks the result and saves it;
+  - the transcript is kept in `.local/media/claude/`.
+- **The GIF:** the terminal is drawn from this run's transcript by the existing tools, and the app frames are recorded on the saved exploration: arriving in the library marked "written by your assistant", the aspect level, a card, a joint's link card, and the source.
+- **It records X20.3 for Claude:** the model, the duration, whether a repair was needed, and the shape of the saved exploration.
+- This run uses the owner's Claude account, on a public topic only. If it fails twice, the GIF waits, and the README says what is witnessed.
+- Acceptance: under 5 MB, no private content, the run's evidence in X20.3.
+
+**For the phase:** `npm run check` (local note as in the verification strategy), `npm run build` and `npm run brand` pass, and the owner reviews the README and both GIFs before the push.
+
+- **Done (2026-11-09),** on the branch `feature/present-exploration`, cut from `main` after PR 47 was merged:
+  - **X32, the run.**
+    - **Setup:** the built app ran on a scratch data folder with "Connect AI assistants" on. Claude Code 2.1.319 ran headless (`claude -p`, the owner's CLI and account), with this build's MCP server as its only server (`--strict-mcp-config`) and only `start_exploration`, `read_source` and `submit_exploration` allowed.
+    - **Prompt:** "Explain how a browser checks an HTTPS certificate, then explore your explanation with Break the Wall."
+    - **Result:** model `claude-sonnet-5-5`, 7 turns, 67 s, about $0.29. `start_exploration` received a 37-line English source. The first `submit_exploration` was refused (one role's text had 113 characters, at most 110), and the second was accepted, saved and opened, with origin "assistant · claude-code 2.1.319".
+    - **Shape:** no aspects, 8 roles, 14 components, one prerequisite as the premise, 2 annotations, 12 links (4 interpreted), one trace.
+    - **This is X20.3's Claude route.** Claude's last chat line came in Italian, following the owner's global instructions. The GIF shows the tool results only.
+  - **X32, the GIF.** The terminal is drawn from the transcript, and the app frames come from the same app over DevTools: the library without the exploration (its folder held aside), "Use with Claude" with the command blurred (it holds local paths), then the library with "Written by your assistant", the roles, a role and a link's card. `docs/images/claude.gif`: 2.3 MB, 34.5 s.
+  - **X31.** A new storyboard on the prepared examples, at 1440×860 in blueprint:
+    - the card set to 22% before recording, with the same separator a learner uses, so the drawing has room;
+    - the theme switched to paper near the end;
+    - a new end card, "a source → its structure → explore it";
+    - `docs/images/demo.gif`: 4.8 MB (4,760,498 bytes), 49 s.
+
+    On 2026-11-10 the owner asked for a version in paper, at a larger size, opening wide and zooming point by point. It was made (`.local/media/linkedin/compose-cam.swift`: a camera on the regions recorded after each step, 5 frames a second while anything moves, equal frames merged; 768×432, 49 s, 4.8 MiB). Comparing the two, the owner kept the first, in blueprint.
+  - **X30, in paper:** `docs/images/exploration-importer-paper.png` (1440×980) replaces `disassembly-mill-blueprint.png`, which is removed. The social card is in paper too, with the paper wordmark, the new text, and that image; `npm run brand` rendered it. The upload to GitHub is the owner's step.
+  - **claude.gif:** reviewed by the owner and kept. Its refused first `submit_exploration` (a real tool error in the run) stays, since it shows the check and the repair.
+  - **X29.** The README is rewritten around the exploration; its links and anchors were checked by a script. Two claims were corrected against the code: an exploration's view state is not saved, and the entry point also accepts disassemblies.
+  - **Frames:** the key frames of both GIFs were reviewed. They show only public examples, the public topic, and no local path.
+  - **Checks:** `npm run typecheck` passes, `npx vitest run --dir tests` runs 41 files and 608 tests, and `npm run build` and `npm run brand` pass.
+  - **Found, outside this phase:** the app's own copy still names the old loop. The library hero says "Turn a wall of text into parts you can inspect, test and put back together", and the "Use with Claude" panel says "writing the disassembly". The demo starts on the library's explorations, and the copy is not changed here.
+
 ## Verification strategy
 
 - **Runners:** `npm run check` (TypeScript and Vitest) and `npm run build`, from the adapter.
@@ -1135,16 +1225,19 @@ From the owner's look on 2026-11-09, after X22–X26. X27 and X28 are independen
 - **The aspect card can grow long** (X24). An aspect has at most 14 roles (the contract's limit), each with its sentence. The card scrolls, as it does today.
 - **A two-line description takes height** from the bar (X27). The bar grows by one line at most, and the panels below shrink by that much.
 - **The premise step shows less text** (X28). A reader who does not choose the premise sees only its name. The chip is the way to the sentence, and the guide's first step still lights the premise in the drawing.
+- **Public media can leak private content** (X30–X32). Only the prepared public fixtures and a public topic are recorded, the scratch data folder holds nothing else, and every frame is reviewed before commit.
+- **A real model run can fail or cost more than expected** (X32). It is one run, with the app's single repair. If it fails twice, the README says what is witnessed, and the GIF waits.
+- **The README can overstate** (X29). Every claim is checked against the code and this plan's evidence, and run and reassemble are presented as later.
 - **Leader lines across the structure** cross other nodes, as in the prototype. The line is drawn above the nodes, thin, and only for the current selection.
 
 ## Approval
 
 Record:
-- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v9".
-- **Timestamp:** 2026-11-09T17:13:12Z.
-- **Approved version:** 9.
-- **Plan digest:** SHA-256 `0f87623f5525ab18281c43215e669678b8f9dfc4c153960169b79b5e3dacf483` of this file before this record was added.
-- **Authorized scope:** as listed below under "v9 authorizes".
+- **Approver:** Simone Riggi (owner), in chat: "Approve P-20261105-exploration v10".
+- **Timestamp:** 2026-11-09T17:37:47Z.
+- **Approved version:** 10.
+- **Plan digest:** SHA-256 `28e7757162cd6b324815dc0b6fbdee4651f1c67ccf4a73f48bba009c311b686f` of this file before this record was added.
+- **Authorized scope:** as listed below under "v10 authorizes".
 
 History:
 - v2 was approved on 2026-11-05T16:56:08Z; void after v3.
@@ -1153,22 +1246,27 @@ History:
 - v5 was approved on 2026-11-06T11:21:02Z by Simone Riggi ("Approve P-20261105-exploration v5"), SHA-256 `47da2401756a7cc3ce8bfe840a2b1b328d0021c501c3a607db7a490c23dc5c5c`. Its X1 ran A1 and A2 and passed. Void since v6's approval: v6 changes X4, X5, X11, X12, X15 and X16.
 - v6 was approved on 2026-11-06T15:04:33Z by Simone Riggi ("Approve P-20261105-exploration v6"), SHA-256 `3d0b158fb993099e100b2a673ed0f82acce449fda20574ca01b1857c850fad1c`. It authorized X2–X20 and the branch `feature/exploration`. X2–X19 and X20.1–X20.3 (ChatGPT) are done under it. Void since v7's approval: v7 adds X21 and supersedes part of X16.
 - v7 was approved on 2026-11-09T16:16:35Z by Simone Riggi ("Approve P-20261105-exploration v7"), SHA-256 `c3e741ea36bd354cc64e526d01ec80fa74353ef2342ce2b21202cc5443d7cb16`. It authorized X21 and what was left of X20. X21 is done under it (commit 1ad37b5). Void since v8's approval: v8 adds X22–X26 and supersedes X21 on the aspect card.
-- v8 was approved on 2026-11-09T16:51:32Z by Simone Riggi ("Approve P-20261105-exploration v8"), SHA-256 `ce8ca03b55c568db28a4f78010de97766e20420cc1b52260f7458e19164d3d60`. It authorized X22–X26 and what was left of X20. X22–X26 are done under it (not yet committed). Void since v9's approval: v9 adds X27–X28.
+- v8 was approved on 2026-11-09T16:51:32Z by Simone Riggi ("Approve P-20261105-exploration v8"), SHA-256 `ce8ca03b55c568db28a4f78010de97766e20420cc1b52260f7458e19164d3d60`. It authorized X22–X26 and what was left of X20. X22–X26 are done under it (committed in 9fd7221). Void since v9's approval: v9 adds X27–X28.
+- v9 was approved on 2026-11-09T17:13:12Z by Simone Riggi ("Approve P-20261105-exploration v9"), SHA-256 `0f87623f5525ab18281c43215e669678b8f9dfc4c153960169b79b5e3dacf483`. It authorized committing X22–X26, X27–X28 and what was left of X20. Done under it: commit 9fd7221, pushed to PR 47. Void since v10's approval: v10 adds X29–X32.
 
 Review:
 - v7: the cuts were drafted from the owner's feedback of 2026-11-09 and read again in chat. Dropping the points with no mark was given up, and the 4 px threshold was added.
 - v8: each task comes from the owner's own look and words on 2026-11-09. The places to reuse were checked in the code, and the owner chose the band's placement.
 - v9: both tasks come from the owner's look on 2026-11-09. The causes were found in the code (the bar's CSS, the strip's premise text and its "away" condition). The popover the owner asked about was weighed and not adopted, for the reasons in "What changes from v8"; the owner then asked for v9 as proposed.
+- v10: the owner asked for the README and the GIFs on 2026-11-09, and chose PR 47 and a real Claude run. The local media pipeline was found in `.local/media` (its README, the storyboards, and the earlier run's transcript and replay), and the MCP server was found to read `BTW_USER_DATA_DIR`.
 
-v9 authorizes:
-- committing X22–X26 as they stand;
-- X27–X28, in phase `clarity`, on `feature/exploration`, and adding them to PR 47 when the owner asks for a push;
+Owner's instruction after approval (2026-11-09, in chat: "crea poi una nuova PR, la #47 la mergio ora"): PR 47 is merged without phase `present`. X29–X32 are done on a new branch from the updated `main`, and go to a new pull request, which the owner confirmed in the same message. The tasks are unchanged.
+
+v10 authorizes:
+- X29–X32, in phase `present`, on `feature/exploration`, and adding them to PR 47 when the owner asks for a push;
+- one headless Claude Code run with the owner's installed CLI and account, on a public topic, against this build's MCP server and a scratch data folder (X32);
 - what is left of X20, as v6 wrote it.
 
-v9 does not authorize:
+v10 does not authorize:
 - merge;
-- publishing the Claude Desktop extension;
-- sending a private source to OpenAI;
+- uploading GitHub's social preview (the owner's step);
+- publishing the Claude Desktop extension or a release;
+- sending a private source to OpenAI or to Anthropic;
 - changing the exploration contract or its request;
 - any new dependency.
 
@@ -1177,7 +1275,7 @@ Each needs its own confirmation when reached.
 Approve with exactly:
 
 ```text
-Approve P-20261105-exploration v9
+Approve P-20261105-exploration v10
 ```
 
-Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v9 --phase clarity`.
+Approval records approval only. Implementation starts with a later, separate command: `implement P-20261105-exploration v10 --phase present`.
