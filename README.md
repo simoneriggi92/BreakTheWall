@@ -313,7 +313,7 @@ llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
 
 ## Project status
 
-The exploration follows the approved plan [P-20261105-exploration](docs/workflow/plans/P-20261105-exploration/plan.md) (v10). Earlier work follows [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md), [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) and [P-20261028-mcp-integration](docs/workflow/plans/P-20261028-mcp-integration/plan.md). Evidence for each task is in its plan.
+The exploration follows the approved plan [P-20261105-exploration](docs/workflow/plans/P-20261105-exploration/plan.md) (v14). Earlier work follows [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md), [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) and [P-20261028-mcp-integration](docs/workflow/plans/P-20261028-mcp-integration/plan.md). Evidence for each task is in its plan.
 
 | Phase | Tasks | Status |
 |---|---|---|
@@ -322,6 +322,7 @@ The exploration follows the approved plan [P-20261105-exploration](docs/workflow
 | Generation | X7–X10 the request through ChatGPT, the store, Claude over MCP, four prepared explorations (one written by Claude) | ✅ code and automated tests; one ChatGPT run and two Claude Code runs kept (a third was refused by the app's checks) |
 | View | X11–X19 tokens, the view and its guides, the sub-level in place, joint labels, card and index, "How it was read", opening from the library and Studio | ✅ code, automated tests and the built app driven on macOS |
 | Polish | X21–X28 the card explains the selection, two views of the source, resizable panes, the index legend, a readable bar | ✅ code, automated tests and the built app driven, after the owner's look |
+| Presentation and checks | X29–X40 README and demos, the app's own text, developers as first readers, one refusal that names every finding | ✅ code, automated tests and the built app driven; released in `v0.5.0-alpha` |
 | Verify | X20 CI on macOS and Windows, the owner's look at their own sources | 🟡 the owner's own sources are being judged |
 | Earlier | Disassembly player, generation and Studio; macOS and Windows apps; Claude integration | ✅ see the earlier plans; released up to `v0.4.0-alpha` |
 

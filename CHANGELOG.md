@@ -4,6 +4,41 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.0-alpha] - 2026-11-10
+
+Exploring a source is the core: the app reads how a text holds together and lets you explore it, down to its source lines.
+
+### Added
+- **The exploration**, now the default way to open a source. In one request the app reads its structure:
+  - its aspects (the large concerns) and the roles inside each;
+  - the components each role names;
+  - links that say what they do, and whether the source states them or they were inferred;
+  - the questions the source itself walks.
+
+  It chooses the way in from that shape, never from the subject.
+- **One view, three roles:** the guide, the structure and the source, on one shared state.
+  - An aspect opens in place, down to its roles.
+  - A joint label opens its link's card, and the card explains only what you selected.
+  - What the source names but does not connect stays in a band set apart.
+  - The source reads rendered or line by line, with an index and a legend, and the panes resize.
+- **"How it was read":** how much of the source is in the map, the basis of its links, and what was left out.
+- **Claude explores:** Claude Desktop and Claude Code write an exploration through the app's MCP server, and the app checks it and saves it as "Written by your assistant". ChatGPT (experimental) generates one from Studio.
+- **Four prepared explorations:**
+  - "From address bar to rendered page", in English, which Claude wrote and explored in one real run, kept as the app saved it;
+  - the Larkspur importer, the Atlas Reader release runbook and Mill's harm principle, in English and Italian.
+- **No question needed:** give a source and the app reads the whole of it. A question stays available as an optional focus.
+- **Larger sources:** up to 120,000 characters across a source's files, and a long source reaches Claude in pages.
+
+### Changed
+- **Repairs that can land:** one refusal names every finding, the text limits and the structural rules together, so the single repair can fix them all.
+- **Taking a part apart during use is retired.** Disassemblies you already have still open in their player, and Studio can still generate one.
+- The app's own text, its metadata, the README and its demos present the exploration. The README leads with technical text, for developers reading what AI writes.
+
+### Known limits
+- An exploration reads its source in one request, up to 52,000 characters; a longer source is refused, with the limit named.
+- Local models (Ollama) do not generate explorations yet.
+- An exploration's view state, such as the selection or the open level, is not saved.
+
 ## [0.4.0-alpha] - 2026-10-29
 
 A lighter player: the drawing, the explanation and its source on one screen.
