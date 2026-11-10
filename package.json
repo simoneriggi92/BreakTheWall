@@ -30,9 +30,9 @@
     "brand": "node scripts/brand.mjs"
   },
   "dependencies": {
-    "lucide-react": "1.61.0",
+    "lucide-react": "1.70.0",
     "markdown-it": "15.0.3",
-    "mermaid": "12.2.0",
+    "mermaid": "12.3.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "4.6.7"
