@@ -24,6 +24,8 @@ The idea comes from reverse engineering: tools such as [REA](https://github.com/
 
 **⚠ Where the metaphor stops.** Taking software apart has an objective answer: the binary is what it is. Taking a topic apart involves interpretation, and the model can be wrong. This is why every part stays attached to its source and why model inferences must stay distinguishable from quoted content. Evidence is this product's equivalent of reverse engineering's proof.
 
+**First readers** (owner, 2026-11-10). The product is built first for developers who read technical text written or explained by AI: design documents, runbooks, release notes, the long answer to "how does X work". The pain is there: AI writes this text faster than anyone reads it, and a wrong reading has a cost. The first readers decide which examples come first and what the demos show. They never add a mode, a prompt or a view for a subject, and the identity above is unchanged: one loop for every subject.
+
 ### The structure of a source
 
 Owner, 2026-11-05, after [research R-20261104](workflow/research/R-20261104-exploration-experience.md). The earlier extractor asked for 3–7 parts and a joint for every part. That forced a source with two bodies of logic into one mechanism, and turned catalogues, findings and paths into parts joined by joints that carried no load. The structure is now read before it is drawn, and nothing is connected that the source does not connect.

@@ -7,7 +7,7 @@
 
 <h1 align="center">Take the text apart.</h1>
 
-<p align="center">AI gives you a wall of text. Break the Wall reads its structure and lets you explore how it holds together, down to its source lines.</p>
+<p align="center">AI writes design docs, runbooks and long answers faster than anyone can read them. Break the Wall reads their structure and lets you explore how they hold together, down to the source lines.</p>
 
 <p align="center"><strong>Open-source alpha · macOS · Windows · Works with Claude · English &amp; Italian · Apache-2.0</strong></p>
 
@@ -27,7 +27,7 @@
 
 <p align="center"><strong>2 · Explore the source</strong></p>
 
-![Demo: the library opens on its explorations; the Larkspur importer opens at its aspect level; an aspect's card lists its roles and one opens the aspect in place, down to its roles; a joint label is clicked and its link card says the source declares it, with its lines lit in the source; the source's own question is followed step by step; the source is read line by line; "How it was read" shows coverage, basis and order; the theme switches from blueprint to paper; Mill's harm principle opens on its roles, layer by layer, its card explaining the selected role](docs/images/explore-a-source.gif)
+![Demo: the library opens on "From address bar to rendered page", an explanation Claude wrote and explored; it opens on the source's own question, "What happens after I type a URL and press Enter?"; the aspect "Reaching the server" lists its roles and opens in place, down to TLS and its components; a joint label is clicked and its link card says the link was inferred, with its lines lit in the source; the guide moves step by step; "Where time goes", which the source does not connect, stays in the band set apart; the source is read line by line; "How it was read" shows coverage, basis and order; the theme switches from blueprint to paper; the aspect "Building the page" explains its roles(docs/images/explore-a-source.gif)
 
 > [!NOTE]
 > **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared explorations work without an account. Exploring your own text or Markdown uses ChatGPT (experimental) or [Claude Desktop and Claude Code](#use-with-claude), which write the structure themselves. PDF documents and repositories as sources are on the [roadmap](#roadmap).
@@ -55,7 +55,7 @@
 
 ## Why Break the Wall?
 
-A useful AI explanation can still be a wall of text: correct-sounding, hard to retain and hard to check. Break the Wall reads how the text holds together and shows it as a structure you can explore:
+You ask an AI how something works, or it writes the design doc, the runbook or the release notes for you. The answer is long, it sounds right, and it is hard to check. Break the Wall is built first for developers who read what AI writes, and the same view works on any text. It reads how the text holds together and shows it as a structure you can explore:
 - its large concerns;
 - the roles inside each one, and the components each role names;
 - the links between them, each saying whether the source states it or it was inferred;
@@ -86,7 +86,7 @@ The idea comes from reverse engineering, which takes software apart with evidenc
 | **The way in is chosen** | From the shape of what was read, never from the subject: the source's own question when it walks most of the mechanism, otherwise its premise and then its layers. |
 | **Explore** | One view with three roles on one shared state: the guide, the structure and the source. Click a block, a link or a line, and the other two follow. |
 
-The prepared explorations cover a technical document (the Larkspur importer), a release runbook (Atlas Reader) and an argument (Mill's harm principle). The same view works for any subject. Putting a link under load and reassembling the structure are later additions, not part of the current loop.
+The prepared explorations start with what happens when you type an address and press Enter, an explanation Claude wrote and explored in one real run, kept as the app saved it. Then come a technical document (the Larkspur importer), a release runbook (Atlas Reader) and an argument (Mill's harm principle): the same view works for any subject. Putting a link under load and reassembling the structure are later additions, not part of the current loop.
 
 ## Try the alpha
 
@@ -162,7 +162,7 @@ Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your
 
 ### The exploration
 
-![The Larkspur importer explored in the paper theme: the index of the source with its legend on the left; in the middle the premise and the aspect "Who reads the signals and acts", with its lit joints, and its card listing its two roles; the source on the right with the aspect's lines highlighted](docs/images/exploration-importer-paper.png)
+![What happens when you press Enter on an address, explored in the paper theme: the index of the source with its legend on the left; in the middle the premise "The pipeline framing" and the aspect "Reaching the server", with its lit joints and a 0-RTT replay warning, and its card listing its four roles; the source on the right with the aspect's lines highlighted](docs/images/exploration-press-enter-paper.png)
 
 - **Levels of abstraction:**
   - when the source names large concerns, the view opens on its **aspects** (two to four), each with its own hue at every level;
@@ -205,7 +205,7 @@ A cell opens its line, and an inferred link opens its card.
 ### Two themes, two languages
 
 - **Paper** (light) and **blueprint** (dark), following the system or chosen in the header. Every text color reaches WCAG AA in both themes, checked by a test.
-- **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. The prepared explorations exist in both languages.
+- **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. The hand-written prepared explorations exist in both languages; the one Claude wrote is in English.
 
 ### Generation
 
@@ -319,7 +319,7 @@ The exploration follows the approved plan [P-20261105-exploration](docs/workflow
 |---|---|---|
 | Gate | X1 the structure request on Claude and ChatGPT, judged by the owner on six sources | ✅ passed |
 | Core | X2–X6 contract, detector, source index, layout, levels of abstraction, reading report | ✅ code and automated tests |
-| Generation | X7–X10 the request through ChatGPT, the store, Claude over MCP, three prepared explorations | ✅ code and automated tests; one ChatGPT run and one Claude Code run witnessed |
+| Generation | X7–X10 the request through ChatGPT, the store, Claude over MCP, four prepared explorations (one written by Claude) | ✅ code and automated tests; one ChatGPT run and two Claude Code runs kept (a third was refused by the app's checks) |
 | View | X11–X19 tokens, the view and its guides, the sub-level in place, joint labels, card and index, "How it was read", opening from the library and Studio | ✅ code, automated tests and the built app driven on macOS |
 | Polish | X21–X28 the card explains the selection, two views of the source, resizable panes, the index legend, a readable bar | ✅ code, automated tests and the built app driven, after the owner's look |
 | Verify | X20 CI on macOS and Windows, the owner's look at their own sources | 🟡 the owner's own sources are being judged |
