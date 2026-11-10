@@ -179,8 +179,10 @@ function worded(issues: z.core.$ZodIssue[], json: unknown): Finding[] {
 
 /**
  * The answer, accepted or refused with findings for one repair: parsed in the answer's shape, mapped to the contract,
- * then the contract's schema (its text limits included) and its structural rules. Points outside their part are a
- * measure, not an error (`pointsInside`).
+ * then checked against the contract's schema (its text limits included) and its structural rules together, so one
+ * refusal names every finding and the one repair can fix them all (X40). The answer's shape already holds what the
+ * structural rules read (ids, kinds, arrays, cites), so they do not wait for the text limits. Points outside their part
+ * are a measure, not an error (`pointsInside`).
  */
 export function acceptExploration(raw: string, input: ExplorationInput): Exploration {
   let json: unknown;
@@ -190,9 +192,12 @@ export function acceptExploration(raw: string, input: ExplorationInput): Explora
   if (!draft.success) throw new ExplorationError(worded(draft.error.issues, json));
   const mapped = fromDraft(draft.data, input);
   const parsed = explorationSchema.safeParse(mapped);
-  if (!parsed.success) throw new ExplorationError(worded(parsed.error.issues, mapped));
-  const findings = checkExploration(parsed.data).map(f => ({ ...f, path: answerPath(f.path) }));
-  if (findings.length) throw new ExplorationError(findings);
+  const findings = parsed.success ? [] : worded(parsed.error.issues, mapped), seen = new Set(findings.map(f => `${f.path}\n${f.message}`));
+  for (const f of checkExploration(mapped)) {
+    const at = { ...f, path: answerPath(f.path) }, key = `${at.path}\n${at.message}`;
+    if (!seen.has(key)) { seen.add(key); findings.push(at); }
+  }
+  if (findings.length || !parsed.success) throw new ExplorationError(findings);
   return parsed.data;
 }
 
