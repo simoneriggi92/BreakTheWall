@@ -7,7 +7,7 @@
 
 <h1 align="center">Take the text apart.</h1>
 
-<p align="center">AI gives you a wall of text. Break the Wall turns it into source-linked parts you can explore, test and put back together.</p>
+<p align="center">AI gives you a wall of text. Break the Wall reads its structure and lets you explore how it holds together, down to its source lines.</p>
 
 <p align="center"><strong>Open-source alpha · macOS · Windows · Works with Claude · English &amp; Italian · Apache-2.0</strong></p>
 
@@ -21,16 +21,16 @@
 
 <p align="center"><a href="#try-the-alpha"><strong>Try the alpha</strong></a> · <a href="#how-it-works">How it works</a> · <a href="#roadmap">Roadmap</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 
-<p align="center"><strong>1 · Claude writes it, Break the Wall checks it</strong> · <a href="#use-with-claude">Use with Claude</a></p>
+<p align="center"><strong>1 · Explore a source</strong></p>
 
-![Demo with Claude: Use with Claude turned on in the app; in Claude Code the request is typed, Claude explains how a browser checks an HTTPS certificate and takes the explanation apart with Break the Wall, phase by phase; the app refuses the first structure and the first runs and Claude fixes them; the disassembly opens in the app marked as written by your assistant, a part shows its source lines, and the scenario is run step by step with a prediction](docs/images/claude.gif)
+![Demo: the library opens on its explorations; the Larkspur importer opens at its aspect level; an aspect's card lists its roles and one opens the aspect in place, down to its roles; a joint label is clicked and its link card says the source declares it, with its lines lit in the source; the source's own question is followed step by step; the source is read line by line; "How it was read" shows coverage, basis and order; the theme switches from blueprint to paper; Mill's harm principle opens on its roles, layer by layer, its card explaining the selected role](docs/images/demo.gif)
 
-<p align="center"><strong>2 · Explore it, run it, put it back together</strong></p>
+<p align="center"><strong>2 · Claude writes the structure, Break the Wall checks it</strong> · <a href="#use-with-claude">Use with Claude</a></p>
 
-![Demo: a release runbook taken apart into six parts; a part's card with its source lines highlighted, then its sub-assembly opened one level down; a scenario predicted and run on the drawing, where a smoke test fails and the rollback takes over; the theme switched from blueprint to paper; Mill's harm principle, where pulling out one premise makes the claim fall; the blank drawing for reassembly; the bill of materials](docs/images/demo.gif)
+![Demo with Claude: Use with Claude turned on in the app; in Claude Code the request is typed; Claude explains how a browser checks an HTTPS certificate and explores the explanation with Break the Wall; the app refuses the first structure because one role's text is three characters too long, and Claude fixes it; the exploration opens in the app marked as written by your assistant, with its roles, a role's card and a link's card](docs/images/claude.gif)
 
 > [!NOTE]
-> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared examples work without an account. Taking apart your own text or Markdown uses ChatGPT (experimental), a local model on your computer, or [Claude Desktop and Claude Code](#use-with-claude), which can open a text in Studio or write the disassembly themselves. PDF documents and repositories as sources are on the [roadmap](#roadmap).
+> **Alpha.** [Download the app](#try-the-alpha) for Apple Silicon Macs or Windows x64 PCs, or run it from source. The prepared explorations work without an account. Exploring your own text or Markdown uses ChatGPT (experimental) or [Claude Desktop and Claude Code](#use-with-claude), which write the structure themselves. PDF documents and repositories as sources are on the [roadmap](#roadmap).
 
 ## Table of contents
 
@@ -38,15 +38,14 @@
 - [How it works](#how-it-works)
 - [Try the alpha](#try-the-alpha)
 - [Features](#features)
-  - [The disassembly](#the-disassembly)
-  - [Run](#run)
-  - [Reassemble](#reassemble)
-  - [Bill of materials](#bill-of-materials)
+  - [The exploration](#the-exploration)
+  - [How it was read](#how-it-was-read)
   - [Two themes, two languages](#two-themes-two-languages)
   - [Generation](#generation)
+  - [Disassemblies (earlier loop)](#disassemblies-earlier-loop)
   - [Progress and privacy](#progress-and-privacy)
-- [Local models](#local-models)
 - [Use with Claude](#use-with-claude)
+- [Local models](#local-models)
 - [Tech stack](#tech-stack)
 - [Project status](#project-status)
 - [Roadmap](#roadmap)
@@ -56,31 +55,38 @@
 
 ## Why Break the Wall?
 
-A useful AI explanation can still be a wall of text: correct-sounding, hard to retain and hard to check. Break the Wall makes its structure explorable: open one part, see what it connects to, and return to the source lines behind it. The question is not only "can I read this?" but "can I explain how its parts work together?"
+A useful AI explanation can still be a wall of text: correct-sounding, hard to retain and hard to check. Break the Wall reads how the text holds together and shows it as a structure you can explore:
+- its large concerns;
+- the roles inside each one, and the components each role names;
+- the links between them, each saying whether the source states it or it was inferred;
+- the questions the source itself walks.
 
-The idea comes from reverse engineering, which takes software apart with evidence for every finding so it can be understood and rebuilt. It is not a course, a summarizer, a chatbot or a flashcard app; review is there only if you want it. See the [product definition](docs/product.md).
+Every block and every link points back to its source lines. The question is not only "can I read this?" but "can I explain how its parts work together?"
+
+The idea comes from reverse engineering, which takes software apart with evidence for every finding so it can be understood and rebuilt. Break the Wall is not a course, a summarizer, a chatbot or a flashcard app. See the [product definition](docs/product.md).
 
 | | A chat answer | Break the Wall |
 |---|:---:|:---:|
-| The whole as an exploded view of 3–7 parts, with sub-assemblies | ❌ | ✅ |
-| Joints that say how parts connect: sends to, causes, supports, attacks, leads to… | ❌ | ✅ |
-| Every part linked to exact source lines | ❌ | ✅ |
-| Predict before each step runs; remove a brick and see if the claim falls | ❌ | ✅ |
-| A bill of materials that accounts for every line of the source | ❌ | ✅ |
-| Progress, runs and notes that resume after restart | ❌ | ✅ |
+| The whole by levels: aspects, then their roles, then each role's components | ❌ | ✅ |
+| Links that say what they do, and whether the source states them or they were inferred | ❌ | ✅ |
+| Every block, link and point linked to exact source lines | ❌ | ✅ |
+| A way in chosen from the source's shape: its own question, or its premise and layers | ❌ | ✅ |
+| "How it was read": how much of the source is in the map, and what was left out | ❌ | ✅ |
+| Explorations kept on your computer, each with the source it came from | ❌ | ✅ |
 
 > [!IMPORTANT]
-> Source links are checked; explanations can still be wrong. The app checks that every cited line exists in your source, and that every line is either in a part or excluded with a reason. A wrong explanation can still sit next to a correct citation, so read the highlighted lines.
+> Source links are checked; explanations can still be wrong. The app checks that every cited line exists, that every link joins blocks that exist, and that an inferred link is marked as inferred. A wrong reading can still sit next to a correct citation, so read the highlighted lines, and look at "How it was read" before you trust the map.
 
 ## How it works
 
-| Step | What you do |
+| Step | What happens |
 |---|---|
-| **Disassemble** | Explore 3–7 parts per level, with named connections and links to source lines. Open a part to go deeper. |
-| **Run** | Predict a process step before it runs, remove a premise from an argument, or apply the whole to a new case. |
-| **Reassemble** | If you want, rebuild the structure on a drawing whose names are hidden. |
+| **Give a source** | Paste text or pick a `.txt` / `.md` file in Studio, or ask Claude to explore an explanation it wrote. A question is optional. |
+| **The structure is read** | One request reads the whole source and returns its structure. The app checks every citation and every link before keeping it. |
+| **The way in is chosen** | From the shape of what was read, never from the subject: the source's own question when it walks most of the mechanism, otherwise its premise and then its layers. |
+| **Explore** | One view with three roles on one shared state: the guide, the structure and the source. Click a block, a link or a line, and the other two follow. |
 
-The prepared examples show a release runbook and Mill's harm principle. The same loop works for any subject: only the kind of connection changes (mechanism, argument, story).
+The prepared explorations cover a technical document (the Larkspur importer), a release runbook (Atlas Reader) and an argument (Mill's harm principle). The same view works for any subject. Putting a link under load and reassembling the structure are later additions, not part of the current loop.
 
 ## Try the alpha
 
@@ -90,7 +96,12 @@ The prepared examples show a release runbook and Mill's harm principle. The same
 
 1. Download `Break-the-Wall-<version>-arm64.dmg` from the [latest release](https://github.com/simoneriggi92/BreakTheWall/releases).
 2. Open it and drag **Break the Wall** to **Applications**.
-3. Open the app. The first time, macOS shows **“Break the Wall” Not Opened**: *Apple could not verify “Break the Wall” is free of malware that may harm your Mac or compromise your privacy.* The alpha is signed ad-hoc and not notarized by Apple, so this is expected. Choose **Done**. Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm with Touch ID or your password. Open the app again and choose **Open Anyway** in the dialog. You do this once for each download.
+3. Open the app. The first time, macOS shows **“Break the Wall” Not Opened**: *Apple could not verify “Break the Wall” is free of malware that may harm your Mac or compromise your privacy.* The alpha is signed ad-hoc and not notarized by Apple, so this is expected.
+   - Choose **Done**.
+   - Open **System Settings → Privacy & Security**, scroll to **Security**, choose **Open Anyway** next to Break the Wall, and confirm with Touch ID or your password.
+   - Open the app again and choose **Open Anyway** in the dialog.
+
+   You do this once for each download.
 
 To check the download, put the `.sha256` file from the release next to the DMG and run:
 
@@ -98,7 +109,9 @@ To check the download, put the `.sha256` file from the release next to the DMG a
 shasum -a 256 -c Break-the-Wall-<version>-arm64.dmg.sha256
 ```
 
-The app starts clean: the two prepared examples, no account and nothing saved. What you create stays on your Mac in `~/Library/Application Support/Break the Wall`, and ChatGPT credentials stay in your Keychain. There are no automatic updates yet: to update, download the DMG of a newer release and replace the app; your data stays where it is. The ChatGPT sign-in does not carry over from a build run from source, and may not survive an update, because each version is signed ad-hoc: if Studio shows you signed out, sign in again.
+The app starts clean: the prepared examples, no account and nothing saved. What you create stays on your Mac in `~/Library/Application Support/Break the Wall`, and ChatGPT credentials stay in your Keychain.
+
+There are no automatic updates yet. To update, download the DMG of a newer release and replace the app; your data stays where it is. The ChatGPT sign-in does not carry over from a build run from source, and may not survive an update, because each version is signed ad-hoc. If Studio shows you signed out, sign in again.
 
 ### Download for Windows
 
@@ -114,7 +127,9 @@ To check the download, put the `.sha256` file from the release next to the setup
 (Get-FileHash .\Break-the-Wall-<version>-x64-setup.exe).Hash -eq (Get-Content .\Break-the-Wall-<version>-x64-setup.exe.sha256).Split(' ')[0]
 ```
 
-The app starts clean, as on the Mac. What you create stays in `%APPDATA%\Break the Wall`, and ChatGPT credentials are encrypted by Windows for your user. To update, run the setup of a newer release; your data stays. To uninstall, open **Settings → Apps → Installed apps**, find **Break the Wall** and choose **Uninstall**: the app and its shortcuts go, your data folder stays until you delete it.
+The app starts clean, as on the Mac. What you create stays in `%APPDATA%\Break the Wall`, and ChatGPT credentials are encrypted by Windows for your user.
+- **To update,** run the setup of a newer release; your data stays.
+- **To uninstall,** open **Settings → Apps → Installed apps**, find **Break the Wall** and choose **Uninstall**. The app and its shortcuts go; your data folder stays until you delete it.
 
 ### Run from source
 
@@ -128,7 +143,7 @@ npm run build
 npm start
 ```
 
-The first `npm start` downloads Electron's binary for your Mac. Open either prepared example to try the loop without an account. To take apart your own material, choose **Take apart a source** and paste text or pick a `.txt` / `.md` file; generation needs a ChatGPT sign-in or a [local model](#local-models).
+The first `npm start` downloads Electron's binary for your computer. Open a prepared exploration to try it without an account. To explore your own material, choose **Take apart a source**, paste text or pick a `.txt` / `.md` file, and press **Explore the source**. This needs a ChatGPT sign-in, or ask [Claude](#use-with-claude) instead.
 
 **Development**
 
@@ -137,7 +152,7 @@ npm run dev       # Vite + Electron with reload
 npm run check     # strict TypeScript + Vitest
 npm run dev:web   # renderer only, in a browser (no generation)
 npm run eval      # measure generation on fixed cases (see Local development)
-npm run brand     # render the app icon from docs/images/brand
+npm run brand     # render the app icon and the social card from docs/images/brand
 npm run package   # build the Apple Silicon DMG into release/
 ```
 
@@ -145,99 +160,95 @@ Set `BTW_USER_DATA_DIR` to an absolute path to keep test data separate from your
 
 ## Features
 
-### The disassembly
+### The exploration
 
-- **Exploded view:** the parts drawn as plates on a technical sheet, with balloons, a title block and an automatic layout. Mechanisms and stories run left to right; arguments stack, with the claim above its grounds and attacks or limits beside it.
-- **Numbers in reading order:** a part's number follows the arrows: the flow of a mechanism, grounds before the claim they support, the events of a story. The bill of materials numbers parts the same way ("2.1.3").
-- **Room to read:** drag the bar under the drawing to make the plates bigger, and the bar between the card and the source to share the row. Sizes are remembered on this device. Inside a sub-assembly, the ↑ control, Escape or Alt+↑ goes back to the level above.
-- **Sub-assemblies, as deep as the source goes:** a part can open into its own 3–7 parts, and so on, level after level. Every level accounts for its parent's lines. A part with at least 6 lines of its own can be taken apart on request ("Take this part apart", one small request); a smaller one says why it stops there. Parts outside your question stay closed and hatched, but you can still open them.
-- **Three kinds of joint:** mechanism (sends to, causes, depends on), argument (supports, attacks, limits) and story (leads to, because). Each kind has a color, a line style and an end mark, so color is never the only cue.
-- **Part card:** a short lead (what the part is for), then 2–4 points that add the details, marked → (then), = (stays the same) or ⚠ (caution), and an optional lens, metaphor with its limit, and critical note. It also lists the part's joints in words, its citations and your notes.
-- **Source pane:** numbered lines, the cited lines highlighted, page breaks for documents, and a file picker when there are many sources. A markdown or text source can also be read as a document, beside the card or in a full-window reader with an outline: tables and Mermaid diagrams are drawn, and citations highlight their blocks. HTML inside a source is shown as text, links are not followed and images are not fetched.
+![The Larkspur importer explored in the paper theme: the index of the source with its legend on the left; in the middle the premise and the aspect "Who reads the signals and acts", with its lit joints, and its card listing its two roles; the source on the right with the aspect's lines highlighted](docs/images/exploration-importer-paper.png)
 
-### Run
+- **Levels of abstraction:**
+  - when the source names large concerns, the view opens on its **aspects** (two to four), each with its own hue at every level;
+  - an aspect opens **in place**, down to its roles, while the rest of the whole stays where it was;
+  - a **role** lists the components the source names (classes, services, settings, files), each with what it does and its lines;
+  - with no aspects, the view opens on the roles.
+- **Joints and their labels:**
+  - each joint says what it does, with an arrow the way it runs;
+  - pointing at a label marks "who" and "to whom", and choosing a block lights its joints;
+  - a label can be dragged out of the way, or moved with the arrow keys;
+  - clicking a label opens the **link's card**: its ends, whether the source declares it or it was inferred, and its lines.
+- **The card** explains only what is selected, and repeats nothing already on screen:
+  - an aspect's card gives its roles;
+  - a role's card gives what it does for the whole and its points, marked → (then), = (stays the same) or ⚠ (caution);
+  - a component's card gives what it does and its role.
+- **Two guides:**
+  - **The whole source** starts from the source's premise, then goes layer by layer;
+  - **A question of the source** follows a question the source itself walks, lighting the blocks each step touches.
 
-- **Scenario:** a setup and instruments (for example `staging: digest A`), then one step at a time. Before a step runs you predict what happens. The step's parts then show as running and its effects land: states, instruments and the explanation, with its source lines.
-- **Load test:** remove one brick at a time and see whether the target **falls**, **weakens** or **holds**. Interpretations that the text does not state are labelled.
-- **New case:** apply the disassembly to a situation it does not describe, labelled as a constructed case.
+  The guide waits on its step while you explore, and "Back to the step" returns to it.
+- **The source:**
+  - shown rendered (**Document**) or line by line (**Lines**);
+  - each gutter is coloured by the block that cites it, and a click on a line opens that block;
+  - a leader line joins the card to its first highlighted line.
+- **The index:** the source's own sections in order, with a dot for each block that cites a section, filled once the guide has shown it, and a legend for every sign.
+- **Room to read:** the separators between the index, the structure, the card and the source resize them with the pointer or the keyboard. The index and the source fold to a rail, and sizes are remembered on this device.
+- **Set apart:** references and pieces outside the mechanism sit in a band at the foot of the structure, never in the middle of it.
 
-### Reassemble
+### How it was read
 
-Optional. The drawing keeps its shape but loses its names; put the parts back by click or drag. The tray never starts in solution order, and item numbers are hidden. A wrong placement names the part with its hint. Interchangeable parts, such as three independent supports, can go in any of their slots.
+One button replaces the three columns with the reading report, built by the app from what it kept:
+- **Coverage:** how many lines of the source are in the map, and a grid with a verdict for every line.
+- **Shape:** how many aspects, roles, components, prerequisites and annotations.
+- **Basis:** how many links the source states, and how many were inferred.
+- **Way in:** why the guide starts where it does.
+- **Order:** how far the logic follows the source's chapters.
 
-### Bill of materials
-
-Every source line is in a part, in a joint, or excluded with a reason: context, outside the question, repetition, detail, contains secrets, generated. The view shows the scope (a repository snapshot or a document's pages), a strip per source, the items with their line ranges, and file-level exclusions. It also shows the app's own check, which names any forgotten range.
+A cell opens its line, and an inferred link opens its card.
 
 ### Two themes, two languages
 
-![Mill's harm principle taken apart in the blueprint theme: the claim in the middle, its grounds below, the consequence above, the objection and the limit at its sides](docs/images/disassembly-mill-blueprint.png)
-
 - **Paper** (light) and **blueprint** (dark), following the system or chosen in the header. Every text color reaches WCAG AA in both themes, checked by a test.
-- **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. When a disassembly exists in both languages, the player offers the other version, and progress stays separate for each version.
+- **English and Italian** interface, following the system or chosen in the header. Content keeps its own language and is never translated by the app. The prepared explorations exist in both languages.
 
 ### Generation
 
-Studio takes apart pasted text or `.txt` / `.md` files around your question, in three phases:
-1. **Structure:** the parts, their joints and the bill of materials. The app checks it line by line before going on.
-2. **Parts:** one request per top-level part, carrying only that part's lines.
-3. **Runs:** scenarios, load tests or cases, and the reassembly hints.
+Studio explores pasted text or a `.txt` / `.md` file, up to 52,000 characters, in **one request**:
+- The answer is checked by the app: citations, links, kinds, lengths and the structure's own rules.
+- It can be repaired once with the app's findings. Texts a few characters too long are shortened by one small request.
+- Nothing is saved unless the whole of it passes.
+- A question is optional: the exploration reads the whole source either way.
 
-Each phase can be repaired once with the app's findings. When the repair leaves only texts a few characters too long, one small request shortens just those. Nothing is saved as a disassembly unless the whole of it passes.
-
-- **Suggested break-downs:** on the question step, "Suggest break-downs" sends one request and proposes 3–5 questions, each with its kind (mechanism, argument, story) and the parts it would give. Choosing one fills the question field, which you can still edit. Nothing is sent until you press the button.
-- **The drawing while it is written:** once the structure is accepted, Studio draws the top level, and each plate shows whether its part is waiting, being written, done or failed. A part that is done opens its lead and points.
-- **Resume:** a failed or cancelled generation keeps what was accepted (structure, parts, runs) in one draft file in the app's data folder. Studio says what was kept and offers "Resume", which asks only for what is missing, or "Start over". The draft is deleted on success and when a new generation starts.
- You choose the content language (by default, your question's), and you can give the structure and the parts different models, for example a cheaper one for the parts. There are two routes:
-
-| Route | Account | Where your source goes | Status |
+| Route | Account | Where your source goes | Status for explorations |
 |---|---|---|---|
-| **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Experimental. Disassemblies generated live: in the last check, 4 of 4 public cases valid |
-| **Local model** | none | a server on `127.0.0.1` on your Mac | Witnessed for lessons; disassemblies not yet measured |
-| **Your Claude assistant** | your Claude Desktop or Claude Code | Anthropic, through your Claude app ([Use with Claude](#use-with-claude)) | Experimental. Witnessed in Claude Desktop and Claude Code: findings sent back and fixed, every run saved and opened |
+| **ChatGPT** | Sign in with ChatGPT; uses your plan | OpenAI, over the documented Responses API | Experimental. Witnessed in the app on a public source: one request, valid without repair, about two minutes |
+| **Your Claude assistant** | your Claude Desktop or Claude Code | Anthropic, through your Claude app ([Use with Claude](#use-with-claude)) | Experimental. Witnessed in Claude Code: one finding sent back and fixed, saved and opened |
+| **Local model** | none | a server on `127.0.0.1` on your computer | Not offered for explorations yet: it has not passed the quality check |
+
+### Disassemblies (earlier loop)
+
+Before explorations, Break the Wall took a source apart into a **disassembly**: an exploded view of 3–7 parts per level, scenarios to predict, load tests that remove one premise at a time, a blank drawing to reassemble, and a bill of materials. Disassemblies you already have still open, with their progress. Studio can still generate one ("Generate a disassembly instead"), and three prepared disassemblies are in the library. Running and reassembling will come back, redesigned around the exploration.
 
 Lessons created before disassemblies stay readable, with their progress, under "Earlier paths".
 
 ### Progress and privacy
 
-- **Storage:** disassemblies, lessons, progress and notes stay on your device, written atomically. Progress that no longer matches its disassembly is kept on disk and the session restarts, with a notice.
-- **Interrupted generations:** at most one draft, `generation-draft.json`, with the text generated so far. It never leaves the device and is deleted on success, on "Start over" and when a new generation starts.
+- **Storage:** explorations, disassemblies, lessons, progress and notes stay on your device, written atomically. Progress that no longer matches its disassembly is kept on disk and the session restarts, with a notice.
 - **Credentials:** ChatGPT tokens are encrypted with Electron `safeStorage` (the Keychain on macOS, the system's data protection on Windows) and never reach the interface or the logs.
 - **Isolation:** the renderer has no Node, filesystem or network access. Every desktop operation goes through narrow, validated IPC calls.
-- **Local entry point for assistants:** only while **Connect AI assistants** is on, the app listens on a socket in its data folder (readable only by you) or, on Windows, a named pipe. A text arriving there is imported like a paste. A disassembly arriving there is validated like a stored file and accepted only as a new one written by an assistant.
-
-## Local models
-
-Start a model server, open **Take apart a source → Generation → Local model**, and the app finds it. It probes the default ports and identifies each runtime by its own endpoints. Before first use, it sends a tiny probe to check whether the server really enforces the output format.
-
-| Runtime | Default address | How the format is enforced | Observed on Ollama 0.30.8 / llama.cpp b9509 |
-|---|---|---|---|
-| llama.cpp server | `127.0.0.1:8080` | `/completion` with `json_schema` | ✅ enforced |
-| LM Studio | `127.0.0.1:1234` | `response_format` JSON Schema | not yet tested |
-| Ollama | `127.0.0.1:11434` | `format` | depends on the model: ✅ Qwen3.6, ⚠️ ignored for LFM2.5 (the app warns) |
-| Other OpenAI-compatible server | any loopback port | `response_format` JSON Schema | depends on the server |
-
-Measured on an M4 Pro with 48 GB, using Qwen3.6-35B-A3B (Q4_K_M) through llama.cpp: a lesson took about 1–2 minutes. Disassemblies have not been timed yet. Details are in the [local inference trial](docs/workflow/research/R-20261022-local-inference.md).
-
-```bash
-llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
-```
-
-> [!TIP]
-> Use a model with at least ~30B parameters and a 32k context. Plan for 32 GB of memory or more. Only addresses on this machine are accepted, so your source never leaves the computer on this route.
+- **Local entry point for assistants:** only while **Connect AI assistants** is on, the app listens on a socket in its data folder (readable only by you) or, on Windows, a named pipe. A text arriving there is imported like a paste. An exploration or a disassembly arriving there is checked with the same rules as the app's own generations, and accepted only as a new one written by an assistant.
 
 ## Use with Claude
 
 Break the Wall works with **Claude Desktop** and **Claude Code** through a local MCP server that ships inside the app. You install nothing else.
 
-The first demo at the top of this page comes from a real run in Claude Code, with Sonnet: 13 turns and about $0.38 on the user's plan. The first structure and the first runs were refused, and Claude fixed them. The terminal is redrawn from the run's transcript, with each result summarized. The app frames show the disassembly Claude wrote in that run.
+The second demo at the top of this page comes from a real run in Claude Code (2.1.319, Sonnet), on 2026-11-09:
+- **The run:** 7 turns, 67 seconds, about $0.29 on the user's plan.
+- **One refusal:** the app refused the first structure, because one role's text had 113 characters for a limit of 110. Claude fixed it, and the second was accepted.
+- **How the GIF is made:** the terminal is redrawn from the run's transcript, with each result summarized. The app frames show the exploration Claude wrote in that run.
 
 There are two ways to use it:
 
-| | You ask Claude | What happens | Who writes the disassembly |
+| | You ask Claude | What happens | Who writes the structure |
 |---|---|---|---|
-| **Open in Studio** | "Explain how a browser checks an HTTPS certificate and open it in Break the Wall" | The app comes to the front with Claude's text and your question in Studio | Break the Wall, with the route you choose (ChatGPT or a local model), when you press Generate |
-| **Claude writes it** | "Take this apart with Break the Wall" | Claude writes the structure, then each part, then the runs. The app checks every phase with the same rules it uses for its own generations, and returns findings for Claude to fix. After 3 attempts at a step, Claude asks you before trying again, and nothing already accepted is lost | Claude, on your Claude plan; the result opens in the library as "Written by your assistant" |
+| **Claude explores it** | "Explain how a browser checks an HTTPS certificate, then explore your explanation with Break the Wall" | Claude reads the source and writes its structure: aspects, roles and components, links with their basis, the source's questions. The app checks it with the same rules it uses for its own generations and returns findings for Claude to fix, once | Claude, on your Claude plan. The result opens in the library as "Written by your assistant" |
+| **Open in Studio** | "Explain how a browser checks an HTTPS certificate and open it in Break the Wall" | The app comes to the front with Claude's text in Studio | Break the Wall, with the route you choose, when you press **Explore the source** |
 
 **Connect it once.** In the app, open **Use with Claude** at the top of the library:
 1. Turn on **Connect AI assistants**. While it is off, Break the Wall accepts nothing from other apps.
@@ -248,82 +259,91 @@ There are two ways to use it:
    claude mcp add --scope user break-the-wall -e ELECTRON_RUN_AS_NODE=1 -- "<the app>" "<its MCP server>"
    ```
 
-**The `break` prompt.**
-It explains your question and has Claude take the explanation apart: the "Claude writes it" way, in one step.
-- *Claude Desktop:* pick it among the conversation's attachments and type your question in its field.
-- *Claude Code:* type `/break-the-wall:break`. Claude Code passes on only the first word after a prompt's name, so Claude asks for your question. With nothing to ask, it takes apart Claude's last long answer.
+**The `break` prompt.** It explains your topic and has Claude explore the explanation with Break the Wall, in one step.
+- *Claude Desktop:* pick it among the conversation's attachments and type your topic in its field.
+- *Claude Code:* type `/break-the-wall:break`. Claude Code passes on only the first word after a prompt's name, so Claude asks for your topic. With nothing to ask, it explores Claude's last long answer.
 
 > [!NOTE]
 > **What leaves your computer.**
-> - *Open in Studio:* the text is written by Claude, in your Claude conversation, and reaches the app over a local socket. Nothing more leaves the computer until you press Generate, and then only to the route you choose.
-> - *Claude writes it:* your source goes to Anthropic, through your own Claude app and on your plan, because Claude is the one writing.
+> - *Claude explores it:* your source goes to Anthropic, through your own Claude app and on your plan, because Claude is the one writing.
+> - *Open in Studio:* the text is written by Claude, in your Claude conversation, and reaches the app over a local socket. Nothing more leaves the computer until you press **Explore the source**, and then only to the route you choose.
 >
 > Either way, Break the Wall itself sends nothing to Claude.
 
 **Limits.**
 - **Supported clients:** Claude Desktop and Claude Code. ChatGPT cannot reach a server on your computer: it needs a remote server, which would take your sources off the device, so it is not supported.
 - **After updating the app:** add the extension to Claude Desktop again. On Windows, copy the Claude Code command again too, since it names the app's version folder.
-- **Interrupted work:** an unfinished "Claude writes it" session lives only in that conversation. If the conversation ends, start again.
+- **Disassemblies:** Claude can still write one if you ask for a disassembly with runs (`start_disassembly`).
 
 **To disconnect,** turn the switch off. **To remove it:**
 - in Claude Desktop: Settings → Extensions;
 - in Claude Code: `claude mcp remove --scope user break-the-wall`.
+
+## Local models
+
+A local model on your computer can generate **disassemblies and lessons**, not explorations yet. Start a model server, open **Take apart a source → Generation → Local model**, and the app finds it: it probes the default ports and identifies each runtime by its own endpoints. Before first use, it sends a tiny probe to check whether the server really enforces the output format.
+
+| Runtime | Default address | How the format is enforced | Observed on Ollama 0.30.8 / llama.cpp b9509 |
+|---|---|---|---|
+| llama.cpp server | `127.0.0.1:8080` | `/completion` with `json_schema` | ✅ enforced |
+| LM Studio | `127.0.0.1:1234` | `response_format` JSON Schema | not yet tested |
+| Ollama | `127.0.0.1:11434` | `format` | depends on the model: ✅ Qwen3.6, ⚠️ ignored for LFM2.5 (the app warns) |
+| Other OpenAI-compatible server | any loopback port | `response_format` JSON Schema | depends on the server |
+
+Measured on an M4 Pro with 48 GB, using Qwen3.6-35B-A3B (Q4_K_M) through llama.cpp: a lesson took about 1–2 minutes. Details are in the [local inference trial](docs/workflow/research/R-20261022-local-inference.md).
+
+```bash
+llama-server -m Qwen3.6-35B-A3B-Q4_K_M.gguf -c 32768
+```
+
+> [!TIP]
+> Use a model with at least ~30B parameters and a 32k context. Plan for 32 GB of memory or more. Only addresses on this machine are accepted, so your source never leaves the computer on this route.
 
 ## Tech stack
 
 | Layer | Stack |
 |---|---|
 | Desktop host | Electron 45: sandboxed renderer, context isolation, custom `btw://` protocol |
-| Interface | React 19, TypeScript 7, Vite 8, SVG technical drawings, lucide icons, system fonts; markdown-it for sources read as documents, Mermaid for their diagrams (loaded on first use) |
-| Disassembly model | zod 4 contract with located findings, bill-of-materials check, deterministic layered layout and pure run/reassembly transitions; independent of React and Electron |
-| AI routes | Sign in with ChatGPT (OAuth + PKCE, Responses API); Ollama, LM Studio and llama.cpp over loopback |
-| Assistants | An MCP server over stdio, written without an SDK: 5 tools and 1 prompt. It ships as a Claude Desktop extension (`.mcpb`) and runs in Claude Code on the app's Electron in Node mode |
+| Interface | React 19, TypeScript 7, Vite 8, SVG drawings, lucide icons, system fonts; markdown-it for sources read as documents, Mermaid for their diagrams (loaded on first use) |
+| Exploration model | zod 4 contract with located findings, the structure's detector (nuclei, layers, way in), the source index, the levels of abstraction, a deterministic layout with label placement, and the reading report; independent of React and Electron |
+| AI routes | Sign in with ChatGPT (OAuth + PKCE, Responses API); Ollama, LM Studio and llama.cpp over loopback for disassemblies and lessons |
+| Assistants | An MCP server over stdio, written without an SDK: 8 tools and 1 prompt. It ships as a Claude Desktop extension (`.mcpb`) and runs in Claude Code on the app's Electron in Node mode |
 | Storage | atomic JSON files in the app's data folder; credentials via `safeStorage` (Keychain on macOS, DPAPI on Windows) |
-| Tests | Vitest, Testing Library (jsdom): contract, layout geometry, contrast, catalogs, player interactions |
+| Tests | Vitest, Testing Library (jsdom): contracts, detector, layout geometry, contrast, catalogs, view interactions |
 
 ## Project status
 
-Work follows the approved plans [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md) (v7), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md) (v1), [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) (v1) and [P-20261028-mcp-integration](docs/workflow/plans/P-20261028-mcp-integration/plan.md) (v2). Evidence for each task is in its implementation record.
+The exploration follows the approved plan [P-20261105-exploration](docs/workflow/plans/P-20261105-exploration/plan.md) (v10). Earlier work follows [P-20261024-disassembly](docs/workflow/plans/P-20261024-disassembly/plan.md), [P-20261027-macos-dmg](docs/workflow/plans/P-20261027-macos-dmg/plan.md), [P-20261027-windows-alpha](docs/workflow/plans/P-20261027-windows-alpha/plan.md) and [P-20261028-mcp-integration](docs/workflow/plans/P-20261028-mcp-integration/plan.md). Evidence for each task is in its plan.
 
 | Phase | Tasks | Status |
 |---|---|---|
-| Contract | D1 format and host checks · D2 automatic layout · D3 learner state | ✅ automated tests |
-| Player | D4 themes and languages · D5 exploded view · D6 run · D7 reassembly and bill of materials · D8 library and store | ✅ automated tests; 🟡 D8 desktop flow being witnessed by the owner |
-| Generation | D9 two-phase generation and model comparison · D10 Studio and witnessed generation | ✅ code, automated tests and model comparison (setup A chosen); ⏳ witnessed generation |
-| Depth | D13 depth guided by the source · D14 take a part apart on demand | ✅ code, automated tests and 2 measured expansions |
-| Player usability | D15 numbers in reading order · D16 back to the level above · D17 resizable panes · D18 rendered markdown source | ✅ code, automated tests and owner check |
-| Player workbench | U1–U9 lighter chrome · claim and source together · runs that start with the question · one voice for text | ✅ code, automated tests on macOS and Windows, 32 measured layouts and owner check; released in `v0.4.0-alpha` |
-| Generation usability | D19 length repair · D20 short lead · D21 resume · D22 drawing while generating · D23 suggested break-downs | ✅ code, automated tests, D20 live check (4 of 4 valid) and owner check |
-| Identity and presentation | D24 brand assets · D25 mark and tagline · D26 home opening · D27 app icon · D28–D31 README, images, GitHub page, first release | ✅ identity in the app and this page; pre-release [`v0.1.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.0-alpha) |
-| macOS app | K1–K3 package script, ad-hoc signature, start check · K4–K6 release workflow, install steps, witnessed install | ✅ DMG built in CI on a tag and attached to [`v0.1.1-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.1.1-alpha); install from a download witnessed by the owner |
-| Windows app | W1 Windows in CI · W2 platform-aware wording · W3–W5 icon, installer events, setup and release job · W6–W7 install steps and witnessed install | ✅ CI and start check on Windows; setup built in CI on a tag and attached to [`v0.2.0-alpha`](https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha); install witnessed by the owner in a Windows 11 VM |
-| Claude integration | M1–M2 local entry point and Studio hand-off · M3–M4a MCP server, Claude Desktop extension, panel and prompt · M5–M7 Claude writes the disassembly · M8–M9 docs and witnessed checks | ✅ code and automated tests on macOS and Windows, the packaged server checked on both; Claude writing a disassembly witnessed in Claude Desktop and Claude Code |
-| Repository (gated) | D11 local repository as a source | ⏳ after D9 |
-| Document (gated) | D12 PDF document as a source | ⏳ after D9 |
+| Gate | X1 the structure request on Claude and ChatGPT, judged by the owner on six sources | ✅ passed |
+| Core | X2–X6 contract, detector, source index, layout, levels of abstraction, reading report | ✅ code and automated tests |
+| Generation | X7–X10 the request through ChatGPT, the store, Claude over MCP, three prepared explorations | ✅ code and automated tests; one ChatGPT run and one Claude Code run witnessed |
+| View | X11–X19 tokens, the view and its guides, the sub-level in place, joint labels, card and index, "How it was read", opening from the library and Studio | ✅ code, automated tests and the built app driven on macOS |
+| Polish | X21–X28 the card explains the selection, two views of the source, resizable panes, the index legend, a readable bar | ✅ code, automated tests and the built app driven, after the owner's look |
+| Verify | X20 CI on macOS and Windows, the owner's look at their own sources | 🟡 the owner's own sources are being judged |
+| Earlier | Disassembly player, generation and Studio; macOS and Windows apps; Claude integration | ✅ see the earlier plans; released up to `v0.4.0-alpha` |
 
-Not claimed: learning effectiveness, correctness of generated explanations, platforms other than macOS and Windows x64, Intel Mac or Windows on ARM builds, or apps signed by Apple or Microsoft.
+Not claimed: learning effectiveness, correctness of generated explorations, platforms other than macOS and Windows x64, Intel Mac or Windows on ARM builds, or apps signed by Apple or Microsoft.
 
 ## Roadmap
 
-- [x] Disassembly format with a verified bill of materials
-- [x] Automatic layout for mechanisms, arguments and stories
-- [x] Player: exploded view, run, reassemble, bill of materials
+- [x] Exploration: structure read in one request, checked links with their basis, levels of abstraction, two guides, "How it was read"
+- [x] Claude Desktop and Claude Code write explorations (MCP); ChatGPT generates them in the app
 - [x] Paper and blueprint themes; English and Italian interface
-- [x] Two-phase generation of disassemblies, with suggested questions, a live drawing and resume
-- [ ] Local models measured on disassemblies
-- [ ] Repositories as a source: snapshot identity, secrets found by content, file-level bill of materials
+- [x] Downloadable macOS app for Apple Silicon (ad-hoc signed) and Windows app for x64 (unsigned installer)
+- [ ] The owner's own sources judged, and long sources split across requests
+- [ ] Run and reassemble, redesigned around the exploration
+- [ ] Local models measured and offered for explorations
+- [ ] Repositories as a source: snapshot identity, secrets found by content
 - [ ] PDF documents as a source: checked extraction, page citations
-- [ ] Dependency map for repositories, and a reassembly that simulates the effect of a misplaced part
-- [x] Downloadable macOS app for Apple Silicon (ad-hoc signed)
-- [ ] Signed and notarized macOS app (Apple Developer ID), with updates
-- [x] Downloadable Windows app for x64 (unsigned installer)
-- [ ] Code-signed Windows installer
-- [x] Claude Desktop and Claude Code integration (MCP): open a text in Studio, or let Claude write the disassembly
-- [ ] ChatGPT integration (needs a remote MCP server; sources would leave the device)
+- [ ] Signed and notarized macOS app (Apple Developer ID), with updates; code-signed Windows installer
+- [ ] ChatGPT integration as an assistant (needs a remote MCP server; sources would leave the device)
 
 ## Contributing
 
-Contributions are welcome, from a bug report or a translation fix to a new prepared disassembly. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the checks every change passes and the research → plan → implement workflow used for larger changes.
+Contributions are welcome, from a bug report or a translation fix to a new prepared exploration. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the checks every change passes and the research → plan → implement workflow used for larger changes.
 
 ## Community
 
