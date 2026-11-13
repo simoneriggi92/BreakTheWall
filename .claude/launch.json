@@ -14,6 +14,18 @@
       "port": 4321
     },
     {
+      "name": "exploration-d",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4331",
+        "--bind",
+        "127.0.0.1"
+      ],
+      "port": 4331
+    },
+    {
       "name": "web-check",
       "runtimeExecutable": "npx",
       "runtimeArgs": [

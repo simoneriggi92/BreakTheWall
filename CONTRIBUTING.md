@@ -16,7 +16,7 @@ Please judge a proposal against this before writing code. Subject-specific modes
 - **Suggest an improvement.** Open an issue first for anything larger than a small fix, so we can agree on the approach before you spend time on it.
 - **Improve the interface text.** Every string exists in Italian and English (`src/renderer/i18n/it.ts` and `en.ts`); both catalogs must change together.
 - **Write a prepared exploration.** Prepared explorations live in `src/fixtures/explorations/`, one file per language. Their sources must be original or in the public domain, and the file must pass the exploration checks (`npm run check` validates every fixture). Prepared disassemblies in `src/fixtures/disassemblies/` stay welcome too.
-- **Pick up a roadmap item.** Repositories and PDF documents as sources are the next large steps, already planned in [the disassembly plan](docs/workflow/plans/P-20261024-disassembly/plan.md) (tasks D11 and D12); the exploration follows [its own plan](docs/workflow/plans/P-20261105-exploration/plan.md). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the plan.
+- **Pick up a roadmap item.** Repositories as a source are the next large step, laid out in [the scope](docs/scope/scope.md). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the scope.
 
 ## Set up
 
@@ -47,17 +47,16 @@ Both must pass. In addition:
 
 Small fixes can go straight to a pull request against `main`. Describe what changed and how you checked it.
 
-## Larger changes: research → plan → implement
+## Larger changes: scope → spec → build
 
-Larger changes follow the workflow described in [AGENTS.md](AGENTS.md):
+Larger changes follow the workflow described in [AGENTS.md](AGENTS.md#workflow):
 
-1. **Research** (`docs/workflow/research/`): the problem, the current code path, the constraints and the open questions, with evidence.
-2. **Plan** (`docs/workflow/plans/`): ordered tasks with acceptance criteria, risks and the checks that will prove each task.
-3. **Approval** by the maintainer, recorded in the plan.
-4. **Implementation**, one phase at a time, with its evidence recorded in the plan.
-5. **Verification**: every task is marked verified only with evidence; `STATUS.md` is generated from the plan.
+1. **Scope** ([docs/scope/scope.md](docs/scope/scope.md)): the feature, its release, and when it is done.
+2. **Spec** (`docs/specs/`): the decision and its acceptance criteria, written before building when the feature has a real choice to make.
+3. **Build** against the spec, then **verify** it on the real app, and **test** it when the feature asks for it.
+4. **Sync**: the conventions the change settled go back into `AGENTS.md`.
 
-You do not need to write the research and plan yourself to propose a large change: open an issue, and we can write them together.
+You do not need to write the spec yourself to propose a large change: open an issue, and we can write it together. The earlier research and plans in [docs/workflow/](docs/workflow/README.md) are kept as history.
 
 ## Licensing of contributions
 
