@@ -2,14 +2,16 @@
 id: P-20261105-exploration
 title: Exploration - the structure of a source, read by the app and explored by levels of abstraction in one view with three roles
 version: 14
-state: implementing
-current_task: X20
+state: completed
+current_task: none
 last_evidence: X40 (2026-11-10) one refusal names schema and structural findings together; new test red on the old code, green on the fix; tsc, vitest --dir tests 41 files 611 tests, build
-next_action: owner - open and merge the pull request of fix/all-findings; then X20.4
+next_action: none - closed by the owner on 2026-11-13 with X20 dropped; work continues in docs/scope/scope.md
 approval: approved
 ---
 
 # Exploration
+
+> **Closed on 2026-11-13 by the owner.** The exploration is complete as released in `v0.5.0-alpha`. X20 is dropped, X20.4 (the owner's look at their own sources) included; X20.1 to X20.3 stay below as the evidence they gathered. This plan is frozen history: the work continues in [the scope](../../../scope/scope.md) with the `jsmastery-pro/skills` workflow.
 
 ## Outcome
 
@@ -923,7 +925,7 @@ Not included:
 
 ### Phase `verify`
 
-**X20. Checked and witnessed.**
+**X20. Checked and witnessed.** Dropped by the owner on 2026-11-13, when the exploration was closed; the evidence below stays as it was gathered.
 1. `npm run check` and `npm run build` on macOS; CI on macOS and Windows after the owner confirms a push.
 2. Integration on the built app (`npm start`) with a scratch data folder, at 1280×800, in both themes and both languages, recorded as a witnessed flow:
    - the three prepared examples;
