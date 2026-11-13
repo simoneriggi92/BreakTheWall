@@ -20,7 +20,7 @@ describe('the aspect level (X5)', () => {
     expect(L.links).toHaveLength(1);
     const [j] = L.links;
     expect(j).toMatchObject({ from: 'a', to: 'b', class: 'bond', basis: 'declared', label: 'feeds +1', labels: ['feeds', 'checks'] });
-    expect(j.bonds).toEqual([{ from: 'a1', to: 'b1', label: 'feeds' }, { from: 'a2', to: 'b1', label: 'checks' }, { from: 'a2', to: 'b2', label: 'feeds' }]);
+    expect(j.bonds!.map(({ from, to, label }) => ({ from, to, label }))).toEqual([{ from: 'a1', to: 'b1', label: 'feeds' }, { from: 'a2', to: 'b1', label: 'checks' }, { from: 'a2', to: 'b2', label: 'feeds' }]);
   });
 
   it('is declared only when one of its bonds is', () => {

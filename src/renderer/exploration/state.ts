@@ -31,6 +31,8 @@ export interface ViewState {
   /** Labels the reader moved, by key, as an offset from their joint's midpoint. Not stored. */
   moved: Record<string, [number, number]>;
   folded: { index: boolean; source: boolean };
+  /** How the source shows (X22): rendered, or its raw lines numbered. Kept when the column folds. */
+  sourceView: 'document' | 'lines';
   /** The panel shown on a narrow window. */
   tab: 'index' | 'structure' | 'source';
   report: boolean;
@@ -42,7 +44,7 @@ export function initialState(m: Model): ViewState {
     guide: question ? { kind: 'question', trace: m.shape.trace!, at: 0 } : { kind: 'whole', at: 0 },
     all: false, visited: [], explore: null, pick: null, section: null,
     sub: null, subSel: null, opened: [], member: null, before: null, grow: false,
-    moved: {}, folded: { index: false, source: false }, tab: 'structure', report: false,
+    moved: {}, folded: { index: false, source: false }, sourceView: 'document', tab: 'structure', report: false,
   };
 }
 
@@ -66,6 +68,7 @@ export type Action =
   | { type: 'grown' }
   | { type: 'move'; key: string; offset: [number, number] | null }
   | { type: 'fold'; panel: 'index' | 'source' }
+  | { type: 'source-view'; view: 'document' | 'lines' }
   | { type: 'tab'; tab: ViewState['tab'] }
   | { type: 'report'; on: boolean }
   | { type: 'escape' };
@@ -115,9 +118,10 @@ export function reduce(m: Model, s: ViewState, a: Action): ViewState {
       return { ...s, moved };
     }
     case 'fold': return { ...s, folded: { ...s.folded, [a.panel]: !s.folded[a.panel] } };
+    case 'source-view': return { ...s, sourceView: a.view };
     case 'tab': return { ...s, tab: a.tab };
     case 'report': return { ...s, report: a.on };
-    // Escape closes the sub-level first, then returns from exploring, then leaves "all the layers"
-    case 'escape': return s.report ? { ...s, report: false } : s.sub ? reduce(m, s, { type: 'close' }) : s.explore || s.pick || s.section !== null ? reduce(m, s, { type: 'back' }) : s.all ? { ...s, all: false } : s;
+    // Escape lets a chosen link go first (X21), then closes the sub-level, then returns from exploring, then leaves "all the layers"
+    case 'escape': return s.report ? { ...s, report: false } : s.pick && 'link' in s.pick ? { ...s, pick: null } : s.sub ? reduce(m, s, { type: 'close' }) : s.explore || s.pick || s.section !== null ? reduce(m, s, { type: 'back' }) : s.all ? { ...s, all: false } : s;
   }
 }

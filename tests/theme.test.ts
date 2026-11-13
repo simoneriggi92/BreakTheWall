@@ -69,6 +69,29 @@ describe('the exploration stylesheet (X11)', () => {
     const used = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map(m => m[1]))];
     expect(used.filter(x => !defined.has(x) && !local.has(x))).toEqual([]);
   });
+  it('shows the card’s lines only while the source column is hidden (X21)', () => {
+    expect(css).toMatch(/\.xp-card-lines \{ display: none;/);
+    expect(css).toMatch(/\.xp-src-closed \.xp-card-lines \{ display: block; \}/);
+    const narrow = css.slice(css.indexOf('@media (max-width: 899px)'));
+    expect(narrow).toMatch(/\.xp-tab-structure \.xp-card-lines \{ display: block; \}/);
+  });
+  it('never lets a block’s peek hold the pointer over a joint label (X21)', () => {
+    expect(css).toMatch(/\.xp-peek \{ pointer-events: none; \}/);
+  });
+  it('gives the pieces aside the aside colour, in a band set off from the drawing (X25)', () => {
+    expect(css).toMatch(/\.xp-aside-band \.xp-chip \{[^}]*var\(--x-aside\)[^}]*var\(--x-aside-soft\)/);
+    expect(css).toMatch(/\.xp-aside-band \{[^}]*border-top: 1px dashed var\(--x-aside\)/);
+  });
+  it('shows no separator on a narrow window (X23)', () => {
+    const narrow = css.slice(css.indexOf('@media (max-width: 899px)'));
+    expect(narrow).toMatch(/\.xp-split, \.xp-structure-panel > \.splitter-horizontal \{ display: none; \}/);
+  });
+  it('gives the bar a readable description: full colour, two lines, never a single cut line (X27)', () => {
+    const meta = css.match(/\.xp-meta \{[^}]*\}/)![0];
+    expect(meta).toMatch(/color: var\(--ink\)/);
+    expect(meta).toMatch(/-webkit-line-clamp: 2/);
+    expect(meta).not.toMatch(/white-space: nowrap/);
+  });
   it('stops the motion under "reduce motion"', () => {
     const styles = readFileSync('src/renderer/styles.css', 'utf8');
     const reduce = styles.slice(styles.indexOf('@media (prefers-reduced-motion: reduce)'));
