@@ -1,4 +1,4 @@
-# Contributing to Break the Wall
+    # Contributing to Break the Wall
 
 Thank you for your interest. Break the Wall is an alpha, and contributions of every size help: a bug report, a translation fix, a new prepared disassembly, a layout improvement, or a step on the [roadmap](README.md#roadmap).
 
