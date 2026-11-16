@@ -37,5 +37,3 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 ## Related specs
 
 - [docs/development.md](../../docs/development.md#the-mcp-server-claude-desktop-and-claude-code): diagram, build and tests (`tests/mcp-*.test.ts`, `tests/incoming.test.ts`, `tests/assistants.test.ts`).
-
-_Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._

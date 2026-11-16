@@ -16,7 +16,7 @@ Please judge a proposal against this before writing code. Subject-specific modes
 - **Suggest an improvement.** Open an issue first for anything larger than a small fix, so we can agree on the approach before you spend time on it.
 - **Improve the interface text.** Every string exists in Italian and English (`src/renderer/i18n/it.ts` and `en.ts`); both catalogs must change together.
 - **Write a prepared exploration.** Prepared explorations live in `src/fixtures/explorations/`, one file per language. Their sources must be original or in the public domain, and the file must pass the exploration checks (`npm run check` validates every fixture). Prepared disassemblies in `src/fixtures/disassemblies/` stay welcome too.
-- **Pick up a roadmap item.** Repositories as a source are the next large step, laid out in [the scope](docs/scope/scope.md). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the scope.
+- **Pick up a roadmap item.** Repositories as a source are the next large step, tracked in [the issues](https://github.com/simoneriggi92/BreakTheWall/issues). Start a thread in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions) before writing code, so the work fits the direction.
 
 ## Set up
 
@@ -47,16 +47,16 @@ Both must pass. In addition:
 
 Small fixes can go straight to a pull request against `main`. Describe what changed and how you checked it.
 
-## Larger changes: scope → spec → build
+## Larger changes: idea → spec → tickets → build
 
 Larger changes follow the workflow described in [AGENTS.md](AGENTS.md#workflow):
 
-1. **Scope** ([docs/scope/scope.md](docs/scope/scope.md)): the feature, its release, and when it is done.
-2. **Spec** (`docs/specs/`): the decision and its acceptance criteria, written before building when the feature has a real choice to make.
-3. **Build** against the spec, then **verify** it on the real app, and **test** it when the feature asks for it.
-4. **Sync**: the conventions the change settled go back into `AGENTS.md`.
+1. **Idea**: open an issue. It is triaged with the labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human` or `wontfix`.
+2. **Spec**: the decision and its acceptance criteria, written as an issue before building when the change has a real choice to make.
+3. **Tickets**: the spec is split into small issues, each one shippable on its own, with the issues it waits on marked as blockers.
+4. **Build** each ticket test-first, then review the change against the spec and the rules in [AGENTS.md](AGENTS.md#rules).
 
-You do not need to write the spec yourself to propose a large change: open an issue, and we can write it together. The earlier research and plans in [docs/workflow/](docs/workflow/README.md) are kept as history.
+You do not need to write the spec yourself to propose a large change: open an issue, and we can write it together. The earlier research, plans, scope and specs in [docs/workflow/](docs/workflow/README.md) are kept as history.
 
 ## Licensing of contributions
 
