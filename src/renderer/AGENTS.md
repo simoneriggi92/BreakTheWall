@@ -32,5 +32,3 @@ npm run dev:web   # this renderer alone in a browser, for layout only (no genera
 - The production content policy allows styles only from the app's files. A Mermaid diagram's styles are applied through the CSS object model in `svg-mount.ts`; do not loosen the policy to make a style work.
 - Mermaid loads on first use and runs with `securityLevel: 'strict'`.
 - Browser preview is not proof of desktop behavior: persistence and the bridge only exist under Electron.
-
-_Drafted by /audit from the repo, worth a quick human pass. Edit freely: once a line stops matching this draft, later runs treat it as curated and will flag rather than overwrite it._
