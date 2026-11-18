@@ -12,6 +12,10 @@ _Avoid_: input, mode, subject type
 A source made of many files, cited by file and line. It is explored by the same loop as any other source, never as a mode of its own.
 _Avoid_: repo mode, codebase view
 
+**Snapshot**:
+The files a repository is made of at the moment it is read, as they are on disk, identified by their content. A commit, when there is one, only labels it.
+_Avoid_: revision, checkout, version
+
 **Large source**:
 A source larger than the app's budget for one reading, whatever its kind. It opens through an overview and a focus; a source within the budget is read whole.
 _Avoid_: big repo, large repository
