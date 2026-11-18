@@ -11,3 +11,19 @@ _Avoid_: input, mode, subject type
 **Repository**:
 A source made of many files, cited by file and line. It is explored by the same loop as any other source, never as a mode of its own.
 _Avoid_: repo mode, codebase view
+
+**Snapshot**:
+The files a repository is made of at the moment it is read, as they are on disk, identified by their content. A commit, when there is one, only labels it.
+_Avoid_: revision, checkout, version
+
+**Large source**:
+A source larger than the app's budget for one reading, whatever its kind. It opens through an overview and a focus; a source within the budget is read whole.
+_Avoid_: big repo, large repository
+
+**Overview**:
+The reading of a large source as a whole: what it is about, its aspects, and its roles with the files or sections each one holds.
+_Avoid_: level 1, whole level
+
+**Focus**:
+The part of a large source read in depth, chosen by the learner's question or, without one, by the app.
+_Avoid_: scope, area, level 2
