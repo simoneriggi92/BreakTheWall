@@ -1,0 +1,523 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway (issue #78). Three variants of answering one grilling round, switched with ?variant=A|B|C.
+     No agent, no plugin, state in memory only. Never merged. -->
+<html lang="it" data-theme="paper">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Round · prototipo</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.min.js"></script>
+<style>
+/* Tokens copied from src/renderer/styles.css (paper and blueprint), so the prototype starts from Break the Wall's character. */
+:root, :root[data-theme="paper"] {
+  --bg:#f4f0e6; --surface:#fbf8f1; --sunk:#ece6d8; --ink:#1d2733; --muted:#4c5866; --line:#cdc4b1;
+  --accent:#1f5f99; --accent-soft:#e1e7ee; --accent-ink:#fff; --amber:#8a5a0f; --amber-soft:#f3e6cc;
+  --good:#2d6e45; --good-soft:#dfeadc; --bad:#a8261e; --bad-soft:#f5ddd7; --brick:#a3402a;
+  --grid:rgba(29,39,51,.055); --shadow:rgba(29,39,51,.12); --hl:rgba(138,90,15,.22);
+  color-scheme: light;
+}
+:root[data-theme="blueprint"] {
+  --bg:#0f2c4f; --surface:#13365f; --sunk:#0c2542; --ink:#e9f1f9; --muted:#b2c6db; --line:#3a6290;
+  --accent:#8ec5ff; --accent-soft:#1c4775; --accent-ink:#0b2340; --amber:#ffd27d; --amber-soft:#3a3a2c;
+  --good:#9fe2b4; --good-soft:#17453c; --bad:#ff9a91; --bad-soft:#4a2a3c; --brick:#ffb092;
+  --grid:rgba(233,241,249,.06); --shadow:rgba(0,0,0,.35); --hl:rgba(255,210,125,.28);
+  color-scheme: dark;
+}
+:root { --f-display:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --f-body:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; --f-mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --measure:66ch; --ease:cubic-bezier(.2,.8,.2,1); }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 var(--f-body); -webkit-font-smoothing:antialiased;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px); background-size:24px 24px; }
+button, textarea, input { font:inherit; color:inherit; }
+button { cursor:pointer; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:6px; }
+code { font-family:var(--f-mono); font-size:.88em; background:var(--sunk); padding:1px 5px; border-radius:5px; }
+h1,h2,h3,p { margin:0; }
+::highlight(btw-annot) { background-color:var(--hl); text-decoration:underline 2px var(--amber); }
+
+/* top bar: always visible, carries progress */
+.top { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:16px; padding:10px 22px; background:var(--bg); border-bottom:1px solid var(--line); }
+.top .title { display:flex; flex-direction:column; line-height:1.25; min-width:0; flex:1; }
+.top .title small { font-size:12px; color:var(--muted); }
+.top .title strong { font-family:var(--f-display); font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.proto-tag { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; border:1px dashed var(--amber); color:var(--amber); border-radius:6px; padding:3px 8px; white-space:nowrap; }
+.count { font-size:13px; font-weight:700; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.count b { color:var(--ink); }
+.ghost { background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:6px 12px; font-size:14px; }
+.ghost:hover { border-color:var(--ink); }
+.primary { background:var(--accent); color:var(--accent-ink); border:1px solid var(--accent); border-radius:9px; padding:7px 14px; font-weight:700; font-size:14px; }
+.linkish { background:none; border:0; padding:2px 0; color:var(--accent); font-weight:700; font-size:13.5px; }
+.kbd { font:11px var(--f-mono); border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 4px; color:var(--muted); }
+
+/* the block: shared by every variant */
+.block { scroll-margin-top:84px; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:26px 30px 22px; box-shadow:0 1px 0 var(--shadow); }
+.block.focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft), 0 10px 30px var(--shadow); }
+.block .qid { font:700 12px var(--f-mono); color:var(--accent); letter-spacing:.06em; }
+.block h2 { font-family:var(--f-display); font-size:21px; line-height:1.3; margin:4px 0 14px; max-width:var(--measure); }
+.body { max-width:var(--measure); font-size:15.5px; }
+.body p { margin:0 0 12px; }
+.body .lbl { display:block; font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:16px 0 6px; }
+.opts { display:grid; gap:10px; margin:6px 0 12px; }
+.opt { border:1px solid var(--line); border-left:4px solid var(--line); border-radius:10px; padding:10px 14px; background:var(--bg); }
+.opt .k { font:700 13px var(--f-mono); color:var(--accent); margin-right:6px; }
+.opt.rec { border-left-color:var(--good); }
+.opt.picked { border-color:var(--accent); border-left-color:var(--accent); background:var(--accent-soft); }
+.breaks { border-left:3px solid var(--amber); padding:4px 0 4px 12px; color:var(--ink); }
+.breaks::before { content:"⚠ "; color:var(--amber); font-weight:700; }
+.proposal { border:1px solid var(--good); background:var(--good-soft); border-radius:10px; padding:10px 14px; }
+.proposal .who { font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--good); display:block; margin-bottom:2px; }
+.figure { margin:14px 0 6px; min-height:150px; display:grid; place-items:center; background:var(--bg); border:1px dashed var(--line); border-radius:12px; padding:12px; overflow-x:auto; }
+.figure svg { max-width:100%; height:auto; }
+.figcap { font-size:12px; color:var(--muted); margin:-2px 0 8px; }
+
+/* answer controls */
+.answer { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+.answer textarea, .answer .annots { align-self:stretch; }
+.choices { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.choice { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--bg); border-radius:999px; padding:6px 14px; font-weight:700; font-size:14px; }
+.choice:hover { border-color:var(--ink); }
+.choice.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.choice .tag { font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--good); }
+.choice.on .tag { color:inherit; opacity:.8; }
+.choice .kbd { margin-left:2px; }
+textarea.note { width:100%; max-width:var(--measure); min-height:64px; resize:vertical; border:1px solid var(--line); border-radius:10px; background:var(--bg); padding:8px 12px; font-size:15px; line-height:1.5; }
+.annots { display:flex; flex-direction:column; gap:6px; }
+.annot { display:grid; grid-template-columns:1fr auto; gap:2px 10px; font-size:13.5px; border-left:3px solid var(--amber); background:var(--amber-soft); border-radius:0 8px 8px 0; padding:6px 10px; max-width:var(--measure); }
+.annot q { font-style:italic; color:var(--muted); }
+.annot button { grid-row:span 2; background:none; border:0; color:var(--muted); font-size:16px; }
+.hint { font-size:12.5px; color:var(--muted); }
+
+/* folded block (answered, not in focus) */
+.folded { display:flex; align-items:baseline; gap:12px; padding:10px 16px; border:1px solid var(--line); border-radius:12px; background:var(--surface); opacity:.8; cursor:pointer; text-align:left; width:100%; }
+.folded:hover { opacity:1; border-color:var(--ink); }
+.folded .qid { font:700 12px var(--f-mono); color:var(--good); }
+.folded .t { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14.5px; }
+.folded .a { font-weight:700; font-size:13.5px; color:var(--good); white-space:nowrap; }
+
+/* the return text */
+.ret { font:13px/1.6 var(--f-mono); white-space:pre-wrap; background:var(--sunk); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:0; max-width:76ch; }
+.tail { max-width:var(--measure); font-size:14px; color:var(--muted); border-top:1px dashed var(--line); padding-top:12px; }
+
+/* annotation popover */
+.pop { position:absolute; z-index:40; width:320px; background:var(--surface); border:1px solid var(--accent); border-radius:12px; box-shadow:0 12px 30px var(--shadow); padding:10px; display:flex; flex-direction:column; gap:8px; }
+.pop q { font-size:12.5px; color:var(--muted); font-style:italic; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.pop input { border:1px solid var(--line); border-radius:8px; background:var(--bg); padding:6px 10px; font-size:14px; }
+.pop .row { display:flex; justify-content:flex-end; gap:8px; }
+
+/* review sheet */
+.sheet-back { position:fixed; inset:0; background:rgba(10,20,35,.45); z-index:50; display:grid; place-items:center; padding:20px; }
+.sheet { background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:22px 24px; max-width:820px; width:100%; max-height:86vh; overflow:auto; display:flex; flex-direction:column; gap:14px; }
+.sheet .row { display:flex; gap:10px; justify-content:flex-end; }
+
+/* ---- Variant A: one at a time ---- */
+.va { max-width:820px; margin:0 auto; padding:22px 22px 120px; display:flex; flex-direction:column; gap:16px; }
+.strip { display:flex; gap:6px; }
+.seg { flex:1; height:30px; border:1px solid var(--line); border-radius:8px; background:var(--surface); font:700 11.5px var(--f-mono); color:var(--muted); }
+.seg.done { background:var(--good-soft); border-color:var(--good); color:var(--good); }
+.seg.cur { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); color:var(--accent); }
+.nav { display:flex; justify-content:space-between; align-items:center; }
+
+/* ---- Variant B: outline + reader + return ---- */
+.vb { display:grid; grid-template-columns:250px minmax(0,1fr) 330px; gap:20px; padding:20px 22px 110px; align-items:start; }
+.outline, .side { position:sticky; top:72px; display:flex; flex-direction:column; gap:6px; }
+.oitem { text-align:left; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; padding:9px 10px; border:1px solid transparent; border-radius:10px; background:none; }
+.oitem:hover { background:var(--surface); }
+.oitem.cur { background:var(--surface); border-color:var(--accent); }
+.oitem .qid { font:700 12px var(--f-mono); color:var(--muted); }
+.oitem.done .qid { color:var(--good); }
+.oitem .t { font-size:13.5px; line-height:1.35; }
+.oitem .a { grid-column:2; font-size:12px; font-weight:700; color:var(--good); }
+.side h3, .outline h3 { font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 4px 4px; }
+.side .ret { max-height:calc(100vh - 220px); overflow:auto; font-size:12px; }
+
+/* ---- Variant C: document with margin ---- */
+.vc { max-width:1180px; margin:0 auto; padding:22px 22px 120px; display:flex; flex-direction:column; gap:14px; }
+.vc .row { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:22px; align-items:start; }
+.vc .block:not(.focus) { opacity:.42; transition:opacity .2s var(--ease); cursor:pointer; }
+.vc .block:not(.focus):hover { opacity:.7; }
+.margin { position:sticky; top:72px; display:flex; flex-direction:column; gap:10px; font-size:14px; }
+.margin .answer { margin:0; border:0; padding:0; }
+.margin .status { font-size:12.5px; color:var(--muted); }
+.vc .folded { opacity:.75; }
+
+/* prototype switcher: deliberately not part of the design */
+.switcher { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); z-index:60; display:flex; align-items:center; gap:6px; background:#111; color:#fff; border-radius:999px; padding:6px 8px; box-shadow:0 8px 24px rgba(0,0,0,.35); font:600 13px var(--f-body); }
+.switcher button { background:#333; color:#fff; border:0; border-radius:999px; width:30px; height:30px; }
+.switcher span { padding:0 10px; white-space:nowrap; }
+@media (max-width:1100px) { .vb { grid-template-columns:200px minmax(0,1fr); } .vb .side { display:none; } .vc .row { grid-template-columns:1fr; } .margin { position:static; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="switcher" id="switcher"></div>
+<script>
+'use strict';
+
+// ---------- the round (fixture): issue #69, transcribed from the terminal on 2026-11-20 ----------
+const ROUND = {
+  title: 'Cosa contiene il record dell’overview, e come lo controlla l’host?',
+  origin: 'grill-with-docs · #69 · round 2',
+  blocks: [
+    { id:'Q2', title:'Cosa contiene un ruolo? (seguito)', kind:'proposal',
+      body:`<p><span class="lbl">Prova di deriva</span>Con (a) una cartella di capitoli dà membri <code>{ ch3.md, 1, 220 }</code>, e un unico documento lungo dà membri <code>{ book.md, 120, 340 }</code>. È la stessa forma.</p>
+<p><span class="lbl">Problema di termini</span>Nell’exploration un <code>member</code> è un componente nominato che ha <code>does</code> e <code>cites</code>; usarlo anche per “i file di un ruolo” gli dà due significati.</p>`,
+      proposal:`Scelgo (a). Il ruolo contiene (<em>holds</em>) nodi del digest, file interi o sezioni elencate, scritti come <code>{ file, from, to }</code>. L’host accetta solo intervalli che coincidono con un nodo del digest. Niente <code>member</code> per questo; Role entra nel glossario con “holds”.` },
+    { id:'Q3', title:'Chi produce i legami dichiarati tra ruoli?', kind:'choice', rec:'a',
+      body:`<p>Il digest contiene già legami file→file dichiarati dal parser, con il loro <code>file:line</code>.</p>`,
+      options:[
+        { k:'a', html:`L’host deriva i bond dichiarati: se un file del ruolo A importa un file del ruolo B, l’host crea il bond A→B (<code>basis: declared</code>) e cita gli import. Il modello aggiunge solo i legami che legge nei doc del digest, <code>declared</code> se le righe lo dicono a parole e <code>interpreted</code> altrimenti.` },
+        { k:'b', html:`Il modello scrive tutti i legami e l’host controlla che ogni <code>declared</code> citi un import del digest tra file dei due ruoli.` } ],
+      after:`<p>Con (b) il modello ricopia un fatto che l’host conosce già, e ogni errore costa un repair.</p><p class="breaks">Caso che rompe (a): due ruoli legati da cinquanta import → un solo bond, citazioni fino al tetto di 20, direzione dagli import.</p>`,
+      diagram:`flowchart LR
+  subgraph A["Ruolo A"]
+    a1["client.py"]
+    a2["pool.py"]
+  end
+  subgraph B["Ruolo B"]
+    b1["timeout.py"]
+  end
+  a1 -- "import · file:line" --> b1
+  a2 -- "import · file:line" --> b1
+  A == "1 bond «usa» · declared · dall'host" ==> B`,
+      proposal:`(a). Un bond per coppia ordinata di ruoli, etichetta fissa del catalogo (“usa”/“uses”); il modello scrive solo i legami dei doc. Per una lingua senza parser restano solo i legami del modello (ADR 0001).` },
+    { id:'Q4', title:'Dove vive la domanda del learner?', kind:'choice', rec:'a',
+      body:`<p>ADR 0001: la domanda entra nella richiesta di overview, che nomina i ruoli che attraversa; ma l’overview si salva una volta per snapshot.</p><p><span class="lbl">Scenario</span>Apro httpx chiedendo “come gestisce i timeout?”, poi sullo stesso snapshot “come funziona l’autenticazione?”.</p>`,
+      options:[
+        { k:'a', html:`L’overview resta indipendente dalla domanda: i ruoli attraversati si salvano nell’exploration del focus (<code>overview: { id, role, crosses? }</code>); una seconda domanda costa una richiesta piccola (domanda + overview, non il digest).` },
+        { k:'b', html:`La domanda fa parte dell’identità dell’overview → più overview per snapshot; contraddice ADR 0003.` },
+        { k:'c', html:`La seconda domanda rigenera l’overview e sostituisce la prima; le exploration salvate punterebbero a ruoli che non esistono più.` } ],
+      diagram:`flowchart LR
+  S["Snapshot httpx"] --> O["Overview<br/>una per snapshot"]
+  O --> E1["Exploration<br/>«timeout?»<br/>crosses: Trasporto, Config"]
+  O --> E2["Exploration<br/>«autenticazione?»<br/>crosses: Auth, Client"]`,
+      proposal:`(a). Va in un ADR: difficile da invertire e sorprende chi non ha il contesto.` },
+    { id:'Q5', title:'Cosa salva l’overview per riaprirsi senza la cartella?', kind:'proposal',
+      body:`<p>ADR 0002: “il testo dei file letti”.</p><p><span class="lbl">Proposta</span><code>snapshot</code> (hash ed etichetta), <code>files: [{ path, text, sha256 }]</code> per manifest e doc letti interi (le righe citabili), <code>tree: [{ path, lines, sha256, sections? }]</code> per i file elencati ma non letti.</p><p>L’host controlla che ogni nodo di un ruolo esista in <code>tree</code> o <code>files</code>, e ogni citazione di un legame in <code>files</code>.</p>`,
+      proposal:`Sì: testi letti (<code>files</code>, forma dell’exploration) + elenco (<code>tree</code>, solo metadati e intervalli). Le citazioni puntano ai testi, i ruoli all’elenco.` },
+    { id:'Q6', title:'Il digest di un unico documento lungo', kind:'proposal',
+      body:`<p>ADR 0001 definisce il digest di un repository; la prova di deriva chiede lo stesso record per un documento di 300k caratteri.</p><p><span class="lbl">Proposta</span>Struttura dei titoli con intervalli (i nodi), più la sezione d’apertura letta intera (equivalente del README). Legami dichiarati = link e ancore Markdown interne; “vedi capitolo 3” in prosa lo legge il modello. Una cartella di capitoli unisce le due cose.</p><p class="breaks">Un documento senza titoli non ha nodi: blocchi di righe di lunghezza fissa, dichiarati in “How it was read”.</p>`,
+      proposal:`Sì, compreso il taglio in blocchi.` },
+    { id:'Q7', title:'Il percorso di riparazione', kind:'choice', rec:'a',
+      body:`<p>Oggi: una richiesta, al massimo un repair con i findings, uno shorten se restano solo lunghezze (<code>withRepair</code>); se fallisce, niente si salva.</p>`,
+      options:[
+        { k:'a', html:`Lo stesso percorso; se fallisce dopo il repair, la fonte non si apre e la vista dice perché.` },
+        { k:'b', html:`L’host corregge da solo gli errori meccanici (scarta un nodo inesistente, un file in due ruoli) e manda il repair solo per il resto. Sembra comodo, ma un file scartato in silenzio finisce in nessun ruolo: è la “No silent cut” che ADR 0001 vieta.` } ],
+      proposal:`(a): stesso <code>withRepair</code>, stessi findings con il path esatto. Fallita l’overview, non parte il focus.` },
+  ],
+  tail:`Rispondi anche solo con i numeri. Le domande in arrivo: i tipi che un ruolo può avere (part/reference/procedure?), l’esclusività (un file in due ruoli?), la copertura (un file in nessun ruolo è un finding o una voce della bill of materials?).`,
+};
+const B = ROUND.blocks;
+const VARIANTS = { A:'Una alla volta', B:'Indice + lettore', C:'Documento con margine' };
+
+// ---------- state (memory only) ----------
+const S = {
+  variant: VARIANTS[new URLSearchParams(location.search).get('variant')] ? new URLSearchParams(location.search).get('variant') : 'A',
+  theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'blueprint' : 'paper',
+  focus: 0,
+  answers: Object.fromEntries(B.map(b => [b.id, { choice:null, note:'', noteOpen:false }])),
+  annots: [], // { n, block, start, end, quote, comment }
+  review: false,
+};
+let annotSeq = 0;
+
+// ---------- helpers ----------
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const strip = h => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent.replace(/\s+/g, ' ').trim(); };
+const choicesOf = b => b.kind === 'choice' ? b.options.map(o => o.k) : ['sì', 'no'];
+const recOf = b => b.kind === 'choice' ? b.rec : 'sì';
+const answered = b => S.answers[b.id].choice !== null;
+const doneCount = () => B.filter(answered).length;
+const choiceLabel = (b, k) => b.kind === 'choice' ? `(${k})` : (k === 'sì' ? 'Sì' : 'No');
+const annotsOf = b => S.annots.filter(a => a.block === b.id);
+
+function summary(b) {
+  const a = S.answers[b.id]; if (!a.choice) return '';
+  const extra = [a.note && 'nota', annotsOf(b).length && `${annotsOf(b).length} annot.`].filter(Boolean).join(' · ');
+  return choiceLabel(b, a.choice) + (a.choice === recOf(b) ? ' ✓' : '') + (extra ? ' · ' + extra : '');
+}
+
+// The text the agent would receive: one line per block, notes and annotations indented under it.
+function returnText() {
+  const lines = [`Risposte al round «${ROUND.title}» (${doneCount()}/${B.length})`, ''];
+  for (const b of B) {
+    const a = S.answers[b.id];
+    const head = a.choice ? `${b.id} · ${choiceLabel(b, a.choice)}${a.choice === recOf(b) ? ' (come proposto)' : ''}` : `${b.id} · — non risposta`;
+    lines.push(head);
+    if (a.note.trim()) lines.push(...a.note.trim().split('\n').map((l, i) => (i ? '        ' : '  nota: ') + l));
+    for (const n of annotsOf(b)) lines.push(`  su «${n.quote}»: ${n.comment}`);
+  }
+  return lines.join('\n');
+}
+
+// ---------- block pieces ----------
+function blockBody(b) {
+  const a = S.answers[b.id];
+  const opts = b.kind === 'choice' ? `<div class="opts">${b.options.map(o =>
+    `<div class="opt${o.k === b.rec ? ' rec' : ''}${a.choice === o.k ? ' picked' : ''}"><span class="k">(${o.k})</span>${o.html}</div>`).join('')}</div>` : '';
+  // .body holds only the text that can be annotated; the figure sits outside it so offsets ignore the SVG.
+  return `<div class="body" data-body="${b.id}">${b.body}${opts}${b.after || ''}
+    <div class="proposal"><span class="who">Proposta dell’agente</span>${b.proposal}</div></div>
+    ${b.diagram ? `<div class="figure" data-fig="${b.id}"></div><div class="figcap">Diagramma aggiunto dal prototipo</div>` : ''}`;
+}
+
+function answerControls(b, { compact = false } = {}) {
+  const a = S.answers[b.id];
+  const keys = choicesOf(b);
+  const choices = keys.map((k, i) => `<button class="choice${a.choice === k ? ' on' : ''}" data-act="choose" data-b="${b.id}" data-k="${k}">
+      ${choiceLabel(b, k)}${k === recOf(b) ? '<span class="tag">proposta</span>' : ''}${compact ? '' : `<span class="kbd">${i + 1}</span>`}</button>`).join('');
+  const note = a.noteOpen || a.note
+    ? `<textarea class="note" data-note="${b.id}" placeholder="Una nota per l’agente (facoltativa)">${esc(a.note)}</textarea>`
+    : `<button class="linkish" data-act="note" data-b="${b.id}">+ nota</button>`;
+  const ann = annotsOf(b).map(n => `<div class="annot"><q>${esc(n.quote)}</q><button title="Rimuovi" data-act="unannot" data-n="${n.n}">×</button><span>${esc(n.comment)}</span></div>`).join('');
+  return `<div class="answer">
+    <div class="choices">${choices}</div>
+    ${note}
+    ${ann ? `<div class="annots">${ann}</div>` : ''}
+    ${compact ? '' : `<span class="hint">Seleziona del testo nel blocco per annotarlo.</span>`}
+  </div>`;
+}
+
+function block(b, i, { controls = true } = {}) {
+  return `<article class="block${i === S.focus ? ' focus' : ''}" data-i="${i}" id="blk-${b.id}">
+    <span class="qid">${b.id} · ${i + 1} di ${B.length}</span><h2>${b.title}</h2>
+    ${blockBody(b)}
+    ${controls ? answerControls(b) : ''}
+  </article>`;
+}
+
+function folded(b, i) {
+  return `<button class="folded" data-act="focus" data-i="${i}"><span class="qid">${b.id}</span><span class="t">${b.title}</span><span class="a">${summary(b)}</span></button>`;
+}
+
+function topBar() {
+  return `<header class="top">
+    <span class="proto-tag">Prototipo · nessun agente</span>
+    <div class="title"><small>${ROUND.origin}</small><strong>${ROUND.title}</strong></div>
+    <span class="count" data-live="count"><b>${doneCount()}</b>/${B.length} risposte</span>
+    <button class="primary" data-act="review">Rivedi e invia <span class="kbd" style="color:inherit;border-color:currentColor">r</span></button>
+    <button class="ghost" data-act="theme" title="Tema (t)">${S.theme === 'paper' ? 'Blueprint' : 'Paper'}</button>
+  </header>`;
+}
+
+// ---------- variants ----------
+function variantA() {
+  const b = B[S.focus];
+  const strip = B.map((x, i) => `<button class="seg${answered(x) ? ' done' : ''}${i === S.focus ? ' cur' : ''}" data-act="focus" data-i="${i}" title="${esc(x.title)}">${x.id}${answered(x) ? ' ✓' : ''}</button>`).join('');
+  return `<main class="va">
+    <div class="strip">${strip}</div>
+    ${block(b, S.focus)}
+    <div class="nav">
+      <button class="ghost" data-act="prev" ${S.focus === 0 ? 'disabled' : ''}>‹ Precedente <span class="kbd">k</span></button>
+      <span class="hint">${b.id} · ${S.focus + 1} di ${B.length}</span>
+      ${S.focus === B.length - 1
+        ? `<button class="primary" data-act="review">Rivedi e invia</button>`
+        : `<button class="${answered(b) ? 'primary' : 'ghost'}" data-act="next">Successiva › <span class="kbd" style="color:inherit">j</span></button>`}
+    </div>
+    <p class="tail">${ROUND.tail}</p>
+  </main>`;
+}
+
+function variantB() {
+  const outline = B.map((x, i) => `<button class="oitem${answered(x) ? ' done' : ''}${i === S.focus ? ' cur' : ''}" data-act="focus" data-i="${i}">
+      <span class="qid">${x.id}</span><span class="t">${x.title}</span>${answered(x) ? `<span class="a">${summary(x)}</span>` : ''}</button>`).join('');
+  return `<main class="vb">
+    <nav class="outline"><h3>Domande</h3>${outline}<p class="tail" style="margin-top:12px">${ROUND.tail}</p></nav>
+    <div>${block(B[S.focus], S.focus)}</div>
+    <aside class="side"><h3>Cosa riceve l’agente</h3><pre class="ret" data-live="ret">${esc(returnText())}</pre>
+      <button class="ghost" data-act="copy">Copia</button></aside>
+  </main>`;
+}
+
+function variantC() {
+  const rows = B.map((b, i) => {
+    if (i !== S.focus && answered(b)) return `<div class="row">${folded(b, i)}<div></div></div>`;
+    const margin = i === S.focus
+      ? `<aside class="margin"><span class="status">${answered(b) ? 'Risposta data' : 'In attesa di risposta'}</span>${answerControls(b)}</aside>`
+      : `<aside class="margin"><span class="status">${b.id} · da rispondere</span></aside>`;
+    return `<div class="row">${block(b, i, { controls:false })}${margin}</div>`;
+  }).join('');
+  return `<main class="vc">${rows}
+    <div class="row"><div><p class="tail">${ROUND.tail}</p></div><div></div></div>
+    <div class="row"><div><h3 class="hint" style="text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Cosa riceve l’agente</h3><pre class="ret" data-live="ret">${esc(returnText())}</pre></div><div></div></div>
+  </main>`;
+}
+
+function reviewSheet() {
+  const missing = B.filter(b => !answered(b)).map(b => b.id);
+  return `<div class="sheet-back" data-act="close-review"><div class="sheet" role="dialog" aria-label="Rivedi le risposte">
+    <h2 style="font-family:var(--f-display)">Rivedi le risposte</h2>
+    ${missing.length ? `<p class="hint">Senza risposta: ${missing.join(', ')}. Puoi inviare lo stesso.</p>` : ''}
+    <pre class="ret">${esc(returnText())}</pre>
+    <div class="row"><button class="ghost" data-act="close-review">Torna al round <span class="kbd">Esc</span></button><button class="ghost" data-act="copy">Copia</button><button class="primary" data-act="send">Invia all’agente</button></div>
+  </div></div>`;
+}
+
+// ---------- render ----------
+const svgCache = new Map();
+let diagramSeq = 0;
+
+function render() {
+  document.documentElement.dataset.theme = S.theme;
+  const app = document.getElementById('app');
+  app.innerHTML = topBar() + ({ A:variantA, B:variantB, C:variantC }[S.variant])() + (S.review ? reviewSheet() : '');
+  document.getElementById('switcher').innerHTML =
+    `<button data-act="vprev" aria-label="Variante precedente">‹</button><span>${S.variant} (${VARIANTS[S.variant]})</span><button data-act="vnext" aria-label="Variante successiva">›</button>`;
+  paintHighlights();
+  paintDiagrams();
+}
+
+// Only the live parts, so typing in a note never re-renders the textarea.
+function renderLive() {
+  document.querySelectorAll('[data-live="count"]').forEach(n => n.innerHTML = `<b>${doneCount()}</b>/${B.length} risposte`);
+  document.querySelectorAll('[data-live="ret"]').forEach(n => n.textContent = returnText());
+}
+
+async function paintDiagrams() {
+  if (!window.mermaid) { document.querySelectorAll('.figure').forEach(f => f.textContent = 'Mermaid non caricato (offline?)'); return; }
+  for (const fig of document.querySelectorAll('.figure')) {
+    const b = B.find(x => x.id === fig.dataset.fig);
+    const key = `${b.id}:${S.theme}`;
+    if (!svgCache.has(key)) {
+      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme: S.theme === 'blueprint' ? 'dark' : 'neutral', fontFamily:'inherit' });
+      try { svgCache.set(key, (await mermaid.render(`d${++diagramSeq}`, b.diagram)).svg); }
+      catch (e) { svgCache.set(key, `<span class="hint">Diagramma non valido: ${esc(String(e.message || e))}</span>`); }
+    }
+    if (fig.isConnected) fig.innerHTML = svgCache.get(key);
+  }
+}
+
+// ---------- annotations: character offsets inside a block's .body, painted with the CSS Highlight API ----------
+function textNodes(root) {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); const out = []; let n;
+  while ((n = w.nextNode())) out.push(n);
+  return out;
+}
+function offsetOf(root, node, off) {
+  const r = document.createRange(); r.setStart(root, 0); r.setEnd(node, off); return r.toString().length;
+}
+function rangeFrom(root, start, end) {
+  let pos = 0; const r = document.createRange(); let started = false;
+  for (const t of textNodes(root)) {
+    const len = t.data.length;
+    if (!started && start <= pos + len) { r.setStart(t, start - pos); started = true; }
+    if (started && end <= pos + len) { r.setEnd(t, end - pos); return r; }
+    pos += len;
+  }
+  return null;
+}
+function paintHighlights() {
+  if (!window.CSS || !CSS.highlights) return;
+  const ranges = [];
+  for (const n of S.annots) {
+    const root = document.querySelector(`[data-body="${n.block}"]`);
+    const r = root && rangeFrom(root, n.start, n.end);
+    if (r) ranges.push(r);
+  }
+  CSS.highlights.set('btw-annot', new Highlight(...ranges));
+}
+
+let pending = null;
+document.addEventListener('mouseup', e => {
+  if (e.target.closest('.pop')) return;
+  const sel = getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const root = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement).closest('[data-body]');
+  const range = sel.getRangeAt(0);
+  if (!root || !root.contains(range.endContainer)) return;
+  const start = offsetOf(root, range.startContainer, range.startOffset);
+  const end = offsetOf(root, range.endContainer, range.endOffset);
+  const quote = range.toString().replace(/\s+/g, ' ').trim();
+  if (!quote) return;
+  pending = { block: root.dataset.body, start, end, quote };
+  showPop(range.getBoundingClientRect());
+});
+function showPop(rect) {
+  closePop();
+  const p = document.createElement('div'); p.className = 'pop';
+  p.innerHTML = `<q>${esc(pending.quote)}</q><input placeholder="Commento su questo passaggio" /><div class="row"><button class="ghost" data-act="pop-cancel">Annulla</button><button class="primary" data-act="pop-save">Annota</button></div>`;
+  p.style.left = Math.min(innerWidth - 340, Math.max(12, rect.left + scrollX)) + 'px';
+  p.style.top = (rect.bottom + scrollY + 8) + 'px';
+  document.body.appendChild(p);
+  const input = p.querySelector('input'); input.focus();
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') savePop(); if (e.key === 'Escape') closePop(); });
+}
+function savePop() {
+  const input = document.querySelector('.pop input');
+  if (pending && input && input.value.trim()) S.annots.push({ n: ++annotSeq, ...pending, comment: input.value.trim() });
+  closePop(); getSelection().removeAllRanges(); render();
+}
+function closePop() { document.querySelector('.pop')?.remove(); }
+
+// ---------- actions ----------
+function setFocus(i, scroll = true) {
+  S.focus = Math.max(0, Math.min(B.length - 1, i)); render();
+  if (scroll) document.getElementById(`blk-${B[S.focus].id}`)?.scrollIntoView({ block:'start', behavior:'smooth' });
+}
+function choose(id, k) {
+  const a = S.answers[id]; a.choice = a.choice === k ? null : k; render();
+}
+function setVariant(v) {
+  S.variant = v; const u = new URL(location.href); u.searchParams.set('variant', v); history.replaceState(null, '', u); render();
+}
+function cycleVariant(d) { const ks = Object.keys(VARIANTS); setVariant(ks[(ks.indexOf(S.variant) + d + ks.length) % ks.length]); }
+function openNote(id) {
+  S.answers[id].noteOpen = true; render();
+  document.querySelector(`[data-note="${id}"]`)?.focus();
+}
+async function copy() { try { await navigator.clipboard.writeText(returnText()); toast('Copiato'); } catch { toast('Copia non riuscita'); } }
+function toast(msg) { const t = document.querySelector('.switcher span'); if (t) { const old = t.textContent; t.textContent = msg; setTimeout(() => t.textContent = old, 900); } }
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) {
+    // In variant C a click on a dimmed block brings it into focus.
+    const art = e.target.closest('.vc .block:not(.focus)');
+    if (art && getSelection().isCollapsed) setFocus(+art.dataset.i, false);
+    return;
+  }
+  if (el.classList.contains('sheet-back') && e.target !== el) return;
+  const { act } = el.dataset;
+  if (act === 'focus') setFocus(+el.dataset.i);
+  else if (act === 'choose') choose(el.dataset.b, el.dataset.k);
+  else if (act === 'note') openNote(el.dataset.b);
+  else if (act === 'unannot') { S.annots = S.annots.filter(n => n.n !== +el.dataset.n); render(); }
+  else if (act === 'next') setFocus(S.focus + 1);
+  else if (act === 'prev') setFocus(S.focus - 1);
+  else if (act === 'review') { S.review = true; render(); }
+  else if (act === 'close-review') { S.review = false; render(); }
+  else if (act === 'send') { S.review = false; render(); toast('Inviato (finto)'); }
+  else if (act === 'copy') copy();
+  else if (act === 'theme') { S.theme = S.theme === 'paper' ? 'blueprint' : 'paper'; render(); }
+  else if (act === 'vprev') cycleVariant(-1);
+  else if (act === 'vnext') cycleVariant(1);
+  else if (act === 'pop-save') savePop();
+  else if (act === 'pop-cancel') closePop();
+});
+document.addEventListener('input', e => {
+  const id = e.target.dataset?.note; if (!id) return;
+  S.answers[id].note = e.target.value; renderLive();
+});
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t.matches('input, textarea, [contenteditable]')) { if (e.key === 'Escape') t.blur(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const b = B[S.focus];
+  if (e.key === 'Escape') { if (S.review) { S.review = false; render(); } closePop(); return; }
+  if (S.review) return;
+  if (e.key === 'j') setFocus(S.focus + 1);
+  else if (e.key === 'k') setFocus(S.focus - 1);
+  else if (/^[1-4]$/.test(e.key)) { const k = choicesOf(b)[+e.key - 1]; if (k) choose(b.id, k); }
+  else if (e.key === 'y') { S.answers[b.id].choice = recOf(b); render(); }
+  else if (e.key === 'n') { e.preventDefault(); openNote(b.id); }
+  else if (e.key === 'r') { S.review = true; render(); }
+  else if (e.key === 't') { S.theme = S.theme === 'paper' ? 'blueprint' : 'paper'; render(); }
+  else if (e.key === 'ArrowLeft') cycleVariant(-1);
+  else if (e.key === 'ArrowRight') cycleVariant(1);
+  else return;
+});
+
+render();
+</script>
+</body>
+</html>
