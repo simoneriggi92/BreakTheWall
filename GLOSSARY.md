@@ -5,7 +5,7 @@ Break the Wall takes a source apart into source-linked parts and lets the learne
 ## Language
 
 **Source**:
-The material the learner gives the app to explore, read whole and cited by its own lines. One loop serves every source.
+The material opened in the app to explore, given by the person or handed over as a spec, read whole and cited by its own lines. One loop serves every source.
 _Avoid_: input, mode, subject type
 
 **Repository**:
@@ -51,6 +51,14 @@ _Avoid_: form, questionnaire, prompt
 **Side chat**:
 A conversation anchored to one question of a round, that can read what the agent reads but never enters the agent's conversation unless the person attaches a reply to their answer.
 _Avoid_: btw, ask AI, thread
+
+**Remark**:
+A note in free text the person anchors to one passage of a round's question or of a spec, for the agent to read. It is never answered where it is written.
+_Avoid_: annotation (a part of a source), comment, note (the free text of an answer)
+
+**Spec**:
+What the agent writes from the answered rounds of a session. It opens as a source of one file, read as it was when handed over.
+_Avoid_: plan, PRD, design doc
 
 **Exploration**:
 The in-depth reading of a source within the budget, or of one focus of a large source, saved with the files it read. A focus's exploration refers to the overview it came from; another focus of the same snapshot is another exploration sharing that overview.
