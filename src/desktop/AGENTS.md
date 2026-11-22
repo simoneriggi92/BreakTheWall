@@ -10,7 +10,7 @@ The Electron main process and its preload. It owns every file, network and crede
 |---|---|
 | `main.ts` | Window, `btw://app` protocol, navigation and permission rules, every `ipcMain` handler |
 | `preload.ts` | The named bridge the renderer sees (`DesktopBridge`, `StudioBridge` from `src/core`) |
-| `incoming.ts` | Local socket or pipe for AI assistants, off unless the learner turns on "Connect AI assistants" |
+| `incoming.ts` | Local socket or pipe for AI assistants, off unless the person turns on "Connect AI assistants" |
 | `chatgpt/` | Sign in with ChatGPT (OAuth on a one shot `127.0.0.1` listener) and the Responses calls |
 | `local/runtimes.ts` | Discovery and schema mechanism per local model server (loopback only) |
 | `*-store.ts`, `secure-files.ts` | Versioned files under `<userData>`, replaced atomically; credentials through `safeStorage` |

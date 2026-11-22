@@ -16,7 +16,7 @@ Revised by the owner on 2026-11-20 ([Is this a new product or Break the Wall?](h
  │     │ the agent writes the spec                                           │
  │     ▼                                                                     │
  │  UNDERSTAND  spec = source → taken apart → explored                       │
- │     │ what the reader notices                                             │
+ │     │ what the person notices                                             │
  │     └──────────────▶ opens the next round                                 │
  └───────────────────────────────────────────────────────────────────────────┘
    arrows: "produces" / "becomes"
@@ -25,8 +25,8 @@ Revised by the owner on 2026-11-20 ([Is this a new product or Break the Wall?](h
 - **Decide is the way in.** An agent's round opens in a local page: one question at a time, a side chat anchored to a question, and only the answers return to the agent.
 - **Understand is what sets the product apart.** The spec the rounds lead to opens as a source, explored as described below.
 - **The dependence is one way.** Rounds stand on their own; exploration is reached through them. Sources can still be opened directly, without a round.
-- **Why.** Exploration alone had a cold start: the reader had to bring a source and open an app. The owner, its first reader, did not open it for that friction (2026-11-20). Rounds are already part of the work, so the source arrives without being brought. Outside readers (2026-11-21) asked for the same thing from the other side: a way to check an AI-written design doc against its lines before signing off, and a way to see it without installing anything ([comments](https://github.com/simoneriggi92/BreakTheWall/issues/76#issuecomment-7063527658)). No outside reader has yet asked for help with rounds.
-- **One surface.** A local page launched from the agent; no desktop app is required and the reader never switches between a browser and an app. The Electron app is frozen: no new features, kept until the local page covers exploration.
+- **Why.** Exploration alone had a cold start: the person had to bring a source and open an app. The owner, its first reader, did not open it for that friction (2026-11-20). Rounds are already part of the work, so the source arrives without being brought. Outside readers (2026-11-21) asked for the same thing from the other side: a way to check an AI-written design doc against its lines before signing off, and a way to see it without installing anything ([comments](https://github.com/simoneriggi92/BreakTheWall/issues/76#issuecomment-7063527658)). No outside reader has yet asked for help with rounds.
+- **One surface.** A local page launched from the agent; no desktop app is required and the person never switches between a browser and an app. The Electron app is frozen: no new features, kept until the local page covers exploration.
 - **No chat as the main surface.** A side chat is always anchored to one question of a round.
 - **Unchanged.** One loop for every subject, no subject modes, nothing connected that the source does not connect.
 
@@ -44,11 +44,11 @@ The idea comes from reverse engineering: tools such as [REA](https://github.com/
    source's own questions)                                if and when wanted)
 ```
 
-- **Explore.** The moment a learner opens a source is the product. The app reads the source's structure, decides how to enter it and guides the learner through it, with every part, point and link tied to its lines. The learner never has to choose a representation.
+- **Explore.** The moment a person opens a source is the product. The app reads the source's structure, decides how to enter it and guides the person through it, with every part, point and link tied to its lines. The person never has to choose a representation.
 - **Run** and **reassemble** stay in the direction of the product, but they are set aside until they are designed again on top of exploration (owner, 2026-11-04). The [earlier definitions](#run-and-reassemble-later) are kept below.
 - **Parts store.** Every part understood can go into a personal atlas across sources. Also later.
 
-**No question needed** (owner, 2026-10-29). Wanting to understand a source is reason enough. By default the learner gives the source and the app takes the whole of it apart: what it is for, how it holds together, and where to start. The learner does not have to know what to ask first; finding that out is part of what the app supports. A question stays available, before generation, as an optional focus.
+**No question needed** (owner, 2026-10-29). Wanting to understand a source is reason enough. By default the person gives the source and the app takes the whole of it apart: what it is for, how it holds together, and where to start. The person does not have to know what to ask first; finding that out is part of what the app supports. A question stays available, before generation, as an optional focus.
 
 **⚠ Where the metaphor stops.** Taking software apart has an objective answer: the binary is what it is. Taking a topic apart involves interpretation, and the model can be wrong. This is why every part stays attached to its source and why model inferences must stay distinguishable from quoted content. Evidence is this product's equivalent of reverse engineering's proof.
 
@@ -62,7 +62,7 @@ Owner, 2026-11-05, after [research R-20261104](workflow/research/R-20261104-expl
   SOURCE ──contains──▶ parts ──joined by──▶ links ──each cites──▶ lines
      │                   │ kinds: part · prerequisite · annotation · reference · procedure
      │                   └ each part: a lead and 2–4 points, every point citing its own lines
-     └──walks──▶ traces: questions the source itself takes the reader through, step by step
+     └──walks──▶ traces: questions the source itself takes the person through, step by step
 ```
 
 | Element | Meaning | Test |
@@ -145,11 +145,11 @@ Research on learning shapes how disassembly works; it is the engine, not the pro
 |---|---|---|
 | Retrieval practice | **reassembling** a part, the natural action after taking it apart | quizzes, flashcards |
 | Generation and construction | rebuilding the exploded view, deciding where a part goes | homework |
-| Spacing | "reassemble again", when the learner chooses | reminders, streaks, guilt |
+| Spacing | "reassemble again", when the person chooses | reminders, streaks, guilt |
 | Interleaving | recognizing a part already met in another disassembly | a study schedule |
 | Managing load | one part opened at a time, from the outside in | long lessons |
 
-Not everything taken apart today needs to be reviewed in 55 days. Review is a door in the parts store, opened by the learner; it is never the core loop.
+Not everything taken apart today needs to be reviewed in 55 days. Review is a door in the parts store, opened by the person; it is never the core loop.
 
 ### Signature: one view, three roles
 
@@ -165,7 +165,7 @@ The source's own index stays beside them, and "how it was read" gives every line
 Engineering manuals use the exploded-view drawing: the assembly with its parts pulled apart, leader lines to each one, the order of assembly. It was the product's visual signature, and its leader lines carry over to the view above:
 - **parts** detached from the whole, each with a stable icon and a line to its source lines;
 - **run** sets the exploded view in motion: packets flow, states change;
-- **reassemble** brings the parts back together, and the learner places them.
+- **reassemble** brings the parts back together, and the person places them.
 
 One level of the exploded view opens at a time, so the map never overwhelms.
 
@@ -175,7 +175,7 @@ The 3–7 parts rule applies **per level**, not per disassembly. Each screen sta
 
 ```
   Frontend deploy (disassembly)
-   ├─ Build            ← open sub-assembly (the learner's question goes through it)
+   ├─ Build            ← open sub-assembly (the person's question goes through it)
    │   ├─ install
    │   ├─ test
    │   └─ artifact
@@ -185,12 +185,12 @@ The 3–7 parts rule applies **per level**, not per disassembly. Each screen sta
 ```
 
 - ⚠ **Superseded on 2026-11-05:** no level is taken apart on demand any more. Everything is read before the view opens, and the "take this part apart" action is retired.
-- **What opens.** Without a question, the whole source is taken apart and no sub-assembly is closed; deeper levels open on request. When the learner gives a question, it decides what opens: relevant parts are taken apart in depth, and the others stay closed sub-assemblies, visible with their function and source, openable on demand (the example above).
-- **Nothing disappears silently: the bill of materials.** Every section of the source is either assigned to a part or listed as **not taken apart**, with a reason (repetition, context, or outside the question when the learner gave one). The host checks it as it checks citations: a line range neither assigned nor excluded is a finding.
+- **What opens.** Without a question, the whole source is taken apart and no sub-assembly is closed; deeper levels open on request. When the person gives a question, it decides what opens: relevant parts are taken apart in depth, and the others stay closed sub-assemblies, visible with their function and source, openable on demand (the example above).
+- **Nothing disappears silently: the bill of materials.** Every section of the source is either assigned to a part or listed as **not taken apart**, with a reason (repetition, context, or outside the question when the person gave one). The host checks it as it checks citations: a line range neither assigned nor excluded is a finding.
 
 | Approach | What happens to what is left out |
 |---|---|
-| Summary | it disappears, and the learner does not know |
+| Summary | it disappears, and the person does not know |
 | Bill of materials | it is visible: "these 40 lines were not taken apart, because…" |
 
 ⚠ The bill of materials guarantees that nothing vanishes, not that the choice of what to open is right. That still needs claim review and the coverage metrics measured by `npm run eval`.
@@ -229,16 +229,16 @@ The test for every feature: would the owner, the first user, use it on a real pr
 ## Owner requirements
 
 - Desktop application, intended to be open source.
-- General subjects, using material uploaded by the learner or information retrieved with AI assistance.
+- General subjects, using material uploaded by the person or information retrieved with AI assistance.
 - Deliberately paced: a coherent exploded view of the whole, and one part opened at a time.
-- Variety: maps, sequences, comparisons, worked examples, concept lenses, scenarios and meaningful activities. Simulations, animations and games are optional and never forced on the learner.
+- Variety: maps, sequences, comparisons, worked examples, concept lenses, scenarios and meaningful activities. Simulations, animations and games are optional and never forced on the person.
 - A pleasant, clean interface with consistent icons and colors. Progressive disclosure should reduce simultaneous detail.
-- Two interface languages, English and Italian (owner, 2026-10-25). The default follows the system and the learner can change it. The interface language is independent of a disassembly's content: each disassembly is written in one language and says which, and the app never translates sources or content.
+- Two interface languages, English and Italian (owner, 2026-10-25). The default follows the system and the person can change it. The interface language is independent of a disassembly's content: each disassembly is written in one language and says which, and the app never translates sources or content.
 - Strong links between every part and its source. For code, retain exact excerpts and the lines relevant to each frame.
 - A sense of progression without pressure: no streaks, no mandatory review.
-- Learner responses, feedback, notes, and iteration from both owner and user feedback.
+- Responses, feedback, notes, and iteration from both owner and user feedback.
 - The user's ChatGPT account is the preferred AI access direction where supported; unlimited access is not assumed.
-- The learner can instead generate with a model already running on their own Mac, chosen in the app. The source then stays on the device. Local models are slower and less reliable than hosted ones, and the app says which route produced each disassembly.
+- The person can instead generate with a model already running on their own Mac, chosen in the app. The source then stays on the device. Local models are slower and less reliable than hosted ones, and the app says which route produced each disassembly.
 
 The owner reported that the prototype helped them understand a repository. Use this as evidence of personal usefulness. General effectiveness, repeated adoption, and willingness to pay remain hypotheses.
 
@@ -247,7 +247,7 @@ The owner reported that the prototype helped them understand a repository. Use t
 1. **Give a source.** Pasted text or a file; the whole of it is read. No question is needed.
 2. **The app reads its structure** (one request, before the view opens) and checks it: every citation in range, every annotation on a part, every bond between parts, every trace through real parts.
 3. **The app chooses the way in** from the shape: a source's own question when it walks most of the main nucleus, otherwise the whole source by layers; a source with no connected body opens on the source itself.
-4. **The learner explores.** The guide moves one step or layer at a time; anything can be selected off the guide and the guide waits. A point lights exactly its lines. A change of nucleus is announced.
+4. **The person explores.** The guide moves one step or layer at a time; anything can be selected off the guide and the guide waits. A point lights exactly its lines. A change of nucleus is announced.
 5. **Nothing waits inside the view** (owner, 2026-11-05). Every part, layer and nucleus is read before the source opens; no part is taken apart on demand.
 6. **How it was read** is one click away: every line's verdict, coverage, shape, basis, why this way in, and whether the logic follows the chapters.
 
@@ -255,12 +255,12 @@ The owner reported that the prototype helped them understand a repository. Use t
 
 The loop of the first alpha, kept as direction. It returns once it is designed on top of exploration.
 
-- **Run.** The learner puts a joint under load: changes an input and watches what moves, removes a premise and checks whether the conclusion still holds, or applies a part to a new case. It is always an action by the learner that tests a connection, never more text from the AI. An interpreted link is a natural place to start: "the source does not say it: does A really break B?"
-- **Reassemble.** The learner puts the parts back in place. It is optional, and it is the real test.
+- **Run.** The person puts a joint under load: changes an input and watches what moves, removes a premise and checks whether the conclusion still holds, or applies a part to a new case. It is always an action by the person that tests a connection, never more text from the AI. An interpreted link is a natural place to start: "the source does not say it: does A really break B?"
+- **Reassemble.** The person puts the parts back in place. It is optional, and it is the real test.
 
 ## The disassembly loop
 
-1. **Choose what to take apart.** The learner gives the source; by default the whole of it is taken apart. A question is an optional focus ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
+1. **Choose what to take apart.** The person gives the source; by default the whole of it is taken apart. A question is an optional focus ("how does the frontend deploy from TeamCity?"); the app shows which material will be used.
 2. **See the exploded view.** The whole, what it does and why it matters, then its 3–7 parts with named joints of the right kind ("sends to", "supports", "leads to").
 3. **Open a part.** One main idea, a suitable representation (including a metaphor with its limit), and the source lines beside it. The explanation is 2–4 short points, not prose. A point may carry a meaning mark: → a step or consequence, = what stays unchanged, ⚠ a warning. There are no decorative icons per point, because those would not work for narrative or argumentative material.
 4. **Run.** Put a joint under load: predict what happens, step through a sequence or scenario, remove a premise, apply the part to a new case. Not every part needs an activity.
@@ -283,7 +283,7 @@ The first alpha shipped before the identity was fixed. The mapping below guides 
 | — | bill of materials | distinta base | bill of materials |
 | atlas of concepts | parts store across disassemblies | magazzino dei pezzi | parts store |
 
-Not yet built: typed joints, sub-assemblies and the verified bill of materials, the technical-drawing style, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the learner when material has no structure to take apart.
+Not yet built: typed joints, sub-assemblies and the verified bill of materials, the technical-drawing style, scenarios (a declarative state machine whose rules cite source lines, rendered as 2D SVG, generated as data and never as executable UI), load tests for arguments (remove a premise, find a counterexample), parts recognized across disassemblies, opt-in review from the parts store, and telling the person when material has no structure to take apart.
 
 ## Sources and explanation
 
@@ -323,7 +323,7 @@ Earlier: [plan P-20261024-disassembly](workflow/plans/P-20261024-disassembly/pla
 
 Later, after the alpha core:
 - **Dependency map for repositories.** It shows where a part lives (solution, project, namespace, file) and who references, registers or resolves it, one level at a time. The app computes it from the code, not the model; with dependency injection, the container's registration and resolution are edges too.
-- **Simulated reassembly.** After each placed part, the mechanism runs with the current assembly. The learner sees what breaks when a part is in the wrong place, and why: a part placed before its input arrives is missing what its incoming joint carries.
+- **Simulated reassembly.** After each placed part, the mechanism runs with the current assembly. The person sees what breaks when a part is in the wrong place, and why: a part placed before its input arrives is missing what its incoming joint carries.
 - The cross-disassembly parts store, AI-assisted web discovery, further document formats, contextual regeneration, and richer feedback.
 
 These are direction, not completed features. Analysis of a whole repository without a question (a text or a document is taken apart whole by default; a repository is larger than one request), arbitrary executable simulations, collaboration, synchronization, billing, and automatic mastery scoring are outside the first alpha.
@@ -332,4 +332,4 @@ These are direction, not completed features. Analysis of a whole repository with
 
 Record feedback against the relevant part or block: useful explanation, excessive density, missing step, incorrect relationship, unsupported claim, or poor representation. Keep topic-specific requests distinct from reusable product problems.
 
-With a small group, observe whether learners can reassemble a relationship, apply it to a new case, and find the evidence. Also observe whether they come back to take apart another problem. Early observations are qualitative; completion alone does not establish learning efficacy.
+With a small group, observe whether people can reassemble a relationship, apply it to a new case, and find the evidence. Also observe whether they come back to take apart another problem. Early observations are qualitative; completion alone does not establish learning efficacy.

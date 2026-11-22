@@ -1,8 +1,12 @@
 # Break the Wall
 
-Break the Wall takes a source apart into source-linked parts and lets the learner explore how it holds together.
+Break the Wall lets a person answer an agent's rounds one question at a time, then explore the spec they lead to, taken apart into source-linked parts.
 
 ## Language
+
+**Person**:
+The one who answers an agent's rounds and explores the spec they lead to, or any source they open.
+_Avoid_: learner, user, owner (who decides the product), reader (for the role; a reading surface, and the first readers are the audience), reviewer
 
 **Source**:
 The material opened in the app to explore, given by the person or handed over as a spec, read whole and cited by its own lines. One loop serves every source.
@@ -33,7 +37,7 @@ What the app shows of a large source to its overview, built without a model: the
 _Avoid_: summary, index, map
 
 **Overview**:
-The reading of a large source as a whole: what it is about, its aspects, and its roles with the files or sections each one holds. It never holds a learner's question.
+The reading of a large source as a whole: what it is about, its aspects, and its roles with the files or sections each one holds. It never holds a person's question.
 _Avoid_: level 1, whole level
 
 **Role**:
@@ -41,7 +45,7 @@ A part of a source named by what it does for the whole, not by a component's nam
 _Avoid_: module, component, folder, member (a member is a component a role names)
 
 **Focus**:
-The part of a large source read in depth, chosen by the learner's question or, without one, by the app.
+The part of a large source read in depth, chosen by the person's question or, without one, by the app.
 _Avoid_: scope, area, level 2
 
 **Session**:
