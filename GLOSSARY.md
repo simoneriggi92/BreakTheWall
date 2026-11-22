@@ -48,6 +48,10 @@ _Avoid_: scope, area, level 2
 The questions an agent asks together and waits on before it goes on, each with its context, options and recommendation. Answering rounds is the way into Break the Wall.
 _Avoid_: form, questionnaire, prompt
 
+**Answer**:
+What the person gives one question of a round: a choice (the recommendation, an option, or none), an optional note, and the remarks and side-chat replies they attach. A round's answers return to the agent together.
+_Avoid_: reply (a side chat's), feedback
+
 **Side chat**:
 A conversation anchored to one question of a round, that can read what the agent reads but never enters the agent's conversation unless the person attaches a reply to their answer.
 _Avoid_: btw, ask AI, thread
