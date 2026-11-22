@@ -44,8 +44,12 @@ _Avoid_: module, component, folder, member (a member is a component a role names
 The part of a large source read in depth, chosen by the learner's question or, without one, by the app.
 _Avoid_: scope, area, level 2
 
+**Session**:
+The agent's conversation in which rounds are asked, named by its agent. It is live while the agent runs it and ended otherwise; an ended session can be resumed, and keeps its rounds either way.
+_Avoid_: conversation, chat, tab
+
 **Round**:
-The questions an agent asks together and waits on before it goes on, each with its context, options and recommendation. Answering rounds is the way into Break the Wall.
+The questions an agent asks together and waits on before it goes on, each with its context, options and recommendation. Answering rounds is the way into Break the Wall. A round is superseded when a later round of the same session arrives; only the latest round of a session takes answers.
 _Avoid_: form, questionnaire, prompt
 
 **Answer**:
@@ -61,7 +65,7 @@ A note in free text the person anchors to one passage of a round's question or o
 _Avoid_: annotation (a part of a source), comment, note (the free text of an answer)
 
 **Spec**:
-What the agent writes from the answered rounds of a session. It opens as a source of one file, read as it was when handed over.
+What the agent writes from the answered rounds of a session. It opens as a source of one file, read as it was when handed over. A spec revised and handed over again is a new version; the earlier one stays readable as it was, and takes no new remarks.
 _Avoid_: plan, PRD, design doc
 
 **Exploration**:
