@@ -37,6 +37,8 @@ At `session.start` the mod runs `node --version` (Node ≥ 22 on `PATH` is requi
 
 The server binds `127.0.0.1`. Every `/api/` call needs `Host` `127.0.0.1:<port>` or `localhost:<port>`, no foreign `Origin`, and the secret in `x-btw-secret`; nothing sends CORS headers. The built page needs no secret. The page reads the secret from the fragment, keeps it in `sessionStorage`, removes it from the address, and talks to the server through the HTTP bridge (`src/renderer/http-bridge.ts`). A tab with no valid secret says only to open it from Claude Code. `BTW_USER_DATA_DIR` isolates the data folder here too.
 
+`npm run smoke:page` opens the built page in headless Chrome (set `CHROME_PATH` if Chrome is elsewhere) and `npm run check:plugin` runs Claude Code's validator on the mod; CI runs both. `npm install` points git at `.githooks/`, whose pre-commit runs the fast checks.
+
 ## Brand assets
 
 The mark, the wordmarks and the app icon are hand-written SVG in `docs/images/brand/`. The header draws the same mark inline, with its colours from the theme's `--brand-*` tokens; terracotta is used only for the piece pulled out of the mark. `npm run brand` renders `assets/icon.png` (1024 × 1024) and `assets/icon.ico` (16–256 px, for Windows) from `app-icon.svg` with the installed Electron, and the desktop host sets it as the Dock icon for `npm start` and `npm run dev` on macOS and as the window icon elsewhere. The packaged app carries it as its bundle icon instead (see [Packaging](#packaging)).
