@@ -44,6 +44,14 @@ _Avoid_: module, component, folder, member (a member is a component a role names
 The part of a large source read in depth, chosen by the learner's question or, without one, by the app.
 _Avoid_: scope, area, level 2
 
+**Round**:
+The questions an agent asks together and waits on before it goes on, each with its context, options and recommendation. Answering rounds is the way into Break the Wall.
+_Avoid_: form, questionnaire, prompt
+
+**Side chat**:
+A conversation anchored to one question of a round, that can read what the agent reads but never enters the agent's conversation unless the person attaches a reply to their answer.
+_Avoid_: btw, ask AI, thread
+
 **Exploration**:
 The in-depth reading of a source within the budget, or of one focus of a large source, saved with the files it read. A focus's exploration refers to the overview it came from; another focus of the same snapshot is another exploration sharing that overview.
 _Avoid_: lesson, session, analysis

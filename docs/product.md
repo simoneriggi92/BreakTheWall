@@ -4,6 +4,34 @@ Status: identity fixed by the owner on 2026-10-24, before the lab prototype, and
 
 ## Identity
 
+> **Break the Wall turns the walls of text of agentic work into something you decide on and understand: an agent's question rounds become questions you answer one at a time, the spec they lead to becomes a source taken apart into source-linked parts, and what you notice there opens the next round.**
+
+Revised by the owner on 2026-11-20 ([Is this a new product or Break the Wall?](https://github.com/simoneriggi92/BreakTheWall/issues/76)). The 2026-11-05 identity below still defines the second core; it is no longer the whole product.
+
+### Two cores, one loop
+
+```
+ ┌──────────────── one local page, launched from Claude Code ────────────────┐
+ │  DECIDE      round → questions → answers return to the agent              │
+ │     │ the agent writes the spec                                           │
+ │     ▼                                                                     │
+ │  UNDERSTAND  spec = source → taken apart → explored                       │
+ │     │ what the reader notices                                             │
+ │     └──────────────▶ opens the next round                                 │
+ └───────────────────────────────────────────────────────────────────────────┘
+   arrows: "produces" / "becomes"
+```
+
+- **Decide is the way in.** An agent's round opens in a local page: one question at a time, a side chat anchored to a question, and only the answers return to the agent.
+- **Understand is what sets the product apart.** The spec the rounds lead to opens as a source, explored as described below.
+- **The dependence is one way.** Rounds stand on their own; exploration is reached through them. Sources can still be opened directly, without a round.
+- **Why.** Exploration alone had a cold start: the reader had to bring a source and open an app. The owner, its first reader, did not open it for that friction (2026-11-20). Rounds are already part of the work, so the source arrives without being brought. Outside readers (2026-11-21) asked for the same thing from the other side: a way to check an AI-written design doc against its lines before signing off, and a way to see it without installing anything ([comments](https://github.com/simoneriggi92/BreakTheWall/issues/76#issuecomment-7063527658)). No outside reader has yet asked for help with rounds.
+- **One surface.** A local page launched from the agent; no desktop app is required and the reader never switches between a browser and an app. The Electron app is frozen: no new features, kept until the local page covers exploration.
+- **No chat as the main surface.** A side chat is always anchored to one question of a round.
+- **Unchanged.** One loop for every subject, no subject modes, nothing connected that the source does not connect.
+
+### Understanding a source (identity of 2026-11-05)
+
 > **Break the Wall takes apart whatever you want to understand (a source, a repository, a topic) and shows you how it holds together, with every piece tied to the lines it comes from.**
 
 The idea comes from reverse engineering: tools such as [REA](https://github.com/morluto/rea) take software apart, with evidence for each finding, so that you can understand and rebuild it. Break the Wall applies the same principle to knowledge. The name already says it: the wall of text becomes **bricks**, and each brick is a part tied to its source.
