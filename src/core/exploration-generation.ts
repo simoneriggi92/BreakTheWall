@@ -18,7 +18,9 @@ import type { UserSource } from './source';
 
 /**
  * The longest source that passed X1 on both routes: the explainer, 955 lines and 51,125 characters. A longer one is
- * refused before anything is sent; one request bounds the source in this version.
+ * refused before anything is sent; one request bounds the source in this version. The explainer is private (it lives
+ * only in the owner's `.local/eval/cases`); the public stand-in of the same size is
+ * `docs/workflow/research/R-20261104-exploration-experience.md` (50,893 characters), witnessed in #93.
  */
 export const EXPLORATION_SOURCE_LIMIT = 52_000;
 
