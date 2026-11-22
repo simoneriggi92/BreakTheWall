@@ -29,6 +29,15 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+      # The local page in headless Chrome, served by the built plugin's server (the runner image ships Chrome).
+      - run: node scripts/build-plugin.mjs
+      - run: npm run smoke:page
+      # The mod runs only inside Claude Code: its validator, pinned to the version the mod was written against.
+      - run: npm install --global @anthropic-ai/claude-code@2.1.330
+      - name: Plugin check
+        env:
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+        run: npm run check:plugin
 
   windows:
     name: 'Windows: types, tests and build'

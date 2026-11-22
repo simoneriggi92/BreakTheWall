@@ -1,0 +1,8 @@
+#!/bin/sh
+# Installed by `npm install` (the prepare script sets core.hooksPath). Fast checks only; npm run check stays the full gate.
+set -e
+node scripts/check-json-casts.mjs
+# The mod has no tests: Claude Code's validator is its check, whenever the commit touches the plugin.
+if git diff --cached --name-only | grep -q '^plugin/'; then
+  node scripts/check-plugin.mjs
+fi
