@@ -65,8 +65,12 @@ A note in free text the person anchors to one passage of a round's question or o
 _Avoid_: annotation (a part of a source), comment, note (the free text of an answer)
 
 **Spec**:
-What the agent writes from the answered rounds of a session. It opens as a source of one file, read as it was when handed over. A spec revised and handed over again is a new version; the earlier one stays readable as it was, and takes no new remarks.
+What the agent writes from the person's decisions, taken in the rounds of one or more sessions. It opens as a source of one file, read as it was when handed over. A spec revised and handed over again is a new version; the earlier one stays readable as it was, and takes no new remarks.
 _Avoid_: plan, PRD, design doc
+
+**Backing**:
+What a statement of a spec declares it rests on: an answer, a decision recorded elsewhere, or lines of a file. A statement without backing is unbacked; one whose backing cannot be found has a broken backing.
+_Avoid_: basis (a link's, declared or interpreted), evidence, source
 
 **Exploration**:
 The in-depth reading of a source within the budget, or of one focus of a large source, saved with the files it read. A focus's exploration refers to the overview it came from; another focus of the same snapshot is another exploration sharing that overview.
