@@ -28,9 +28,17 @@ _Avoid_: reference, quote, evidence
 A source larger than the app's budget for one reading, whatever its kind. It opens through an overview and a focus; a source within the budget is read whole.
 _Avoid_: big repo, large repository
 
+**Digest**:
+What the app shows of a large source to its overview, built without a model: the listing of its files and sections with their line ranges, the few texts read whole, and the links the source declares.
+_Avoid_: summary, index, map
+
 **Overview**:
-The reading of a large source as a whole: what it is about, its aspects, and its roles with the files or sections each one holds.
+The reading of a large source as a whole: what it is about, its aspects, and its roles with the files or sections each one holds. It never holds a learner's question.
 _Avoid_: level 1, whole level
+
+**Role**:
+A part of a source named by what it does for the whole, not by a component's name. In an overview a role holds whole files or listed sections of the digest.
+_Avoid_: module, component, folder, member (a member is a component a role names)
 
 **Focus**:
 The part of a large source read in depth, chosen by the learner's question or, without one, by the app.
