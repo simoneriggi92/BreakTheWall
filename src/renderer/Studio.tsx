@@ -4,7 +4,7 @@ import type { Disassembly } from '../core/disassembly';
 import type { Exploration } from '../core/exploration';
 import { buildStructureInput, defaultContentLanguage, type ContentLanguage } from '../core/disassembly-generation';
 import { detectLanguage } from '../core/generation';
-import { resumable, RUNTIME_NAMES, type AccountStatus, type DraftState, type FormatCheck, type GenerationProgress, type GenerationRoute, type GenerationSetup, type IncomingSource, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioSettings, type Suggestion } from '../core/provider';
+import { resumable, RUNTIME_NAMES, type AccountStatus, type DraftState, type FormatCheck, type GenerationProgress, type GenerationSetup, type IncomingSource, type LocalModel, type LocalRuntime, type LocalServer, type ModelOption, type PickError, type ProviderFailure, type StudioBridge, type StudioRoute, type StudioSettings, type Suggestion } from '../core/provider';
 import { checkSelection, CODE_LANGUAGES, goalSchema, importSource, SOURCE_LIMITS, SourceImportError, type UserSource } from '../core/source';
 import { GenerationPreview } from './disassembly/GenerationPreview';
 import { Icon } from './icons';
@@ -170,7 +170,7 @@ function useRoutes(studio?: StudioBridge) {
   // Parts and runs use the structure model unless the learner picked another one that the account still lists.
   const contentModel = models.some(m => m.slug === settings?.chatgptContentModel) ? settings!.chatgptContentModel! : '';
   const local = settings?.local;
-  const localRoute: GenerationRoute | undefined = local && { provider: 'local', runtime: local.runtime, baseUrl: local.baseUrl, model: local.model };
+  const localRoute: StudioRoute | undefined = local && { provider: 'local', runtime: local.runtime, baseUrl: local.baseUrl, model: local.model };
   const setup: GenerationSetup | undefined = provider === 'local'
     ? localRoute && { structure: localRoute, content: localRoute }
     : planReady && chatgptModel ? { structure: { provider: 'chatgpt', model: chatgptModel }, content: { provider: 'chatgpt', model: contentModel || chatgptModel } } : undefined;
@@ -182,7 +182,7 @@ type Routes = ReturnType<typeof useRoutes>;
  * Suggested break-downs (D23), only when the learner presses the button: one request to the content route, with the
  * cost said beside it. A card fills the question field, which stays editable; the content language follows it.
  */
-function Suggestions({ studio, draft, setDraft, language, route }: { studio: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; language: ContentLanguage; route?: GenerationRoute }) {
+function Suggestions({ studio, draft, setDraft, language, route }: { studio: StudioBridge; draft: StudioDraft; setDraft: (update: (d: StudioDraft) => StudioDraft) => void; language: ContentLanguage; route?: StudioRoute }) {
   const { t } = usePreferences();
   const s = t.suggest;
   const [running, setRunning] = useState(false);

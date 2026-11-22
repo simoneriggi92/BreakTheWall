@@ -12,6 +12,7 @@ The Electron main process and its preload. It owns every file, network and crede
 | `preload.ts` | The named bridge the renderer sees (`DesktopBridge`, `StudioBridge` from `src/core`) |
 | `incoming.ts` | Local socket or pipe for AI assistants, off unless the person turns on "Connect AI assistants" |
 | `chatgpt/` | Sign in with ChatGPT (OAuth on a one shot `127.0.0.1` listener) and the Responses calls |
+| `claude/completer.ts` | The Claude Code route for explorations: a fresh `claude -p --json-schema` per request, plain Node, no credentials |
 | `local/runtimes.ts` | Discovery and schema mechanism per local model server (loopback only) |
 | `*-store.ts`, `secure-files.ts` | Versioned files under `<userData>`, replaced atomically; credentials through `safeStorage` |
 | `squirrel.ts` | Windows install, update and uninstall shortcuts |

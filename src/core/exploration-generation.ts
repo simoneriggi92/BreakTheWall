@@ -162,7 +162,9 @@ export function fromDraft(draft: ExplorationDraft, { source, language, meta }: E
   };
 }
 
-export interface ExplorationInput { source: UserSource; language: ContentLanguage; meta: GenerationMeta }
+/** A disassembly's origin, or Claude Code, which writes explorations only. */
+export type ExplorationMeta = Omit<GenerationMeta, 'provider'> & { provider: GenerationMeta['provider'] | 'claude' };
+export interface ExplorationInput { source: UserSource; language: ContentLanguage; meta: ExplorationMeta }
 /** A contract path as the answer writes it: the answer calls a link's class `cls`. */
 const answerPath = (path: string) => path.replace(/^(links\[\d+\])\.class\b/, '$1.cls');
 const valueAt = (json: unknown, path: readonly PropertyKey[]) =>

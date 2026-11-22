@@ -20,7 +20,7 @@ export type FailureReason = 'local-not-a-server' | 'local-timeout' | 'local-stop
   | 'sign-in-busy' | 'sign-in-denied' | 'sign-in-other-app' | 'sign-in-no-code' | 'sign-in-no-identity' | 'sign-in-other-account'
   | 'session-rejected' | 'models-format' | 'stream-unreadable' | 'sign-in-port' | 'sign-in-timeout' | 'sign-in-cancelled'
   | 'sign-in-invalid-client' | 'sign-in-refused' | 'identity-unverified' | 'question-language' | 'draft-changed' | 'local-window'
-  | 'exploration-local' | 'exploration-too-long';
+  | 'exploration-local' | 'exploration-too-long' | 'exploration-claude' | 'claude-missing' | 'claude-failed';
 /** `message` stays Italian for logs and tests; the interface words the failure from `reason` or `code`. */
 export interface ProviderFailure { code: FailureCode; reason?: FailureReason; message: string; action?: RecoveryAction; issues?: string[]; requestId?: string }
 
@@ -81,13 +81,19 @@ export interface LocalServer { runtime: LocalRuntime; baseUrl: string; models: s
 /** Whether the server constrained a tiny request to the given JSON Schema. Observed, not assumed per runtime. */
 export interface FormatCheck { enforced: boolean; detail: string; checkedAt: string; reason?: 'timeout' | 'respected' | 'ignored'; sample?: string }
 
-export const routeSchema = z.discriminatedUnion('provider', [
-  z.strictObject({ provider: z.literal('chatgpt'), model: z.string().min(1).max(100) }),
-  localModelSchema.extend({ provider: z.literal('local') }),
-]);
+const chatgptRoute = z.strictObject({ provider: z.literal('chatgpt'), model: z.string().min(1).max(100) });
+const localRoute = localModelSchema.extend({ provider: z.literal('local') });
+/** The routes that write disassemblies and suggestions. */
+export const studioRouteSchema = z.discriminatedUnion('provider', [chatgptRoute, localRoute]);
+export type StudioRoute = z.infer<typeof studioRouteSchema>;
+/**
+ * Every route. `claude` runs a fresh `claude -p` on the person's own Claude login, so it carries only a model name,
+ * never a credential; it writes explorations only (#93).
+ */
+export const routeSchema = z.discriminatedUnion('provider', [chatgptRoute, localRoute, z.strictObject({ provider: z.literal('claude'), model: z.string().min(1).max(100) })]);
 export type GenerationRoute = z.infer<typeof routeSchema>;
 /** One route writes the structure, another the parts and runs; they may be the same. */
-export const setupSchema = z.strictObject({ structure: routeSchema, content: routeSchema });
+export const setupSchema = z.strictObject({ structure: studioRouteSchema, content: studioRouteSchema });
 export type GenerationSetup = z.infer<typeof setupSchema>;
 export const settingsSchema = z.strictObject({
   version: z.literal(1), provider: z.enum(['chatgpt', 'local']),
@@ -148,7 +154,7 @@ export const BREAKDOWN_KINDS = ['mechanism', 'argument', 'story'] as const;
 /** A way to take the selection apart, proposed on request before the learner writes a question (D23). */
 export interface Suggestion { question: string; kind: typeof BREAKDOWN_KINDS[number]; parts: string[]; cites: { source: string; from: number; to: number }[] }
 /** `avoid` carries the questions already shown, so "other suggestions" differ from them. */
-export interface SuggestionRequest { sources: UserSource[]; language: 'it' | 'en'; priorKnowledge: string; route: GenerationRoute; avoid: string[] }
+export interface SuggestionRequest { sources: UserSource[]; language: 'it' | 'en'; priorKnowledge: string; route: StudioRoute; avoid: string[] }
 export type SuggestionResult = { ok: true; suggestions: Suggestion[] } | { ok: false; failure: ProviderFailure };
 export type GenerationResult = { ok: true; disassembly: Disassembly; stats: GenerationStats } | { ok: false; failure: ProviderFailure; stats?: GenerationStats };
 /** Explore one source through one route (plan P-20261105-exploration X8). The local route is refused until its own phase. */
