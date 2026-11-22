@@ -66,6 +66,13 @@ describe('the Claude Code completer (#93)', () => {
     expect(await claudeCompleter(runner).complete(request([{ role: 'user', content: 'x' }]), new AbortController().signal, () => {})).toBe('Here is the structure.');
   });
 
+  it('hands an answer Claude Code could not fit to the schema on to the acceptance, as on every other route', async () => {
+    const gaveUp = (result?: string) => printed({ is_error: true, subtype: 'error_max_structured_output_retries', ...(result === undefined ? {} : { result }) });
+    const complete = (stdout: string) => claudeCompleter(fakeRunner({ stdout }).runner).complete(request([{ role: 'user', content: 'x' }]), new AbortController().signal, () => {});
+    expect(await complete(gaveUp('{"start": 3}'))).toBe('{"start": 3}');
+    expect(await complete(gaveUp())).toBe('');
+  });
+
   it('sends a repair as one prompt: the request, the earlier answer, then the findings', async () => {
     const { runner, runs } = fakeRunner({ stdout: printed({ structured_output: { start: 'p1' } }) });
     await claudeCompleter(runner).complete(request([
@@ -82,7 +89,7 @@ describe('the Claude Code completer (#93)', () => {
     const complete = (exit: Partial<ClaudeExit> | Error) => failureOf(claudeCompleter(fakeRunner(exit).runner).complete(request([{ role: 'user', content: 'x' }]), new AbortController().signal, () => {}));
     expect(await complete(missing)).toMatchObject({ code: 'unavailable', reason: 'claude-missing' });
     expect(await complete({ code: 1, stderr: 'Invalid API key · Please run /login' })).toMatchObject({ code: 'unavailable', reason: 'claude-failed', message: expect.stringContaining('Please run /login') });
-    expect(await complete({ stdout: printed({ is_error: true, subtype: 'error_max_structured_output_retries' }) })).toMatchObject({ reason: 'claude-failed', message: expect.stringContaining('error_max_structured_output_retries') });
+    expect(await complete({ stdout: printed({ is_error: true, subtype: 'error_during_execution' }) })).toMatchObject({ reason: 'claude-failed', message: expect.stringContaining('error_during_execution') });
     expect(await complete({ stdout: 'not json' })).toMatchObject({ reason: 'claude-failed' });
   });
 

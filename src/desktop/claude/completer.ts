@@ -10,7 +10,11 @@ import type { Completer, CompletionRequest } from '../completion';
  * own login, as it does in the person's terminal.
  */
 
-/** One run of the CLI: its arguments and what goes to its stdin. Nothing else crosses, not even an environment. */
+/**
+ * One run of the CLI: its arguments and what goes to its stdin; nothing else of the request crosses. The process
+ * inherits the host's environment, because that is where Claude Code finds the person's login (a key in
+ * `ANTHROPIC_API_KEY`, if the person set one, is that login).
+ */
 export interface ClaudeRun { args: string[]; input: string; signal: AbortSignal }
 export interface ClaudeExit { code: number | null; stdout: string; stderr: string }
 /** The seam tests replace: a real process in the app, a script in tests. */
@@ -45,21 +49,25 @@ function prompt(messages: CompletionRequest['messages']): string {
   return messages.map(m => m.role === 'assistant' ? `Your previous answer:\n\n${m.content}\n\nEnd of your previous answer.` : m.content).join('\n\n');
 }
 
-const failed = (detail: string) => new ProviderError(failure('unavailable', { reason: 'claude-failed', message: `Claude Code non ha completato la richiesta: ${detail.trim().slice(-300)}` }));
+const claudeFailure = (detail: string) => new ProviderError(failure('unavailable', { reason: 'claude-failed', message: `Claude Code non ha completato la richiesta: ${detail.trim().slice(-300)}` }));
 
 /** The answer of one run, with its cost and time as Claude Code reports them. */
 export function readClaudeResult(stdout: string): { text: string; costUsd?: number; durationMs?: number } {
   let json: unknown;
-  try { json = JSON.parse(stdout); } catch { throw failed(`output non leggibile (${stdout.slice(0, 80)})`); }
+  try { json = JSON.parse(stdout); } catch { throw claudeFailure(`output non leggibile (${stdout.slice(0, 80)})`); }
   const printed = printedSchema.safeParse(json);
-  if (!printed.success) throw failed('output senza il risultato atteso');
+  if (!printed.success) throw claudeFailure('output senza il risultato atteso');
   const { is_error, subtype, result, structured_output, total_cost_usd, duration_ms } = printed.data;
-  if (is_error) throw failed(`${subtype ?? 'errore'}${result ? ` · ${result}` : ''}`);
+  // An answer Claude Code could not fit to the schema goes on like any other refused answer: the exploration's
+  // acceptance refuses it and the app's one repair runs, as on every route.
+  if (is_error && subtype === 'error_max_structured_output_retries') return { text: result ?? '', ...usage(total_cost_usd, duration_ms) };
+  if (is_error) throw claudeFailure(`${subtype ?? 'errore'}${result ? ` · ${result}` : ''}`);
   // Without structured output the text goes on as it is: the exploration's acceptance refuses or repairs it.
   const text = structured_output !== undefined && structured_output !== null ? JSON.stringify(structured_output) : result;
-  if (text === undefined) throw failed('nessuna risposta');
-  return { text, ...(total_cost_usd !== undefined ? { costUsd: total_cost_usd } : {}), ...(duration_ms !== undefined ? { durationMs: duration_ms } : {}) };
+  if (text === undefined) throw claudeFailure('nessuna risposta');
+  return { text, ...usage(total_cost_usd, duration_ms) };
 }
+const usage = (costUsd?: number, durationMs?: number) => ({ ...(costUsd !== undefined ? { costUsd } : {}), ...(durationMs !== undefined ? { durationMs } : {}) });
 
 export function claudeCompleter(runner: ClaudeRunner = spawnClaude()): Completer {
   return {
@@ -72,7 +80,7 @@ export function claudeCompleter(runner: ClaudeRunner = spawnClaude()): Completer
         }
         throw error;
       }
-      if (exit.code !== 0) throw failed(exit.stderr || exit.stdout || `codice di uscita ${exit.code}`);
+      if (exit.code !== 0) throw claudeFailure(exit.stderr || exit.stdout || `codice di uscita ${exit.code}`);
       const { text } = readClaudeResult(exit.stdout);
       onProgress(text.length);
       return text;

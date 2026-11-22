@@ -22,7 +22,7 @@ The Electron main process and its preload. It owns every file, network and crede
 - A new desktop operation is one named `ipcRenderer.invoke` in `preload.ts` with its handler in `main.ts`. Never expose a generic IPC, shell or filesystem call.
 - Every `ipcMain.handle` starts with `trustedSender(event)`, which refuses any frame outside the app origin. A new handler without it is a hole.
 - Validate everything that crosses the bridge with the Zod schemas in `src/core`: the handler parses its input, and the preload drops what arrives from the host and does not parse.
-- Network calls happen only here, in the main process. The local model route accepts only `127.0.0.1`, `localhost` or `[::1]`.
+- Network calls happen only here, in the main process. The Claude Code route (`claude/completer.ts`) makes none itself: it starts the `claude` process, which does. The local model route accepts only `127.0.0.1`, `localhost` or `[::1]`.
 - Keep the window locked: `sandbox`, `contextIsolation`, no `nodeIntegration`, denied permissions, no new windows, navigation only inside the app origin. The production content policy is not loosened.
 - Credentials never go in plain files or renderer state. Without the macOS Keychain, sign in is disabled rather than stored in plain text.
 
