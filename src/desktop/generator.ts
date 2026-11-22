@@ -10,8 +10,8 @@ import { ExplorationError, type Exploration } from '../core/exploration';
 import { acceptExploration, explorationRequest, generatedExplorationId, sourceFindings } from '../core/exploration-generation';
 import { detectLanguage } from '../core/generation';
 import {
-  failure, ProviderError, routeSchema, setupSchema, type DraftState, type GenerationPhase, type GenerationPreview, type GenerationProgress,
-  type ExplorationResult, type GenerationResult, type GenerationRoute, type GenerationStats, type LocalModel, type PART_STATUSES, type PhaseStats, type ProviderFailure, type SuggestionResult,
+  failure, ProviderError, routeSchema, setupSchema, studioRouteSchema, type DraftState, type GenerationPhase, type GenerationPreview, type GenerationProgress,
+  type ExplorationResult, type GenerationResult, type GenerationStats, type LocalModel, type PART_STATUSES, type PhaseStats, type ProviderFailure, type StudioRoute, type SuggestionResult,
 } from '../core/provider';
 import { goalSchema, SourceImportError, verifySelection } from '../core/source';
 import type { Completer, CompletionRequest } from './completion';
@@ -20,7 +20,8 @@ import type { DraftStore, KeptDraft } from './generation-draft';
 export type { Completer } from './completion';
 export interface AcceptedExplorations { save(exploration: Exploration): Promise<Exploration> }
 export interface AcceptedDisassemblies { save(disassembly: Disassembly): Promise<Disassembly> }
-export interface Routes { chatgpt: Completer; local: (target: LocalModel) => Completer }
+/** `claude` is present only where the host can run Claude Code (`claude -p`); it writes explorations only (#93). */
+export interface Routes { chatgpt: Completer; local: (target: LocalModel) => Completer; claude?: Completer }
 /** Where a failed or cancelled generation keeps what was accepted (D21). */
 export type Drafts = Pick<DraftStore, 'read' | 'state' | 'write' | 'clear'>;
 
@@ -28,7 +29,7 @@ export type Drafts = Pick<DraftStore, 'read' | 'state' | 'write' | 'clear'>;
 const PARALLEL = { chatgpt: 3, local: 1 } as const;
 const requestSchema = z.strictObject({ sources: z.unknown(), goal: goalSchema, language: z.enum(['it', 'en']), setup: setupSchema, resume: z.boolean().optional() });
 const explorationSchema = z.strictObject({ source: z.unknown(), language: z.enum(['it', 'en']), route: routeSchema });
-const suggestionSchema = z.strictObject({ sources: z.unknown(), language: z.enum(['it', 'en']), priorKnowledge: goalSchema.shape.priorKnowledge, route: routeSchema, avoid: z.array(z.string().max(400)).max(20) });
+const suggestionSchema = z.strictObject({ sources: z.unknown(), language: z.enum(['it', 'en']), priorKnowledge: goalSchema.shape.priorKnowledge, route: studioRouteSchema, avoid: z.array(z.string().max(400)).max(20) });
 const emptyStats = (): GenerationStats => ({ structure: blank(), content: blank(), runs: blank() });
 const blank = () => ({ requests: 0, repairs: 0, sentChars: 0, receivedChars: 0, ms: 0 });
 const located = (where: string) => (f: Finding) => `${where} · ${f.path || '(answer)'}: ${f.message}`;
@@ -111,7 +112,7 @@ export class Generator {
   private active?: AbortController;
   private suggesting?: AbortController;
   constructor(private routes: Routes, private store: AcceptedDisassemblies, private now = () => new Date(), private drafts?: Drafts, private explorations?: AcceptedExplorations) {}
-  private completer(route: GenerationRoute): Completer {
+  private completer(route: StudioRoute): Completer {
     return route.provider === 'local' ? this.routes.local({ runtime: route.runtime, baseUrl: route.baseUrl, model: route.model }) : this.routes.chatgpt;
   }
 
@@ -175,7 +176,7 @@ export class Generator {
         saving = saving.then(() => drafts.write(snapshot)).catch(error => console.error('[draft]', (error as Error)?.message));
       };
 
-      const ask = <T>(phase: GenerationPhase, route: GenerationRoute, first: CompletionRequest, accept: (raw: string) => T, signal: AbortSignal, where: string): Promise<T> =>
+      const ask = <T>(phase: GenerationPhase, route: StudioRoute, first: CompletionRequest, accept: (raw: string) => T, signal: AbortSignal, where: string): Promise<T> =>
         withRepair((body, mode) => { requests++; report(phase, mode, 0); return counted(this.completer(route), body, signal, stats[phase], mode, n => report(phase, mode, n)); }, first, accept, signal, where, language);
 
       if (!structure) {
@@ -254,9 +255,10 @@ export class Generator {
   cancelSuggestions() { this.suggesting?.abort(); }
 
   /**
-   * Explores one source (plan P-20261105-exploration X8): one request on the ChatGPT route, at most one repair (and the
-   * shorten request when only lengths are left), saved only after the final check. The local route is refused with a
-   * code until its own phase; a source over the request limit is refused before anything is sent.
+   * Explores one source (plan P-20261105-exploration X8): one request on the ChatGPT or Claude Code route, at most one
+   * repair (and the shorten request when only lengths are left), saved only after the final check. The local route is
+   * refused with a code until its own phase, and so is Claude Code where the host cannot run it; a source over the
+   * request limit is refused before anything is sent.
    */
   async explore(input: unknown, onProgress: (progress: GenerationProgress) => void): Promise<ExplorationResult> {
     if (this.active) return { ok: false, failure: failure('busy') };
@@ -268,15 +270,17 @@ export class Generator {
       const request = explorationSchema.parse(input);
       const { route, language } = request;
       if (route.provider === 'local') return { ok: false, failure: failure('unsupported', { reason: 'exploration-local', message: 'L’esplorazione non usa ancora un modello locale: scegli ChatGPT o il tuo assistente Claude.' }) };
+      const completer = route.provider === 'claude' ? this.routes.claude : this.routes.chatgpt;
+      if (!completer) return { ok: false, failure: failure('unsupported', { reason: 'exploration-claude', message: 'Qui l’esplorazione non può usare Claude Code.' }) };
       if (!this.explorations) return { ok: false, failure: failure('unsupported', { message: 'L’esplorazione non è disponibile qui.' }) };
       const [source] = await verifySelection([request.source]);
       const over = sourceFindings(source);
       if (over.length) return { ok: false, failure: failure('unsupported', { reason: 'exploration-too-long', message: 'La fonte è troppo lunga per una sola richiesta di esplorazione.', issues: over.map(located('source')) }) };
       const created = this.now();
-      const meta = { id: generatedExplorationId(created), createdAt: created.toISOString(), provider: 'chatgpt' as const, model: route.model };
+      const meta = { id: generatedExplorationId(created), createdAt: created.toISOString(), provider: route.provider, model: route.model };
       const body = explorationRequest(source, language);
       const report = (mode: Mode, received: number) => onProgress({ phase: 'structure', repairing: mode !== 'first', ...(mode === 'shorten' ? { shortening: true } : {}), received, requests: stats.requests });
-      const exploration = await withRepair((sent, mode) => { const answer = counted(this.routes.chatgpt, sent, controller.signal, stats, mode, n => report(mode, n)); report(mode, 0); return answer; }, {
+      const exploration = await withRepair((sent, mode) => { const answer = counted(completer, sent, controller.signal, stats, mode, n => report(mode, n)); report(mode, 0); return answer; }, {
         model: route.model, instructions: body.instructions, schemaName: body.schemaName, schema: body.schema, messages: [{ role: 'user', content: body.input }],
       }, raw => acceptExploration(raw, { source, language, meta }), controller.signal, 'exploration', language);
       if (controller.signal.aborted) return { ok: false, failure: failure('cancelled'), stats };
@@ -296,7 +300,7 @@ class PhaseError extends Error {
 }
 
 /** The stored origin names one provider: ChatGPT whenever any phase sent the sources to OpenAI. */
-function describe(structure: GenerationRoute, content: GenerationRoute, id: string, createdAt: string): GenerationMeta {
+function describe(structure: StudioRoute, content: StudioRoute, id: string, createdAt: string): GenerationMeta {
   const provider = structure.provider === 'chatgpt' || content.provider === 'chatgpt' ? 'chatgpt' : 'local';
   const runtime = structure.provider === 'local' && content.provider === 'local' && structure.runtime === content.runtime ? structure.runtime : undefined;
   const model = structure.model === content.model ? structure.model : `${structure.model} + ${content.model}`;

@@ -9,7 +9,7 @@ import { App } from '../src/renderer/App';
 import { DEVICE_TEXTS, DEVICES, forPlatform } from '../src/renderer/i18n/devices';
 import { en } from '../src/renderer/i18n/en';
 import { it as italian } from '../src/renderer/i18n/it';
-import { PreferencesProvider, usePreferences } from '../src/renderer/preferences';
+import { originText, PreferencesProvider, usePreferences } from '../src/renderer/preferences';
 import { sample } from './sample';
 
 /** Every leaf of a catalog, with its path; functions are called with neutral arguments. */
@@ -53,6 +53,13 @@ describe('interface catalogs', () => {
     expect(italian.importErrors['too-large']({ name: 'big.txt', kb: 161, limit: 160 }, n)).toBe('«big.txt» pesa 161 kB; il limite è 160 kB.');
     expect(italian.importErrors['too-large']({ chars: 40_001, limit: 40_000 }, n)).toBe('La fonte ha 40.001 caratteri; il limite è 40.000. Seleziona la parte che vuoi studiare.');
   });
+  it('names Claude Code as the origin of an exploration it wrote, in both languages (#93)', () => {
+    const claude = { provider: 'claude' as const, model: 'sonnet' };
+    expect(originText(en, claude)).toBe('Claude Code · sonnet');
+    expect(originText(italian, claude)).toBe('Claude Code · sonnet');
+    expect(originText(en, { provider: 'chatgpt', model: 'm' })).toBe('ChatGPT · m');
+  });
+
   it('resolves the system language from the locale', () => {
     expect(resolveLanguage('system', 'it-IT')).toBe('it');
     expect(resolveLanguage(undefined, 'en-GB')).toBe('en');

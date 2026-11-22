@@ -159,6 +159,7 @@ export const en: Messages = {
     originPrepared: 'Prepared example · original teaching sources.',
     generatedBy: (local: boolean, model: string) => `${local ? 'Local model' : 'ChatGPT'} · ${model}`,
     writtenByAssistant: (client: string) => `Your assistant · ${client}`,
+    writtenByClaudeCode: (model: string) => `Claude Code · ${model}`,
   },
   blocks: {
     linkSource: 'Link to the source', yourSource: 'YOUR SOURCE', originalText: 'ORIGINAL TEXT', excerpts: 'Available excerpts', excerpt: (n: number) => `Excerpt ${n}`,
@@ -306,6 +307,9 @@ export const en: Messages = {
     'draft-changed': 'The sources, the question or the language are no longer those of the interrupted generation: start over.',
     'exploration-local': 'Exploring a source does not use a local model yet: choose ChatGPT or your Claude assistant.',
     'exploration-too-long': 'This source is too long to explore in one request: select the part you want to explore.',
+    'exploration-claude': 'Claude Code cannot be used to explore here.',
+    'claude-missing': 'Claude Code was not found: install it, or check that the claude command is on PATH.',
+    'claude-failed': 'Claude Code did not finish the request. Check that you are signed in with claude in a terminal, then try again. Nothing was saved.',
   },
   accountNotices: {
     'plan-not-authorized': 'Signed in, but ChatGPT plan usage was not authorized.',

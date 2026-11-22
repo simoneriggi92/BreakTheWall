@@ -2,7 +2,7 @@ import { app, safeStorage } from 'electron';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { localModelSchema, type GenerationRoute, type GenerationSetup } from '../src/core/provider';
+import { localModelSchema, type GenerationRoute, type GenerationSetup, type StudioRoute } from '../src/core/provider';
 import { ChatGPTAccount } from '../src/desktop/chatgpt/account';
 import { Generator } from '../src/desktop/generator';
 import { localCompleter } from '../src/desktop/local/runtimes';
@@ -42,7 +42,7 @@ async function readLedger(root: string): Promise<LedgerEntry[]> {
 interface NamedSetup { name: string; setup: GenerationSetup }
 /** The comparison's setups, by letter. Model slugs come from the account's list at run time and are never assumed. */
 function chatgptSetups(values: { setups?: string; strong?: string; cheap?: string; 'structure-model'?: string; 'content-model'?: string }): NamedSetup[] {
-  const gpt = (model: string): GenerationRoute => ({ provider: 'chatgpt', model });
+  const gpt = (model: string): StudioRoute => ({ provider: 'chatgpt', model });
   if (values['structure-model']) return [{ name: 'custom', setup: { structure: gpt(values['structure-model']), content: gpt(values['content-model'] ?? values['structure-model']) } }];
   const need = (slug: string | undefined, flag: string) => { if (!slug) throw new Error(`${flag} is required for this setup (see --list-models).`); return slug; };
   return (values.setups ?? 'A').split(',').map(x => x.trim().toUpperCase()).map(name => {

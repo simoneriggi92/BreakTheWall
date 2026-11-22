@@ -22,7 +22,7 @@ const answer = async () => JSON.stringify(toAnswer(await bakery()));
 async function broken() { const a = toAnswer(await bakery()); a.parts[1].members[0].cites = [[40, 41]]; return JSON.stringify(a); }
 const chatgpt = { provider: 'chatgpt' as const, model: 'model-a' };
 
-function setup(answers: (string | ((signal: AbortSignal) => Promise<string>))[]) {
+function scripted(answers: (string | ((signal: AbortSignal) => Promise<string>))[]) {
   const requests: CompletionRequest[] = [];
   const complete = vi.fn(async (request: CompletionRequest, signal: AbortSignal) => {
     requests.push(request);
@@ -30,10 +30,22 @@ function setup(answers: (string | ((signal: AbortSignal) => Promise<string>))[])
     if (next === undefined) throw new Error('no answer scripted');
     return typeof next === 'string' ? next : next(signal);
   });
+  return { requests, complete };
+}
+function setup(answers: (string | ((signal: AbortSignal) => Promise<string>))[]) {
+  const { requests, complete } = scripted(answers);
   const store = new ExplorationStore(join(root, 'explorations'));
   const generator = new Generator({ chatgpt: { complete }, local: () => ({ complete }) }, { save: async d => d }, () => new Date('2026-11-06T12:00:00Z'), undefined, store);
   return { generator, store, requests, complete };
 }
+/** ChatGPT and Claude Code answer from separate scripts, so a test sees which route was asked. */
+function withClaude(answers: string[]) {
+  const claude = scripted(answers), chatgpt = scripted([]);
+  const store = new ExplorationStore(join(root, 'explorations'));
+  const generator = new Generator({ chatgpt: { complete: chatgpt.complete }, local: () => ({ complete: chatgpt.complete }), claude: { complete: claude.complete } }, { save: async d => d }, () => new Date('2026-11-06T12:00:00Z'), undefined, store);
+  return { generator, store, requests: claude.requests, chatgpt: chatgpt.complete };
+}
+const claudeRoute = { provider: 'claude' as const, model: 'sonnet' };
 
 describe('the exploration store (X8)', () => {
   it('round-trips a generated exploration and finds it by id and revision', async () => {
@@ -124,6 +136,42 @@ describe('explore: one request, one repair, saved after the final check (X8)', (
     const result = await generator.explore({ source: long, language: 'en', route: chatgpt }, () => {});
     expect(result).toMatchObject({ ok: false, failure: { code: 'unsupported', reason: 'exploration-too-long' } });
     if (!result.ok) expect(result.failure.issues?.[0]).toContain(`at most ${EXPLORATION_SOURCE_LIMIT}`);
+    expect(complete).not.toHaveBeenCalled();
+  });
+});
+
+describe('explore on the claude route (#93)', () => {
+  it('asks Claude Code, never ChatGPT, and names Claude in the saved origin', async () => {
+    const { generator, store, requests, chatgpt } = withClaude([await answer()]);
+    const result = await generator.explore({ source: await source(), language: 'en', route: claudeRoute }, () => {});
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.exploration.generation).toMatchObject({ provider: 'claude', model: 'sonnet' });
+    expect(chatgpt).not.toHaveBeenCalled();
+    expect(requests[0]).toMatchObject({ model: 'sonnet', schemaName: 'break_the_wall_exploration' });
+    expect(await store.find(result.exploration.id, 'v1')).toEqual(result.exploration);
+  });
+
+  it('repairs a reply that is not JSON, then one that breaks the contract, exactly once each', async () => {
+    for (const first of ['Here is the structure you asked for.', await broken()]) {
+      const { generator, requests } = withClaude([first, await answer()]);
+      const result = await generator.explore({ source: await source(), language: 'en', route: claudeRoute }, () => {});
+      expect(result).toMatchObject({ ok: true, stats: { requests: 2, repairs: 1 } });
+      expect(requests[1].messages[1].content).toBe(first);
+    }
+  });
+
+  it('saves nothing when the repaired reply still breaks the contract', async () => {
+    const { generator, store } = withClaude([await broken(), await broken()]);
+    const result = await generator.explore({ source: await source(), language: 'en', route: claudeRoute }, () => {});
+    expect(result).toMatchObject({ ok: false, failure: { code: 'invalid-output' } });
+    expect((await store.list()).explorations).toEqual([]);
+  });
+
+  it('refuses the claude route with a code where the host has no Claude Code completer', async () => {
+    const { generator, complete } = setup([]);
+    expect(await generator.explore({ source: await source(), language: 'en', route: claudeRoute }, () => {}))
+      .toMatchObject({ ok: false, failure: { code: 'unsupported', reason: 'exploration-claude' } });
     expect(complete).not.toHaveBeenCalled();
   });
 });

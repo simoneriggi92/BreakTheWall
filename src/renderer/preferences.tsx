@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Settings2 } from 'lucide-react';
 import type { DesktopBridge, ProgressResult } from '../core/bridge';
 import { resolveLanguage, type Language, type LanguageSetting } from '../core/language';
+import type { Exploration } from '../core/exploration';
 import { defaultSettings, type ProviderFailure, type StudioSettings } from '../core/provider';
 import { en } from './i18n/en';
 import { forPlatform } from './i18n/devices';
@@ -87,9 +88,12 @@ export function PreferencesMenu() {
   </div></details>;
 }
 
-/** Who wrote a generated disassembly: ChatGPT or a local model with its model, or the learner's assistant (P-20261028-mcp-integration M5). */
-export const originText = (t: Messages, g: { provider: 'chatgpt' | 'local' | 'assistant'; model: string }) =>
-  g.provider === 'assistant' ? t.tools.writtenByAssistant(g.model) : t.tools.generatedBy(g.provider === 'local', g.model);
+/**
+ * Who wrote a generated disassembly or exploration: ChatGPT or a local model with its model, the person's assistant
+ * (P-20261028-mcp-integration M5), or Claude Code (#93, explorations only). A disassembly's origins are a subset.
+ */
+export const originText = (t: Messages, g: Pick<NonNullable<Exploration['generation']>, 'provider' | 'model'>) =>
+  g.provider === 'assistant' ? t.tools.writtenByAssistant(g.model) : g.provider === 'claude' ? t.tools.writtenByClaudeCode(g.model) : t.tools.generatedBy(g.provider === 'local', g.model);
 
 /** Host failures are worded from their most specific code. */
 export const failureText = (t: Messages, failure: ProviderFailure) => failure.reason ? t.reasons[failure.reason] : t.failures[failure.code];

@@ -49,9 +49,12 @@ const traceSchema = z.strictObject({
 
 export const explorationSchema = z.strictObject({
   schemaVersion: z.literal(1), id, revision: id, kind: z.enum(['prepared', 'generated']),
-  /** As for disassemblies; `assistant` is the learner's AI assistant writing through the MCP server. */
+  /**
+   * As for disassemblies; `assistant` is the person's AI assistant writing through the MCP server, `claude` a fresh
+   * `claude -p` on the person's Claude login (#93).
+   */
   generation: z.strictObject({
-    provider: z.enum(['chatgpt', 'local', 'assistant']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(),
+    provider: z.enum(['chatgpt', 'local', 'assistant', 'claude']), runtime: z.enum(['ollama', 'lmstudio', 'llamacpp', 'openai']).optional(),
     model: z.string().min(1).max(200), createdAt: z.iso.datetime(),
   }).optional(),
   title: z.string().min(1).max(200), language: z.enum(['it', 'en']),

@@ -158,6 +158,7 @@ export const it = {
     originPrepared: 'Esempio preparato · fonti didattiche originali.',
     generatedBy: (local: boolean, model: string) => `${local ? 'Modello locale' : 'ChatGPT'} · ${model}`,
     writtenByAssistant: (client: string) => `Il tuo assistente · ${client}`,
+    writtenByClaudeCode: (model: string) => `Claude Code · ${model}`,
   },
   blocks: {
     linkSource: 'Collega alla fonte', yourSource: 'LA TUA FONTE', originalText: 'TESTO ORIGINALE', excerpts: 'Estratti disponibili', excerpt: (n: number) => `Estratto ${n}`,
@@ -305,6 +306,9 @@ export const it = {
     'draft-changed': 'Le fonti, la domanda o la lingua non sono più quelle della generazione interrotta: ricomincia da capo.',
     'exploration-local': 'L’esplorazione di una fonte non usa ancora un modello locale: scegli ChatGPT o il tuo assistente Claude.',
     'exploration-too-long': 'Questa fonte è troppo lunga per essere esplorata in una sola richiesta: seleziona la parte che vuoi esplorare.',
+    'exploration-claude': 'Qui l’esplorazione non può usare Claude Code.',
+    'claude-missing': 'Claude Code non è stato trovato: installalo o controlla che il comando claude sia nel PATH.',
+    'claude-failed': 'Claude Code non ha completato la richiesta. Controlla in un terminale di aver fatto l’accesso con claude, poi riprova. Non è stato salvato nulla.',
   },
   accountNotices: {
     'plan-not-authorized': 'Accesso riuscito, ma l’uso del piano ChatGPT non è stato autorizzato.',

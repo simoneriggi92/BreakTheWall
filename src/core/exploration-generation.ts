@@ -18,7 +18,9 @@ import type { UserSource } from './source';
 
 /**
  * The longest source that passed X1 on both routes: the explainer, 955 lines and 51,125 characters. A longer one is
- * refused before anything is sent; one request bounds the source in this version.
+ * refused before anything is sent; one request bounds the source in this version. The explainer is private (it lives
+ * only in the owner's `.local/eval/cases`); the public stand-in of the same size is
+ * `docs/workflow/research/R-20261104-exploration-experience.md` (50,893 characters), witnessed in #93.
  */
 export const EXPLORATION_SOURCE_LIMIT = 52_000;
 
@@ -162,7 +164,9 @@ export function fromDraft(draft: ExplorationDraft, { source, language, meta }: E
   };
 }
 
-export interface ExplorationInput { source: UserSource; language: ContentLanguage; meta: GenerationMeta }
+/** The stored origin of an exploration, which Claude Code can also write (#93), with the id it is saved under. */
+export type ExplorationMeta = Omit<GenerationMeta, 'provider'> & Pick<NonNullable<Exploration['generation']>, 'provider'>;
+export interface ExplorationInput { source: UserSource; language: ContentLanguage; meta: ExplorationMeta }
 /** A contract path as the answer writes it: the answer calls a link's class `cls`. */
 const answerPath = (path: string) => path.replace(/^(links\[\d+\])\.class\b/, '$1.cls');
 const valueAt = (json: unknown, path: readonly PropertyKey[]) =>
