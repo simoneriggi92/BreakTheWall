@@ -60,6 +60,8 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+/* The local page opened without a valid link: one line, where the eye lands. */
+.secretless { max-width: 36rem; margin: 30vh auto 0; padding: 0 24px; font-size: 18px; }
 button, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }

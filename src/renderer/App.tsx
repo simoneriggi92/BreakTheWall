@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Home, LockKeyhole, MessageSquareText, PanelRight, X } from 'lucide-react';
-import type { DesktopBridge, ProgressResult } from '../core/bridge';
+import type { DesktopBridge, ProgressResult, RuntimeInfo } from '../core/bridge';
 import type { IncomingSource } from '../core/provider';
 import { validateLesson, type Lesson } from '../core/lesson';
 import { canVisit, initialState, navigate, restoreState, solved, submit, type LearnerState, type RestoredState } from '../core/state';
@@ -37,7 +37,7 @@ function Shell({ bridge, prepared, preparedDisassemblies, preparedExplorations }
   const [selected, setSelected] = useState<{ kind: 'lesson' | 'disassembly' | 'exploration'; id: string }>();
   // Errors and notices are kept as codes and worded at render time, so they follow a language switch.
   const [error, setError] = useState<keyof typeof t.shell>();
-  const [runtime, setRuntime] = useState<'desktop' | 'browser'>();
+  const [runtime, setRuntime] = useState<RuntimeInfo['mode']>();
   const [generated, setGenerated] = useState<Lesson[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [draft, setDraft] = useState<StudioDraft>(emptyDraft);
@@ -103,7 +103,7 @@ function Shell({ bridge, prepared, preparedDisassemblies, preparedExplorations }
   const lesson = selected?.kind === 'lesson' ? [...generated, ...lessons].find(x => x.id === selected.id) : undefined;
   const disassembly = selected?.kind === 'disassembly' ? allDisassemblies.find(x => x.id === selected.id) : undefined;
   const created = (item: Disassembly) => { setGeneratedDisassemblies(list => [item, ...list.filter(x => x.id !== item.id)]); setDraft(emptyDraft); openDisassembly(item.id); };
-  const runtimeLabel = runtime === 'desktop' ? t.common.desktopRuntime : runtime === 'browser' ? t.common.browserRuntime : '';
+  const runtimeLabel = runtime ? { desktop: t.common.desktopRuntime, browser: t.common.browserRuntime, page: t.common.pageRuntime }[runtime] : '';
   return <><a href="#main" className="skip-link">{t.common.skip}</a>{exploration
     ? <ExplorationView key={`${exploration.id}:${exploration.revision}`} x={exploration} goHome={() => setSelected(undefined)}/>
     : disassembly

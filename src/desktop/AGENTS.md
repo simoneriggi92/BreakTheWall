@@ -30,7 +30,7 @@ The Electron main process and its preload. It owns every file, network and crede
 - `BTW_USER_DATA_DIR` (absolute path) isolates a run's data folder; `incoming.ts` derives the socket address from it, so the MCP server must see the same value.
 - `BTW_SMOKE_TEST=1` makes the main process exit 0 once the library is drawn, 1 otherwise. CI and both packaging scripts rely on it.
 - `npm run dev` reloads renderer changes only. Restart it after changing `main.ts` or `preload.ts`.
-- `incoming.ts` is imported by `src/mcp`, which runs as plain Node: keep it free of `electron` imports.
+- `incoming.ts` is imported by `src/mcp` and `src/server`, which run as plain Node: keep it free of `electron` imports.
 
 ## Related specs
 

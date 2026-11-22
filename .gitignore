@@ -7,3 +7,7 @@ coverage/
 .DS_Store
 *.log
 .local/
+# The plugin's build output (npm run build:plugin) and the types Claude Code lays beside a loaded mod.
+plugin/page/
+plugin/server/
+plugin/.claude-plugin/types/
