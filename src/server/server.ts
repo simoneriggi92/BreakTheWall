@@ -5,7 +5,7 @@ import { extname, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
-import { draftSchema, messageLanguageSchema, returnMessage } from '../core/round-answers';
+import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from '../core/round-answers';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type RoundRefusal } from './rounds';
 
@@ -160,6 +160,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       if (req.method === 'PUT' && action === 'draft') {
         const draft = draftSchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
         if (!draft.success) return send(res, 400, { error: 'bad-request' });
+        const questions = rounds.questions(session, Number(number));
+        if (questions && !fitsQuestions(questions, draft.data)) return send(res, 400, { error: 'bad-request' });
         const refused = await rounds.saveDraft(session, Number(number), draft.data);
         if (refused) return send(res, REFUSED[refused], { error: refused });
         return noContent(res);
@@ -169,6 +171,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         if (!body.success) return send(res, 400, { error: 'bad-request' });
         const questions = rounds.questions(session, Number(number));
         if (!questions) return send(res, 404, { error: 'unknown' });
+        if (!fitsQuestions(questions, body.data.draft)) return send(res, 400, { error: 'bad-request' });
         // The server words the message with the same function the page previews it with: what the person saw is
         // what the agent receives.
         const message = returnMessage(questions, body.data.draft, body.data.language);

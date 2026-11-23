@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { answerKind, answerOf, isAnswered, returnMessage, type Answer, type Draft, type RoundView } from '../../core/round-answers';
 import type { RoundBridge } from '../http-bridge';
 import { Brand } from '../icons';
-import { renderMarkdown } from '../markdown';
+import { renderInlineMarkdown, renderMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
 
 /**
@@ -46,6 +46,10 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   };
   // Choosing the same thing again takes the choice back; the note stays.
   const toggle = (choice: NonNullable<Answer['choice']>) => changeAnswer({ choice: answerOf(latest.current, question)?.choice === choice ? undefined : choice });
+  const answerState = (a: Answer | undefined) => {
+    const kind = answerKind(a);
+    return kind === 'option' ? r.optionState(a?.choice ?? '') : r.states[kind];
+  };
 
   async function send() {
     setSending(true);
@@ -71,7 +75,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
               <li key={q.number}>
                 <button type="button" className={`round-outline-item${isAnswered(answerOf(draft, q)) ? ' is-answered' : ''}`} aria-current={q.number === question.number ? 'true' : undefined} onClick={() => setFocus(q.number)}>
                   <span className="round-outline-title">{r.question(q.number, q.title)}</span>
-                  <span className="round-outline-state">{r.states[answerKind(answerOf(draft, q))]}</span>
+                  <span className="round-outline-state">{answerState(answerOf(draft, q))}</span>
                 </button>
               </li>
             ))}
@@ -80,6 +84,23 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
         <article className="round-question" aria-labelledby="round-question-title">
           <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
           <Markdown text={question.body}/>
+          {question.options.length > 0 && (
+            <div className="round-options" role="group" aria-label={r.options}>
+              {question.options.map(option => (
+                <button
+                  key={option.letter} type="button" className={`round-option${option.letter === question.recommended ? ' is-recommended' : ''}`}
+                  aria-pressed={answer?.choice === option.letter} disabled={readOnly} onClick={() => toggle(option.letter)}
+                >
+                  <span className="round-option-head">
+                    <span className="round-option-letter">({option.letter})</span>
+                    <Inline className="round-option-label" text={option.label}/>
+                    {option.letter === question.recommended && <span className="round-option-badge">{r.recommended}</span>}
+                  </span>
+                  {option.consequence && <Inline className="round-option-consequence" text={option.consequence}/>}
+                </button>
+              ))}
+            </div>
+          )}
           <section className="round-recommendation" aria-label={r.recommendation}>
             <h3>{r.recommendation}</h3>
             {question.recommendation ? <Markdown text={question.recommendation}/> : <p>{r.noRecommendation}</p>}
@@ -146,6 +167,12 @@ function useDraftSaver(round: RoundView, bridge: RoundBridge, sent: boolean, set
       s.busy = false;
     })();
   };
+}
+
+/** An option's label or consequence: inline Markdown only, as it sits inside a button. */
+function Inline({ text, className }: { text: string; className: string }) {
+  const html = useMemo(() => renderInlineMarkdown(text), [text]);
+  return <span className={className} dangerouslySetInnerHTML={{ __html: html }}/>;
 }
 
 /** The agent's Markdown, rendered with raw HTML off: markup in a round shows as text and never runs. */

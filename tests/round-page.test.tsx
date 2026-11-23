@@ -13,8 +13,8 @@ const ROUND: RoundView = {
   receivedAt: '2026-11-23T10:00:00.000Z',
   turnText: 'I read the server and the plugin. Two decisions are open.',
   questions: [
-    { number: 1, title: 'Where do rounds live?', body: 'The server keeps every round it receives.', recommendation: 'In the per-user data folder.' },
-    { number: 2, title: 'Who recognises a round?', body: 'The mod or the server.', recommendation: 'The server, where tests reach it.' },
+    { number: 1, title: 'Where do rounds live?', body: 'The server keeps every round it receives.', options: [], recommended: null, recommendation: 'In the per-user data folder.' },
+    { number: 2, title: 'Who recognises a round?', body: 'The mod or the server.', options: [], recommended: null, recommendation: 'The server, where tests reach it.' },
   ],
   draft: { generalNote: '', answers: {} },
   sent: null,
@@ -73,6 +73,8 @@ describe('a round in the page (#95)', () => {
     expect(question).toHaveTextContent('The server keeps every round it receives.');
     expect(question).toHaveTextContent('In the per-user data folder.');
     expect(question).not.toHaveTextContent('The mod or the server.');
+    // Without an options list the question takes "yes" or a note, as before #96.
+    expect(within(question).queryByRole('group', { name: 'Options' })).toBeNull();
   });
 
   it('updates what the agent receives live, and saves the draft on every change', async () => {
@@ -174,5 +176,56 @@ describe('a round in the page (#95)', () => {
       .toBe('**Q1 · Where do rounds live?** raccomandazione\n**Q2 · Who recognises a round?** nessuna risposta');
     await user.click(screen.getByRole('button', { name: 'Invia' }));
     expect(server.requests.find(x => x.method === 'POST')?.body).toMatchObject({ language: 'it' });
+  });
+});
+
+const WITH_OPTIONS: RoundView = {
+  ...ROUND,
+  questions: [
+    {
+      number: 1, title: 'Where does the question live?', body: 'The page needs one place to read it from.',
+      options: [
+        { letter: 'a', label: 'In the turn', consequence: 'nothing to store, but gone after a restart.' },
+        { letter: 'b', label: 'On disk', consequence: 'survives a restart; one more folder to clean.' },
+        { letter: 'c', label: 'In the session', consequence: 'the agent keeps it.' },
+      ],
+      recommended: 'b', recommendation: '(b), since the page outlives the session.',
+    },
+    ROUND.questions[1],
+  ],
+};
+
+describe('a question\'s options side by side (#96)', () => {
+  it('shows each option with its consequence, and marks the recommended one', async () => {
+    render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
+    const options = within(await screen.findByRole('article')).getByRole('group', { name: 'Options' });
+    const cards = within(options).getAllByRole('button');
+    expect(cards.map(x => x.textContent)).toEqual([
+      '(a)In the turnnothing to store, but gone after a restart.',
+      '(b)On diskRecommendedsurvives a restart; one more folder to clean.',
+      '(c)In the sessionthe agent keeps it.',
+    ]);
+    expect(cards.map(x => x.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'false']);
+  });
+
+  it('puts the picked option\'s letter on the title line, saves it, and takes it back when picked again', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(WITH_OPTIONS);
+    render(<LocalPage fetch={server.fetch}/>);
+    const options = within(await screen.findByRole('article')).getByRole('group', { name: 'Options' });
+    await user.click(within(options).getByRole('button', { name: /In the session/ }));
+    expect(within(options).getByRole('button', { name: /In the session/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(outline()).getAllByRole('button')[0]).toHaveTextContent('option (c)');
+    expect(returnText()).toBe('**Q1 · Where does the question live?** (c)\n**Q2 · Who recognises a round?** no answer');
+    await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({ generalNote: '', answers: { '1': { choice: 'c', note: '' } } }));
+
+    // Accepting the recommendation is its own answer, and replaces the option.
+    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
+    expect(within(options).getByRole('button', { name: /In the session/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(returnText()).toContain('**Q1 · Where does the question live?** recommendation');
+
+    await user.click(within(options).getByRole('button', { name: /On disk/ }));
+    await user.click(within(options).getByRole('button', { name: /On disk/ }));
+    expect(returnText()).toContain('**Q1 · Where does the question live?** no answer');
   });
 });

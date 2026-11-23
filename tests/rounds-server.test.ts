@@ -75,8 +75,8 @@ describe('what is and is not a round (#95)', () => {
     const api = client(await start());
     await api.turn('❓ **Q1** - **Keep the old store?**: It still holds drafts from the app.\n\n❓ **Q2** - **Rename it?**: Optional.\n\n➡️ Yes.');
     expect((await api.round()).questions).toEqual([
-      { number: 1, title: 'Keep the old store?', body: 'It still holds drafts from the app.', recommendation: '' },
-      { number: 2, title: 'Rename it?', body: 'Optional.', recommendation: 'Yes.' },
+      { number: 1, title: 'Keep the old store?', body: 'It still holds drafts from the app.', options: [], recommended: null, recommendation: '' },
+      { number: 2, title: 'Rename it?', body: 'Optional.', options: [], recommended: null, recommendation: 'Yes.' },
     ]);
   });
 
@@ -294,5 +294,87 @@ describe('drafts are kept as they change (#95)', () => {
     const second = await start({ dataDir });
     expect((await client(second).round()).draft).toEqual(ANSWERED);
     expect((await client(second).round()).sent).toBeNull();
+  });
+});
+
+const WITH_OPTIONS = `❓ **Q1** - **Where does the question live?**: The page needs one place to read it from.
+
+- **(a)** In the turn: nothing to store, but gone after a restart.
+- **(b)** **On disk**: survives a restart; one more folder to clean.
+  Old rounds stay until history is cleared.
+- **(c)** In the session: the agent keeps it.
+
+⚠ Pick before the side chat lands.
+
+➡️ **(b)**, since the page outlives the session.`;
+
+describe('a question\'s options sit side by side (#96)', () => {
+  it('reads the options list out of the body, each with its letter, label and consequence, and marks the recommended one', async () => {
+    const api = client(await start());
+    await api.turn(WITH_OPTIONS);
+    expect((await api.round()).questions).toEqual([{
+      number: 1,
+      title: 'Where does the question live?',
+      body: 'The page needs one place to read it from.\n\n⚠ Pick before the side chat lands.',
+      options: [
+        { letter: 'a', label: 'In the turn', consequence: 'nothing to store, but gone after a restart.' },
+        { letter: 'b', label: 'On disk', consequence: 'survives a restart; one more folder to clean.\nOld rounds stay until history is cleared.' },
+        { letter: 'c', label: 'In the session', consequence: 'the agent keeps it.' },
+      ],
+      recommended: 'b',
+      recommendation: '**(b)**, since the page outlives the session.',
+    }]);
+  });
+
+  it('reads a label the agent made bold together with its letter', async () => {
+    const api = client(await start());
+    await api.turn('❓ **Q1** - **Which?**: Pick.\n\n- **(a) Keep**: as is.\n- **(b) Drop** — gone.');
+    expect((await api.round()).questions[0].options).toEqual([
+      { letter: 'a', label: 'Keep', consequence: 'as is.' },
+      { letter: 'b', label: 'Drop', consequence: 'gone.' },
+    ]);
+  });
+
+  it('leaves a lone lettered line, a list with a repeated letter, and one inside a code block in the body', async () => {
+    const api = client(await start());
+    const lone = '❓ **Q1** - **One?**: Only this:\n\n- **(a)** Keep it: as is.\n\n➡️ (a).';
+    const repeated = '❓ **Q2** - **Two?**: Twice:\n\n- **(a)** First: one.\n- **(a)** Again: two.';
+    const fenced = '❓ **Q3** - **Three?**: Quoted:\n\n```\n- **(a)** First: one.\n- **(b)** Second: two.\n```';
+    await api.turn([lone, repeated, fenced].join('\n\n---\n\n'));
+    const questions = (await api.round()).questions;
+    expect(questions.map((q: { options: unknown[]; recommended: unknown }) => [q.options, q.recommended])).toEqual([[[], null], [[], null], [[], null]]);
+    expect(questions[0].body).toBe('Only this:\n\n- **(a)** Keep it: as is.');
+    expect(questions[2].body).toBe('Quoted:\n\n```\n- **(a)** First: one.\n- **(b)** Second: two.\n```');
+  });
+
+  it('puts the picked option\'s letter on the question\'s title line', async () => {
+    const api = client(await start());
+    await api.turn(WITH_OPTIONS);
+    await api.send(1, { generalNote: '', answers: { '1': { choice: 'c', note: 'The agent forgets less than I think.' } } });
+    expect(await api.delivery()).toBe('**Q1 · Where does the question live?** (c)\n  The agent forgets less than I think.');
+  });
+
+  it('still reads a round kept before options existed, as a round without a list', async () => {
+    const dataDir = folder();
+    const kept = join(dataDir, 'projects', 'feedfacefeedface', SESSION);
+    mkdirSync(kept, { recursive: true });
+    writeFileSync(join(kept, 'round-1.json'), JSON.stringify({
+      version: 1, session: SESSION, cwd: CWD, number: 1, receivedAt: '2026-11-20T10:00:00.000Z',
+      round: { turnText: '', questions: [{ number: 1, title: 'Old?', body: 'Kept by #95.', recommendation: 'Yes.' }] },
+      draft: { generalNote: '', answers: {} }, sent: null,
+    }));
+    const api = client(await start({ dataDir }));
+    expect((await api.round()).questions).toEqual([{ number: 1, title: 'Old?', body: 'Kept by #95.', options: [], recommended: null, recommendation: 'Yes.' }]);
+    expect((await api.saveDraft(1, { generalNote: '', answers: { '1': { choice: 'recommendation', note: '' } } })).status).toBe(204);
+  });
+
+  it('refuses a letter the question does not offer, and any letter on a question without options', async () => {
+    const api = client(await start());
+    await api.turn(WITH_OPTIONS);
+    expect((await api.saveDraft(1, { generalNote: '', answers: { '1': { choice: 'd', note: '' } } })).status).toBe(400);
+    expect((await api.send(1, { generalNote: '', answers: { '1': { choice: 'd', note: '' } } })).status).toBe(400);
+    await api.turn(ROUND);
+    expect((await api.saveDraft(2, { generalNote: '', answers: { '1': { choice: 'a', note: '' } } })).status).toBe(400);
+    expect((await api.saveDraft(2, ANSWERED)).status).toBe(204);
   });
 });

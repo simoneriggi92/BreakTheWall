@@ -1,15 +1,15 @@
 import { z } from 'zod';
 import { sessionIdSchema } from './local-server';
-import { questionSchema, type Question } from './round';
+import { optionLetterSchema, questionSchema, type Question } from './round';
 
 /**
  * What the person gives a round and what returns to the agent (#95). The page builds the message live from the same
  * function the server sends with, so "what the agent receives" is exactly what it receives.
  */
 
-/** No options list yet (#96): a question takes the recommendation, no choice, or only a note. */
+/** A question takes the recommendation, one of its options by letter (#96), no choice, or only a note. */
 export const answerSchema = z.strictObject({
-  choice: z.enum(['recommendation', 'none']).optional(),
+  choice: z.union([z.enum(['recommendation', 'none']), optionLetterSchema]).optional(),
   note: z.string().max(50_000),
 });
 export const draftSchema = z.strictObject({
@@ -43,22 +43,32 @@ export type RoundView = z.infer<typeof roundViewSchema>;
 export const answerOf = (draft: Draft, question: Pick<Question, 'number'>): Answer | undefined => draft.answers[String(question.number)];
 
 /** What an answer amounts to: the outline's state and the message's title line both follow it. */
-export type AnswerKind = 'unanswered' | 'recommendation' | 'none' | 'note';
+export type AnswerKind = 'unanswered' | 'recommendation' | 'none' | 'option' | 'note';
 export function answerKind(answer: Answer | undefined): AnswerKind {
-  if (answer?.choice) return answer.choice;
+  if (answer?.choice === 'recommendation' || answer?.choice === 'none') return answer.choice;
+  if (answer?.choice) return 'option';
   return answer && answer.note.trim() !== '' ? 'note' : 'unanswered';
+}
+
+/** Every option letter in the draft is one its question offers: the page offers no other, so another is a bad request. */
+export function fitsQuestions(questions: readonly Question[], draft: Draft): boolean {
+  return Object.entries(draft.answers).every(([number, answer]) => {
+    if (answerKind(answer) !== 'option') return true;
+    return questions.find(q => String(q.number) === number)?.options.some(x => x.letter === answer.choice) ?? false;
+  });
 }
 export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
 
 /** The words on a question's title line, in the page's interface language; a note alone puts none there. */
-const TITLE_WORDS: Record<MessageLanguage, Record<AnswerKind, string>> = {
+const TITLE_WORDS: Record<MessageLanguage, Record<Exclude<AnswerKind, 'option'>, string>> = {
   it: { recommendation: 'raccomandazione', none: 'nessuna scelta', unanswered: 'nessuna risposta', note: '' },
   en: { recommendation: 'recommendation', none: 'no choice', unanswered: 'no answer', note: '' },
 };
 
 /**
  * Plain Markdown that reads as the person's own words: the general note first, then every question by number and
- * title, so it still reads after compaction, the choice on the title line and the note indented below.
+ * title, so it still reads after compaction, the choice on the title line ("recommendation", the option's letter, "no
+ * choice" or "no answer") and the note indented below.
  */
 export function returnMessage(questions: readonly Question[], draft: Draft, language: MessageLanguage): string {
   const lines: string[] = [];
@@ -66,7 +76,9 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
   if (general) lines.push(general, '');
   for (const question of questions) {
     const answer = answerOf(draft, question);
-    const word = TITLE_WORDS[language][answerKind(answer)];
+    const kind = answerKind(answer);
+    // An option is named by its letter alone, as the agent wrote it in the round.
+    const word = kind === 'option' ? `(${answer?.choice})` : TITLE_WORDS[language][kind];
     const title = `**Q${question.number} · ${question.title}**`;
     lines.push(word ? `${title} ${word}` : title);
     const note = answer?.note.trim();
