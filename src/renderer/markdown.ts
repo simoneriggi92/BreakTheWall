@@ -41,5 +41,8 @@ export function renderMarkdown(text: string): RenderedSource {
   return { html: md.renderer.render(tokens, md.options, {}), headings, diagrams };
 }
 
+/** One line of Markdown with no block around it, under the same rules: for text that sits inside a control. */
+export const renderInlineMarkdown = (text: string): string => md.renderInline(text);
+
 /** A source is prose, not code, when it has no language or a two-letter content language. */
 export const isProse = (source: { language?: string }) => !source.language || /^[a-z]{2}$/.test(source.language);

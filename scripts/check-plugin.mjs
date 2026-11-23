@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { skippedModHooks } from './mod-hooks.mjs';
 
 // The plugin's mod runs only inside Claude Code, so `npm run check` cannot reach it: Claude Code's own validator
 // reads it as the engine will (it refuses, for one, `$` passed to anything but a top-level function), and its test
@@ -15,7 +16,21 @@ try {
   console.warn('check:plugin skipped: the claude CLI is not on PATH.');
   process.exit(0);
 }
-run('claude', ['plugin', 'validate', 'plugin']);
+// Its report is kept to read which events the mod hooks: one the engine skips past the mod fails the check here,
+// since the kit's tests run it anyway.
+let validated;
+try {
+  validated = execFileSync('claude', ['plugin', 'validate', 'plugin'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32' });
+} catch (error) {
+  process.stdout.write(error.stdout ?? '');
+  process.exit(error.status ?? 1);
+}
+process.stdout.write(validated);
+const skipped = skippedModHooks(validated);
+if (skipped.length > 0) {
+  console.error(`check:plugin: the mod hooks ${skipped.join(', ')}. On Claude Code 2.1.330 the built-in cc-plugin-sec-default passes these events on past every other plugin, so the hook never runs in a session. Declare a classic command hook in plugin/hooks/hooks.json instead (plugin/AGENTS.md, #96).`);
+  process.exit(1);
+}
 // The mod's tests run inside the engine's test kit, which stands in for Claude Code beneath the mod.
 run('claude', ['plugin', 'test', 'plugin']);
 // The engine lays the mod's types in plugin/.claude-plugin/types only when an interactive session loads the plugin
