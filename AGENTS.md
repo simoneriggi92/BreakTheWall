@@ -9,7 +9,7 @@
 
 ## Rules
 
-- A change in behavior comes with a test that fails without it. Tests live flat in `tests/` as `*.test.ts(x)` (Vitest, jsdom).
+- A change in behavior comes with a test that fails without it. Tests live flat in `tests/` as `*.test.ts(x)` (Vitest, jsdom); the mod's own live beside it in `plugin/hooks/`, run by `npm run check:plugin`.
 - Untrusted data (sources, saved files, model output, anything crossing IPC or the local socket) is parsed with Zod where it enters; TypeScript types alone are not a check.
 - The renderer has no Node, filesystem or network access. New desktop operations go through a named, validated IPC call in `src/desktop/preload.ts`; the production content policy is not loosened. The one explicit exception: the local page built with `vite build --mode page` has `connect-src 'self'`, to reach its own local server (`src/server`) through the HTTP bridge with the per-launch secret; the Electron build keeps `connect-src 'none'`.
 - Every interface string exists in Italian and English; both catalogs change together.

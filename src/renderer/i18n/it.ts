@@ -13,6 +13,30 @@ export const it = {
   page: {
     /** Followed by the command, shown as code. */
     secretless: 'Aprila da Claude Code con',
+    /** A round the agent asked (#95). */
+    round: {
+      title: (n: number) => `Round ${n}`,
+      turnText: 'Il testo del turno',
+      outline: 'Domande',
+      progress: (answered: number, total: number) => `${answered}/${total} con risposta`,
+      question: (n: number, title: string) => `Q${n} · ${title}`,
+      states: { unanswered: 'nessuna risposta', recommendation: 'raccomandazione', none: 'nessuna scelta', note: 'nota' },
+      recommendation: 'Raccomandazione',
+      noRecommendation: 'L’agente non ha scritto una raccomandazione: rispondi con una nota.',
+      accept: 'Accetta la raccomandazione',
+      none: 'Nessuna scelta',
+      note: 'Nota',
+      previous: 'Domanda precedente',
+      next: 'Domanda successiva',
+      generalNote: 'Nota generale',
+      generalNoteHint: 'Torna in cima al messaggio.',
+      receives: 'Cosa riceve l’agente',
+      send: 'Invia',
+      sending: 'Invio…',
+      sent: 'Inviato. L’agente riceve esattamente questo messaggio; il round resta in sola lettura.',
+      sendFailed: 'Invio non riuscito. Riprova.',
+      saveFailed: 'L’ultima modifica non è stata salvata.',
+    },
   },
   assistants: {
     label: 'Usa con Claude', title: 'Usa Break the Wall da Claude',

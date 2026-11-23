@@ -1,39 +1,14 @@
 // @vitest-environment node
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { request } from 'node:http';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { lockPath } from '../src/server/lock';
-import { startLocalServer, type LocalServer, type LocalServerOptions } from '../src/server/server';
+import { startLocalServer, type LocalServer } from '../src/server/server';
+import { useLocalServers } from './local-server-harness';
 
-const folders: string[] = [];
-const servers: LocalServer[] = [];
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map(x => x.stop()));
-  for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
-});
-
-function folder() {
-  const path = mkdtempSync(join(tmpdir(), 'btw-server-'));
-  folders.push(path);
-  return path;
-}
-/** A page build with one file, so static serving has something to serve. */
-function pageFolder() {
-  const path = folder();
-  writeFileSync(join(path, 'index.html'), '<!doctype html><title>page</title>');
-  mkdirSync(join(path, 'assets'));
-  writeFileSync(join(path, 'assets', 'app.js'), 'console.log(1)');
-  return path;
-}
-async function start(options: Partial<LocalServerOptions> = {}) {
-  const server = await startLocalServer({ dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...options });
-  if (!server) throw new Error('the server did not start');
-  servers.push(server);
-  return server;
-}
+const { folder, options, track, start } = useLocalServers();
 
 interface Reply { status: number; headers: Record<string, string | string[] | undefined>; body: string }
 /** A raw HTTP call, so a test can send any Host or Origin, as a browser on another site or a rebinding DNS would. */
@@ -114,7 +89,7 @@ describe('one server per person, found through a lock file (#94)', () => {
   it('does not start a second server while the first one answers', async () => {
     const dataDir = folder();
     const first = await start({ dataDir });
-    expect(await startLocalServer({ dataDir, staticDir: pageFolder(), version: '0.6.0-test' })).toBeNull();
+    expect(await startLocalServer(options({ dataDir }))).toBeNull();
     expect(readLock(dataDir).port).toBe(first.port);
     expect((await call(first.port, '/api/status', { headers: withSecret(first) })).status).toBe(200);
   });
@@ -148,9 +123,9 @@ describe('one server per person, found through a lock file (#94)', () => {
 
   it('leaves exactly one server when several start at once on the same folder', async () => {
     const dataDir = folder();
-    const options = { dataDir, staticDir: pageFolder(), version: '0.6.0-test', checkEveryMs: 20 };
-    const started = (await Promise.all(Array.from({ length: 6 }, () => startLocalServer(options)))).filter(x => x !== null);
-    servers.push(...started);
+    const shared = options({ dataDir, checkEveryMs: 20 });
+    const started = (await Promise.all(Array.from({ length: 6 }, () => startLocalServer(shared)))).filter(x => x !== null);
+    track(...started);
     await new Promise(done => setTimeout(done, 200));
     const running = await Promise.all(started.map(x => Promise.race([x.stopped.then(() => false), Promise.resolve(true)])));
     const alive = started.filter((_, i) => running[i]);

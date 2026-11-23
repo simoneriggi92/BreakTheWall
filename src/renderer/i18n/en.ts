@@ -14,6 +14,30 @@ export const en: Messages = {
   page: {
     /** Followed by the command, shown as code. */
     secretless: 'Open it from Claude Code with',
+    /** A round the agent asked (#95). */
+    round: {
+      title: (n: number) => `Round ${n}`,
+      turnText: 'The turn’s text',
+      outline: 'Questions',
+      progress: (answered: number, total: number) => `${answered}/${total} answered`,
+      question: (n: number, title: string) => `Q${n} · ${title}`,
+      states: { unanswered: 'no answer', recommendation: 'recommendation', none: 'no choice', note: 'note' },
+      recommendation: 'Recommendation',
+      noRecommendation: 'The agent wrote no recommendation: answer with a note.',
+      accept: 'Accept the recommendation',
+      none: 'No choice',
+      note: 'Note',
+      previous: 'Previous question',
+      next: 'Next question',
+      generalNote: 'General note',
+      generalNoteHint: 'Returns at the top of the message.',
+      receives: 'What the agent receives',
+      send: 'Send',
+      sending: 'Sending…',
+      sent: 'Sent. The agent receives exactly this message; the round stays read-only.',
+      sendFailed: 'Sending failed. Try again.',
+      saveFailed: 'The last change was not saved.',
+    },
   },
   assistants: {
     label: 'Use with Claude', title: 'Use Break the Wall from Claude',
