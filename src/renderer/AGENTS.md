@@ -20,6 +20,7 @@ The React interface: library, studio, the exploration view with its three roles 
 
 ```bash
 npm run dev:web   # this renderer alone in a browser, for layout only (no generation, no desktop persistence)
+npm run build:plugin && npm run preview:round [-- turn.md]   # one round in the real page: prints its address with the secret
 ```
 
 ## Conventions
@@ -35,3 +36,4 @@ npm run dev:web   # this renderer alone in a browser, for layout only (no genera
 - Mermaid loads on first use and runs with `securityLevel: 'strict'`.
 - The round's width steps live in `RoundPage` (`is-wide`, `is-rail`, `is-drawer` classes), not in `round.css` media queries: the rail and the drawer change what is on the page, so CSS alone would let layout and content disagree. Tests fake `window.matchMedia` to reach them.
 - Browser preview is not proof of desktop behavior: persistence and the bridge only exist under Electron.
+- jsdom lays nothing out: a change to the round's measure, themes, rail or drawer is checked in `npm run preview:round` with a browser (Playwright), at full width, ~1100 px and ~760 px, in both themes. Measure a line's characters with the canvas (`measureText`), not by eye: `ch` is the width of a zero, wider than an average character.
