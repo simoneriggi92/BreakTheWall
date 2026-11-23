@@ -8,6 +8,12 @@ export const en: Messages = {
     skip: 'Skip to content', opening: 'OPENING…', desktopRuntime: 'DESKTOP · LOCAL', browserRuntime: 'BROWSER PREVIEW',
     close: 'Close', closeNotice: 'Close notice', optional: 'optional', lines: 'lines', characters: 'characters',
     brandTagline: 'Take the text apart.',
+    pageRuntime: 'CLAUDE CODE · LOCAL',
+  },
+  /** The local page opened from Claude Code (#94). */
+  page: {
+    /** Followed by the command, shown as code. */
+    secretless: 'Open it from Claude Code with',
   },
   assistants: {
     label: 'Use with Claude', title: 'Use Break the Wall from Claude',

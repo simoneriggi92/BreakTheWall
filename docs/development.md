@@ -21,7 +21,7 @@ npm start
 
 ## Boundaries
 
-The renderer has no Node integration, filesystem API, or credentials. Electron uses sandboxing, context isolation, permission denial, navigation restrictions, and an application-owned `btw://app/` protocol. The preload exposes named operations, never a generic IPC or shell API. The development server is loopback-only; production content policy allows no network connections.
+The renderer has no Node integration, filesystem API, or credentials. Electron uses sandboxing, context isolation, permission denial, navigation restrictions, and an application-owned `btw://app/` protocol. The preload exposes named operations, never a generic IPC or shell API. The development server is loopback-only; the Electron build's content policy allows no network connections. The local page is the one exception: its build allows connections to its own origin only (see below).
 
 Network access for AI belongs to the main process only, except the Claude Code route below, where the `claude` process makes its own calls: the system browser handles sign-in, a one-shot listener on `127.0.0.1` receives the callback, and `https://auth.openai.com` and `https://api.openai.com/v1` serve tokens and inference. Credentials are encrypted with Electron `safeStorage` under `<userData>/credentials/`; generated disassemblies live in `<userData>/disassemblies/` (one folder per disassembly, every revision kept), earlier generated lessons in `<userData>/lessons/`, progress in `<userData>/workspaces/`, and the draft of an interrupted generation in `<userData>/generation-draft.json`. Sign-in needs the macOS Keychain; without it the app disables sign-in rather than storing plaintext.
 
@@ -30,6 +30,16 @@ The local-model route talks only to loopback addresses, from the main process. T
 The Claude Code route (`src/desktop/claude/completer.ts`) writes explorations only. Each request runs a fresh `claude -p --json-schema` on the person's own Claude login, from the system's temporary folder, with no tools, no project files and no saved session (`--tools ""`, `--safe-mode`, `--strict-mcp-config`, `--no-session-persistence`). The prompt goes on stdin. The app reads and stores no credential for it: the process inherits the environment, where Claude Code finds the person's login as it does in a terminal (including `ANTHROPIC_API_KEY`, when the person set one). An answer Claude Code could not fit to the schema is handed to the exploration's acceptance like any refused answer, so the one repair runs. The module is plain Node, so the plugin's local server can run it; the Electron app does not offer the route.
 
 The domain module must remain independent of React and Electron. Lesson content is data rendered with application-owned components; source text is never HTML or executable UI. A source read as a document is rendered by `markdown-it` with raw HTML off, so markup in it shows as text; links are not followed and images are not fetched. Mermaid diagrams load on first use and run in strict mode. The production policy allows styles only from the app's files, so a diagram's `<style>` and `style` attributes are applied through the CSS object model (`src/renderer/svg-mount.ts`) rather than by loosening the policy.
+
+## The local page and the Claude Code plugin
+
+`plugin/` is a Claude Code plugin: a mod (`plugin/hooks/register.ts`) that registers `/break-the-wall`. `npm run build:plugin` bundles the local server and its launcher into `plugin/server/` and builds the page into `plugin/page/` (both ignored); then `claude --plugin-dir plugin` loads it for one session.
+
+At `session.start` the mod runs `node --version` (Node ≥ 22 on `PATH` is required; otherwise `/break-the-wall` says so and nothing else happens) and `node plugin/server/launcher.cjs start`. The launcher finds the one server through `<userData>/rounds/server.lock` (port, pid, version, secret; mode `0600`), or starts it detached in a process group of its own, so it outlives the session. The mod registers the session and renews the registration every 30 seconds. `/break-the-wall` runs `launcher.cjs open`, which opens `http://127.0.0.1:<port>/#t=<secret>` only when no page is polling. The server stops after 10 minutes with no session registered and no page connected.
+
+The server binds `127.0.0.1`. Every `/api/` call needs `Host` `127.0.0.1:<port>` or `localhost:<port>`, no foreign `Origin`, and the secret in `x-btw-secret`; nothing sends CORS headers. The built page needs no secret. The page reads the secret from the fragment, keeps it in `sessionStorage`, removes it from the address, and talks to the server through the HTTP bridge (`src/renderer/http-bridge.ts`). A tab with no valid secret says only to open it from Claude Code. `BTW_USER_DATA_DIR` isolates the data folder here too.
+
+`npm run smoke:page` opens the built page in headless Chrome (set `CHROME_PATH` if Chrome is elsewhere) and `npm run check:plugin` runs Claude Code's validator on the mod; CI runs both. `npm install` points git at `.githooks/`, whose pre-commit runs the fast checks.
 
 ## Brand assets
 

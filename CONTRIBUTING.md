@@ -40,7 +40,7 @@ npm run build     # production bundles
 Both must pass. In addition:
 
 - **Tests.** A change in behavior comes with a test that fails without it. Interface changes are tested in both interface languages where wording matters.
-- **Boundaries.** `src/core` stays independent of React and Electron. The renderer has no Node, filesystem or network access: new desktop operations go through a named, validated IPC call in `src/desktop/preload.ts`. The production content policy is not loosened.
+- **Boundaries.** `src/core` stays independent of React and Electron. The renderer has no Node, filesystem or network access: new desktop operations go through a named, validated IPC call in `src/desktop/preload.ts`. The production content policy is not loosened; the one exception is the local page (`vite build --mode page`), whose `connect-src 'self'` reaches only its own local server.
 - **Dependencies.** Add one only when it is needed, at an exact version (`save-exact` is set), and say why in the pull request.
 - **Public content only.** The repository is public. Never commit credentials, private documents, private code, or text you do not have the right to publish. Evaluation cases that are private stay in the ignored `.local/` folder.
 - **Language.** Code, comments and documentation are written in English. Comments explain why, not what.

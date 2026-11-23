@@ -7,6 +7,12 @@ export const it = {
     skip: 'Vai al contenuto', opening: 'APERTURA…', desktopRuntime: 'DESKTOP · LOCALE', browserRuntime: 'ANTEPRIMA BROWSER',
     close: 'Chiudi', closeNotice: 'Chiudi avviso', optional: 'facoltativo', lines: 'righe', characters: 'caratteri',
     brandTagline: 'Smonta il testo.',
+    pageRuntime: 'CLAUDE CODE · LOCALE',
+  },
+  /** The local page opened from Claude Code (#94). */
+  page: {
+    /** Followed by the command, shown as code. */
+    secretless: 'Aprila da Claude Code con',
   },
   assistants: {
     label: 'Usa con Claude', title: 'Usa Break the Wall da Claude',
