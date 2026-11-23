@@ -13,8 +13,8 @@ The React interface: library, studio, the exploration view with its three roles 
 | `disassembly/` | The disassembly player (run and reassemble), kept readable |
 | `i18n/` | Text catalogs: `it.ts` and `en.ts` for the app, `x-it.ts` and `x-en.ts` for the exploration, `devices.ts` for words that name the computer |
 | `LocalPage.tsx`, `http-bridge.ts` | The local page's entry (`vite build --mode page`): the secret from the fragment, the HTTP bridge, the page's poll, which reads the latest round again whenever it answers |
-| `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline, one question in focus, "what the agent receives" live, one Send, read-only once sent |
-| `markdown.ts`, `diagrams.ts`, `svg-mount.ts` | Rendering a source as a document, and its Mermaid diagrams |
+| `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline (answered questions folded), one question in focus, "what the agent receives" live, one Send, read-only once sent; its keys, and the width steps (rail below ~1180 px, drawer below ~860 px) read from `matchMedia` |
+| `markdown.ts`, `diagrams.ts`, `svg-mount.ts`, `use-diagrams.ts` | Rendering a source or a question as a document, and drawing its Mermaid diagrams |
 
 ## Commands
 
@@ -33,4 +33,5 @@ npm run dev:web   # this renderer alone in a browser, for layout only (no genera
 
 - The production content policy allows styles only from the app's files. A Mermaid diagram's styles are applied through the CSS object model in `svg-mount.ts`; do not loosen the policy to make a style work.
 - Mermaid loads on first use and runs with `securityLevel: 'strict'`.
+- The round's width steps live in `RoundPage` (`is-wide`, `is-rail`, `is-drawer` classes), not in `round.css` media queries: the rail and the drawer change what is on the page, so CSS alone would let layout and content disagree. Tests fake `window.matchMedia` to reach them.
 - Browser preview is not proof of desktop behavior: persistence and the bridge only exist under Electron.
