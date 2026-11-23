@@ -26,7 +26,7 @@ npm run dev:web   # this renderer alone in a browser, for layout only (no genera
 
 - Every string lives in both languages. The Italian catalog defines the shape (`typeof xIt`, `Messages` from `it.ts`), so a key missing in English fails the type check.
 - Host access goes through the bridge in `src/core/bridge.ts` and `src/core/provider.ts`. Need something new from the host? Add a named operation in `src/desktop/preload.ts` (Electron) or a named endpoint in `src/server` behind the HTTP bridge (the local page), never a workaround here.
-- Source text and model output are content, never HTML or executable UI. Markdown renders with `markdown-it` and raw HTML off; links are not followed and images are not fetched.
+- Source text and model output are content, never HTML or executable UI. Markdown renders with `markdown-it` and raw HTML off; links render as `<span class="md-link">` and images as text, so rendered Markdown, inline included, is safe inside a control and fetches nothing.
 - Wording changes are tested in both languages where the wording matters (`tests/i18n.test.tsx`).
 
 ## Gotchas
