@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
 // The plugin's mod runs only inside Claude Code, so `npm run check` cannot reach it: Claude Code's own validator
-// reads it as the engine will (it refuses, for one, `$` passed to anything but a top-level function).
+// reads it as the engine will (it refuses, for one, `$` passed to anything but a top-level function), and its test
+// kit runs the mod's tests.
 function run(command, args) {
   execFileSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32' });
 }
@@ -15,6 +16,8 @@ try {
   process.exit(0);
 }
 run('claude', ['plugin', 'validate', 'plugin']);
+// The mod's tests run inside the engine's test kit, which stands in for Claude Code beneath the mod.
+run('claude', ['plugin', 'test', 'plugin']);
 // The engine lays the mod's types in plugin/.claude-plugin/types only when an interactive session loads the plugin
 // (claude --plugin-dir plugin); neither `claude plugin test` nor `claude -p` lays them. CI never has them, so there the
 // skip is an annotation on the run, not a line lost in the log.

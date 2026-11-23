@@ -2,13 +2,14 @@
 
 ## Overview
 
-The plugin `claude --plugin-dir plugin` loads: a mod (`hooks/register.ts`) that checks Node, runs `server/launcher.cjs`, keeps the session registered, serves `/break-the-wall`, posts each main-loop turn's final text on `turn.complete`, and long-polls the server for answers it submits with `$.prompt.submit({ asUser: true })` and then confirms. `server/` and `page/` are build output of `npm run build:plugin`.
+The plugin `claude --plugin-dir plugin` loads: a mod (`hooks/register.ts`) that checks Node, runs `server/launcher.cjs`, keeps the session registered, serves `/break-the-wall`, posts every turn's final text on `turn.complete`, and long-polls the server for answers it submits with `$.prompt.submit({ asUser: true })` and then confirms. `server/` and `page/` are build output of `npm run build:plugin`.
 
 ## Conventions
 
-- The mod is a thin adapter: it runs only inside Claude Code and has no automated test. Logic goes to `src/server`; the mod forwards.
+- The mod is a thin adapter: logic goes to `src/server`, where Vitest reaches it; the mod forwards what the engine reports and decides nothing. What it still owns is the order of its calls (submit, then confirm), held by `hooks/register.test.ts`.
+- Its tests run under `claude plugin test plugin` with the engine's kit (`claude-code/testing`): the test answers every call the mod makes on `$` with `{ value }` as Claude Code would, and acts as the bottom of the events it raises (`session.start`, `turn.complete`).
 - Its own words live in both languages in `hooks/messages.ts`, since "needs Node" must be said when no server can run.
-- `npm run check:plugin` is its check: Claude Code's validator, and `tsc -p plugin` once types are laid.
+- `npm run check:plugin` is its check: Claude Code's validator, the mod's tests, and `tsc -p plugin` once types are laid.
 
 ## Gotchas
 

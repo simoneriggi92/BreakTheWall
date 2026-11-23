@@ -87,6 +87,14 @@ describe('what is and is not a round (#95)', () => {
     expect(await api.round()).toMatchObject({ session: SESSION, number: 2, questions: [{ title: 'One more thing?' }] });
   });
 
+  it('ignores a subagent\'s report and a turn that did not end with an answer, even in the skill\'s format', async () => {
+    const api = client(await start());
+    expect(await (await api.turn(ROUND, SESSION, CWD, { agent: 'agent-7' })).json()).toEqual({ round: null });
+    for (const reason of ['aborted', 'refusal', 'error']) expect(await (await api.turn(ROUND, SESSION, CWD, { reason })).json()).toEqual({ round: null });
+    expect(await api.round()).toBeNull();
+    expect((await api.turn(ROUND, SESSION, CWD, { reason: 'later' })).status).toBe(400);
+  });
+
   it('refuses a turn that names no valid session, or one whose session id could name another folder', async () => {
     const api = client(await start());
     expect((await api.call('/api/turns', { method: 'POST', body: { session: SESSION, text: ROUND } })).status).toBe(400);

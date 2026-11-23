@@ -52,8 +52,17 @@ const TYPES: Record<string, string> = {
 
 const cwdSchema = z.string().min(1).max(4096);
 const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema });
-/** A turn's final text, as the mod posts it on `turn.complete`; the server decides whether it holds a round. */
-const turnSchema = z.strictObject({ session: sessionIdSchema, cwd: cwdSchema, text: z.string().max(1_000_000) });
+/**
+ * Every turn as the mod posts it on `turn.complete`, with how it ended and, for a subagent's run, its agent: the server
+ * decides whether it holds a round, so the mod decides nothing.
+ */
+const turnSchema = z.strictObject({
+  session: sessionIdSchema,
+  cwd: cwdSchema,
+  text: z.string().max(1_000_000),
+  reason: z.enum(['answer', 'aborted', 'refusal', 'error']),
+  agent: z.string().min(1).max(200).optional(),
+});
 const MAX_BODY_BYTES = 64 * 1024;
 /** A turn's text, with room for the JSON escaping of a long round. */
 const MAX_TURN_BYTES = 4 * 1024 * 1024;
@@ -137,7 +146,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'POST' && path === '/api/turns') {
       const turn = turnSchema.safeParse(await readJson(req, MAX_TURN_BYTES));
       if (!turn.success) return send(res, 400, { error: 'bad-request' });
-      const round = parseRound(turn.data.text);
+      // A subagent's report is not the session asking the person, and an interrupted turn holds at most half a round.
+      const round = turn.data.agent === undefined && turn.data.reason === 'answer' ? parseRound(turn.data.text) : null;
       if (!round) return send(res, 200, { round: null });
       const stored = await rounds.add(turn.data.session, turn.data.cwd, round);
       pageChanged();

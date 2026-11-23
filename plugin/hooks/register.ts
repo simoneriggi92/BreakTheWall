@@ -6,9 +6,8 @@ import { modMessages, nodeIsSupported } from './messages'
  * Break the Wall's mod (#94, #95): a thin adapter between a Claude Code session and the local server. It checks
  * Node, has the launcher find or start the server, keeps this session registered, serves `/break-the-wall` without a
  * model turn, posts each main-loop turn's final text, and submits the answers the server hands back as the person's
- * own words. It drops only what the server cannot see is not the session's own answer (a subagent's report, an
- * interrupted turn); every other decision (which server, whether to open a tab, whether a turn holds a round, the
- * message's words) is the server's, where it is tested.
+ * own words. Every decision (which server, whether to open a tab, whether a turn holds a round, the message's words)
+ * is the server's, where it is tested; what the mod still owns, the order of its calls, `register.test.ts` holds.
  */
 const COMMAND = 'break-the-wall'
 /** Well inside the server's two-minute registration, so a live session never lapses. */
@@ -49,12 +48,12 @@ export const register: Register = on => {
     return started
   })
 
-  // The server decides whether the text holds a round; a subagent's report is not this session asking the person.
+  // Every turn goes to the server as the engine reports it: whether it holds a round, or is a subagent's report or an
+  // interrupted turn, is the server's decision, where it is tested.
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
-    if (!e.agentId && e.reason === 'answer' && e.answer.trim() !== '') {
-      void postTurn($, e.answer).catch(error => { $.ui.log(`break-the-wall: ${String(error)}`, { to: 'debug' }) })
-    }
+    void postTurn($, { text: e.answer, reason: e.reason, ...(e.agentId ? { agent: e.agentId } : {}) })
+      .catch(error => { $.ui.log(`break-the-wall: ${String(error)}`, { to: 'debug' }) })
     return result
   })
 
@@ -79,10 +78,10 @@ async function registerSession($: EngineInterface) {
   await post($, '/api/sessions', JSON.stringify({ id: await $.session.id(), cwd: await $.session.cwd() }))
 }
 
-/** The turn's final text, as it is: the server recognises a round, or ignores the turn. */
-async function postTurn($: EngineInterface, text: string) {
+/** The turn as the engine reported it: the server recognises a round, or ignores the turn. */
+async function postTurn($: EngineInterface, turn: { text: string; reason: string; agent?: string }) {
   if (!server) return
-  await post($, '/api/turns', JSON.stringify({ session: await $.session.id(), cwd: await $.session.cwd(), text }))
+  await post($, '/api/turns', JSON.stringify({ session: await $.session.id(), cwd: await $.session.cwd(), ...turn }))
 }
 
 async function post($: EngineInterface, path: string, body: string) {

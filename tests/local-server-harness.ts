@@ -55,8 +55,8 @@ export function serverClient(server: LocalServer) {
   });
   return {
     call,
-    /** The mod on `turn.complete`: the turn's final text, with the session it came from. */
-    turn: (text: string, session = SESSION, cwd = CWD) => call('/api/turns', { method: 'POST', body: { session, cwd, text } }),
+    /** The mod on `turn.complete`: every turn's final text as the engine reports it, with the session it came from. */
+    turn: (text: string, session = SESSION, cwd = CWD, more: { reason?: string; agent?: string } = {}) => call('/api/turns', { method: 'POST', body: { session, cwd, text, reason: 'answer', ...more } }),
     /** The mod's long-poll for its session: the message to submit, or nothing when the hold runs out. */
     delivery: async (session = SESSION, signal?: AbortSignal): Promise<string | undefined> => (await (await call(`/api/sessions/${session}/delivery`, { signal })).json()).message,
     /** The same poll, with the round the message answers, which the mod confirms once it has submitted it. */
