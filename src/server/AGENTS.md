@@ -19,7 +19,7 @@ The status contract and the secret header are in `src/core/local-server.ts`, sha
 ## Conventions
 
 - A new endpoint sits behind the guard in `server.ts` and parses its body with Zod. A reply read elsewhere goes through a schema in `src/core/local-server.ts`.
-- Tests drive the server over HTTP in process (`tests/local-server.test.ts`) and the launcher as real processes from an esbuild bundle (`tests/launcher.test.ts`); `npm run smoke:page` opens the built page in Chrome.
+- Tests drive the server over HTTP in process through `tests/local-server-harness.ts` (`useLocalServers` for temporary servers, `serverClient` for the mod's and the page's calls; add a new call there, not in a test file), and the launcher as real processes from an esbuild bundle (`tests/launcher.test.ts`); `npm run smoke:page` opens the built page in Chrome.
 
 ## Gotchas
 

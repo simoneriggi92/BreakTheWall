@@ -17,7 +17,7 @@ The plugin `claude --plugin-dir plugin` loads: a mod (`hooks/register.ts`) that 
 - `$.clock.sleep` counts against the hook's own time; awaiting `$.http.fetch` does not. The delivery loop is therefore a chain of `$.clock.after` timers, each running one held poll.
 - Until the engine lays the types, the mod type-checks against the `claude-code.d.ts` the `plugin-authoring` skill writes, from a tsconfig kept outside the repository.
 - The mod imports only files of the plugin, never `src/`: the secret header and the status shape are restated there by hand. For the same reason it has no Zod: a reply it reads (the launcher's line, a delivery) is checked field by field with `typeof` before use, the one exception to the root rule.
-- The engine writes the `claude-code` types into `.claude-plugin/types/` on the first load; until then `tsc -p plugin` has nothing to check against.
+- The engine writes the `claude-code` types into `.claude-plugin/types/` only when an interactive session loads the plugin; `claude plugin test` and `claude -p --plugin-dir` do not (witnessed on 2.1.330). Until then `tsc -p plugin` has nothing to check against, and CI never type-checks the mod: `check:plugin` flags the skip there with a warning.
 
 ## Related
 

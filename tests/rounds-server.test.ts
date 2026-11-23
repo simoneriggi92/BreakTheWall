@@ -1,64 +1,10 @@
 // @vitest-environment node
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { startLocalServer, type LocalServer, type LocalServerOptions } from '../src/server/server';
+import { describe, expect, it } from 'vitest';
+import { CWD, serverClient as client, SESSION, useLocalServers } from './local-server-harness';
 
-const folders: string[] = [];
-const servers: LocalServer[] = [];
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map(x => x.stop()));
-  for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
-});
-
-function folder() {
-  const path = mkdtempSync(join(tmpdir(), 'btw-rounds-'));
-  folders.push(path);
-  return path;
-}
-function pageFolder() {
-  const path = folder();
-  writeFileSync(join(path, 'index.html'), '<!doctype html><title>page</title>');
-  mkdirSync(join(path, 'assets'));
-  return path;
-}
-async function start(options: Partial<LocalServerOptions> = {}) {
-  const server = await startLocalServer({ dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...options });
-  if (!server) throw new Error('the server did not start');
-  servers.push(server);
-  return server;
-}
-
-const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
-const CWD = '/work/project';
-
-/** The local server as its callers reach it: the mod and the page, both holding the secret. */
-function client(server: LocalServer) {
-  const call = (path: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}) => fetch(`http://127.0.0.1:${server.port}${path}`, {
-    method: init.method ?? 'GET',
-    headers: { 'x-btw-secret': server.secret, ...(init.body === undefined ? {} : { 'content-type': 'application/json' }) },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    signal: init.signal,
-  });
-  return {
-    call,
-    /** What the mod does on `turn.complete`: the turn's final text, with the session it came from. */
-    turn: (text: string, session = SESSION, cwd = CWD) => call('/api/turns', { method: 'POST', body: { session, cwd, text } }),
-    /** What the page shows. */
-    round: async () => (await (await call('/api/round')).json()).round,
-    /** What the page does on every change to an answer. */
-    saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
-    /** The page's one Send. */
-    send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
-    /** The mod's long-poll for its session: the message to submit, or nothing when the hold runs out. */
-    delivery: async (session = SESSION, signal?: AbortSignal): Promise<string | undefined> => (await (await call(`/api/sessions/${session}/delivery`, { signal })).json()).message,
-    /** The same poll, with the round the message answers, which the mod confirms once it has submitted it. */
-    take: async (session = SESSION): Promise<{ round?: number; message?: string }> => (await call(`/api/sessions/${session}/delivery`)).json(),
-    /** What the mod does once `$.prompt.submit` has taken the message. */
-    confirm: (round: number, session = SESSION) => call(`/api/sessions/${session}/delivery/${round}`, { method: 'POST' }),
-  };
-}
+const { folder, start } = useLocalServers();
 
 const ROUND = `I read the server and the plugin. Two decisions are open.
 
