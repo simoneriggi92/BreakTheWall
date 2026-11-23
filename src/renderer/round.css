@@ -9,9 +9,10 @@
   grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(260px, 340px);
   grid-template-areas: "turn turn turn" "outline question return";
 }
-/* About 70 characters a line, where eyes tire least over hours of rounds. The question's box adds its own padding
-   (2 × 24px) and border (2 × 1px) to that measure, so its text, not its box, is 70ch wide. */
-.round-turn { grid-area: turn; max-width: 70ch; color: var(--muted); border-left: 3px solid var(--line); padding-left: 14px; }
+/* About 70 characters a line, where eyes tire least over hours of rounds. Measured in em, not ch: `ch` is the width
+   of a zero, so 70ch held about 99 characters of the body font (6.7px a character at 15px, measured in the page).
+   32em holds about 72. Prose keeps that measure; diagrams and options may use the question's full width. */
+.round-turn { grid-area: turn; max-width: 32em; color: var(--muted); border-left: 3px solid var(--line); padding-left: 14px; }
 .round-outline { grid-area: outline; position: sticky; top: 72px; }
 .round-outline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .round-outline-item {
@@ -28,10 +29,11 @@
 .round-outline-item.is-collapsed .round-outline-title { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-outline-item.is-collapsed.is-answered .round-outline-title { color: var(--good); }
 .round-question {
-  grid-area: question; max-width: calc(70ch + 50px); background: var(--surface); border: 1px solid var(--line);
+  grid-area: question; max-width: 760px; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 20px 24px; line-height: 1.6;
 }
-.round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; }
+.round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; max-width: 32em; }
+.round-markdown > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { max-width: 32em; }
 .round-recommendation { margin-top: 16px; padding: 12px 14px; border-radius: 9px; background: var(--accent-soft); }
 .round-recommendation h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
 .round-recommendation p { margin: 0; }
@@ -52,7 +54,7 @@
 .round-choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .round-choices [aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 /* The small "write" buttons that stand in for a field until it is needed. */
-.round-write { background: none; border: 0; padding: 2px 0; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.round-write { justify-self: start; background: none; border: 0; padding: 2px 0; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .round-write::before { content: "+ "; }
 .round-field { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
 .round-field textarea { font: inherit; font-weight: 400; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; resize: vertical; }
