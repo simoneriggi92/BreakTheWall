@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isAnswered, returnMessage, type Answer, type Draft, type RoundView } from '../../core/round-answers';
+import { answerKind, answerOf, isAnswered, returnMessage, type Answer, type Draft, type RoundView } from '../../core/round-answers';
 import type { RoundBridge } from '../http-bridge';
 import { Brand } from '../icons';
 import { renderMarkdown } from '../markdown';
@@ -16,7 +16,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   const [draft, setDraft] = useState<Draft>(round.draft);
   // Changes read the latest draft from here, so two quick edits never build on the same stale copy.
   const latest = useRef(round.draft);
-  const [focus, setFocus] = useState(() => (round.questions.find(q => !isAnswered(round.draft.answers[String(q.number)])) ?? round.questions[0]).number);
+  const [focus, setFocus] = useState(() => (round.questions.find(q => !isAnswered(answerOf(round.draft, q))) ?? round.questions[0]).number);
   const [delivered, setDelivered] = useState<string | null>(round.sent?.message ?? null);
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<'send' | 'save'>();
@@ -29,8 +29,8 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   const message = delivered ?? returnMessage(round.questions, draft, language);
   const index = Math.max(0, round.questions.findIndex(q => q.number === focus));
   const question = round.questions[index];
-  const answer = draft.answers[String(question.number)];
-  const answered = round.questions.filter(q => isAnswered(draft.answers[String(q.number)])).length;
+  const answer = answerOf(draft, question);
+  const answered = round.questions.filter(q => isAnswered(answerOf(draft, q))).length;
 
   const change = (next: Draft) => {
     if (readOnly) return;
@@ -45,7 +45,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
     change({ ...latest.current, answers: { ...latest.current.answers, [key]: merged } });
   };
   // Choosing the same thing again takes the choice back; the note stays.
-  const toggle = (choice: NonNullable<Answer['choice']>) => changeAnswer({ choice: latest.current.answers[String(question.number)]?.choice === choice ? undefined : choice });
+  const toggle = (choice: NonNullable<Answer['choice']>) => changeAnswer({ choice: answerOf(latest.current, question)?.choice === choice ? undefined : choice });
 
   async function send() {
     setSending(true);
@@ -59,9 +59,6 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
     }
   }
 
-  const stateOf = (a: Answer | undefined) => !isAnswered(a) ? r.states.unanswered
-    : a!.choice === 'recommendation' ? r.states.recommendation : a!.choice === 'none' ? r.states.none : r.states.note;
-
   return (
     <div className="round-page">
       <header className="topbar"><Brand/><div className="course-title"><strong>{r.title(round.number)}</strong></div><PreferencesMenu/></header>
@@ -72,9 +69,9 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
           <ol>
             {round.questions.map(q => (
               <li key={q.number}>
-                <button type="button" className={`round-outline-item${isAnswered(draft.answers[String(q.number)]) ? ' is-answered' : ''}`} aria-current={q.number === question.number ? 'true' : undefined} onClick={() => setFocus(q.number)}>
+                <button type="button" className={`round-outline-item${isAnswered(answerOf(draft, q)) ? ' is-answered' : ''}`} aria-current={q.number === question.number ? 'true' : undefined} onClick={() => setFocus(q.number)}>
                   <span className="round-outline-title">{r.question(q.number, q.title)}</span>
-                  <span className="round-outline-state">{stateOf(draft.answers[String(q.number)])}</span>
+                  <span className="round-outline-state">{r.states[answerKind(answerOf(draft, q))]}</span>
                 </button>
               </li>
             ))}

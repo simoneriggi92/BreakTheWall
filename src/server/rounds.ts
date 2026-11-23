@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
-import { draftSchema, emptyDraft, sessionIdSchema, type Draft, type RoundView } from '../core/round-answers';
+import { sessionIdSchema } from '../core/local-server';
+import { draftSchema, emptyDraft, type Draft, type RoundView } from '../core/round-answers';
 import { roundSchema, type Round } from '../core/round';
 
 /**
@@ -13,7 +14,7 @@ import { roundSchema, type Round } from '../core/round';
 const sentSchema = z.strictObject({
   message: z.string().max(2_000_000),
   at: z.iso.datetime(),
-  /** When the mod took it for the session; null while it waits in the queue. */
+  /** When the mod confirmed it submitted it to the session; null while it waits or is in flight. */
   deliveredAt: z.iso.datetime().nullable(),
 });
 const storedRoundSchema = z.strictObject({
@@ -34,6 +35,8 @@ export type RoundRefusal = 'unknown' | 'sent' | 'superseded';
 export class RoundStore {
   private rounds = new Map<string, StoredRound>();
   private writes = new Map<string, Promise<void>>();
+  /** Messages handed to a poll and not yet confirmed, until when; kept in memory, so a restart offers them again. */
+  private leases = new Map<string, number>();
 
   private constructor(private dir: string) {}
 
@@ -78,15 +81,28 @@ export class RoundStore {
     return null;
   }
 
-  /** The oldest message still waiting for a session, or undefined. */
-  nextDelivery(session: string): { number: number; message: string } | undefined {
-    const waiting = this.ofSession(session).filter(x => x.sent && !x.sent.deliveredAt).sort((a, b) => a.number - b.number)[0];
-    return waiting?.sent ? { number: waiting.number, message: waiting.sent.message } : undefined;
+  /**
+   * The oldest message waiting for a session, leased to the poll that takes it: not offered again until the lease
+   * runs out, and lost only once the mod confirms it submitted it. A mod that died or failed to submit leaves the
+   * message to come back.
+   */
+  take(session: string, leaseMs: number): { number: number; message: string } | undefined {
+    const now = Date.now();
+    const waiting = this.ofSession(session)
+      .filter(x => x.sent && !x.sent.deliveredAt && (this.leases.get(key(x.session, x.number)) ?? 0) <= now)
+      .sort((a, b) => a.number - b.number)[0];
+    if (!waiting?.sent) return undefined;
+    this.leases.set(key(session, waiting.number), now + leaseMs);
+    return { number: waiting.number, message: waiting.sent.message };
   }
 
-  async delivered(session: string, number: number) {
+  /** The mod submitted the message: it is delivered and never offered again. False when the round sent nothing. */
+  async confirm(session: string, number: number): Promise<boolean> {
     const found = this.rounds.get(key(session, number));
-    if (found?.sent && !found.sent.deliveredAt) await this.save({ ...found, sent: { ...found.sent, deliveredAt: new Date().toISOString() } });
+    if (!found?.sent) return false;
+    this.leases.delete(key(session, number));
+    if (!found.sent.deliveredAt) await this.save({ ...found, sent: { ...found.sent, deliveredAt: new Date().toISOString() } });
+    return true;
   }
 
   private answerable(session: string, number: number): StoredRound | RoundRefusal {

@@ -5,9 +5,10 @@ import { modMessages, nodeIsSupported } from './messages'
 /**
  * Break the Wall's mod (#94, #95): a thin adapter between a Claude Code session and the local server. It checks
  * Node, has the launcher find or start the server, keeps this session registered, serves `/break-the-wall` without a
- * model turn, posts each turn's final text, and submits the answers the server hands back as the person's own words.
- * Every decision (which server, whether to open a tab, whether a turn holds a round, the message's words) is the
- * server's, where it is tested.
+ * model turn, posts each main-loop turn's final text, and submits the answers the server hands back as the person's
+ * own words. It drops only what the server cannot see is not the session's own answer (a subagent's report, an
+ * interrupted turn); every other decision (which server, whether to open a tab, whether a turn holds a round, the
+ * message's words) is the server's, where it is tested.
  */
 const COMMAND = 'break-the-wall'
 /** Well inside the server's two-minute registration, so a live session never lapses. */
@@ -101,8 +102,8 @@ function postTo($: EngineInterface, to: Server, path: string, body: string) {
 
 /**
  * One long-poll for this session's answers, then the next on a timer: the server holds it below `$.http.fetch`'s
- * 30 seconds. A message is submitted as the person's own words; `$.prompt.submit` waits until the session is idle.
- * The session id is read again each time, as `/clear` and `/resume` change it.
+ * 30 seconds. A message is submitted as the person's own words (`$.prompt.submit` waits until the session is idle)
+ * and then confirmed. The session id is read again each time, as `/clear` and `/resume` change it.
  */
 async function pollDelivery($: EngineInterface) {
   let wait = DELIVERY_RETRY_MS
@@ -112,8 +113,12 @@ async function pollDelivery($: EngineInterface) {
       const reply = await $.http.fetch(`http://127.0.0.1:${server.port}/api/sessions/${encodeURIComponent(id)}/delivery`, { headers: { 'x-btw-secret': server.secret } })
       if (reply.ok) {
         wait = 1
-        const { message } = JSON.parse(reply.text) as { message?: unknown }
-        if (typeof message === 'string' && message !== '') await $.prompt.submit({ text: message, asUser: true })
+        const { round, message } = JSON.parse(reply.text) as { round?: unknown; message?: unknown }
+        if (typeof round === 'number' && typeof message === 'string' && message !== '') {
+          await $.prompt.submit({ text: message, asUser: true })
+          // Confirmed only once submitted: a submit that fails leaves the message to come back after its lease.
+          await $.http.fetch(`http://127.0.0.1:${server.port}/api/sessions/${encodeURIComponent(id)}/delivery/${round}`, { method: 'POST', headers: { 'x-btw-secret': server.secret } })
+        }
       }
     }
   } catch (error) {

@@ -3,9 +3,9 @@ import { readFile, realpath } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { z } from 'zod';
-import { SECRET_HEADER, type ServerStatus } from '../core/local-server';
+import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
-import { draftSchema, messageLanguageSchema, returnMessage, sessionIdSchema } from '../core/round-answers';
+import { draftSchema, messageLanguageSchema, returnMessage } from '../core/round-answers';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type RoundRefusal } from './rounds';
 
@@ -31,6 +31,11 @@ export interface LocalServerOptions {
   pageGraceMs?: number;
   /** How long the mod's delivery poll is held: below `$.http.fetch`'s 30 seconds per call. */
   deliveryHoldMs?: number;
+  /**
+   * How long a message handed to the mod waits for its confirmation before it is offered again. Long, because
+   * `$.prompt.submit` first waits for the session to be idle: a shorter lease would deliver twice.
+   */
+  deliveryLeaseMs?: number;
 }
 export interface LocalServer {
   port: number;
@@ -56,10 +61,11 @@ const MAX_ANSWER_BYTES = 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
+const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(\d{1,6})$/;
 const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<LocalServer | null> {
-  const { idleMs = 10 * 60_000, checkEveryMs = 15_000, sessionTtlMs = 2 * 60_000, pollHoldMs = 25_000, pageGraceMs = 10_000, deliveryHoldMs = 20_000 } = options;
+  const { idleMs = 10 * 60_000, checkEveryMs = 15_000, sessionTtlMs = 2 * 60_000, pollHoldMs = 25_000, pageGraceMs = 10_000, deliveryHoldMs = 20_000, deliveryLeaseMs = 10 * 60_000 } = options;
   const secret = randomBytes(32).toString('base64url');
   const server = createServer();
   await new Promise<void>((done, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', () => { server.off('error', fail); done(); }); });
@@ -74,7 +80,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const sessions = new Map<string, { cwd: string; until: number }>();
   /** Open page polls, answered early when what the page shows has changed. */
   const pagePolls = new Set<() => void>();
-  /** Mod polls waiting for a message, by session. */
+  /** Mod polls waiting for a message, by session, so a Send wakes only the session it answers. */
   const deliveryPolls = new Map<string, Set<() => void>>();
   const pageChanged = () => { for (const wake of [...pagePolls]) wake(); };
   let openPolls = 0;
@@ -126,8 +132,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       if (!registration.success) return send(res, 400, { error: 'bad-request' });
       sessions.set(registration.data.id, { cwd: registration.data.cwd, until: Date.now() + sessionTtlMs });
       lastBusy = Date.now();
-      res.writeHead(204, { 'cache-control': 'no-store' }).end();
-      return;
+      return noContent(res);
     }
     if (req.method === 'POST' && path === '/api/turns') {
       const turn = turnSchema.safeParse(await readJson(req, MAX_TURN_BYTES));
@@ -147,8 +152,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         if (!draft.success) return send(res, 400, { error: 'bad-request' });
         const refused = await rounds.saveDraft(session, Number(number), draft.data);
         if (refused) return send(res, REFUSED[refused], { error: refused });
-        res.writeHead(204, { 'cache-control': 'no-store' }).end();
-        return;
+        return noContent(res);
       }
       if (req.method === 'POST' && action === 'send') {
         const body = sendSchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
@@ -167,6 +171,11 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     }
     const deliveryPath = DELIVERY_PATH.exec(path);
     if (req.method === 'GET' && deliveryPath && sessionIdSchema.safeParse(deliveryPath[1]).success) return holdDelivery(deliveryPath[1], req, res);
+    const confirmPath = CONFIRM_PATH.exec(path);
+    if (req.method === 'POST' && confirmPath && sessionIdSchema.safeParse(confirmPath[1]).success) {
+      if (!await rounds.confirm(confirmPath[1], Number(confirmPath[2]))) return send(res, 404, { error: 'unknown' });
+      return noContent(res);
+    }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
     return send(res, 404, { error: 'not-found' });
   }
@@ -190,7 +199,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
 
   /**
    * The mod's long-poll for one session: the oldest message waiting for it, at once or as soon as the person sends
-   * one, or nothing once the hold runs out. A message counts as delivered only once it is written to an open poll.
+   * one, or nothing once the hold runs out. The message goes out with its round, which the mod confirms once
+   * `$.prompt.submit` has taken it.
    */
   function holdDelivery(session: string, req: IncomingMessage, res: ServerResponse) {
     let ended = false;
@@ -205,11 +215,12 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return true;
     };
     function offer() {
-      const next = rounds.nextDelivery(session);
-      if (!next || res.destroyed || !end()) return;
-      // Marked before the reply goes out, so a second poll racing this one never takes the same message.
-      void rounds.delivered(session, next.number).catch(() => {});
-      send(res, 200, { message: next.message });
+      if (res.destroyed || ended) return;
+      // Leased before the reply goes out, so a second poll racing this one never takes the same message.
+      const next = rounds.take(session, deliveryLeaseMs);
+      if (!next) return;
+      end();
+      send(res, 200, { round: next.number, message: next.message });
     }
     const timer = setTimeout(() => { if (end()) send(res, 200, {}); }, deliveryHoldMs);
     waiting.add(offer);
@@ -273,6 +284,10 @@ async function takeLock(dataDir: string, own: ServerLock): Promise<boolean> {
 function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
   res.end(JSON.stringify(body));
+}
+
+function noContent(res: ServerResponse) {
+  res.writeHead(204, { 'cache-control': 'no-store' }).end();
 }
 
 function close(server: Server) {

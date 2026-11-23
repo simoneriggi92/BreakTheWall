@@ -25,13 +25,14 @@ const RECOMMENDATION = /^\s*➡️?\s*(.*)$/u;
 const SEPARATOR = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const FENCE = /^\s*(`{3,}|~{3,})/;
 
-interface Draft { number: number; title: string; body: string[]; recommendation: string[] | null; done: boolean }
+/** A question while its lines are read: `done` once a separator or the end of its recommendation closes it. */
+interface PendingQuestion { number: number; title: string; body: string[]; recommendation: string[] | null; done: boolean }
 
 /** The round in an agent's turn, or null when the turn asks no question in the skill's format. */
 export function parseRound(text: string): Round | null {
   const outside: string[] = [];
-  const questions: Draft[] = [];
-  let current: Draft | undefined;
+  const questions: PendingQuestion[] = [];
+  let current: PendingQuestion | undefined;
   let fence: string | undefined;
 
   for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
@@ -76,5 +77,5 @@ export function parseRound(text: string): Round | null {
   }
 }
 
-/** Lines joined, trimmed, with no more than one blank line in a row. */
+/** Lines joined and trimmed; the blank lines left where a question was cut out collapse to one. */
 const tidy = (lines: string[]) => lines.join('\n').replace(/\n[ \t]*(?:\n[ \t]*)+\n/g, '\n\n').trim();

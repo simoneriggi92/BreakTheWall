@@ -1,13 +1,11 @@
 import { z } from 'zod';
+import { sessionIdSchema } from './local-server';
 import { questionSchema, type Question } from './round';
 
 /**
  * What the person gives a round and what returns to the agent (#95). The page builds the message live from the same
  * function the server sends with, so "what the agent receives" is exactly what it receives.
  */
-
-/** A Claude Code session id; it names a folder on disk, so nothing but letters, digits, `-` and `_`. */
-export const sessionIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
 
 /** No options list yet (#96): a question takes the recommendation, no choice, or only a note. */
 export const answerSchema = z.strictObject({
@@ -17,7 +15,7 @@ export const answerSchema = z.strictObject({
 export const draftSchema = z.strictObject({
   /** One per round; it returns at the top of the message. */
   generalNote: z.string().max(50_000),
-  /** Keyed by question number. */
+  /** Keyed by question number, as JSON keys are strings: a question the person never touched has no entry. */
   answers: z.record(z.string().regex(/^\d{1,3}$/), answerSchema),
 });
 export type Answer = z.infer<typeof answerSchema>;
@@ -42,12 +40,20 @@ export const roundViewSchema = z.strictObject({
 });
 export type RoundView = z.infer<typeof roundViewSchema>;
 
-export const isAnswered = (answer: Answer | undefined) => !!answer && (answer.choice !== undefined || answer.note.trim() !== '');
+export const answerOf = (draft: Draft, question: Pick<Question, 'number'>): Answer | undefined => draft.answers[String(question.number)];
 
-/** The message's fixed words follow the page's interface language. */
-const WORDS: Record<MessageLanguage, { recommendation: string; none: string; noAnswer: string }> = {
-  it: { recommendation: 'raccomandazione', none: 'nessuna scelta', noAnswer: 'nessuna risposta' },
-  en: { recommendation: 'recommendation', none: 'no choice', noAnswer: 'no answer' },
+/** What an answer amounts to: the outline's state and the message's title line both follow it. */
+export type AnswerKind = 'unanswered' | 'recommendation' | 'none' | 'note';
+export function answerKind(answer: Answer | undefined): AnswerKind {
+  if (answer?.choice) return answer.choice;
+  return answer && answer.note.trim() !== '' ? 'note' : 'unanswered';
+}
+export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
+
+/** The words on a question's title line, in the page's interface language; a note alone puts none there. */
+const TITLE_WORDS: Record<MessageLanguage, Record<AnswerKind, string>> = {
+  it: { recommendation: 'raccomandazione', none: 'nessuna scelta', unanswered: 'nessuna risposta', note: '' },
+  en: { recommendation: 'recommendation', none: 'no choice', unanswered: 'no answer', note: '' },
 };
 
 /**
@@ -55,17 +61,15 @@ const WORDS: Record<MessageLanguage, { recommendation: string; none: string; noA
  * title, so it still reads after compaction, the choice on the title line and the note indented below.
  */
 export function returnMessage(questions: readonly Question[], draft: Draft, language: MessageLanguage): string {
-  const words = WORDS[language];
   const lines: string[] = [];
   const general = draft.generalNote.trim();
   if (general) lines.push(general, '');
   for (const question of questions) {
-    const answer = draft.answers[String(question.number)];
+    const answer = answerOf(draft, question);
+    const word = TITLE_WORDS[language][answerKind(answer)];
     const title = `**Q${question.number} · ${question.title}**`;
-    if (!isAnswered(answer)) { lines.push(`${title} ${words.noAnswer}`); continue; }
-    const choice = answer!.choice === 'recommendation' ? words.recommendation : answer!.choice === 'none' ? words.none : '';
-    lines.push(choice ? `${title} ${choice}` : title);
-    const note = answer!.note.trim();
+    lines.push(word ? `${title} ${word}` : title);
+    const note = answer?.note.trim();
     if (note) lines.push(...note.split(/\r?\n/).map(line => line.trim() ? `  ${line}` : ''));
   }
   return lines.join('\n');

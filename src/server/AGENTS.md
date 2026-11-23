@@ -27,7 +27,7 @@ The status contract and the secret header are in `src/core/local-server.ts`, sha
 - A `/api/status` call restarts the idle clock, so a launcher that just found the server never sees it stop under it.
 - The server listens on a random port: after a restart an open tab cannot reconnect, and says to open the page from Claude Code again.
 - `BTW_USER_DATA_DIR` isolates the data folder, as in the app; tests and `smoke:page` rely on it.
-- The delivery poll is held 20 s, below `$.http.fetch`'s 30 s per call. A message counts as delivered once it is written to an open poll; it is marked before the reply goes out, so two racing polls never both take it.
+- The delivery poll is held 20 s, below `$.http.fetch`'s 30 s per call. A message handed to a poll is leased (10 minutes, in memory) and counts as delivered only when the mod confirms it submitted it; unconfirmed, it comes back after the lease or a restart. The lease is long because `$.prompt.submit` first waits for the session to be idle.
 - A session id names a folder, so every route that takes one checks it against `sessionIdSchema` first.
 
 ## Related

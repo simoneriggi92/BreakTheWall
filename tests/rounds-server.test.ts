@@ -53,6 +53,10 @@ function client(server: LocalServer) {
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
     /** The mod's long-poll for its session: the message to submit, or nothing when the hold runs out. */
     delivery: async (session = SESSION, signal?: AbortSignal): Promise<string | undefined> => (await (await call(`/api/sessions/${session}/delivery`, { signal })).json()).message,
+    /** The same poll, with the round the message answers, which the mod confirms once it has submitted it. */
+    take: async (session = SESSION): Promise<{ round?: number; message?: string }> => (await call(`/api/sessions/${session}/delivery`)).json(),
+    /** What the mod does once `$.prompt.submit` has taken the message. */
+    confirm: (round: number, session = SESSION) => call(`/api/sessions/${session}/delivery/${round}`, { method: 'POST' }),
   };
 }
 
@@ -254,6 +258,42 @@ describe('the answers return to the session (#95)', () => {
     await first.stop();
     const second = await start({ dataDir });
     expect(await client(second).delivery()).toContain('Both look right');
+  });
+});
+
+describe('a message is lost only once the mod confirms it submitted it (#95)', () => {
+  const quick = { deliveryHoldMs: 100, deliveryLeaseMs: 200 };
+
+  it('offers a message the mod took but never confirmed again once its lease runs out, as when the submit failed', async () => {
+    const api = client(await start(quick));
+    await api.turn(ROUND);
+    await api.send(1, ANSWERED);
+    const taken = await api.take();
+    expect(taken).toMatchObject({ round: 1, message: expect.stringContaining('Both look right') });
+    expect(await api.delivery()).toBeUndefined();
+    await new Promise(done => setTimeout(done, quick.deliveryLeaseMs + 50));
+    expect(await api.delivery()).toBe(taken.message);
+  });
+
+  it('never offers a confirmed message again, not after its lease and not after a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir, ...quick });
+    await client(first).turn(ROUND);
+    await client(first).send(1, ANSWERED);
+    const taken = await client(first).take();
+    expect((await client(first).confirm(taken.round!)).status).toBe(204);
+    await new Promise(done => setTimeout(done, quick.deliveryLeaseMs + 50));
+    expect(await client(first).delivery()).toBeUndefined();
+    await first.stop();
+    const second = await start({ dataDir, ...quick });
+    expect(await client(second).delivery()).toBeUndefined();
+  });
+
+  it('refuses a confirmation for a round that sent nothing', async () => {
+    const api = client(await start(quick));
+    await api.turn(ROUND);
+    expect((await api.confirm(1)).status).toBe(404);
+    expect((await api.confirm(5)).status).toBe(404);
   });
 });
 
