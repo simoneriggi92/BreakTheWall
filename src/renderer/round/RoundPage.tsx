@@ -221,15 +221,19 @@ const RAIL = '(max-width: 1180px)', DRAWER = '(max-width: 860px)';
  * without it (a test environment) the page is wide.
  */
 function useWidthBand(): WidthBand {
-  return useSyncExternalStore(changed => {
-    if (typeof window.matchMedia !== 'function') return () => {};
-    const lists = [window.matchMedia(RAIL), window.matchMedia(DRAWER)];
-    lists.forEach(list => list.addEventListener('change', changed));
-    return () => lists.forEach(list => list.removeEventListener('change', changed));
-  }, () => {
-    if (typeof window.matchMedia !== 'function') return 'wide';
-    return window.matchMedia(DRAWER).matches ? 'drawer' : window.matchMedia(RAIL).matches ? 'rail' : 'wide';
-  });
+  return useSyncExternalStore(subscribeToWidth, widthBand);
+}
+// At module level: React subscribes again whenever it is handed a new subscribe function, so an inline one would
+// re-register both listeners on every render.
+function subscribeToWidth(changed: () => void) {
+  if (typeof window.matchMedia !== 'function') return () => {};
+  const lists = [window.matchMedia(RAIL), window.matchMedia(DRAWER)];
+  lists.forEach(list => list.addEventListener('change', changed));
+  return () => lists.forEach(list => list.removeEventListener('change', changed));
+}
+function widthBand(): WidthBand {
+  if (typeof window.matchMedia !== 'function') return 'wide';
+  return window.matchMedia(DRAWER).matches ? 'drawer' : window.matchMedia(RAIL).matches ? 'rail' : 'wide';
 }
 
 const inField = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));

@@ -354,16 +354,17 @@ describe('reading one question comfortably (#97)', () => {
 /** A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. */
 function viewport(width: number) {
   const lists = new Set<{ query: string; listeners: Set<() => void> }>();
+  let subscribed = 0;
   const matches = (query: string) => { const max = /max-width:\s*(\d+)px/.exec(query); return max ? width <= Number(max[1]) : false; };
   window.matchMedia = ((query: string) => {
     const list = { query, listeners: new Set<() => void>() };
     lists.add(list);
     return {
       get matches() { return matches(query); }, media: query,
-      addEventListener: (_: string, f: () => void) => list.listeners.add(f), removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
+      addEventListener: (_: string, f: () => void) => { subscribed++; list.listeners.add(f); }, removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
     };
   }) as unknown as typeof window.matchMedia;
-  return { resize: (next: number) => { width = next; act(() => lists.forEach(l => l.listeners.forEach(f => f()))); } };
+  return { resize: (next: number) => { width = next; act(() => lists.forEach(l => l.listeners.forEach(f => f()))); }, subscriptions: () => subscribed };
 }
 
 describe('the round beside a terminal (#97)', () => {
@@ -386,6 +387,16 @@ describe('the round beside a terminal (#97)', () => {
     expect(screen.getByRole('article')).toHaveTextContent('The mod or the server.');
     // The right column is still a column at this width.
     expect(receives()).toBeInTheDocument();
+  });
+
+  it('listens to the window\'s width once, not again on every answer', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    const before = browser.subscriptions();
+    await user.keyboard('yjy');
+    expect(browser.subscriptions()).toBe(before);
   });
 
   it('turns the right column into a drawer below ~860 px, opened from the top bar and closed with Escape', async () => {
