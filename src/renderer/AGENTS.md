@@ -12,7 +12,8 @@ The React interface: library, studio, the exploration view with its three roles 
 | `exploration/` | The exploration view and its shared state (`state.ts`, `model.ts`) |
 | `disassembly/` | The disassembly player (run and reassemble), kept readable |
 | `i18n/` | Text catalogs: `it.ts` and `en.ts` for the app, `x-it.ts` and `x-en.ts` for the exploration, `devices.ts` for words that name the computer |
-| `LocalPage.tsx`, `http-bridge.ts` | The local page's entry (`vite build --mode page`): the secret from the fragment, the HTTP bridge, the page's poll |
+| `LocalPage.tsx`, `http-bridge.ts` | The local page's entry (`vite build --mode page`): the secret from the fragment, the HTTP bridge, the page's poll, which reads the latest round again whenever it answers |
+| `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline, one question in focus, "what the agent receives" live, one Send, read-only once sent |
 | `markdown.ts`, `diagrams.ts`, `svg-mount.ts` | Rendering a source as a document, and its Mermaid diagrams |
 
 ## Commands

@@ -4,7 +4,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { SECRET_HEADER, type ServerStatus } from '../core/local-server';
+import { parseRound } from '../core/round';
+import { draftSchema, messageLanguageSchema, returnMessage, sessionIdSchema } from '../core/round-answers';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
+import { RoundStore, type RoundRefusal } from './rounds';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -26,6 +29,8 @@ export interface LocalServerOptions {
   pollHoldMs?: number;
   /** A page still counts as connected for this long after a poll ends, the gap before its next poll. */
   pageGraceMs?: number;
+  /** How long the mod's delivery poll is held: below `$.http.fetch`'s 30 seconds per call. */
+  deliveryHoldMs?: number;
 }
 export interface LocalServer {
   port: number;
@@ -40,11 +45,21 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 
-const registrationSchema = z.strictObject({ id: z.string().min(1).max(200), cwd: z.string().min(1).max(4096) });
+const cwdSchema = z.string().min(1).max(4096);
+const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema });
+/** A turn's final text, as the mod posts it on `turn.complete`; the server decides whether it holds a round. */
+const turnSchema = z.strictObject({ session: sessionIdSchema, cwd: cwdSchema, text: z.string().max(1_000_000) });
 const MAX_BODY_BYTES = 64 * 1024;
+/** A turn's text, with room for the JSON escaping of a long round. */
+const MAX_TURN_BYTES = 4 * 1024 * 1024;
+const MAX_ANSWER_BYTES = 1024 * 1024;
+const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
+const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
+const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
+const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<LocalServer | null> {
-  const { idleMs = 10 * 60_000, checkEveryMs = 15_000, sessionTtlMs = 2 * 60_000, pollHoldMs = 25_000, pageGraceMs = 10_000 } = options;
+  const { idleMs = 10 * 60_000, checkEveryMs = 15_000, sessionTtlMs = 2 * 60_000, pollHoldMs = 25_000, pageGraceMs = 10_000, deliveryHoldMs = 20_000 } = options;
   const secret = randomBytes(32).toString('base64url');
   const server = createServer();
   await new Promise<void>((done, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', () => { server.off('error', fail); done(); }); });
@@ -53,9 +68,15 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const staticRoot = await realpath(options.staticDir);
   const own: ServerLock = { port, pid: process.pid, version: options.version, secret };
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
+  const rounds = await RoundStore.open(options.dataDir);
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
+  /** Open page polls, answered early when what the page shows has changed. */
+  const pagePolls = new Set<() => void>();
+  /** Mod polls waiting for a message, by session. */
+  const deliveryPolls = new Map<string, Set<() => void>>();
+  const pageChanged = () => { for (const wake of [...pagePolls]) wake(); };
   let openPolls = 0;
   let lastPollEnd = -Infinity;
   let lastBusy = Date.now();
@@ -108,11 +129,49 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       res.writeHead(204, { 'cache-control': 'no-store' }).end();
       return;
     }
+    if (req.method === 'POST' && path === '/api/turns') {
+      const turn = turnSchema.safeParse(await readJson(req, MAX_TURN_BYTES));
+      if (!turn.success) return send(res, 400, { error: 'bad-request' });
+      const round = parseRound(turn.data.text);
+      if (!round) return send(res, 200, { round: null });
+      const stored = await rounds.add(turn.data.session, turn.data.cwd, round);
+      pageChanged();
+      return send(res, 200, { round: stored.number });
+    }
+    if (req.method === 'GET' && path === '/api/round') return send(res, 200, { round: rounds.latest() });
+    const roundPath = ROUND_PATH.exec(path);
+    if (roundPath && sessionIdSchema.safeParse(roundPath[1]).success) {
+      const [, session, number, action] = roundPath;
+      if (req.method === 'PUT' && action === 'draft') {
+        const draft = draftSchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
+        if (!draft.success) return send(res, 400, { error: 'bad-request' });
+        const refused = await rounds.saveDraft(session, Number(number), draft.data);
+        if (refused) return send(res, REFUSED[refused], { error: refused });
+        res.writeHead(204, { 'cache-control': 'no-store' }).end();
+        return;
+      }
+      if (req.method === 'POST' && action === 'send') {
+        const body = sendSchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
+        if (!body.success) return send(res, 400, { error: 'bad-request' });
+        const questions = rounds.questions(session, Number(number));
+        if (!questions) return send(res, 404, { error: 'unknown' });
+        // The server words the message with the same function the page previews it with: what the person saw is
+        // what the agent receives.
+        const message = returnMessage(questions, body.data.draft, body.data.language);
+        const refused = await rounds.send(session, Number(number), body.data.draft, message);
+        if (refused) return send(res, REFUSED[refused], { error: refused });
+        for (const wake of [...deliveryPolls.get(session) ?? []]) wake();
+        pageChanged();
+        return send(res, 200, { message });
+      }
+    }
+    const deliveryPath = DELIVERY_PATH.exec(path);
+    if (req.method === 'GET' && deliveryPath && sessionIdSchema.safeParse(deliveryPath[1]).success) return holdDelivery(deliveryPath[1], req, res);
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
     return send(res, 404, { error: 'not-found' });
   }
 
-  /** Held open until it times out or the page goes away; later tickets answer it with what the page must show. */
+  /** Held open until it times out, the page goes away, or what the page shows changes (`changed`). */
   function holdPoll(req: IncomingMessage, res: ServerResponse) {
     openPolls++;
     let ended = false;
@@ -120,10 +179,43 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       if (ended) return;
       ended = true; openPolls--; lastPollEnd = Date.now(); lastBusy = Date.now();
       clearTimeout(timer);
+      pagePolls.delete(wake);
     };
+    const wake = () => { if (ended) return; end(); send(res, 200, { changed: true }); };
+    pagePolls.add(wake);
     const timer = setTimeout(() => { end(); send(res, 200, {}); }, pollHoldMs);
     req.on('close', end);
     res.on('close', end);
+  }
+
+  /**
+   * The mod's long-poll for one session: the oldest message waiting for it, at once or as soon as the person sends
+   * one, or nothing once the hold runs out. A message counts as delivered only once it is written to an open poll.
+   */
+  function holdDelivery(session: string, req: IncomingMessage, res: ServerResponse) {
+    let ended = false;
+    const waiting = deliveryPolls.get(session) ?? new Set<() => void>();
+    deliveryPolls.set(session, waiting);
+    const end = () => {
+      if (ended) return false;
+      ended = true;
+      clearTimeout(timer);
+      waiting.delete(offer);
+      if (waiting.size === 0) deliveryPolls.delete(session);
+      return true;
+    };
+    function offer() {
+      const next = rounds.nextDelivery(session);
+      if (!next || res.destroyed || !end()) return;
+      // Marked before the reply goes out, so a second poll racing this one never takes the same message.
+      void rounds.delivered(session, next.number).catch(() => {});
+      send(res, 200, { message: next.message });
+    }
+    const timer = setTimeout(() => { if (end()) send(res, 200, {}); }, deliveryHoldMs);
+    waiting.add(offer);
+    req.on('close', end);
+    res.on('close', end);
+    offer();
   }
 
   function hasSecret(value: string | string[] | undefined) {
@@ -153,12 +245,12 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
 }
 
 /** The request's JSON body, or undefined when it is too large or not JSON. */
-async function readJson(req: IncomingMessage): Promise<unknown> {
+async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Buffer>) {
     size += chunk.byteLength;
-    if (size > MAX_BODY_BYTES) return undefined;
+    if (size > maxBytes) return undefined;
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return undefined; }
