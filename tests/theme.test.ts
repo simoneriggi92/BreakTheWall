@@ -14,6 +14,13 @@ const luminance = (hex: string) => {
 };
 const contrast = (a: string, b: string) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
 
+/** The round page's stylesheet as it ships, comments left out (#123–#126). */
+const roundCss = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+/** The declarations of every rule in it whose selector list names `selector` as one of its members, in source order. */
+const declarations = (selector: string) => [...roundCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+  .map(m => m[2]).join(';');
+
 // Text drawn on each background, including joint labels in their kind's color.
 const PAIRS: [string, string][] = [
   ['ink', 'bg'], ['ink', 'surface'], ['ink', 'sunk'], ['muted', 'bg'], ['muted', 'surface'], ['muted', 'sunk'],
@@ -103,11 +110,6 @@ describe('the exploration stylesheet (X11)', () => {
 });
 
 describe('the round page as a drafting sheet (#123)', () => {
-  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  /** The declarations of every rule whose selector list names `selector` as one of its members, in source order. */
-  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
-    .map(m => m[2]).join(';');
 
   it('draws the strong grid behind a round and a free block: fine lines every 20 px, major ones every 100 px', () => {
     const page = declarations('.round-page');
@@ -147,46 +149,41 @@ describe('the round page as a drafting sheet (#123)', () => {
   });
 
   it('requests no font and names no face of its own', () => {
-    expect(css).not.toMatch(/@font-face|@import|url\(/);
-    const faces = [...css.matchAll(/font(?:-family)?:\s*([^;}]+)/g)].map(m => m[1]);
+    expect(roundCss).not.toMatch(/@font-face|@import|url\(/);
+    const faces = [...roundCss.matchAll(/font(?:-family)?:\s*([^;}]+)/g)].map(m => m[1]);
     expect(faces.filter(x => /["']|\b(serif|sans-serif|monospace)\b/.test(x))).toEqual([]);
   });
 
   it('uses tokens only: no literal colour', () => {
-    expect(css.replace(/var\(--[a-z0-9-]+/g, 'var(').match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi)).toBeNull();
+    expect(roundCss.replace(/var\(--[a-z0-9-]+/g, 'var(').match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi)).toBeNull();
   });
 });
 
 describe('the round head (#126)', () => {
-  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  /** The declarations of every rule whose selector list names `selector`, in source order: the last one wins. */
-  const rule = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
-    .map(m => m[2]).join(';');
-  const last = (selector: string, property: string) => [...rule(selector).matchAll(new RegExp(`(?:^|[;\\s])${property}:\\s*([^;]+)`, 'g'))].at(-1)?.[1].trim();
+  const last = (selector: string, property: string) => [...declarations(selector).matchAll(new RegExp(`(?:^|[;\\s])${property}:\\s*([^;]+)`, 'g'))].at(-1)?.[1].trim();
   const THEMES = [':root, :root[data-theme="paper"]', ':root[data-theme="blueprint"]'];
 
   it('reads the agent’s text as a page: full ink at 15/1.6, about 64 characters a line', () => {
     expect(last('.round-turn', 'color')).toBeUndefined();
-    expect(rule('.agent-text')).toMatch(/color: var\(--ink\)/);
-    expect(rule('.agent-text')).toMatch(/font-size: 15px/);
-    expect(rule('.agent-text')).toMatch(/line-height: 1\.6/);
+    expect(declarations('.agent-text')).toMatch(/color: var\(--ink\)/);
+    expect(declarations('.agent-text')).toMatch(/font-size: 15px/);
+    expect(declarations('.agent-text')).toMatch(/line-height: 1\.6/);
     // `ch` is a zero's width, so 64ch would hold about 90 characters of the body face; 29em holds about 64.
     expect(last('.agent-text .round-markdown > *', 'max-width')).toBe('29em');
-    expect(css).not.toMatch(/\.round-turn \.round-markdown > \* \{ max-width: none; \}/);
+    expect(roundCss).not.toMatch(/\.round-turn \.round-markdown > \* \{ max-width: none; \}/);
   });
 
   it('gives the text a visible hierarchy: display headings at 16 px, accent list markers, inline code on --sunk, paragraphs .75em apart', () => {
-    const headings = rule('.agent-text .round-markdown :is(h1, h2, h3, h4, h5, h6)');
+    const headings = declarations('.agent-text .round-markdown :is(h1, h2, h3, h4, h5, h6)');
     expect(headings).toMatch(/font-family: var\(--f-display\)/);
     expect(headings).toMatch(/font-size: 16px/);
-    expect(rule('.agent-text li::marker')).toMatch(/color: var\(--accent\)/);
-    expect(rule('.agent-text :not(pre) > code')).toMatch(/background: var\(--sunk\)/);
-    expect(rule('.agent-text .round-markdown > * + *')).toMatch(/margin-top: \.75em/);
+    expect(declarations('.agent-text li::marker')).toMatch(/color: var\(--accent\)/);
+    expect(declarations('.agent-text :not(pre) > code')).toMatch(/background: var\(--sunk\)/);
+    expect(declarations('.agent-text .round-markdown > * + *')).toMatch(/margin-top: \.75em/);
   });
 
   it('heads it with a static chip in the mono face, 11.5 px on --sunk with a hairline', () => {
-    const chip = rule('.turn-chip');
+    const chip = declarations('.turn-chip');
     expect(chip).toMatch(/font: [^;]*11\.5px[^;]*var\(--f-mono\)/);
     expect(chip).toMatch(/border: 1px solid var\(--line\)/);
     expect(chip).not.toMatch(/animation|transition/);
@@ -206,8 +203,8 @@ describe('the round head (#126)', () => {
   });
 
   it('folds to one line: the chip, the first line cut with an ellipsis, the control', () => {
-    expect(rule('.agent-text.is-folded')).toMatch(/grid-template-columns: auto minmax\(0, 1fr\) auto/);
-    const line = rule('.turn-line');
+    expect(declarations('.agent-text.is-folded')).toMatch(/grid-template-columns: auto minmax\(0, 1fr\) auto/);
+    const line = declarations('.turn-line');
     expect(line).toMatch(/white-space: nowrap/);
     expect(line).toMatch(/text-overflow: ellipsis/);
     expect(line).toMatch(/overflow: hidden/);
@@ -215,11 +212,6 @@ describe('the round head (#126)', () => {
 });
 
 describe('the progress strip at the window\'s foot (#125)', () => {
-  // The #123 block's reader, kept apart so the tickets built beside this one merge without touching each other.
-  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
-    .map(m => m[2]).join(';');
 
   it('fixes a 42 px strip to the window\'s foot, its text on --surface', () => {
     const strip = declarations('.round-strip');
@@ -246,10 +238,6 @@ describe('the progress strip at the window\'s foot (#125)', () => {
 });
 
 describe('the rail as a ruler and the question\'s numeral (#124)', () => {
-  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
-    .map(m => m[2]).join(';');
   /** `fg` laid over `bg` at `share` percent, as `color-mix(in srgb, fg share%, transparent)` draws it on that ground. */
   const over = (fg: string, share: number, bg: string) => '#' + [1, 3, 5]
     .map(i => Math.round(parseInt(fg.slice(i, i + 2), 16) * share / 100 + parseInt(bg.slice(i, i + 2), 16) * (1 - share / 100)))
