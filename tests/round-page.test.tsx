@@ -17,6 +17,7 @@ const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
 
 const ROUND: RoundView = {
   session: SESSION,
+  cwd: '/Users/someone/Projects/BreakTheWall',
   number: 1,
   receivedAt: '2026-11-23T10:00:00.000Z',
   turnText: 'I read the server and the plugin. Two decisions are open.',
@@ -61,6 +62,8 @@ function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; 
       init?.signal?.addEventListener('abort', () => fail(new DOMException('aborted', 'AbortError')));
     });
     if (method === 'PUT' && url === `/api/rounds/${SESSION}/1/draft`) return new Response(null, { status: 204 });
+    if (method === 'PUT' && url === `/api/rounds/${SESSION}/${round?.number}/fold`) { round = round && { ...round, turnFolded: (body as { folded: boolean }).folded }; return new Response(null, { status: 204 }); }
+    if (method === 'PUT' && url === `/api/free/${SESSION}/1/fold`) { free = free && { ...free, turnFolded: (body as { folded: boolean }).folded }; return new Response(null, { status: 204 }); }
     if (method === 'POST' && url === `/api/rounds/${SESSION}/1/send`) {
       // The server words the message; the page must show the server's words, not its own preview.
       const message = `as delivered by the server (${(body as { language: string }).language})`;
@@ -431,17 +434,6 @@ describe('folding the parts of a round', () => {
     expect(receives()).toBeVisible();
   });
 
-  it('folds the turn’s text to one line and shows it again', async () => {
-    const user = userEvent.setup();
-    render(<LocalPage fetch={fakeServer().fetch}/>);
-    const turn = await screen.findByRole('region', { name: 'The turn’s text' });
-    await user.click(within(turn).getByRole('button', { name: 'Hide the agent’s text' }));
-    expect(turn).not.toHaveTextContent('Two decisions are open.');
-
-    await user.click(within(turn).getByRole('button', { name: 'Show the agent’s text' }));
-    expect(turn).toHaveTextContent('Two decisions are open.');
-  });
-
   it('remembers what was folded when the page opens again', async () => {
     const user = userEvent.setup();
     const first = render(<LocalPage fetch={fakeServer().fetch}/>);
@@ -804,6 +796,7 @@ describe('remarks on a question\'s passage (#98)', () => {
 
 const FREE: FreeBlockView = {
   session: SESSION,
+  cwd: '/Users/someone/Projects/BreakTheWall',
   number: 1,
   receivedAt: '2026-11-23T10:04:00.000Z',
   text: 'Before the next round: do you mean **the page** or the terminal when you say "the view"?',
@@ -940,6 +933,77 @@ describe('the round page as a drafting sheet (#123)', () => {
     await user.click(foldQuestions);
     expect(screen.queryByRole('heading', { level: 2, name: 'Questions' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Unfold the questions' })).toBeInTheDocument();
+  });
+});
+
+const CONTEXT: RoundView = {
+  ...ROUND,
+  turnText: '## What I read\n\n- The server keeps **every** round.\n- The plugin only injects.\n\nTwo decisions are open.',
+};
+const turnText = () => screen.getByRole('region', { name: 'The turn’s text' });
+const folds = (requests: Request[]) => requests.filter(x => x.method === 'PUT' && x.url.endsWith('/fold'));
+
+describe('the round head (#126)', () => {
+  it('heads the agent’s text with where the round came from: project · session · round', async () => {
+    render(<LocalPage fetch={fakeServer({ ...ROUND, number: 3 }).fetch}/>);
+    await screen.findByRole('article');
+    expect(within(turnText()).getByText('BreakTheWall · c0ffee00 · Round 3')).toBeInTheDocument();
+  });
+
+  it('folds the agent’s text to one line, the chip then its first line, and keeps that with the round', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(CONTEXT);
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    await user.click(within(turnText()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(turnText()).toHaveTextContent(/^BreakTheWall · c0ffee00 · Round 1\s*What I read\s*Show the agent’s text$/);
+    await waitFor(() => expect(folds(server.requests)).toEqual([{ method: 'PUT', url: `/api/rounds/${SESSION}/1/fold`, body: { folded: true } }]));
+
+    await user.click(within(turnText()).getByRole('button', { name: 'Show the agent’s text' }));
+    expect(turnText()).toHaveTextContent('The plugin only injects.');
+    await waitFor(() => expect(folds(server.requests).at(-1)?.body).toEqual({ folded: false }));
+  });
+
+  it('opens a round folded as the person left it, and the next round unfolded', async () => {
+    const server = fakeServer({ ...CONTEXT, turnFolded: true });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    expect(turnText()).not.toHaveTextContent('The plugin only injects.');
+    expect(within(turnText()).getByRole('button', { name: 'Show the agent’s text' })).toHaveAttribute('aria-expanded', 'false');
+
+    await act(async () => server.changeRound({ ...CONTEXT, number: 2 }));
+    await waitFor(() => expect(turnText()).toHaveTextContent('BreakTheWall · c0ffee00 · Round 2'));
+    expect(turnText()).toHaveTextContent('The plugin only injects.');
+  });
+
+  it('folds a sent round too: folding is reading, not answering', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ ...CONTEXT, sent: { message: 'done', at: '2026-11-23T10:05:00.000Z' } });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    await user.click(within(turnText()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(turnText()).not.toHaveTextContent('The plugin only injects.');
+    await waitFor(() => expect(folds(server.requests)).toHaveLength(1));
+  });
+
+  it('gives a free block the same head and the same fold, naming its project and session', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(ROUND, { free: { ...FREE, text: CONTEXT.turnText } });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('region', { name: 'The agent’s turn' });
+    expect(within(freeBlock()).getByText('BreakTheWall · c0ffee00')).toBeInTheDocument();
+    expect(within(freeBlock()).getByRole('heading', { name: 'What I read' })).toBeInTheDocument();
+    await user.click(within(freeBlock()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(freeBlock()).toHaveTextContent(/^BreakTheWall · c0ffee00\s*What I read\s*Show the agent’s text$/);
+    await waitFor(() => expect(folds(server.requests)).toEqual([{ method: 'PUT', url: `/api/free/${SESSION}/1/fold`, body: { folded: true } }]));
+    // The response stays: folding the text never hides what the person writes.
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeInTheDocument();
+  });
+
+  it('names the fold in Italian on a free block too', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer(ROUND, { free: FREE }).fetch}/>);
+    expect(await screen.findByRole('button', { name: 'Nascondi il testo dell’agente' })).toBeInTheDocument();
   });
 });
 

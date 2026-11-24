@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { sessionIdSchema } from './local-server';
-import { asText, roundViewSchema } from './round-answers';
+import { asText, roundViewSchema, turnFoldedField } from './round-answers';
 import { specRemarksSectionSchema } from './spec-remarks';
 
 /**
@@ -36,6 +36,8 @@ export const responseSchema = z.string().max(50_000);
 /** A free block as the page reads it. */
 export const freeBlockViewSchema = z.strictObject({
   session: sessionIdSchema,
+  /** The working directory the session ran in, as on a round (#126). */
+  cwd: z.string().min(1).max(4096),
   number: z.number().int().min(1),
   receivedAt: z.iso.datetime(),
   /** The agent's turn, whole: nothing in it is parsed. */
@@ -45,6 +47,7 @@ export const freeBlockViewSchema = z.strictObject({
   sent: z.strictObject({ message: z.string(), at: z.iso.datetime() }).nullable(),
   /** A later turn of the same session arrived on the page: this one no longer takes a response. */
   superseded: z.boolean(),
+  ...turnFoldedField,
 });
 export type FreeBlockView = z.infer<typeof freeBlockViewSchema>;
 

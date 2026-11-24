@@ -157,6 +157,63 @@ describe('the round page as a drafting sheet (#123)', () => {
   });
 });
 
+describe('the round head (#126)', () => {
+  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  /** The declarations of every rule whose selector list names `selector`, in source order: the last one wins. */
+  const rule = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+    .map(m => m[2]).join(';');
+  const last = (selector: string, property: string) => [...rule(selector).matchAll(new RegExp(`(?:^|[;\\s])${property}:\\s*([^;]+)`, 'g'))].at(-1)?.[1].trim();
+  const THEMES = [':root, :root[data-theme="paper"]', ':root[data-theme="blueprint"]'];
+
+  it('reads the agent’s text as a page: full ink at 15/1.6, about 64 characters a line', () => {
+    expect(last('.round-turn', 'color')).toBeUndefined();
+    expect(rule('.agent-text')).toMatch(/color: var\(--ink\)/);
+    expect(rule('.agent-text')).toMatch(/font-size: 15px/);
+    expect(rule('.agent-text')).toMatch(/line-height: 1\.6/);
+    // `ch` is a zero's width, so 64ch would hold about 90 characters of the body face; 29em holds about 64.
+    expect(last('.agent-text .round-markdown > *', 'max-width')).toBe('29em');
+    expect(css).not.toMatch(/\.round-turn \.round-markdown > \* \{ max-width: none; \}/);
+  });
+
+  it('gives the text a visible hierarchy: display headings at 16 px, accent list markers, inline code on --sunk, paragraphs .75em apart', () => {
+    const headings = rule('.agent-text .round-markdown :is(h1, h2, h3, h4, h5, h6)');
+    expect(headings).toMatch(/font-family: var\(--f-display\)/);
+    expect(headings).toMatch(/font-size: 16px/);
+    expect(rule('.agent-text li::marker')).toMatch(/color: var\(--accent\)/);
+    expect(rule('.agent-text :not(pre) > code')).toMatch(/background: var\(--sunk\)/);
+    expect(rule('.agent-text .round-markdown > * + *')).toMatch(/margin-top: \.75em/);
+  });
+
+  it('heads it with a static chip in the mono face, 11.5 px on --sunk with a hairline', () => {
+    const chip = rule('.turn-chip');
+    expect(chip).toMatch(/font: [^;]*11\.5px[^;]*var\(--f-mono\)/);
+    expect(chip).toMatch(/border: 1px solid var\(--line\)/);
+    expect(chip).not.toMatch(/animation|transition/);
+  });
+
+  it.each(THEMES)('%s keeps the chip, the text and the folded line at WCAG AA', selector => {
+    const t = tokens(selector);
+    const token = (value: string | undefined) => /^var\(--([a-z0-9-]+)\)$/.exec(value ?? '')?.[1] ?? '';
+    const pairs: [string, string][] = [
+      [token(last('.turn-chip', 'color')), token(last('.turn-chip', 'background'))],
+      [token(last('.agent-text', 'color')), 'surface'],
+      [token(last('.turn-line', 'color')), 'surface'],
+      [token(last('.agent-text li::marker', 'color')), 'surface'],
+      [token(last('.agent-text', 'color')), token(last('.agent-text :not(pre) > code', 'background'))],
+    ];
+    expect(pairs.filter(([fg, bg]) => !t[fg] || !t[bg] || contrast(t[fg], t[bg]) < 4.5).map(x => x.join('/'))).toEqual([]);
+  });
+
+  it('folds to one line: the chip, the first line cut with an ellipsis, the control', () => {
+    expect(rule('.agent-text.is-folded')).toMatch(/grid-template-columns: auto minmax\(0, 1fr\) auto/);
+    const line = rule('.turn-line');
+    expect(line).toMatch(/white-space: nowrap/);
+    expect(line).toMatch(/text-overflow: ellipsis/);
+    expect(line).toMatch(/overflow: hidden/);
+  });
+});
+
 describe('the progress strip at the window\'s foot (#125)', () => {
   // The #123 block's reader, kept apart so the tickets built beside this one merge without touching each other.
   const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

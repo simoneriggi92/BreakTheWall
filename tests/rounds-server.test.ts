@@ -731,3 +731,52 @@ describe('a response is sent as text, never as a command (#99)', () => {
     expect((await api.delivery())?.split('\n')[0]).toBe('Use /grilling again');
   });
 });
+
+describe('the round head (#126)', () => {
+  const fold = (api: ReturnType<typeof client>, kind: 'rounds' | 'free', number: number, folded: unknown, session = SESSION) =>
+    api.call(`/api/${kind}/${session}/${number}/fold`, { method: 'PUT', body: { folded } });
+
+  it('names the working directory a round and a free block came from, for the chip at their head', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    expect((await api.round()).cwd).toBe(CWD);
+    await api.turn(CLARIFICATION);
+    expect((await api.free()).cwd).toBe(CWD);
+  });
+
+  it('keeps the agent\'s text folded for that round alone, with its draft, across a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir });
+    const api = client(first);
+    await api.turn(ROUND);
+    expect((await api.round()).turnFolded).toBe(false);
+    expect((await fold(api, 'rounds', 1, true)).status).toBe(204);
+    await api.saveDraft(1, ANSWERED);
+    expect(await api.round()).toMatchObject({ turnFolded: true, draft: ANSWERED });
+    await first.stop();
+    const again = client(await start({ dataDir }));
+    expect(await again.round()).toMatchObject({ turnFolded: true, draft: ANSWERED });
+    await again.turn(ROUND);
+    expect((await again.round()).turnFolded).toBe(false);
+  });
+
+  it('folds a sent or superseded round and a free block too: folding is reading, not answering', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    await api.send(1, ANSWERED);
+    expect((await fold(api, 'rounds', 1, true)).status).toBe(204);
+    expect((await api.round()).turnFolded).toBe(true);
+    await api.turn(CLARIFICATION);
+    expect((await fold(api, 'free', 1, true)).status).toBe(204);
+    expect((await api.free()).turnFolded).toBe(true);
+    expect((await fold(api, 'rounds', 1, false)).status).toBe(204);
+  });
+
+  it('refuses a fold that is not a yes or no, and one on a round or free block that does not exist', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    expect((await fold(api, 'rounds', 1, 'yes')).status).toBe(400);
+    expect((await fold(api, 'rounds', 7, true)).status).toBe(404);
+    expect((await fold(api, 'free', 1, true)).status).toBe(404);
+  });
+});

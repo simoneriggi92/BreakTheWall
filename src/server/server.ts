@@ -97,6 +97,9 @@ const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguag
 const responseBodySchema = z.strictObject({ response: responseSchema });
 /** The injection marker (#99), with the round skill that started and its arguments, which name the session (#102). */
 const phaseSchema = z.strictObject({ cwd: cwdSchema, skill: z.string().min(1).max(200).optional(), args: z.string().max(4000).optional() });
+/** Folding the agent's text of a round or a free block (#126). */
+const foldSchema = z.strictObject({ folded: z.boolean() });
+const FOLD_PATH = /^\/api\/(rounds|free)\/([^/]+)\/(\d{1,6})\/fold$/;
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
 const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
 const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
@@ -251,6 +254,15 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         pageChanged();
         return noContent(res);
       }
+    }
+    // Before the answers' paths: a round whose transcript is gone, or that was sent, still folds, as reading does.
+    const foldPath = FOLD_PATH.exec(path);
+    if (req.method === 'PUT' && foldPath && sessionIdSchema.safeParse(foldPath[2]).success) {
+      const [, kind, session, number] = foldPath;
+      const body = foldSchema.safeParse(await readJson(req));
+      if (!body.success) return send(res, 400, { error: 'bad-request' });
+      if (!await rounds.foldTurn(session, kind === 'rounds' ? 'round' : 'free', Number(number), body.data.folded)) return send(res, 404, { error: 'unknown' });
+      return noContent(res);
     }
     const freePath = FREE_PATH.exec(path);
     if (freePath && sessionIdSchema.safeParse(freePath[1]).success) {

@@ -13,7 +13,7 @@ const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
 const RESUME = `claude --resume ${SESSION}`;
 
 const ROUND: RoundView = {
-  session: SESSION,
+  session: SESSION, cwd: '/work/BreakTheWall',
   number: 1,
   receivedAt: '2026-11-24T10:00:00.000Z',
   turnText: '',
@@ -24,7 +24,7 @@ const ROUND: RoundView = {
 };
 const SENT: RoundView = { ...ROUND, sent: { message: '**Q1 · Where do rounds live?** recommendation', at: '2026-11-24T10:05:00.000Z' } };
 const FREE: FreeBlockView = {
-  session: SESSION, number: 1, receivedAt: '2026-11-24T10:06:00.000Z', text: 'Which folder did you mean?', response: 'The plugin folder.',
+  session: SESSION, cwd: '/work/BreakTheWall', number: 1, receivedAt: '2026-11-24T10:06:00.000Z', text: 'Which folder did you mean?', response: 'The plugin folder.',
   sent: { message: 'The plugin folder.', at: '2026-11-24T10:07:00.000Z' }, superseded: false,
 };
 

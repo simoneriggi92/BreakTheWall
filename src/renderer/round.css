@@ -39,14 +39,13 @@
 /* About 70 characters a line, where eyes tire least over hours of rounds. Measured in em, not ch: `ch` is the width
    of a zero, so 70ch held about 99 characters of the body font (6.7px a character at 15px, measured in the page).
    32em holds about 72. Prose keeps that measure; diagrams and options may use the question's full width. */
-/* The turn's text is context, not the question: it takes the column's width rather than the prose measure, so a
-   long preamble stays short and lines up with the question below it. */
+/* The turn's text sits in a card as wide as the question's, so both read on one left edge; how its text reads is the
+   round head's (#126), below. */
 .round-turn, .round-question { justify-self: center; width: min(100% - 128px, 800px); }
 .round-turn {
-  grid-area: turn; margin-top: 32px; color: var(--muted); line-height: 1.6;
+  grid-area: turn; margin-top: 32px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 24px;
 }
-.round-turn .round-markdown > * { max-width: none; }
 /* The panels: full height between the bar and the window's foot, scrolling inside, divided from the canvas by a
    hairline. The outline is one at every width; the right column only where it is not the drawer's overlay. */
 .round-outline {
@@ -287,9 +286,6 @@
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
 }
 .round-fold-strip:hover { color: var(--ink); border-color: var(--accent); }
-.round-turn-fold { float: right; margin: 0 0 6px 12px; }
-.round-turn.is-folded { padding: 8px 12px 8px 16px; }
-.round-turn.is-folded .round-turn-fold { float: none; margin: 0; }
 
 /* The edges between columns (dragged, or moved with ← → once focused): a thin line that shows on hover, focus and
    while dragging. With no gap between the panels and the canvas, each sits on its panel's hairline, inside the
@@ -302,6 +298,37 @@
 .round-edge:hover::after, .round-edge:focus-visible::after, body.is-resizing .round-edge::after { background: var(--accent); }
 .round-edge:focus-visible { outline: none; }
 body.is-resizing { cursor: col-resize; user-select: none; }
+
+/* ---- #126 The round head: a chip says where the turn came from, and the agent's text reads like a page ----
+   One rendering for a round's turn and a free block's (`.agent-text` on `.round-turn` and `.free-turn`), as the owner
+   chose in #122 (variant C). The chip and the fold share a head row, so a long project name never runs under the
+   control; the text spans the card below them. */
+.agent-text {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: start;
+  color: var(--ink); font-size: 15px; line-height: 1.6;
+}
+.agent-text > .round-markdown { grid-column: 1 / -1; margin-top: 12px; }
+/* About 64 characters a line: 29em of the body face. `ch` is a zero's width, so 64ch would hold about 90. */
+.agent-text .round-markdown > * { max-width: 29em; margin-bottom: 0; }
+.agent-text .round-markdown > * + * { margin-top: .75em; }
+/* The measure is for prose; a diagram keeps the card's width. */
+.agent-text .round-markdown > .md-diagram { max-width: none; }
+.agent-text .round-markdown :is(h1, h2, h3, h4, h5, h6) { font-family: var(--f-display); font-size: 16px; line-height: 1.35; }
+.agent-text ul, .agent-text ol { padding-left: 1.2em; }
+.agent-text li + li { margin-top: 4px; }
+.agent-text li::marker { color: var(--accent); }
+.agent-text strong { font-weight: 650; }
+.agent-text :not(pre) > code { font-size: .88em; background: var(--sunk); border-radius: 4px; padding: 1px 5px; }
+/* Static on purpose: metadata to glance at, never a terminal's typing or cursor. */
+.turn-chip {
+  justify-self: start; margin: 0; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--sunk); color: var(--muted); font: 500 11.5px/1.5 var(--f-mono); overflow-wrap: anywhere;
+}
+.turn-fold { margin: 0; }
+/* Folded: one line, the chip, then the text's first line cut with an ellipsis, then the control. */
+.agent-text.is-folded { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 8px 12px 8px 16px; }
+.agent-text.is-folded .turn-chip { overflow-wrap: normal; white-space: nowrap; }
+.turn-line { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 14px; }
 
 /* ---- The progress strip (#125) ----
    The round's progress at the window's foot, at every width, as the owner chose in #122 (variant C): a ruler that

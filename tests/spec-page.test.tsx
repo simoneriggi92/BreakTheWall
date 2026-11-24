@@ -22,7 +22,7 @@ const version = (fields: Partial<SpecView> = {}): SpecView => ({
   superseded: false, latest: V1, exploration: { id: 'x-one', revision: 'v1' }, run: null, ...fields,
 });
 const ROUND: RoundView = {
-  session: SESSION, number: 1, receivedAt: '2026-11-24T09:00:00.000Z', turnText: 'One decision is open.',
+  session: SESSION, cwd: '/work/BreakTheWall', number: 1, receivedAt: '2026-11-24T09:00:00.000Z', turnText: 'One decision is open.',
   questions: [{ number: 1, title: 'Where do specs live?', body: 'In a file or an issue.', options: [], recommended: null, recommendation: 'In an issue.' }],
   draft: { generalNote: '', answers: {} }, sent: null, superseded: false,
 };

@@ -9,7 +9,7 @@ import { Brand } from '../icons';
 import { renderInlineMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
 import { passageIn, type Passage } from './passages';
-import { CopyButton, Markdown, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
+import { AgentText, CopyButton, Markdown, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
 import { SideChat, useSideChats } from './SideChat';
 
 /**
@@ -277,10 +277,10 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         <PreferencesMenu/>
       </header>
       <main className={`round-layout is-${band}${outlineFolded ? ' is-outline-folded' : ''}${sideFolded ? ' is-side-folded' : ''}`} style={columnWidths}>
-        {round.turnText && <section className={`round-turn${folds.turn ? ' is-folded' : ''}`} aria-label={r.turnText}>
-          <button type="button" className="subtle round-fold round-turn-fold" aria-expanded={!folds.turn} onClick={() => fold({ turn: !folds.turn })}>{folds.turn ? f.showTurn : f.hideTurn}</button>
-          {!folds.turn && <Markdown text={round.turnText}/>}
-        </section>}
+        {round.turnText && <AgentText
+          entry={{ kind: 'round', session: round.session, number: round.number }} cwd={round.cwd} text={round.turnText}
+          round={r.title(round.number)} folded={round.turnFolded ?? false} label={r.turnText} className="round-turn" bridge={bridge}
+        />}
         <div className="round-outline">
         {/* The panel's head row names it and holds its fold; folded to a rail, the numbers need no name above them. */}
         <div className="round-panel-head">
@@ -469,8 +469,11 @@ function ProgressStrip({ label, count, current, segments }: {
 
 const NO_RIDING: readonly SpecRemarksSection[] = [];
 
-/** Which parts of a round the person folded. Unset means the page decides (the outline folds by itself when narrow). */
-const foldsSchema = z.object({ outline: z.boolean().optional(), side: z.boolean().optional(), turn: z.boolean().optional() });
+/**
+ * Which panels the person folded, for every round. Unset means the page decides (the outline folds by itself when
+ * narrow). The agent's text is folded per round, with the round on the server (#126).
+ */
+const foldsSchema = z.object({ outline: z.boolean().optional(), side: z.boolean().optional() });
 const FOLDS_KEY = 'btw:round-folds';
 /** The widths the person dragged the columns to, in pixels; unset means the column's own width for the band. */
 const widthsSchema = z.object({ left: z.number().optional(), right: z.number().optional(), chat: z.number().optional() });
