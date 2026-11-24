@@ -98,6 +98,7 @@ export const en: Messages = {
     notice: {
       newRound: 'New round in',
       newTurn: 'The agent’s new turn in',
+      newSpec: 'New spec in',
       open: 'Open',
       update: (version: string) => `Break the Wall ${version} is ready: the update comes once the other sessions end.`,
     },

@@ -104,6 +104,8 @@ export const it = {
       /** Followed by the project's name, emphasised. */
       newRound: 'Nuovo round in',
       newTurn: 'Nuovo turno dell’agente in',
+      /** A spec handed over while the person writes or reads history (#104). */
+      newSpec: 'Nuova specifica in',
       open: 'Apri',
       update: (version: string) => `Break the Wall ${version} è pronto: l’aggiornamento arriva quando le altre sessioni finiscono.`,
     },

@@ -86,6 +86,22 @@ describe('a handed-over spec opens in the page (#104)', () => {
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('One decision is open.');
   });
 
+  it('holds a spec handed over while the person writes in the round, says so, and opens it on request', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [], round: ROUND, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('One decision is open.');
+    await user.click(screen.getByRole('button', { name: 'Write a note' }));
+    const field = screen.getByRole('textbox', { name: 'Note' });
+    await user.type(field, 'Half a tho');
+    server.changeSpecs([version({ handedOverAt: '2026-11-24T10:00:00.000Z' })]);
+    const notice = await screen.findByRole('status', { name: 'New spec in' });
+    expect(screen.getByRole('region', { name: 'The turn’s text' })).toBeInTheDocument();
+    expect(field).toHaveFocus();
+    await user.click(within(notice).getByRole('button', { name: 'Open' }));
+    await title();
+  });
+
   it('keeps the round in front when the round came after the spec', async () => {
     const server = fakeServer({ specs: [version()], round: { ...ROUND, receivedAt: '2026-11-24T11:00:00.000Z' }, explorations: [await explored('x-one')] });
     render(<LocalPage fetch={server.fetch}/>);

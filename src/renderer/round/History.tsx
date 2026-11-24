@@ -80,21 +80,33 @@ function SessionEntry({ session, shown, bridge, onOpen, onDeleted }: { session: 
 }
 
 /**
- * What the page says beside what it shows: a round that arrived while the person was writing or reading history,
- * named by its project, with the action that opens it; and a newer version waiting for the other sessions to end.
+ * What the page says beside what it shows: a round or a spec that arrived while the person was writing or reading
+ * history, named by its project, with the action that opens it; and a newer version waiting for the other sessions to end.
  */
-export function PageNotices({ arrived, project, update, onOpen }: { arrived: 'round' | 'free' | null; project: string | null; update: string | null; onOpen(): void }) {
+export function PageNotices({ arrived, project, spec, update, onOpen }: {
+  arrived: 'round' | 'free' | null;
+  project: string | null;
+  /** A spec handed over meanwhile (#104), with the project it came from. */
+  spec: { project: string | null; onOpen(): void } | null;
+  update: string | null;
+  onOpen(): void;
+}) {
   const { t } = usePreferences();
   const n = t.page.notice;
-  const words = arrived === 'free' ? n.newTurn : n.newRound;
-  if (!arrived && !update) return null;
+  if (!arrived && !spec && !update) return null;
   return (
     <div className="page-notices">
-      {arrived && <p role="status" className="page-notice" aria-label={project ? `${words} ${project}` : words}>
-        <span>{words} {project && <em>{project}</em>}</span>
-        <button type="button" className="primary" onClick={onOpen}>{n.open}</button>
-      </p>}
+      {arrived && <Arrived words={arrived === 'free' ? n.newTurn : n.newRound} project={project} onOpen={onOpen}/>}
+      {spec && <Arrived words={n.newSpec} project={spec.project} onOpen={spec.onOpen}/>}
       {update && <p className="page-notice">{n.update(update)}</p>}
     </div>
   );
+}
+
+function Arrived({ words, project, onOpen }: { words: string; project: string | null; onOpen(): void }) {
+  const { t } = usePreferences();
+  return <p role="status" className="page-notice" aria-label={project ? `${words} ${project}` : words}>
+    <span>{words} {project && <em>{project}</em>}</span>
+    <button type="button" className="primary" onClick={onOpen}>{t.page.notice.open}</button>
+  </p>;
 }

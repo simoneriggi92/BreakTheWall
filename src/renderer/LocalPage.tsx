@@ -78,6 +78,26 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   const [closedSpec, setClosedSpec] = useState<string>();
   /** The person opened the spec again from a round (#105), to write remarks while the round waits. */
   const [specOpened, setSpecOpened] = useState(false);
+  /** The newest spec the page let open; undefined until the specs are first read. */
+  const takenSpec = useRef<string | null | undefined>(undefined);
+  /** A spec handed over while the person writes or reads history: like a round, only announced (#102). */
+  const [arrivedSpec, setArrivedSpec] = useState<SpecView | null>(null);
+  const heldSpec = useRef<SpecView | null>(null);
+  /** The spec, not a round, is in front: a new version there is the spec page's own business. */
+  const specInFront = useRef(false);
+  const holdSpec = (spec: SpecView | null) => { heldSpec.current = spec; setArrivedSpec(spec); };
+  const followSpecs = (next: SpecView[]) => {
+    setSpecs(next);
+    const newest = newestSpec(next);
+    if (!newest) { takenSpec.current ??= null; return; }
+    if (newest.id === takenSpec.current) return;
+    const busy = reading.current || held.current !== null || heldSpec.current !== null || isWriting();
+    if (takenSpec.current !== undefined && !specInFront.current && shown.current !== null && busy) return holdSpec(newest);
+    takenSpec.current = newest.id;
+    holdSpec(null);
+  };
+  const followSpecsRef = useRef(followSpecs);
+  followSpecsRef.current = followSpecs;
 
   useEffect(() => {
     if (!bridge) return;
@@ -96,7 +116,7 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
     const stop = new AbortController();
     // The history column reads alongside: a server that cannot answer it still shows the round.
     const refresh = () => {
-      void bridge.listSpecs().then(next => { if (!stop.signal.aborted) setSpecs(next); }, () => {});
+      void bridge.listSpecs().then(next => { if (!stop.signal.aborted) followSpecsRef.current(next); }, () => {});
       return Promise.all([bridge.getCurrent(), bridge.getHistory().catch(() => null)]).then(([next, column]) => {
         if (stop.signal.aborted) return;
         if (column) setHistory(column);
@@ -126,7 +146,8 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   if (state === 'open' && bridge) {
     const spec = newestSpec(specs);
     const shownAt = current?.kind === 'round' ? current.round.receivedAt : current?.block.receivedAt;
-    if (spec && (specOpened || (spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt)))) {
+    specInFront.current = Boolean(spec && (specOpened || (spec.id === takenSpec.current && spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt))));
+    if (spec && specInFront.current) {
       const close = () => { setSpecOpened(false); setClosedSpec(spec.id); };
       return <PreferencesProvider bridge={bridge}><SpecPage specs={specs} bridge={bridge} onClose={close}/></PreferencesProvider>;
     }
@@ -146,7 +167,16 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
       if (sessionOf(held.current) === session) hold(null);
       void Promise.all([bridge.getCurrent(), bridge.getHistory()]).then(([next, column]) => { setHistory(column); followRef.current(next); }, () => {});
     };
-    const arrivedProject = history?.projects.find(p => p.sessions.some(x => x.session === sessionOf(arrived)))?.cwd;
+    const projectOf = (session: string | null) => {
+      const cwd = history?.projects.find(p => p.sessions.some(x => x.session === session))?.cwd;
+      return cwd ? projectName(cwd) : null;
+    };
+    const openSpec = () => {
+      // Opened by the person, the newest spec is the one the page follows from now on.
+      if (spec) takenSpec.current = spec.id;
+      holdSpec(null);
+      setSpecOpened(true);
+    };
     const shownRound = current.kind === 'round' ? current.round : null;
     // Keyed by what is shown, so a new round or free block starts with its own draft and focus.
     return <PreferencesProvider bridge={bridge}>
@@ -156,8 +186,10 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
       {historyOpen && history && <SessionHistory history={history} shown={shownRound} bridge={bridge} onOpen={openRound} onDeleted={deleted} onClose={() => setHistoryOpen(false)}/>}
       <div className="page-dock">
         {!historyOpen && history && history.projects.length > 0 && <HistoryToggle onOpen={() => setHistoryOpen(true)}/>}
-        {spec && <SpecToggle title={spec.title} onOpen={() => setSpecOpened(true)}/>}
-        <PageNotices arrived={arrived?.kind ?? null} project={arrivedProject ? projectName(arrivedProject) : null} update={history?.update ?? null} onOpen={openArrived}/>
+        {spec && <SpecToggle title={spec.title} onOpen={openSpec}/>}
+        <PageNotices
+          arrived={arrived?.kind ?? null} project={projectOf(sessionOf(arrived))} onOpen={openArrived}
+          spec={arrivedSpec && { project: projectOf(arrivedSpec.session), onOpen: openSpec }} update={history?.update ?? null}/>
       </div>
     </PreferencesProvider>;
   }
