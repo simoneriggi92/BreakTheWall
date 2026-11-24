@@ -5,8 +5,9 @@ import type { History, HistoryProject } from '../core/session-history';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
-import { atomicWrite, entries, projectsDir, sessionFolder, type RoundStore } from './rounds';
-import { noContent, readJson, send } from './server';
+import { sessionFolders, WriteQueue } from './files';
+import { noContent, readJson, send } from './http';
+import { projectsDir, sessionFolder, type RoundStore } from './rounds';
 
 /**
  * Sessions across projects (#102): the history column the page reads, a past round it opens, a session the person
@@ -26,11 +27,11 @@ export interface SessionsContext {
   pageChanged(): void;
 }
 
+const updateSchema = z.strictObject({ version: z.string().min(1).max(100) });
 /**
  * Why Claude Code ended the session, as `session.end` words it (`clear`, `resume`, `prompt_input_exit`, `logout`,
  * `other`). Kept open to the words a later Claude Code adds: whatever the reason, the session is no longer live.
  */
-const updateSchema = z.strictObject({ version: z.string().min(1).max(100) });
 const endSchema = z.strictObject({ reason: z.string().regex(/^[a-z_]{1,40}$/) });
 const END_PATH = /^\/api\/sessions\/([^/]+)\/end$/;
 const SESSION_PATH = /^\/api\/sessions\/([^/]+)$/;
@@ -119,19 +120,17 @@ type StoredLabel = z.infer<typeof storedLabelSchema>;
  */
 export class SessionLabels {
   private labels = new Map<string, StoredLabel>();
-  private writes = new Map<string, Promise<void>>();
+  private writes = new WriteQueue();
 
   private constructor(private dir: string) {}
 
   static async open(dataDir: string): Promise<SessionLabels> {
     const store = new SessionLabels(projectsDir(dataDir));
-    for (const project of await entries(store.dir)) {
-      for (const session of await entries(join(store.dir, project))) {
-        try {
-          const x = storedLabelSchema.parse(JSON.parse(await readFile(join(store.dir, project, session, 'session.json'), 'utf8')));
-          store.labels.set(x.session, x);
-        } catch { /* No label, or one that does not parse: the session stays unnamed. */ }
-      }
+    for (const folder of await sessionFolders(store.dir)) {
+      try {
+        const x = storedLabelSchema.parse(JSON.parse(await readFile(join(folder, 'session.json'), 'utf8')));
+        store.labels.set(x.session, x);
+      } catch { /* No label, or one that does not parse: the session stays unnamed. */ }
     }
     return store;
   }
@@ -145,9 +144,7 @@ export class SessionLabels {
     const ticket = /#(\d{1,7})\b/.exec(args)?.[1];
     const label: StoredLabel = { version: 1, session, cwd, skill: name, ticket: ticket ? Number(ticket) : null };
     this.labels.set(session, label);
-    const write = atomicWrite(join(sessionFolder(this.dir, label), 'session.json'), JSON.stringify(label, null, 2));
-    this.writes.set(session, write);
-    await write;
+    await this.writes.write(session, join(sessionFolder(this.dir, label), 'session.json'), label);
   }
 
   of(session: string): { skill: string | null; ticket: number | null } {
@@ -157,8 +154,7 @@ export class SessionLabels {
 
   /** The session was deleted: its folder goes with its rounds, once the label's own write has landed. */
   async forget(session: string): Promise<void> {
-    await this.writes.get(session)?.catch(() => {});
-    this.writes.delete(session);
+    await this.writes.settle(key => key === session);
     this.labels.delete(session);
   }
 }
@@ -182,20 +178,18 @@ export const transcriptPathSchema = z.string().max(4096).refine(x => x === '' ||
 export class SessionTranscripts {
   private paths = new Map<string, string>();
   private kept = new Map<string, string>();
-  private writes = new Map<string, Promise<void>>();
+  private writes = new WriteQueue();
 
   private constructor(private dir: string, private rounds: RoundStore) {}
 
   static async open(dataDir: string, rounds: RoundStore): Promise<SessionTranscripts> {
     const store = new SessionTranscripts(projectsDir(dataDir), rounds);
-    for (const project of await entries(store.dir)) {
-      for (const session of await entries(join(store.dir, project))) {
-        try {
-          const x = storedTranscriptSchema.parse(JSON.parse(await readFile(join(store.dir, project, session, 'transcript.json'), 'utf8')));
-          store.paths.set(x.session, x.path);
-          store.kept.set(x.session, x.path);
-        } catch { /* None, or one that does not parse: the session stays answerable. */ }
-      }
+    for (const folder of await sessionFolders(store.dir)) {
+      try {
+        const x = storedTranscriptSchema.parse(JSON.parse(await readFile(join(folder, 'transcript.json'), 'utf8')));
+        store.paths.set(x.session, x.path);
+        store.kept.set(x.session, x.path);
+      } catch { /* None, or one that does not parse: the session stays answerable. */ }
     }
     return store;
   }
@@ -214,10 +208,7 @@ export class SessionTranscripts {
     if (path === undefined || cwd === undefined || this.kept.get(session) === path) return;
     this.kept.set(session, path);
     const stored: StoredTranscript = { version: 1, session, cwd, path };
-    const write = (this.writes.get(session) ?? Promise.resolve()).catch(() => {})
-      .then(() => atomicWrite(join(sessionFolder(this.dir, stored), 'transcript.json'), JSON.stringify(stored, null, 2)));
-    this.writes.set(session, write);
-    await write;
+    await this.writes.write(session, join(sessionFolder(this.dir, stored), 'transcript.json'), stored);
   }
 
   /** Only a transcript the mod named and that is no longer there: a session never told of stays answerable. */
@@ -227,8 +218,7 @@ export class SessionTranscripts {
   }
 
   async forget(session: string): Promise<void> {
-    await this.writes.get(session)?.catch(() => {});
-    this.writes.delete(session);
+    await this.writes.settle(key => key === session);
     this.paths.delete(session);
     this.kept.delete(session);
   }

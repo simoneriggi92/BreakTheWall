@@ -1,22 +1,20 @@
-import { readFile, realpath, stat } from 'node:fs/promises';
-import { resolve as resolvePath, sep } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { checkBacking, type BackingReference, type BackingReport, type CitedAnswer, type Resolution } from '../core/backing';
+import { fileInside } from './files';
+import { GH_TIMEOUT_MS, ghIssueSchema, type GhRunner } from './gh';
 import type { RoundStore } from './rounds';
-import type { GhRunner } from './specs';
 
 /**
  * The backing check on the server (#106): a version's references resolved against what the server can reach, with no
  * model. Answers against the rounds of the spec's sessions, links through the person's `gh`, lines against the files
  * of the session's folder, never outside it.
  */
-const GH_TIMEOUT_MS = 30_000;
 /** At most this many `gh` runs at once: a spec citing many issues should not flood the person's machine or GitHub. */
 const GH_AT_ONCE = 4;
 /** A file larger than this is not read to count its lines: its lines are a broken backing. */
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-const ghIssueSchema = z.object({ url: z.string().max(1_000), title: z.string().max(1_000) });
 const ghCommentSchema = z.object({ issue_url: z.string().max(1_000) });
 
 export interface BackingChecker {
@@ -76,12 +74,8 @@ export function backingChecker(options: { rounds: Pick<RoundStore, 'cited'>; gh:
     if (reference.from < 1 || reference.to < reference.from) return { found: false };
     try {
       // Only a file inside the session's folder: the path comes from the spec, which the agent wrote.
-      const root = await realpath(cwd);
-      const file = await realpath(resolvePath(root, reference.path));
-      if (!file.startsWith(root + sep)) return { found: false };
-      const info = await stat(file);
-      if (!info.isFile() || info.size > MAX_FILE_BYTES) return { found: false };
-      return { found: await lineCount(file) >= reference.to };
+      const found = await fileInside(cwd, reference.path, MAX_FILE_BYTES);
+      return { found: 'file' in found && await lineCount(found.file) >= reference.to };
     } catch {
       return { found: false };
     }

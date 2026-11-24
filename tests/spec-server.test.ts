@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { ClaudeExit, ClaudeRun } from '../src/desktop/claude/completer';
-import type { GhRun } from '../src/server/specs';
+import type { GhRun } from '../src/server/gh';
 import { BAKERY, bakery, toAnswer } from './explorations';
 import { serverClient, SESSION, useLocalServers } from './local-server-harness';
 

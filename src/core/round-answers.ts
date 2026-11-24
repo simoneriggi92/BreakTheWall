@@ -24,9 +24,9 @@ export type Remark = z.infer<typeof remarkSchema>;
 
 /**
  * One exchange of a question's side chat the person attached to their answer (#101): what they asked, the passage
- * they asked about if any, and the reply, copied whole from the thread when attached. Kept in the draft, so the page's
+ * they asked about if any, and the reply, copied whole from the side chat when attached. Kept in the draft, so the page's
  * preview and the message the server sends come from the same text through the same function. `turn` names the
- * exchange in its thread: one turn is attached once.
+ * exchange in its side chat: one turn is attached once.
  */
 export const attachedSchema = z.strictObject({
   turn: z.number().int().min(1),
@@ -111,7 +111,7 @@ export const sortRemarks = (remarks: readonly Remark[]): Remark[] =>
 export const remarksOf = (answer: Answer | undefined): Remark[] => sortRemarks(answer?.remarks ?? []);
 /** A remark is known by where it stands: one passage takes one remark. */
 export const remarkKey = (x: Pick<Remark, 'part' | 'start' | 'end'>) => `${x.part}:${x.start}:${x.end}`;
-/** Attached exchanges in the order they were asked in their thread. */
+/** Attached exchanges in the order they were asked in their side chat. */
 export const attachedOf = (answer: Answer | undefined): Attached[] => [...answer?.attached ?? []].sort((a, b) => a.turn - b.turn);
 export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
 

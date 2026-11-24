@@ -130,7 +130,7 @@ export const it = {
       askingAbout: 'Chiedi su',
       wholeQuestion: 'Chiedi sull’intera domanda',
       attach: '📎 Allega alla risposta',
-      /** Before Send: threads none of whose replies the person attached. */
+      /** Before Send: side chats none of whose replies the person attached. */
       unattached: (n: number) => n === 1 ? '1 chat laterale senza una risposta allegata' : `${n} chat laterali senza una risposta allegata`,
       key: 'c chat laterale',
     },

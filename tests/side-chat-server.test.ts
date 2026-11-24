@@ -140,7 +140,7 @@ describe('a side chat on one question (#100)', () => {
     expect(third.indexOf('First reply on Q1.')).toBeLessThan(third.indexOf('Second ask on Q1.'));
   });
 
-  it('keeps one thread per question, each turn with its reply and the files the fork read', async () => {
+  it('keeps one side chat per question, each turn with its reply and the files the fork read', async () => {
     const claude = fakeClaude(async run => {
       run.onLine(line.tool('Read', { file_path: `${run.cwd}/src/server/rounds.ts`, offset: 60, limit: 40 }));
       run.onLine(line.tool('Grep', { pattern: 'sessionDir', path: `${run.cwd}/src` }));
@@ -194,7 +194,7 @@ describe('a side chat on one question (#100)', () => {
     expect((await settled(api)).map(x => x.turns[0].status)).toEqual(['done', 'done']);
   });
 
-  it('refuses a second question on a thread whose reply still runs', async () => {
+  it('refuses a second question on a side chat whose reply still runs', async () => {
     const claude = heldClaude();
     const api = client(await start({ runners: { sideChat: claude.runner } }));
     await api.turn(ROUND);
@@ -278,7 +278,7 @@ describe('a side chat on one question (#100)', () => {
     expect(claude.runs[0].args).not.toContain('--dangerously-skip-permissions');
   });
 
-  it('keeps the threads across a restart, and a reply cut short by it shows as failed', async () => {
+  it('keeps the side chats across a restart, and a reply cut short by it shows as failed', async () => {
     const dataDir = folder();
     const claude = heldClaude();
     const first = await start({ dataDir, runners: { sideChat: claude.runner } });
@@ -317,8 +317,8 @@ describe('asking about a passage (#101)', () => {
     const api = client(await start({ runners: { sideChat: claude.runner } }));
     await api.turn(ROUND);
     expect((await api.askAbout(1, 1, 'Why here?', PASSAGE)).status).toBe(202);
-    const [thread] = await settled(api);
-    expect(thread.turns[0]).toMatchObject({ ask: 'Why here?', passage: PASSAGE, status: 'done' });
+    const [sideChat] = await settled(api);
+    expect(sideChat.turns[0]).toMatchObject({ ask: 'Why here?', passage: PASSAGE, status: 'done' });
     expect(claude.runs[0].input).toContain('The person asks about this passage of the question: «Beside the rounds»\nWhy here?');
   });
 

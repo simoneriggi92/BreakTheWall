@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Question } from '../../core/round';
 import { quoted } from '../../core/round-answers';
-import type { SideChatPassage, SideChat as Thread } from '../../core/side-chat';
+import type { SideChatPassage, SideChat as KeptSideChat } from '../../core/side-chat';
 import type { RoundKey, SideChatBridge } from '../http-bridge';
 import { usePreferences } from '../preferences';
 import { Markdown } from './shared';
@@ -12,8 +12,8 @@ const RETRY_MS = 2000;
  * A round's side chats (#100), kept current: one held read after another, each answered as soon as a reply grows, so
  * a reply streams in. A failed read (a server that stopped, a round it does not know) is tried again after a pause.
  */
-export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] {
-  const [threads, setThreads] = useState<Thread[]>([]);
+export function useSideChats(bridge: SideChatBridge, round: RoundKey): KeptSideChat[] {
+  const [sideChats, setSideChats] = useState<KeptSideChat[]>([]);
   const { session, number } = round;
   useEffect(() => {
     const stop = new AbortController();
@@ -24,7 +24,7 @@ export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] 
           const view = await bridge.getSideChats({ session, number }, after, stop.signal);
           if (stop.signal.aborted) return;
           after = view.version;
-          setThreads(view.sideChats);
+          setSideChats(view.sideChats);
         } catch {
           if (stop.signal.aborted) return;
           await new Promise(done => setTimeout(done, RETRY_MS));
@@ -33,7 +33,7 @@ export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] 
     })();
     return () => stop.abort();
   }, [bridge, session, number]);
-  return threads;
+  return sideChats;
 }
 
 /**
@@ -41,10 +41,10 @@ export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] 
  * copy of the session, each with what it read. Nothing here reaches the agent unless the person attaches a reply to
  * their answer with 📎 (#101).
  */
-export function SideChat({ question, thread, readOnly = false, ask, passage, attached, onAsk, onAskChange, onDropPassage, onAttach, onClose }: {
+export function SideChat({ question, sideChat, readOnly = false, ask, passage, attached, onAsk, onAskChange, onDropPassage, onAttach, onClose }: {
   question: Question;
-  thread: Thread | undefined;
-  /** Claude Code no longer keeps the session (#103): the thread is read, never continued. */
+  sideChat: KeptSideChat | undefined;
+  /** Claude Code no longer keeps the session (#103): its side chats are read, never continued. */
   readOnly?: boolean;
   /** What the person is typing for this question, kept while the focus moves. */
   ask: string;
@@ -61,7 +61,7 @@ export function SideChat({ question, thread, readOnly = false, ask, passage, att
 }) {
   const { t } = usePreferences();
   const s = t.page.sideChat;
-  const turns = thread?.turns ?? [];
+  const turns = sideChat?.turns ?? [];
   const running = turns.some(x => x.status === 'running');
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);

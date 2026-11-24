@@ -8,11 +8,14 @@ import { parseRound } from '../core/round';
 import { draftSchema, fitsQuestions, messageLanguageSchema } from '../core/round-answers';
 import { answersWithRemarks } from '../core/spec-remarks';
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
+import type { GhRunner } from './gh';
+import { noContent, readJson, send, TRANSCRIPT_GONE } from './http';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type DeliveryKind, type RoundRefusal } from './rounds';
 import { handleSessions, SessionLabels, SessionTranscripts, transcriptPathSchema } from './sessions';
 import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
-import { openSpecs, type GhRunner } from './specs';
+import { specRemarkRoutes } from './spec-remarks';
+import { openSpecs } from './specs';
 import type { ClaudeRunner } from '../desktop/claude/completer';
 
 /**
@@ -83,7 +86,6 @@ const turnSchema = z.strictObject({
   reason: z.enum(['answer', 'aborted', 'refusal', 'error']),
   agent: z.string().min(1).max(200).optional(),
 });
-const MAX_BODY_BYTES = 64 * 1024;
 /** A turn's text, with room for the JSON escaping of a long round. */
 const MAX_TURN_BYTES = 4 * 1024 * 1024;
 const MAX_ANSWER_BYTES = 1024 * 1024;
@@ -97,8 +99,6 @@ const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
 const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free|remarks)-(\d{1,6})$/;
 const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
-/** Claude Code no longer keeps the session's transcript (#103): its rounds and side chats take nothing more. */
-const TRANSCRIPT_GONE = { error: 'transcript-gone' };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<LocalServer | null> {
   const { idleMs = 10 * 60_000, checkEveryMs = 15_000, sessionTtlMs = 2 * 60_000, pollHoldMs = 25_000, pageGraceMs = 10_000, deliveryHoldMs = 20_000, deliveryLeaseMs = 10 * 60_000 } = options;
@@ -120,9 +120,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
   const live = (session: string) => (sessions.get(session)?.until ?? 0) > Date.now();
-  const rounds = await RoundStore.open(options.dataDir, {
-    live, transcriptGone: session => transcripts.gone(session), riding: session => specs.riding(session).map(x => x.section),
-  });
+  /** Open page polls, answered early when what the page shows has changed. */
+  const pagePolls = new Set<() => void>();
+  /** Mod polls waiting for a message, by session, so a Send wakes only the session it answers. */
+  const deliveryPolls = new Map<string, Set<() => void>>();
+  const pageChanged = () => { for (const wake of [...pagePolls]) wake(); };
+  // Each store is opened before anything that reads it: the rounds' standing, which reads the later stores, is tied
+  // in last.
+  const rounds = await RoundStore.open(options.dataDir);
   const labels = await SessionLabels.open(options.dataDir);
   const transcripts = await SessionTranscripts.open(options.dataDir, rounds);
   /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
@@ -133,18 +138,13 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
     modelOf: session => { const x = models.get(session); return x?.sideChatModel ?? x?.model; },
     readOnly: session => transcripts.gone(session),
-    io: { readJson, send },
   });
-  const specs = await openSpecs({
-    dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send,
-    remarks: { rounds, transcriptGone: session => transcripts.gone(session), queued: session => queued(session), readJson },
+  const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: pageChanged, rounds });
+  const remarks = await specRemarkRoutes({
+    specOf: id => specs.specOf(id), allSpecs: () => specs.allSpecs(), rounds,
+    transcriptGone: session => transcripts.gone(session), queued: session => queued(session), changed: pageChanged,
   });
-
-  /** Open page polls, answered early when what the page shows has changed. */
-  const pagePolls = new Set<() => void>();
-  /** Mod polls waiting for a message, by session, so a Send wakes only the session it answers. */
-  const deliveryPolls = new Map<string, Set<() => void>>();
-  const pageChanged = () => { for (const wake of [...pagePolls]) wake(); };
+  rounds.standOn({ live, transcriptGone: session => transcripts.gone(session), riding: session => remarks.riding(session).map(x => x.section) });
   let openPolls = 0;
   let lastPollEnd = -Infinity;
   let lastBusy = Date.now();
@@ -291,11 +291,11 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         if (!fitsQuestions(questions, body.data.draft)) return send(res, 400, { error: 'bad-request' });
         // The server words the message with the same function the page previews it with: what the person saw is
         // what the agent receives. Remarks on a spec written while the round awaited answers ride after them (#105).
-        const riding = rounds.awaiting(session) === Number(number) ? specs.riding(session) : [];
+        const riding = rounds.awaiting(session) === Number(number) ? remarks.riding(session) : [];
         const message = answersWithRemarks(questions, body.data.draft, body.data.language, riding.map(x => x.section));
         const refused = await rounds.send(session, Number(number), body.data.draft, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
-        await specs.rodeWith(session, Number(number), riding);
+        await remarks.rodeWith(session, Number(number), riding);
         queued(session);
         return send(res, 200, { message });
       }
@@ -310,6 +310,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
     if (await handleSessions(req, res, path, { rounds, labels, transcripts, sideChats, leases: sessions, live, update, pageChanged })) return;
     if (await sideChats.handle(req, res, path)) return;
+    if (await remarks.handle(req, res, path)) return;
     if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
   }
@@ -395,18 +396,6 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   return { port, secret, stopped, stop };
 }
 
-/** The request's JSON body, or undefined when it is too large or not JSON. */
-export async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req as AsyncIterable<Buffer>) {
-    size += chunk.byteLength;
-    if (size > maxBytes) return undefined;
-    chunks.push(chunk);
-  }
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return undefined; }
-}
-
 /**
  * Owns the lock, replacing an orphaned one. Listening comes first, so a rival that finds this lock can already reach
  * this server and step aside. Returns false when another live server owns it.
@@ -419,15 +408,6 @@ async function takeLock(dataDir: string, own: ServerLock): Promise<boolean> {
     removeLock(dataDir);
   }
   return false;
-}
-
-export function send(res: ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
-  res.end(JSON.stringify(body));
-}
-
-export function noContent(res: ServerResponse) {
-  res.writeHead(204, { 'cache-control': 'no-store' }).end();
 }
 
 function close(server: Server) {

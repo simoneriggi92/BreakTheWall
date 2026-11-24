@@ -123,7 +123,7 @@ export const en: Messages = {
       askingAbout: 'Asking about',
       wholeQuestion: 'Ask about the whole question',
       attach: '📎 Attach to answer',
-      /** Before Send: threads none of whose replies the person attached. */
+      /** Before Send: side chats none of whose replies the person attached. */
       unattached: (n: number) => n === 1 ? '1 side chat with no reply attached' : `${n} side chats with no reply attached`,
       key: 'c side chat',
     },
