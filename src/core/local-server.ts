@@ -18,5 +18,8 @@ export const serverStatusSchema = z.object({
 });
 export type ServerStatus = z.infer<typeof serverStatusSchema>;
 
+/** The working directory a session runs in, as the mod sends it and every store keeps it. */
+export const cwdSchema = z.string().min(1).max(4096);
+
 /** A Claude Code session id as the mod sends it; it names a folder on disk, so nothing but letters, digits, `-` and `_`. */
 export const sessionIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);

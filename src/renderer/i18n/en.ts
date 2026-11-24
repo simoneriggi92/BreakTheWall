@@ -23,6 +23,7 @@ export const en: Messages = {
         foldOutline: 'Fold the questions', unfoldOutline: 'Unfold the questions',
         foldSide: 'Fold the right column', unfoldSide: 'Unfold the right column',
         hideTurn: 'Hide the agent’s text', showTurn: 'Show the agent’s text',
+        turnFoldFailed: 'Not saved: the agent’s text stays this way on this page only.',
         resizeOutline: 'Resize the questions', resizeSide: 'Resize the right column',
         resizeHint: 'Drag or use ← → to resize · double click for the starting width',
       },
@@ -32,9 +33,9 @@ export const en: Messages = {
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,
-      // The rail's ruler (#124): a tick's number, and its name starting with that number, so a voice command says what it sees.
+      // The ruler's number (#124, #125), in the rail and the strip; a tick's name starts with it, so a voice command says what it sees.
       tick: (n: number) => String(n).padStart(2, '0'),
-      tickName: (n: number, title: string, state: string) => `${String(n).padStart(2, '0')} · ${title} · ${state}`,
+      tickName: (tick: string, title: string, state: string) => `${tick} · ${title} · ${state}`,
       states: { unanswered: 'no answer', recommendation: 'recommendation', none: 'no choice', note: 'note' },
       optionState: (letter: string) => `option (${letter})`,
       options: 'Options',
@@ -67,6 +68,7 @@ export const en: Messages = {
     },
     free: {
       title: 'The agent’s turn',
+      number: (n: number) => `Block ${n}`,
       response: 'Your response',
       asText: 'Starts with / or !: it is sent as text, and Claude Code runs no command or skill.',
       send: 'Send',

@@ -13,7 +13,7 @@ const ALPHA = 'c0ffee00-0000-4000-8000-00000000000a';
 const BETA = 'c0ffee00-0000-4000-8000-00000000000b';
 
 const roundOf = (session: string, number: number, title: string, more: Partial<RoundView> = {}): RoundView => ({
-  session, cwd: '/work/BreakTheWall', number, receivedAt: `2026-11-23T10:0${number}:00.000Z`, turnText: '',
+  session, project: 'BreakTheWall', turnFolded: false, number, receivedAt: `2026-11-23T10:0${number}:00.000Z`, turnText: '',
   questions: [{ number: 1, title, body: `About ${title.toLowerCase()}`, options: [], recommended: null, recommendation: 'The simple one.' }],
   draft: { generalNote: '', answers: {} }, sent: null, superseded: false, ...more,
 });

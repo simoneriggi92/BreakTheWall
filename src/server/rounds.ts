@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { sessionIdSchema } from '../core/local-server';
+import { cwdSchema, sessionIdSchema } from '../core/local-server';
 import { answerOf, draftSchema, emptyDraft, type Answer, type Draft, type RoundView } from '../core/round-answers';
 import { roundSchema, type Question, type Round } from '../core/round';
 import type { SpecRemarksSection } from '../core/spec-remarks';
-import type { HistoryRoundState } from '../core/session-history';
-import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
+import { projectName, type HistoryRoundState } from '../core/session-history';
+import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase, type TurnKey } from '../core/round-phase';
 import { entries, sessionFolders, WriteQueue } from './files';
 
 /**
@@ -28,7 +28,7 @@ const sentSchema = z.strictObject({
 const entryFields = {
   version: z.literal(1),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   number: z.number().int().min(1),
   /**
    * Where the entry stands among the session's rounds and free blocks, which are numbered apart. Absent on a round
@@ -45,7 +45,7 @@ const storedFreeSchema = z.strictObject({ ...entryFields, kind: z.literal('free'
 const storedPhaseSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   open: z.boolean(),
   quietTurns: z.number().int().min(0),
 });
@@ -61,13 +61,13 @@ const storedRemarksSchema = z.strictObject({
   version: z.literal(1),
   kind: z.literal('remarks'),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   number: z.number().int().min(1),
   sent: sentSchema,
 });
 type StoredRemarks = z.infer<typeof storedRemarksSchema>;
 /** A round or a free block: numbered apart, so the kind and the number together name an entry. */
-export type Kind = 'round' | 'free';
+export type Kind = TurnKey['kind'];
 /** What a delivery answers: a round, a free block, or remarks on a spec sent alone. */
 export type DeliveryKind = Kind | 'remarks';
 type EntryOf<K extends Kind> = K extends 'round' ? StoredRound : StoredFree;
@@ -176,7 +176,8 @@ export class RoundStore {
     const phaseOpen = this.phaseOf(x.session)?.open ?? false;
     const superseded = this.ofSession(x.session).some(y => orderOf(y) > orderOf(x));
     const sent = x.sent ? { message: x.sent.message, at: x.sent.at } : null;
-    const base = { session: x.session, cwd: x.cwd, number: x.number, receivedAt: x.receivedAt, sent, superseded, turnFolded: x.turnFolded ?? false };
+    const head = { project: projectName(x.cwd), turnFolded: x.turnFolded ?? false };
+    const base = { session: x.session, number: x.number, receivedAt: x.receivedAt, sent, superseded, ...head };
     const transcriptGone = this.standing.transcriptGone(x.session);
     const standing = { phaseOpen, queued: this.queued(x), transcriptGone };
     if ('round' in x) {
@@ -233,7 +234,7 @@ export class RoundStore {
    * The person folded or unfolded the agent's text of a round or free block (#126). Kept beside its draft, on a sent or
    * superseded entry too: folding is reading, not answering. False for an entry the store does not have.
    */
-  async foldTurn(session: string, kind: Kind, number: number, folded: boolean): Promise<boolean> {
+  async foldTurn({ session, kind, number }: TurnKey, folded: boolean): Promise<boolean> {
     const found = this.entries.get(key(session, kind, number));
     if (!found) return false;
     if ((found.turnFolded ?? false) !== folded) await this.save({ ...found, turnFolded: folded });

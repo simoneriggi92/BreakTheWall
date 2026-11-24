@@ -22,6 +22,8 @@ export const it = {
         foldOutline: 'Comprimi le domande', unfoldOutline: 'Espandi le domande',
         foldSide: 'Comprimi la colonna destra', unfoldSide: 'Espandi la colonna destra',
         hideTurn: 'Nascondi il testo dell’agente', showTurn: 'Mostra il testo dell’agente',
+        /** The server did not keep the fold of the agent's text (#126): it still holds on the page that made it. */
+        turnFoldFailed: 'Non salvato: il testo dell’agente resta così solo in questa pagina.',
         resizeOutline: 'Ridimensiona le domande', resizeSide: 'Ridimensiona la colonna destra',
         resizeHint: 'Trascina o usa ← → per ridimensionare · doppio clic per la larghezza iniziale',
       },
@@ -32,9 +34,9 @@ export const it = {
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,
-      // The rail's ruler (#124): a tick's number, and its name starting with that number, so a voice command says what it sees.
+      // The ruler's number (#124, #125), in the rail and the strip; a tick's name starts with it, so a voice command says what it sees.
       tick: (n: number) => String(n).padStart(2, '0'),
-      tickName: (n: number, title: string, state: string) => `${String(n).padStart(2, '0')} · ${title} · ${state}`,
+      tickName: (tick: string, title: string, state: string) => `${tick} · ${title} · ${state}`,
       states: { unanswered: 'nessuna risposta', recommendation: 'raccomandazione', none: 'nessuna scelta', note: 'nota' },
       optionState: (letter: string) => `opzione (${letter})`,
       options: 'Opzioni',
@@ -68,6 +70,8 @@ export const it = {
     /** A turn without a round, during the round phase (#99). */
     free: {
       title: 'Il turno dell’agente',
+      /** The chip's last part (#126): free blocks are numbered apart from rounds, so two of one session read apart. */
+      number: (n: number) => `Blocco ${n}`,
       response: 'La tua risposta',
       asText: 'Inizia con / o !: viene inviata come testo, Claude Code non esegue comandi né skill.',
       send: 'Invia',

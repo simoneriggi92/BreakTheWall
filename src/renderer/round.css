@@ -329,6 +329,7 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .agent-text.is-folded { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 8px 12px 8px 16px; }
 .agent-text.is-folded .turn-chip { overflow-wrap: normal; white-space: nowrap; }
 .turn-line { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 14px; }
+.agent-text [role="alert"] { grid-column: 1 / -1; margin: 8px 0 0; color: var(--bad); font-size: 14px; }
 
 /* ---- The progress strip (#125) ----
    The round's progress at the window's foot, at every width, as the owner chose in #122 (variant C): a ruler that

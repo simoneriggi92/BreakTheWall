@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sessionIdSchema } from './local-server';
+import { cwdSchema, sessionIdSchema } from './local-server';
 import { optionLetterSchema, questionSchema, type Question } from './round';
 
 /**
@@ -64,17 +64,20 @@ export const emptyDraft = (): Draft => ({ generalNote: '', answers: {} });
 export const messageLanguageSchema = z.enum(['it', 'en']);
 export type MessageLanguage = z.infer<typeof messageLanguageSchema>;
 
-/**
- * The person folded the agent's text to one line (#126): kept with the round's draft, so it holds for that round alone
- * and on any device. Absent reads as unfolded, as in a round kept before it existed.
- */
-export const turnFoldedField = { turnFolded: z.boolean().optional() };
+/** What the head of a round or a free block shows besides the agent's text (#126), the same on both views. */
+export const turnHeadFields = {
+  /**
+   * The project the session ran in, for the chip: its working directory's last folder, never the whole path, which the
+   * page has no use for. Bounded as the directory it is cut from.
+   */
+  project: cwdSchema,
+  /** The person folded the agent's text to one line: kept with the entry, so it holds for that round alone. */
+  turnFolded: z.boolean(),
+};
 
 /** The round as the page reads it from the server. */
 export const roundViewSchema = z.strictObject({
   session: sessionIdSchema,
-  /** The working directory the session ran in: its last folder names the project in the round's chip (#126). */
-  cwd: z.string().min(1).max(4096),
   number: z.number().int().min(1),
   receivedAt: z.iso.datetime(),
   turnText: z.string(),
@@ -84,7 +87,7 @@ export const roundViewSchema = z.strictObject({
   sent: z.strictObject({ message: z.string(), at: z.iso.datetime() }).nullable(),
   /** A later round of the same session arrived: this one no longer takes answers. */
   superseded: z.boolean(),
-  ...turnFoldedField,
+  ...turnHeadFields,
 });
 export type RoundView = z.infer<typeof roundViewSchema>;
 

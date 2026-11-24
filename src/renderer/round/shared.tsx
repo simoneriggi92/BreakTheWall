@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { projectName } from '../../core/session-history';
-import type { FoldBridge, PhaseBridge, TurnKey } from '../http-bridge';
+import type { TurnKey } from '../../core/round-phase';
+import type { FoldBridge, PhaseBridge } from '../http-bridge';
 import { renderMarkdown } from '../markdown';
 import { usePreferences } from '../preferences';
 import { useDiagrams } from '../use-diagrams';
@@ -32,12 +32,13 @@ export function Markdown({ text, host: given, marks = NO_MARKS }: { text: string
  * the text's first line cut, the control. The fold is kept with the entry on the server, so it holds for that round
  * alone; it is reading, not answering, so it works on a sent or superseded entry too.
  */
-export function AgentText({ entry, cwd, text, round, folded: kept, label, className, bridge }: {
+export function AgentText({ entry, project, text, number, folded: kept, label, className, bridge }: {
   entry: TurnKey;
-  cwd: string;
+  /** The project as the server names it: the working directory's last folder. */
+  project: string;
   text: string;
-  /** The chip's last part, on a round: "Round n". A free block is not a round and has none. */
-  round?: string;
+  /** The chip's last part: "Round n", or "Block n" for a free block, so two of one session never read the same. */
+  number: string;
   folded: boolean;
   label: string;
   className: string;
@@ -45,19 +46,28 @@ export function AgentText({ entry, cwd, text, round, folded: kept, label, classN
 }) {
   const { t } = usePreferences();
   const f = t.page.round.folds;
-  const [folded, setFolded] = useState(kept);
+  // The person's fold wins on this page until the server's word changes: another entry shown in the same place, or the
+  // same one folded from another tab. Adjusted while rendering, so a stale fold is never drawn for a frame.
+  const id = `${entry.kind}/${entry.session}/${entry.number}`;
+  const [mine, setMine] = useState({ id, kept, folded: kept });
+  if (mine.id !== id || mine.kept !== kept) setMine({ id, kept, folded: kept });
+  const folded = mine.id === id && mine.kept === kept ? mine.folded : kept;
+  // Saved as a draft is, newest last; a fold the server did not keep still holds on this page, and says so. Folding
+  // works on a sent entry too, so a refusal is never expected and always shown.
+  const [failure, setFailure] = useState<'save'>();
+  const save = useLatestSaver((x: { entry: TurnKey; folded: boolean }) => bridge.foldTurn(x.entry, x.folded), false, setFailure);
   const toggle = () => {
     const next = !folded;
-    setFolded(next);
-    // A fold the server did not keep still holds on this page: it is a way of reading, with nothing to lose.
-    bridge.foldTurn(entry, next).catch(() => {});
+    setMine({ id, kept, folded: next });
+    save({ entry, folded: next });
   };
-  const chip = [projectName(cwd), entry.session.slice(0, 8), round].filter(Boolean).join(' · ');
+  const chip = [project, entry.session.slice(0, 8), number].join(' · ');
   return (
     <section className={`${className} agent-text${folded ? ' is-folded' : ''}`} aria-label={label}>
       <p className="turn-chip" title={entry.session}>{chip}</p>
       {folded && <p className="turn-line">{firstLine(text)}</p>}
       <button type="button" className="subtle round-fold turn-fold" aria-expanded={!folded} onClick={toggle}>{folded ? f.showTurn : f.hideTurn}</button>
+      {failure && <p role="alert">{f.turnFoldFailed}</p>}
       {!folded && <Markdown text={text}/>}
     </section>
   );

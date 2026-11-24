@@ -56,8 +56,8 @@ export function FreeBlockPage({ block, phaseOpen, queued = false, transcriptGone
       </header>
       <main className="free-layout">
         <AgentText
-          entry={{ kind: 'free', session: block.session, number: block.number }} cwd={block.cwd} text={block.text}
-          folded={block.turnFolded ?? false} label={f.title} className="free-turn" bridge={bridge}
+          entry={{ kind: 'free', session: block.session, number: block.number }} project={block.project} text={block.text}
+          number={f.number(block.number)} folded={block.turnFolded} label={f.title} className="free-turn" bridge={bridge}
         />
         {/* A card of its own, so what follows the turn is read on the surface and never on the grid (#123). */}
         <div className="free-reply">
