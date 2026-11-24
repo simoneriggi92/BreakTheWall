@@ -27,6 +27,9 @@ const PAIRS: [string, string][] = [
   ...['a1', 'a2', 'a3', 'a4'].flatMap(x => [[x, `${x}-wash`], [x, 'surface'], ['ink', `${x}-wash`]] as [string, string][]),
   ['x-strip-ink', 'x-strip-seen'], ['x-strip-ink', 'x-strip-next'], ['x-strip-active-ink', 'x-strip-active'], ['x-prereq', 'x-prereq-soft'],
   ['x-lit-ink', 'x-lit'], ['muted', 'surface'],
+  // The progress strip (#125): an open question's number on the strip, an answered one's on its filled span, the
+  // current one's in accent on either, and the count.
+  ['muted', 'surface'], ['ink', 'accent-soft'], ['accent', 'surface'], ['accent', 'accent-soft'], ['ink', 'surface'],
 ];
 
 describe('paper and blueprint themes', () => {
@@ -208,5 +211,82 @@ describe('the round head (#126)', () => {
     expect(line).toMatch(/white-space: nowrap/);
     expect(line).toMatch(/text-overflow: ellipsis/);
     expect(line).toMatch(/overflow: hidden/);
+  });
+});
+
+describe('the progress strip at the window\'s foot (#125)', () => {
+  // The #123 block's reader, kept apart so the tickets built beside this one merge without touching each other.
+  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+    .map(m => m[2]).join(';');
+
+  it('fixes a 42 px strip to the window\'s foot, its text on --surface', () => {
+    const strip = declarations('.round-strip');
+    expect(strip).toMatch(/position: fixed/);
+    expect(strip).toMatch(/bottom: 0/);
+    expect(strip).toMatch(/height: var\(--strip-h\)/);
+    expect(strip).toMatch(/background: var\(--surface\)/);
+    expect(declarations('.round-page.has-strip')).toMatch(/--strip-h: 42px/);
+  });
+
+  it('reserves the strip\'s height, so it covers no control or content', () => {
+    // The canvas ends above it; the panels already subtract --strip-h (#123).
+    expect(declarations('.round-page.has-strip')).toMatch(/padding-bottom: var\(--strip-h\)/);
+    // The History dock and its notices rise above it, and the overlays (the drawer, the side chat's, the history) end at it.
+    expect(declarations('.round-page.has-strip ~ .page-dock')).toMatch(/bottom: calc\(var\(--strip-h\) \+ 12px\)/);
+    for (const overlay of ['.round-layout.is-drawer .round-return', '.round-layout.is-drawer .round-side', '.round-page.has-strip ~ .page-history']) {
+      expect(declarations(overlay), overlay).toMatch(/bottom: var\(--strip-h\)/);
+    }
+    // The page's siblings do not inherit from it, so they are told the height too.
+    for (const sibling of ['.round-page.has-strip ~ .page-dock', '.round-page.has-strip ~ .page-history']) {
+      expect(declarations(sibling), sibling).toMatch(/--strip-h: 42px/);
+    }
+  });
+});
+
+describe('the rail as a ruler and the question\'s numeral (#124)', () => {
+  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+    .map(m => m[2]).join(';');
+  /** `fg` laid over `bg` at `share` percent, as `color-mix(in srgb, fg share%, transparent)` draws it on that ground. */
+  const over = (fg: string, share: number, bg: string) => '#' + [1, 3, 5]
+    .map(i => Math.round(parseInt(fg.slice(i, i + 2), 16) * share / 100 + parseInt(bg.slice(i, i + 2), 16) * (1 - share / 100)))
+    .map(x => x.toString(16).padStart(2, '0')).join('');
+  const THEMES = [[':root, :root[data-theme="paper"]'], [':root[data-theme="blueprint"]']];
+
+  it('draws the numeral huge and outlined only, in the display face, behind the card\'s content', () => {
+    const numeral = declarations('.round-numeral');
+    expect(numeral).toMatch(/color: transparent/);
+    expect(numeral).toMatch(/-webkit-text-stroke: 1\.25px color-mix\(in srgb, var\(--ink\) 18%, transparent\)/);
+    expect(numeral).toMatch(/font-family: var\(--f-display\)/);
+    expect(numeral).toMatch(/font-weight: 800/);
+    expect(numeral).toMatch(/font-size: 250px/);
+    expect(numeral).toMatch(/pointer-events: none/);
+    expect(numeral).toMatch(/user-select: none/);
+  });
+
+  it.each(THEMES)('%s keeps the numeral faint and the text over it at AA', selector => {
+    // The numeral is decorative, not a text pair: it stays well under the 3:1 of anything meant to be seen, while the
+    // heading and the body's ink, drawn over its stroke, keep AA.
+    const t = tokens(selector);
+    const share = Number(/-webkit-text-stroke: [^;]*var\(--ink\) (\d+)%/.exec(declarations('.round-numeral'))?.[1]);
+    const stroke = over(t.ink, share, t.surface);
+    expect(contrast(stroke, t.surface)).toBeLessThan(2);
+    expect(contrast(t.ink, stroke)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('runs the rail\'s title bottom to top on one line, cut with an ellipsis, never wrapped', () => {
+    const title = declarations('.round-rail-title');
+    expect(title).toMatch(/writing-mode: vertical-rl/);
+    expect(title).toMatch(/transform: rotate\(180deg\)/);
+    expect(title).toMatch(/white-space: nowrap/);
+    expect(title).toMatch(/overflow: hidden/);
+    expect(title).toMatch(/text-overflow: ellipsis/);
+    expect(title).toMatch(/max-height: 32vh/);
+    expect(title).toMatch(/font: [^;]*var\(--f-mono\)/);
+    expect(title).toMatch(/text-transform: uppercase/);
+    expect(title).toMatch(/color: var\(--accent\)/);
   });
 });

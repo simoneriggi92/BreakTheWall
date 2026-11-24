@@ -27,9 +27,14 @@ export const it = {
       },
       outline: 'Domande',
       progress: (answered: number, total: number) => `${answered}/${total} con risposta`,
+      /** The strip at the window's foot (#125): the round's progress, one segment per question and the count. */
+      strip: 'Avanzamento del round',
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,
+      // The rail's ruler (#124): a tick's number, and its name starting with that number, so a voice command says what it sees.
+      tick: (n: number) => String(n).padStart(2, '0'),
+      tickName: (n: number, title: string, state: string) => `${String(n).padStart(2, '0')} · ${title} · ${state}`,
       states: { unanswered: 'nessuna risposta', recommendation: 'raccomandazione', none: 'nessuna scelta', note: 'nota' },
       optionState: (letter: string) => `opzione (${letter})`,
       options: 'Opzioni',

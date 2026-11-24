@@ -268,9 +268,9 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   </>;
 
   return (
-    <div className="round-page">
-      {/* Progress sits in the sticky top bar, so it stays in view at every width, the outline folded or not. */}
-      <header className="topbar"><Brand tagline={false}/><div className="course-title"><strong>{r.title(round.number)}</strong></div><span className="round-progress">{r.progress(answered, round.questions.length)}</span>
+    <div className="round-page has-strip">
+      {/* The bar keeps the phase control; progress lives in the strip at the window's foot (#125). */}
+      <header className="topbar"><Brand tagline={false}/><div className="course-title"><strong>{r.title(round.number)}</strong></div>
         {band === 'drawer' && <button ref={drawerToggle} type="button" className="subtle" aria-expanded={drawerOpen} aria-controls={drawerOpen ? 'round-return' : undefined} onClick={() => setDrawerOpen(open => !open)}>{r.receives}</button>}
         {/* Below ~860 px the bar has no room for it: it goes into the drawer with the rest of the right column. */}
         {band !== 'drawer' && <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>}
@@ -297,18 +297,20 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
               const a = answerOf(draft, q);
               const done = isAnswered(a);
               // An answered question out of focus folds to its number and answer: what is left to do stands out. In the
-              // rail every question is its number, with a tick once answered; the title stays in its name and tooltip.
+              // rail every question is a tick of a ruler (#124), its number alone: the tick and its square draw the state
+              // (current, answered, open), the title stays in its name and tooltip.
               const rail = outlineFolded;
               const collapsed = rail || (done && q.number !== question.number);
               const asked = sideChatOf(q.number)?.turns.length ?? 0;
+              const name = rail ? r.tickName(q.number, q.title, answerState(a)) : r.collapsed(q.number, q.title, answerState(a));
               return (
                 <li key={q.number}>
                   <button
                     type="button" className={`round-outline-item${done ? ' is-answered' : ''}${collapsed ? ' is-collapsed' : ''}`}
                     aria-current={q.number === question.number ? 'true' : undefined} onClick={() => goTo(q.number)}
-                    {...(collapsed ? { title: q.title, 'aria-label': r.collapsed(q.number, q.title, answerState(a)) } : {})}
+                    {...(collapsed ? { title: q.title, 'aria-label': name } : {})}
                   >
-                    <span className="round-outline-title">{rail ? `${r.number(q.number)}${done ? ' ✓' : ''}` : collapsed ? r.number(q.number) : r.question(q.number, q.title)}</span>
+                    <span className="round-outline-title">{rail ? r.tick(q.number) : collapsed ? r.number(q.number) : r.question(q.number, q.title)}</span>
                     {!rail && <span className="round-outline-state">{answerState(a)}</span>}
                     {asked > 0 && <span className="round-outline-chat" title={s.count(asked)}>💬 {asked}</span>}
                   </button>
@@ -317,8 +319,15 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             })}
           </ol>
         </nav>
+        {/* The rail still names what is being read (#124), right under the ticks and not at the window's foot, where the
+            history dock sits. The heading already says it to a screen reader, so this copy is for the eye only. */}
+        {outlineFolded && <p className="round-rail-title" aria-hidden="true" title={question.title}>{question.title}</p>}
         </div>
         <article ref={article} className={`round-question${chatOpen ? ' is-chatting' : ''}`} aria-labelledby="round-question-title" onMouseUp={readSelection} onKeyUp={readSelection}>
+          {/* On the wide layout the question's number stands large and outlined behind its heading (#124): presence,
+              not text to read, so it is hidden from screen readers and the heading keeps the real number. The rail and
+              the drawer have no room for it; folding the outline on a wide window leaves it. */}
+          {band === 'wide' && <span className="round-numeral" aria-hidden="true">{r.tick(question.number)}</span>}
           <div className="round-question-head">
             <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
             <button type="button" className="subtle round-chat-open" aria-label={s.open} title={s.open} aria-pressed={chatOpen} aria-keyshortcuts="c" onClick={() => chatOpen ? setChatOpen(false) : openChat()}>{s.openShort}</button>
@@ -423,7 +432,38 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             {returnBody}
           </section>)}
       </main>
+      <ProgressStrip
+        label={r.strip} count={r.progress(answered, round.questions.length)} current={question.number}
+        segments={round.questions.map(q => ({ number: q.number, answered: isAnswered(answerOf(draft, q)) }))}
+      />
     </div>
+  );
+}
+
+/**
+ * The round's progress at the window's foot (#125), at every width, drawn as a ruler that continues the rail's: one
+ * segment per question, filled once answered, the current one marked. The segments repeat for the eye what the count
+ * says, so assistive technology reads only the count, and they take no click: moving stays with the outline, the rail
+ * and the keys, with no third control doing the same (#115).
+ */
+function ProgressStrip({ label, count, current, segments }: {
+  label: string;
+  count: string;
+  current: number;
+  segments: readonly { number: number; answered: boolean }[];
+}) {
+  return (
+    <footer className="round-strip" aria-label={label}>
+      <ol aria-hidden="true">
+        {segments.map(x => (
+          <li key={x.number} className={`${x.answered ? 'is-answered' : 'is-open'}${x.number === current ? ' is-current' : ''}`}>
+            <span>{String(x.number).padStart(2, '0')}</span>
+          </li>
+        ))}
+      </ol>
+      {/* Polite: an answer is the person's own act, so the new count waits for whatever is being read. */}
+      <span className="round-strip-count" aria-live="polite">{count}</span>
+    </footer>
   );
 }
 

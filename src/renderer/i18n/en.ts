@@ -28,9 +28,13 @@ export const en: Messages = {
       },
       outline: 'Questions',
       progress: (answered: number, total: number) => `${answered}/${total} answered`,
+      strip: 'Round progress',
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,
+      // The rail's ruler (#124): a tick's number, and its name starting with that number, so a voice command says what it sees.
+      tick: (n: number) => String(n).padStart(2, '0'),
+      tickName: (n: number, title: string, state: string) => `${String(n).padStart(2, '0')} · ${title} · ${state}`,
       states: { unanswered: 'no answer', recommendation: 'recommendation', none: 'no choice', note: 'note' },
       optionState: (letter: string) => `option (${letter})`,
       options: 'Options',
