@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
-import { SECRET_HEADER } from '../core/local-server';
-import { answers, readLock, serverStatus, type ServerLock } from './lock';
+import { SECRET_HEADER, type ServerStatus } from '../core/local-server';
+import { answers, readLock, releaseLock, serverStatus, type ServerLock } from './lock';
 
 /**
  * What the mod asks of the launcher (#94): find the one server through its lock file, or start it detached; and open
@@ -13,14 +13,19 @@ export interface LaunchOptions {
   serverScript: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  /** This launcher's own version: an older server it finds is replaced when no other session uses it (#102). */
+  version?: string;
+  /** The session the launcher runs for, which does not count as another. */
+  session?: string;
 }
 
 /** The fragment never travels to the server, so the secret stays out of request lines and logs. */
 export const pageUrl = (lock: Pick<ServerLock, 'port' | 'secret'>) => `http://127.0.0.1:${lock.port}/#t=${lock.secret}`;
 
-export async function ensureServer({ dataDir, serverScript, env = process.env, timeoutMs = 10_000 }: LaunchOptions): Promise<ServerLock> {
+export async function ensureServer({ dataDir, serverScript, env = process.env, timeoutMs = 10_000, version, session }: LaunchOptions): Promise<ServerLock> {
   const found = readLock(dataDir);
-  if (found && await answers(found)) return found;
+  const status = found && await serverStatus(found);
+  if (found && status && !await replaces(dataDir, found, status, version, session)) return found;
   await spawnDetached(process.execPath, [serverScript], { env });
   // The server replaces an orphaned lock itself; the launcher waits for a lock whose server answers.
   const deadline = Date.now() + timeoutMs;
@@ -30,6 +35,55 @@ export async function ensureServer({ dataDir, serverScript, env = process.env, t
     if (lock && await answers(lock)) return lock;
   }
   throw new Error('The local server did not start.');
+}
+
+/**
+ * Whether this launcher's newer server takes the place of the one it found (#102): only when no session but the
+ * launching one is registered with it, so no other session loses its server mid-round. Otherwise the found server is
+ * told the update waits, and its page says so. The found server's lock is removed only while it still names that
+ * server; the server sees its lock gone at its next check and stops.
+ */
+async function replaces(dataDir: string, found: ServerLock, status: ServerStatus, version: string | undefined, session: string | undefined): Promise<boolean> {
+  if (version === undefined || compareVersions(status.version, version) >= 0) return false;
+  // A server older than #102 does not list its sessions: it is left to stop when they end.
+  const others = status.sessions?.filter(x => x !== session) ?? [undefined];
+  if (others.length > 0) {
+    await fetch(`http://127.0.0.1:${found.port}/api/update`, {
+      method: 'POST', headers: { [SECRET_HEADER]: found.secret, 'content-type': 'application/json' }, body: JSON.stringify({ version }), signal: AbortSignal.timeout(1500),
+    }).catch(() => undefined);
+    return false;
+  }
+  releaseLock(dataDir, found);
+  return true;
+}
+
+/**
+ * Orders two versions as `major.minor.patch[-pre]`: a pre-release comes before its release, and pre-releases compare
+ * part by part, numbers as numbers. Negative when `a` is older.
+ */
+export function compareVersions(a: string, b: string): number {
+  const parse = (x: string) => { const [core, ...pre] = x.trim().replace(/^v/, '').split('-'); return { core: core.split('.'), pre: pre.join('-') }; };
+  const part = (x: string | undefined, y: string | undefined) => {
+    if (x === y) return 0;
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const [m, n] = [Number(x), Number(y)];
+    return Number.isInteger(m) && Number.isInteger(n) ? m - n : x < y ? -1 : 1;
+  };
+  const [x, y] = [parse(a), parse(b)];
+  for (let i = 0; i < Math.max(x.core.length, y.core.length); i++) {
+    const order = part(x.core[i] ?? '0', y.core[i] ?? '0');
+    if (order !== 0) return order;
+  }
+  if (x.pre === y.pre) return 0;
+  if (x.pre === '') return 1;
+  if (y.pre === '') return -1;
+  const [p, q] = [x.pre.split('.'), y.pre.split('.')];
+  for (let i = 0; i < Math.max(p.length, q.length); i++) {
+    const order = part(p[i], q[i]);
+    if (order !== 0) return order;
+  }
+  return 0;
 }
 
 /**

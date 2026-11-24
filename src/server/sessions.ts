@@ -16,6 +16,8 @@ export interface SessionsContext {
   labels: SessionLabels;
   /** The registrations the mod renews, by session id: a session is live while its lease runs. */
   leases: Map<string, { cwd: string; until: number }>;
+  /** A newer version a launcher found this server too old for, while other sessions still used it. */
+  update: { version: string | null };
   pageChanged(): void;
 }
 
@@ -23,15 +25,26 @@ export interface SessionsContext {
  * Why Claude Code ended the session, as `session.end` words it (`clear`, `resume`, `prompt_input_exit`, `logout`,
  * `other`). Kept open to the words a later Claude Code adds: whatever the reason, the session is no longer live.
  */
+const updateSchema = z.strictObject({ version: z.string().min(1).max(100) });
 const endSchema = z.strictObject({ reason: z.string().regex(/^[a-z_]{1,40}$/) });
 const END_PATH = /^\/api\/sessions\/([^/]+)\/end$/;
 const SESSION_PATH = /^\/api\/sessions\/([^/]+)$/;
 const PAST_ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})$/;
 
 export async function handleSessions(req: IncomingMessage, res: ServerResponse, path: string, context: SessionsContext): Promise<boolean> {
-  const { rounds, labels, leases, pageChanged } = context;
+  const { rounds, labels, leases, update, pageChanged } = context;
   if (req.method === 'GET' && path === '/api/history') {
     send(res, 200, history(context));
+    return true;
+  }
+  if (req.method === 'POST' && path === '/api/update') {
+    const body = updateSchema.safeParse(await readJson(req));
+    if (!body.success) send(res, 400, { error: 'bad-request' });
+    else {
+      update.version = body.data.version;
+      pageChanged();
+      noContent(res);
+    }
     return true;
   }
   const endPath = END_PATH.exec(path);
@@ -66,7 +79,7 @@ export async function handleSessions(req: IncomingMessage, res: ServerResponse, 
   return false;
 }
 
-function history({ rounds, labels, leases }: SessionsContext): History {
+function history({ rounds, labels, leases, update }: SessionsContext): History {
   const now = Date.now();
   const projects = new Map<string, HistoryProject & { latestAt: string }>();
   const summaries = rounds.summaries().sort((a, b) => b.startedAt.localeCompare(a.startedAt));
@@ -79,7 +92,7 @@ function history({ rounds, labels, leases }: SessionsContext): History {
   }
   return {
     projects: [...projects.values()].sort((a, b) => b.latestAt.localeCompare(a.latestAt)).map(({ cwd, sessions }) => ({ cwd, sessions })),
-    update: null,
+    update: update.version,
   };
 }
 

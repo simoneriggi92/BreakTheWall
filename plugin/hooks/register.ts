@@ -156,10 +156,13 @@ async function checkNode($: EngineInterface): Promise<'ok' | 'missing'> {
   }
 }
 
-/** `node launcher.cjs start | open`: one JSON line back, the server left running on its own. */
+/**
+ * `node launcher.cjs start | open <session>`: one JSON line back, the server left running on its own. The session
+ * is the launcher's to leave out when it counts the sessions an older server still serves (#102).
+ */
 async function launch($: EngineInterface, command: 'start' | 'open'): Promise<Launched> {
   const { CLAUDE_PLUGIN_ROOT: root } = await $.process.hookEnv()
-  const { stdout } = await $.process.run(['node', `${root}/server/launcher.cjs`, command], { timeoutMs: 30_000 })
+  const { stdout } = await $.process.run(['node', `${root}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
   const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '{}') as Partial<Launched> & { error?: string }
   if (typeof reply.port !== 'number' || typeof reply.secret !== 'string') throw new Error(reply.error ?? 'The launcher gave no server.')
   return { port: reply.port, secret: reply.secret, opened: reply.opened }

@@ -92,6 +92,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
   const rounds = await RoundStore.open(options.dataDir);
   const labels = await SessionLabels.open(options.dataDir);
+  /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
+  const update: { version: string | null } = { version: null };
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
@@ -141,7 +143,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && path === '/api/status') {
       // A launcher that just found this server is about to use it: the idle clock starts over.
       lastBusy = Date.now();
-      const status: ServerStatus = { app: 'break-the-wall', version: options.version, platform: process.platform, pageConnected: pageConnected() };
+      busy();
+      const status: ServerStatus = { app: 'break-the-wall', version: options.version, platform: process.platform, pageConnected: pageConnected(), sessions: [...sessions.keys()] };
       return send(res, 200, status);
     }
     if (req.method === 'POST' && path === '/api/sessions') {
@@ -243,7 +246,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
-    if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, pageChanged })) return;
+    if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, update, pageChanged })) return;
     return send(res, 404, { error: 'not-found' });
   }
 

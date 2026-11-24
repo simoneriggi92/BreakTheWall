@@ -166,3 +166,24 @@ describe('what a session began with (#102)', () => {
   });
 });
 
+describe('an update that waits for the other sessions (#102)', () => {
+  it('tells an open page at once that a newer version waits, and names it in the history', async () => {
+    const api = client(await start({ pollHoldMs: 10_000 }));
+    expect((await api.history()).update).toBeNull();
+    const poll = api.call('/api/page/poll');
+    await new Promise(done => setTimeout(done, 50));
+    expect((await api.updateWaits('0.7.0')).status).toBe(204);
+    expect(await (await poll).json()).toEqual({ changed: true });
+    expect((await api.history()).update).toBe('0.7.0');
+    expect((await api.updateWaits('')).status).toBe(400);
+  });
+
+  it('lists the live sessions in its status, so a newer launcher knows whether others still use it', async () => {
+    const api = client(await start());
+    await api.register(SESSION, CWD);
+    await api.register(OTHER, OTHER_CWD);
+    await api.end(OTHER);
+    expect(await (await api.call('/api/status')).json()).toMatchObject({ sessions: [SESSION] });
+  });
+});
+
