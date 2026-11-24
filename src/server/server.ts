@@ -57,9 +57,10 @@ const TYPES: Record<string, string> = {
 const cwdSchema = z.string().min(1).max(4096);
 /**
  * A session as the mod registers it: its id, its folder, the model it runs on, and the side-chat model set in the
- * plugin, if any (#100).
+ * plugin, if any (#100). A model name `--model` could not take is dropped, never the session with it.
  */
-const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema, model: modelSchema.optional(), sideChatModel: modelSchema.optional() });
+const registeredModelSchema = modelSchema.optional().catch(undefined);
+const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema, model: registeredModelSchema, sideChatModel: registeredModelSchema });
 /**
  * Every turn as the mod posts it on `turn.complete`, with how it ended and, for a subagent's run, its agent: the server
  * decides whether it holds a round, so the mod decides nothing.

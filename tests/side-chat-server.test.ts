@@ -267,9 +267,15 @@ describe('a side chat on one question (#100)', () => {
     expect(claude.runs[1].args.slice(-2)).toEqual(['--model', 'haiku']);
   });
 
-  it('refuses a model that would read as an option', async () => {
-    const api = client(await start({ runners: { sideChat: fakeClaude().runner } }));
-    expect((await api.register({ model: '--dangerously-skip-permissions' })).status).toBe(400);
+  it('never passes a model that would read as an option, and still registers the session', async () => {
+    const claude = fakeClaude();
+    const api = client(await start({ runners: { sideChat: claude.runner } }));
+    expect((await api.register({ model: 'Default (recommended)', sideChatModel: '--dangerously-skip-permissions' })).status).toBe(204);
+    await api.turn(ROUND);
+    await api.ask(1, 1, 'Which model?');
+    await settled(api);
+    expect(claude.runs[0].args).not.toContain('--model');
+    expect(claude.runs[0].args).not.toContain('--dangerously-skip-permissions');
   });
 
   it('keeps the threads across a restart, and a reply cut short by it shows as failed', async () => {

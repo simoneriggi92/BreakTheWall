@@ -33,6 +33,7 @@ function engine(on: On) {
   }))
   on('session.id', () => ({ value: state.session }))
   on('session.cwd', () => ({ value: '/work' }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
   on('http.fetch', (_, e) => {
     const method = e.init?.method ?? 'GET'
     state.fetched.push({ url: e.url, method, body: e.init?.body as string | undefined })
@@ -110,4 +111,21 @@ test('reads the session id again for each poll, as /clear and /resume change it 
     '/api/sessions/sess-2/delivery',
   ])
   expect(server.submitted.map(x => x.text)).toEqual(['after the clear'])
+})
+
+const registered = (server: ReturnType<typeof engine>) =>
+  server.fetched.filter(x => x.url === 'http://127.0.0.1:4000/api/sessions').map(x => JSON.parse(x.body ?? '{}'))
+
+test('registers the session with its model and the side-chat model set in the plugin', { options: { sideChatModel: 'haiku' } }, async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5', sideChatModel: 'haiku' })
+})
+
+test('leaves the side-chat model to the server\'s default when the plugin sets none', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5' })
 })
