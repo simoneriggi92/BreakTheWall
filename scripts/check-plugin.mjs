@@ -31,6 +31,8 @@ if (skipped.length > 0) {
   console.error(`check:plugin: the mod hooks ${skipped.join(', ')}. On Claude Code 2.1.330 the built-in cc-plugin-sec-default passes these events on past every other plugin, so the hook never runs in a session. Declare a classic command hook in plugin/hooks/hooks.json instead (plugin/AGENTS.md, #96).`);
   process.exit(1);
 }
+// The marketplace people add (#107), read as `/plugin marketplace add` will read it.
+run('claude', ['plugin', 'validate', '.claude-plugin/marketplace.json']);
 // The mod's tests run inside the engine's test kit, which stands in for Claude Code beneath the mod.
 run('claude', ['plugin', 'test', 'plugin']);
 // The engine lays the mod's types in plugin/.claude-plugin/types only when an interactive session loads the plugin

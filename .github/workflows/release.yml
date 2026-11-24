@@ -1,8 +1,10 @@
 name: Release
 
 # A v* tag builds the Apple Silicon DMG and the Windows x64 setup and attaches them to the tag's release, as a draft
-# pre-release titled from the CHANGELOG when there is none yet; the owner publishes that draft. A pull request that
-# touches packaging, or a manual run, only builds them as workflow artifacts.
+# pre-release titled from the CHANGELOG when there is none yet; the owner publishes that draft. The same tag builds the
+# Claude Code plugin and writes it to the orphan `plugin` branch, tagged plugin-v<version>, the tag the marketplace on
+# main pins (#107). A pull request that touches packaging, or a manual run, only builds them; CI packs the plugin on
+# every pull request.
 on:
   push:
     tags: ['v*']
@@ -80,6 +82,59 @@ jobs:
           path: release/
           if-no-files-found: error
           retention-days: 14
+
+  plugin:
+    name: Claude Code plugin
+    # The plugin is plain files, the same on every platform: the server and its launcher bundled into one file each, the
+    # built page, the mod and its hooks. No lockfile and no package manifest ship, so installing it runs no install step.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm install --global npm@10.9.8
+      - run: npm ci
+      - run: npm run build:plugin
+      # Refuses a tag that is not package.json's version, and a marketplace on main that does not pin plugin-v<version>.
+      # Off a tag, it packs package.json's version.
+      - name: Pack the plugin
+        id: pack
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+        run: node scripts/pack-plugin.mjs "${RELEASE_TAG:-v$(node -p "require('./package.json').version")}" "$RUNNER_TEMP/plugin"
+      - run: npm install --global @anthropic-ai/claude-code@2.1.330
+      - name: Claude Code reads the packed plugin
+        env:
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+        run: claude plugin validate "$RUNNER_TEMP/plugin"
+      # The branch holds only the plugin, one commit per release on top of the last, so main keeps no build output. The
+      # commit is made from the packed folder with its own index, without touching the checkout.
+      - name: Write it to the plugin branch and tag it
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAG: ${{ steps.pack.outputs.tag }}
+          VERSION: ${{ steps.pack.outputs.version }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "::error::$TAG already exists: a plugin tag is written once, and installs may already pin it"
+            exit 1
+          fi
+          parent=()
+          if git fetch --no-tags --depth=1 origin plugin; then parent=(-p FETCH_HEAD); fi
+          export GIT_INDEX_FILE="$RUNNER_TEMP/plugin.index"
+          git -C "$RUNNER_TEMP/plugin" --git-dir="$GITHUB_WORKSPACE/.git" --work-tree=. add --all
+          commit=$(git commit-tree "$(git write-tree)" ${parent[@]+"${parent[@]}"} -m "Break the Wall plugin $VERSION" -m "Built from $GITHUB_SHA ($GITHUB_REF_NAME).")
+          unset GIT_INDEX_FILE
+          git push origin "$commit:refs/heads/plugin" "$commit:refs/tags/$TAG"
 
   release:
     name: Attach to the release
