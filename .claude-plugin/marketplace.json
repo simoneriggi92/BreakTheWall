@@ -1,0 +1,14 @@
+{
+  "name": "break-the-wall",
+  "description": "Break the Wall for Claude Code: answer an agent's question rounds one question at a time in a local page.",
+  "owner": { "name": "Simone Riggi", "url": "https://github.com/simoneriggi92" },
+  "plugins": [
+    {
+      "name": "break-the-wall",
+      "description": "Answer an agent's question rounds one question at a time in a local page, then explore the spec they lead to.",
+      "source": { "source": "github", "repo": "simoneriggi92/BreakTheWall", "ref": "plugin-v0.5.0-alpha" },
+      "homepage": "https://github.com/simoneriggi92/BreakTheWall#use-in-claude-code",
+      "license": "Apache-2.0"
+    }
+  ]
+}

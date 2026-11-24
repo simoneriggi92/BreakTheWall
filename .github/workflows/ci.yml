@@ -32,6 +32,9 @@ jobs:
       # The local page in headless Chrome, served by the built plugin's server (the runner image ships Chrome).
       - run: node scripts/build-plugin.mjs
       - run: npm run smoke:page
+      # The plugin as a release writes it to the plugin branch (#107): no mod tests, no lockfile, the marketplace's pin.
+      - name: Pack the plugin
+        run: node scripts/pack-plugin.mjs "v$(node -p "require('./package.json').version")" "$RUNNER_TEMP/plugin"
       # The mod runs only inside Claude Code: its validator, pinned to the version the mod was written against.
       - run: npm install --global @anthropic-ai/claude-code@2.1.330
       - name: Plugin check
@@ -39,10 +42,26 @@ jobs:
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
         run: npm run check:plugin
 
+  linux:
+    name: 'Linux: types and tests'
+    # The plugin's local server runs wherever Claude Code does (#107). Linux is not verified by hand, so its tests run
+    # here; the desktop app is not built for Linux.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+      - run: npm install --global npm@10.9.8
+      - run: npm ci
+      - run: npm run check
+
   windows:
     name: 'Windows: types, tests and build'
-    # Keeps the app working on Windows (plan P-20261027-windows-alpha). The macOS job above keeps the name the
-    # main ruleset requires.
+    # Keeps the app working on Windows (plan P-20261027-windows-alpha), and runs the plugin server's tests there (#107).
+    # The macOS job above keeps the name the main ruleset requires.
     runs-on: windows-latest
     timeout-minutes: 25
     defaults:

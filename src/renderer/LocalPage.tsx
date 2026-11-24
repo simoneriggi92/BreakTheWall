@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CurrentView } from '../core/round-phase';
+import type { SpecView } from '../core/spec';
 import { App } from './App';
 import { httpBridge, RefusedError } from './http-bridge';
 import { PreferencesProvider, usePreferences } from './preferences';
 import { FreeBlockPage } from './round/FreeBlockPage';
 import { RoundPage } from './round/RoundPage';
+import { newestSpec, SpecPage } from './spec/SpecPage';
 import { browserBridge } from './storage';
 
 const SECRET_KEY = 'btw:page-secret';
@@ -34,6 +36,9 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   const [state, setState] = useState<'checking' | 'open' | 'refused'>(bridge ? 'checking' : 'refused');
   /** The latest round or free block the server holds; read again after every poll, which answers early when it changes. */
   const [current, setCurrent] = useState<CurrentView | null>(null);
+  /** The specs handed over (#104), read with it; the newest opens unless a later turn came after it, or the person closed it. */
+  const [specs, setSpecs] = useState<SpecView[]>([]);
+  const [closedSpec, setClosedSpec] = useState<string>();
 
   useEffect(() => {
     if (!bridge) return;
@@ -50,7 +55,10 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   useEffect(() => {
     if (!bridge || state !== 'open') return;
     const stop = new AbortController();
-    const refresh = () => bridge.getCurrent().then(next => { if (!stop.signal.aborted) setCurrent(next); }, () => {});
+    const refresh = () => {
+      void bridge.listSpecs().then(next => { if (!stop.signal.aborted) setSpecs(next); }, () => {});
+      return bridge.getCurrent().then(next => { if (!stop.signal.aborted) setCurrent(next); }, () => {});
+    };
     void refresh();
     void (async () => {
       while (!stop.signal.aborted) {
@@ -72,6 +80,11 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   }, [bridge, state]);
 
   if (state === 'open' && bridge) {
+    const spec = newestSpec(specs);
+    const shownAt = current?.kind === 'round' ? current.round.receivedAt : current?.block.receivedAt;
+    if (spec && spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt)) {
+      return <PreferencesProvider bridge={bridge}><SpecPage specs={specs} bridge={bridge} onClose={() => setClosedSpec(spec.id)}/></PreferencesProvider>;
+    }
     if (!current) return <App bridge={bridge}/>;
     // Keyed by what is shown, so a new round or free block starts with its own draft and focus.
     return <PreferencesProvider bridge={bridge}>{current.kind === 'round'

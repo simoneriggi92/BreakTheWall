@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach } from 'vitest';
+import { specListSchema } from '../src/core/spec';
 import { startLocalServer, type LocalServer, type LocalServerOptions } from '../src/server/server';
 import type { SideChatsView } from '../src/core/side-chat';
 import type { SideChatRunner } from '../src/server/side-chats';
@@ -32,10 +33,10 @@ export function useLocalServers() {
     writeFileSync(join(path, 'assets', 'app.js'), 'console.log(1)');
     return path;
   }
+  // No test reaches a real CLI: each process the server starts answers as a failure unless the test passes its own.
   const options = (overrides: Partial<LocalServerOptions> = {}): LocalServerOptions => ({
     dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...overrides,
-    // No test starts a real `claude`: a test that needs one passes its own fake.
-    runners: { sideChat: refusingSideChat, ...overrides.runners },
+    runners: { claude: refusingRunner, gh: refusingRunner, sideChat: refusingSideChat, ...overrides.runners },
   });
   /** Servers started some other way (a race of several) are stopped after the test too. */
   const track = (...started: LocalServer[]) => { servers.push(...started); };
@@ -48,6 +49,7 @@ export function useLocalServers() {
   return { folder, pageFolder, options, track, start };
 }
 
+const refusingRunner = async () => ({ code: 1, stdout: '', stderr: 'no process runs in tests' });
 /** A side chat no test asked for: as if `claude` were not installed. */
 const refusingSideChat: SideChatRunner = async () => { throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' }); };
 
@@ -90,6 +92,17 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
+    /** The page's specs (#104): every version handed over, newest first. */
+    specs: async () => specListSchema.parse(await (await call('/api/specs')).json()).specs,
+    /** One version, with its text as handed over. */
+    spec: (id: string) => call(`/api/specs/${id}`),
+    specText: async (id: string): Promise<string> => (await (await call(`/api/specs/${id}`)).json()).text,
+    /** The page's "write the structure" for a version, and its cancel. */
+    explore: (id: string) => call(`/api/specs/${id}/exploration`, { method: 'POST' }),
+    cancelExplore: (id: string) => call(`/api/specs/${id}/exploration`, { method: 'DELETE' }),
+    /** The saved explorations, and one of them by id and revision. */
+    explorations: async () => (await (await call('/api/explorations')).json()).explorations as unknown[],
+    exploration: (id: string, revision: string) => call(`/api/explorations/${id}/${revision}`),
     /** The mod on `session.start` and every renewal: the session, its folder, its model and the plugin's side-chat model. */
     register: (more: { model?: string; sideChatModel?: string } = {}, session = SESSION, cwd = CWD) => call('/api/sessions', { method: 'POST', body: { id: session, cwd, ...more } }),
     /** The page's question in a side chat (#100): answered at once, the reply streams into the round's side chats. */

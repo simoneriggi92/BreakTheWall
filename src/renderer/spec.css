@@ -1,0 +1,10 @@
+/* A handed-over spec in the page (#104): a thin bar naming the version over the exploration view, which keeps the rest of the window. */
+.spec-page { height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); }
+.spec-page > .xp { height: auto; flex: 1; min-height: 0; }
+.spec-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 6px 20px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.spec-version { color: var(--muted); font-family: var(--f-mono); overflow-wrap: anywhere; }
+.spec-superseded { margin: 0; padding: 2px 10px; border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 999px; }
+.spec-link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
+.spec-waiting { max-width: 44rem; margin: 18vh auto 0; padding: 0 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.spec-waiting h1 { font: 500 24px/1.25 var(--f-display); }
+.spec-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

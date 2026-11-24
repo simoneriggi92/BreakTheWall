@@ -48,7 +48,6 @@ describe('the options request rides the round skills (#96)', () => {
 
   it('leaves every other command, skill and tool alone', () => {
     const data = dataFolder();
-    expect(hook(typed('to-spec'), data)).toBeUndefined();
     expect(hook(typed('grilling-notes'), data)).toBeUndefined();
     expect(hook(called('tdd'), data)).toBeUndefined();
     expect(hook(called('grilling', 'Read'), data)).toBeUndefined();
@@ -154,5 +153,42 @@ describe('the injection marks the session\'s round phase on the server (#99)', (
     run({ ...typed('grilling', '../escape'), cwd: CWD });
     run(typed('grilling'));
     expect(await launched(1)).toEqual([]);
+  });
+
+  it('runs nothing when to-spec starts: the spec\'s handover ends the phase, it does not open one', async () => {
+    const { run, launched } = plugin();
+    run({ ...typed('to-spec'), cwd: CWD });
+    run({ ...called('mattpocock-skills:to-spec'), cwd: CWD });
+    expect(await launched(1)).toEqual([]);
+  });
+});
+
+describe('the to-spec skill is asked for the closing `Spec: <location>` line (#104)', () => {
+  it('asks to-spec, typed or called, bare or under its plugin, to end with the line, and not for options', () => {
+    const data = dataFolder();
+    for (const context of [hook(typed('to-spec'), data), hook(called('mattpocock-skills:to-spec'), data)]) {
+      expect(context).toContain('Spec: <location>');
+      expect(context).toMatch(/GitHub issue/);
+      expect(context).toMatch(/`pasted`/);
+      expect(context).not.toContain('- **(a)** label: consequence');
+    }
+  });
+
+  it('asks again after a compaction of a session asked, alongside the options request when both were asked', () => {
+    const data = dataFolder();
+    hook(typed('to-spec'), data);
+    const spec = hook(started('compact'), data);
+    expect(spec).toContain('Spec: <location>');
+    expect(spec).not.toContain('- **(a)** label: consequence');
+    hook(typed('grilling'), data);
+    const both = hook(started('compact'), data);
+    expect(both).toContain('Spec: <location>');
+    expect(both).toContain('- **(a)** label: consequence');
+  });
+
+  it('leaves a session that only had rounds without the spec request after a compaction', () => {
+    const data = dataFolder();
+    hook(typed('grilling'), data);
+    expect(hook(started('compact'), data)).not.toContain('Spec: <location>');
   });
 });
