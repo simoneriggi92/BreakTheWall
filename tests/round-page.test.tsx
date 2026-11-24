@@ -371,6 +371,15 @@ describe('reading one question comfortably (#97)', () => {
 });
 
 /**
+ * The round on screen and listening to the window's width. It subscribes in an effect, which under load can run after
+ * the article is on screen: a resize or a count before then misses the page's listeners.
+ */
+async function shownAt(browser: ReturnType<typeof viewport>) {
+  await screen.findByRole('article');
+  await waitFor(() => expect(browser.subscriptions()).toBeGreaterThanOrEqual(2));
+}
+
+/**
  * A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. It counts
  * the listeners on the width only: the colour scheme's belong to the preferences, mounted again when the page appears.
  */
@@ -396,7 +405,7 @@ describe('the round beside a terminal (#97)', () => {
     const user = userEvent.setup();
     const browser = viewport(1400);
     render(<LocalPage fetch={fakeServer().fetch}/>);
-    await screen.findByRole('article');
+    await shownAt(browser);
     expect(within(outline()).getAllByRole('button')[1]).toHaveTextContent('Q2 · Who recognises a round?no answer');
 
     browser.resize(1100);
@@ -415,9 +424,7 @@ describe('the round beside a terminal (#97)', () => {
     const user = userEvent.setup();
     const browser = viewport(1400);
     render(<LocalPage fetch={fakeServer().fetch}/>);
-    await screen.findByRole('article');
-    // The page subscribes in an effect, which may run after the article is on screen: count from once it has.
-    await waitFor(() => expect(browser.subscriptions()).toBeGreaterThanOrEqual(2));
+    await shownAt(browser);
     const before = browser.subscriptions();
     await user.keyboard('yjy');
     expect(browser.subscriptions()).toBe(before);
