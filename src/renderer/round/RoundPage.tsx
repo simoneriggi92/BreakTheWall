@@ -297,18 +297,20 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
               const a = answerOf(draft, q);
               const done = isAnswered(a);
               // An answered question out of focus folds to its number and answer: what is left to do stands out. In the
-              // rail every question is its number, with a tick once answered; the title stays in its name and tooltip.
+              // rail every question is a tick of a ruler (#124), its number alone: the tick and its square draw the state
+              // (current, answered, open), the title stays in its name and tooltip.
               const rail = outlineFolded;
               const collapsed = rail || (done && q.number !== question.number);
               const asked = sideChatOf(q.number)?.turns.length ?? 0;
+              const name = rail ? r.tickName(q.number, q.title, answerState(a)) : r.collapsed(q.number, q.title, answerState(a));
               return (
                 <li key={q.number}>
                   <button
                     type="button" className={`round-outline-item${done ? ' is-answered' : ''}${collapsed ? ' is-collapsed' : ''}`}
                     aria-current={q.number === question.number ? 'true' : undefined} onClick={() => goTo(q.number)}
-                    {...(collapsed ? { title: q.title, 'aria-label': r.collapsed(q.number, q.title, answerState(a)) } : {})}
+                    {...(collapsed ? { title: q.title, 'aria-label': name } : {})}
                   >
-                    <span className="round-outline-title">{rail ? `${r.number(q.number)}${done ? ' ✓' : ''}` : collapsed ? r.number(q.number) : r.question(q.number, q.title)}</span>
+                    <span className="round-outline-title">{rail ? r.tick(q.number) : collapsed ? r.number(q.number) : r.question(q.number, q.title)}</span>
                     {!rail && <span className="round-outline-state">{answerState(a)}</span>}
                     {asked > 0 && <span className="round-outline-chat" title={s.count(asked)}>💬 {asked}</span>}
                   </button>
@@ -317,8 +319,15 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             })}
           </ol>
         </nav>
+        {/* The rail still names what is being read (#124), right under the ticks and not at the window's foot, where the
+            history dock sits. The heading already says it to a screen reader, so this copy is for the eye only. */}
+        {outlineFolded && <p className="round-rail-title" aria-hidden="true" title={question.title}>{question.title}</p>}
         </div>
         <article ref={article} className={`round-question${chatOpen ? ' is-chatting' : ''}`} aria-labelledby="round-question-title" onMouseUp={readSelection} onKeyUp={readSelection}>
+          {/* On the wide layout the question's number stands large and outlined behind its heading (#124): presence,
+              not text to read, so it is hidden from screen readers and the heading keeps the real number. The rail and
+              the drawer have no room for it; folding the outline on a wide window leaves it. */}
+          {band === 'wide' && <span className="round-numeral" aria-hidden="true">{r.tick(question.number)}</span>}
           <div className="round-question-head">
             <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
             <button type="button" className="subtle round-chat-open" aria-label={s.open} title={s.open} aria-pressed={chatOpen} aria-keyshortcuts="c" onClick={() => chatOpen ? setChatOpen(false) : openChat()}>{s.openShort}</button>

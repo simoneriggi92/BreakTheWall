@@ -176,8 +176,6 @@
 .round-layout.is-rail .round-turn, .round-layout.is-rail .round-question { width: min(100% - 48px, 800px); }
 .round-layout.is-rail .round-question { padding: 24px 28px; }
 .round-layout.is-outline-folded { --col-left: 64px; }
-.round-layout.is-outline-folded .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
-.round-layout.is-outline-folded .round-outline-title { white-space: nowrap; }
 
 /* Below ~860 px: the rail and the question; the right column slides over as a drawer from the top bar. */
 .round-layout.is-drawer {
@@ -280,7 +278,6 @@
 /* Folding (the outline, the right column, the turn's text): each part keeps a button to fold or unfold it. A folded
    right column is a narrow strip that still says how many questions are answered; the question takes the room it
    leaves, while its prose keeps the measure. */
-.round-layout.is-drawer.is-outline-folded { --col-left: 56px; }
 .round-layout.is-side-folded { --col-right: 44px; }
 .round-fold { padding: 2px 9px; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .round-side-fold { align-self: flex-end; justify-self: end; }
@@ -339,3 +336,48 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .round-strip li.is-current span { color: var(--accent); font-weight: 700; }
 .round-strip li.is-current::before { width: 2px; height: 100%; background: var(--accent); }
 .round-strip-count { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---- The rail as a ruler and the question's numeral (#124, settled by #122: variant C) ----
+   The rail (the outline folded, by the width or by hand) is a ruler: a line down its left with one tick per question
+   and a minor tick between two. Tick and square say the state: open is a short muted tick and an open square, answered
+   a longer ink tick and a filled square, current the longest accent tick on accent-soft. No scroll pointer: the page
+   shows one question at a time, so there is no scroll position to point at. A tick, its number and its square need
+   46 px: the rail keeps 64 px in the drawer too, with a narrower inset, so the ruler never scrolls sideways. */
+.round-layout.is-outline-folded .round-outline { padding-inline: 4px; }
+.round-layout.is-outline-folded .round-outline > .round-panel-head { margin-inline: -4px; }
+.round-layout.is-outline-folded .round-outline nav ol { gap: 0; margin-left: 8px; padding: 6px 0; border-left: 1px solid var(--muted); }
+.round-layout.is-outline-folded .round-outline li { position: relative; }
+.round-layout.is-outline-folded .round-outline li + li::before { content: ""; position: absolute; left: 0; top: -1px; width: 4px; height: 1px; background: var(--muted); }
+.round-layout.is-outline-folded .round-outline-item {
+  position: relative; display: flex; justify-content: flex-start; align-items: center; gap: 5px; padding: 8px 4px 8px 16px;
+  border: 0; border-radius: 0 6px 6px 0; text-align: left;
+}
+.round-layout.is-outline-folded .round-outline-item:hover:not([aria-current="true"]) { background: var(--sunk); }
+.round-layout.is-outline-folded .round-outline-item::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 1px; background: var(--muted); }
+.round-layout.is-outline-folded .round-outline-item.is-answered::before { width: 10px; height: 2px; margin-top: -1px; background: var(--ink); }
+.round-layout.is-outline-folded .round-outline-item[aria-current="true"] { background: var(--accent-soft); }
+.round-layout.is-outline-folded .round-outline-item[aria-current="true"]::before { width: 13px; height: 3px; margin-top: -1px; background: var(--accent); }
+.round-layout.is-outline-folded .round-outline-title { white-space: nowrap; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.round-layout.is-outline-folded .round-outline-item.is-answered .round-outline-title { color: var(--ink); }
+.round-layout.is-outline-folded .round-outline-item[aria-current="true"] .round-outline-title { color: var(--accent); font-weight: 700; }
+/* The state said twice for the eye, as the owner chose: an open square for open, a filled one for answered. */
+.round-layout.is-outline-folded .round-outline-item::after { content: ""; flex: none; width: 5px; height: 5px; border: 1px solid var(--muted); }
+.round-layout.is-outline-folded .round-outline-item.is-answered::after { background: var(--ink); border-color: var(--ink); }
+/* A side chat's count would not fit beside a tick; the question's side chat still opens from the question. */
+.round-layout.is-outline-folded .round-outline-chat { display: none; }
+/* The current title runs bottom to top under the ticks, cut rather than wrapped, at a length that keeps it clear of
+   the history dock at the window's foot. */
+.round-rail-title {
+  writing-mode: vertical-rl; transform: rotate(180deg); margin: 18px 0 0 18px; max-height: 32vh;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 11.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent);
+}
+/* The numeral, on the wide layout only (RoundPage draws it there): huge and outlined only, top right of the card,
+   behind the heading and the start of the body, which sit above it. Faint by design: it is presence, not text, and the
+   ink drawn over its stroke keeps AA (tests/theme.test.ts). */
+.round-numeral {
+  position: absolute; top: 6px; right: 12px; z-index: 0; pointer-events: none; user-select: none;
+  font-family: var(--f-display); font-weight: 800; font-size: 250px; line-height: .8; letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+  color: transparent; -webkit-text-stroke: 1.25px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.round-question > :not(.round-numeral):not(.round-selection-offer) { position: relative; z-index: 1; }
