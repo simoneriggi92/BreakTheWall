@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { sessionIdSchema } from './local-server';
 import { asText, roundViewSchema } from './round-answers';
+import { specRemarksSectionSchema } from './spec-remarks';
 
 /**
  * The round phase of a session (#99): from the first round, or from the plugin asking a skill for rounds, until the
@@ -56,6 +57,11 @@ const standingFields = {
   queued: z.boolean().default(false),
   /** Claude Code no longer keeps the session's transcript: nothing can resume or fork it, so the round is read-only. */
   transcriptGone: z.boolean().default(false),
+  /**
+   * Remarks on the specs the session handed over, written while this round awaits answers (#105): they ride in its
+   * message, after the answers. Empty on anything that takes no answers.
+   */
+  riding: z.array(specRemarksSectionSchema).default([]),
 };
 
 /** What the page shows: the latest round or free block across sessions, whether its session is in the phase, and where it stands. */

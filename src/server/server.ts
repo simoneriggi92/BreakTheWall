@@ -5,10 +5,11 @@ import { extname, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
-import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from '../core/round-answers';
+import { draftSchema, fitsQuestions, messageLanguageSchema } from '../core/round-answers';
+import { answersWithRemarks } from '../core/spec-remarks';
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
-import { RoundStore, type Kind, type RoundRefusal } from './rounds';
+import { RoundStore, type DeliveryKind, type RoundRefusal } from './rounds';
 import { handleSessions, SessionLabels, SessionTranscripts, transcriptPathSchema } from './sessions';
 import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
 import { openSpecs, type GhRunner } from './specs';
@@ -94,7 +95,7 @@ const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
 const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
 const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
-const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free)-(\d{1,6})$/;
+const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free|remarks)-(\d{1,6})$/;
 const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
 /** Claude Code no longer keeps the session's transcript (#103): its rounds and side chats take nothing more. */
 const TRANSCRIPT_GONE = { error: 'transcript-gone' };
@@ -119,7 +120,9 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
   const live = (session: string) => (sessions.get(session)?.until ?? 0) > Date.now();
-  const rounds = await RoundStore.open(options.dataDir, { live, transcriptGone: session => transcripts.gone(session) });
+  const rounds = await RoundStore.open(options.dataDir, {
+    live, transcriptGone: session => transcripts.gone(session), riding: session => specs.riding(session).map(x => x.section),
+  });
   const labels = await SessionLabels.open(options.dataDir);
   const transcripts = await SessionTranscripts.open(options.dataDir, rounds);
   /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
@@ -132,7 +135,10 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     readOnly: session => transcripts.gone(session),
     io: { readJson, send },
   });
-  const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send });
+  const specs = await openSpecs({
+    dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send,
+    remarks: { rounds, transcriptGone: session => transcripts.gone(session), queued: session => queued(session), readJson },
+  });
 
   /** Open page polls, answered early when what the page shows has changed. */
   const pagePolls = new Set<() => void>();
@@ -284,10 +290,12 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         if (!questions) return send(res, 404, { error: 'unknown' });
         if (!fitsQuestions(questions, body.data.draft)) return send(res, 400, { error: 'bad-request' });
         // The server words the message with the same function the page previews it with: what the person saw is
-        // what the agent receives.
-        const message = returnMessage(questions, body.data.draft, body.data.language);
+        // what the agent receives. Remarks on a spec written while the round awaited answers ride after them (#105).
+        const riding = rounds.awaiting(session) === Number(number) ? specs.riding(session) : [];
+        const message = answersWithRemarks(questions, body.data.draft, body.data.language, riding.map(x => x.section));
         const refused = await rounds.send(session, Number(number), body.data.draft, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
+        await specs.rodeWith(session, Number(number), riding);
         queued(session);
         return send(res, 200, { message });
       }
@@ -296,7 +304,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && deliveryPath && sessionIdSchema.safeParse(deliveryPath[1]).success) return holdDelivery(deliveryPath[1], req, res);
     const confirmPath = CONFIRM_PATH.exec(path);
     if (req.method === 'POST' && confirmPath && sessionIdSchema.safeParse(confirmPath[1]).success) {
-      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as Kind, Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
+      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as DeliveryKind, Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
