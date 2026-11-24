@@ -4,6 +4,7 @@ import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
 import { historySchema, type History } from '../core/session-history';
+import { specListSchema, type SpecView } from '../core/spec';
 import { browserBridge } from './storage';
 
 /**
@@ -32,6 +33,13 @@ export interface PageBridge extends DesktopBridge {
   getRound(round: RoundKey): Promise<CurrentView>;
   /** The person deletes a session, its rounds and drafts with it. */
   deleteSession(session: string): Promise<void>;
+  /** Every version of every spec handed over (#104), newest first. */
+  listSpecs(): Promise<SpecView[]>;
+  /** Writes a version's structure again, after a failure or a cancel; the page follows it through its poll. */
+  exploreSpec(id: string): Promise<void>;
+  cancelSpec(id: string): Promise<void>;
+  /** A saved exploration, unchecked: the page validates it before showing it. Null when the server has none. */
+  findExploration(key: { id: string; revision: string }): Promise<unknown | null>;
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
@@ -39,9 +47,11 @@ export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
 export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge;
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
+export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration'>;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
+const explorationReplySchema = z.object({ exploration: z.unknown() });
 
 export class RefusedError extends Error {}
 /** The server no longer knows this secret: it restarted, or the tab kept an old one. */
@@ -100,6 +110,20 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     },
     async deleteSession(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}`, { method: 'DELETE' }));
+    },
+    async listSpecs() {
+      return specListSchema.parse(await (await ok(await call('/api/specs'))).json()).specs;
+    },
+    async exploreSpec(id) {
+      await ok(await call(`/api/specs/${encodeURIComponent(id)}/exploration`, { method: 'POST' }));
+    },
+    async cancelSpec(id) {
+      await ok(await call(`/api/specs/${encodeURIComponent(id)}/exploration`, { method: 'DELETE' }));
+    },
+    async findExploration({ id, revision }) {
+      const reply = await call(`/api/explorations/${encodeURIComponent(id)}/${encodeURIComponent(revision)}`);
+      if (reply.status === 404) return null;
+      return explorationReplySchema.parse(await (await ok(reply)).json()).exploration;
     },
   };
 }

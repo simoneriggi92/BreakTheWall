@@ -10,6 +10,8 @@ import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
 import { handleSessions, SessionLabels } from './sessions';
+import { openSpecs, type GhRunner } from './specs';
+import type { ClaudeRunner } from '../desktop/claude/completer';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -38,6 +40,8 @@ export interface LocalServerOptions {
    * `$.prompt.submit` first waits for the session to be idle: a shorter lease would deliver twice.
    */
   deliveryLeaseMs?: number;
+  /** The processes the server starts: the real CLIs unless a test passes fakes. `claude` writes a spec's structure, `gh` reads a spec from an issue (#104). */
+  runners?: { claude?: ClaudeRunner; gh?: GhRunner };
 }
 export interface LocalServer {
   port: number;
@@ -89,11 +93,19 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const local = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const staticRoot = await realpath(options.staticDir);
   const own: ServerLock = { port, pid: process.pid, version: options.version, secret };
+  // Requests are taken from the moment the lock can name this server and answered once its stores are open: a rival
+  // asking for the status meanwhile waits a moment rather than time out and take the lock for an orphan's.
+  let opened!: () => void;
+  const ready = new Promise<void>(done => { opened = done; });
+  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
+    void ready.then(() => handle(req, res)).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
+  });
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
   const rounds = await RoundStore.open(options.dataDir);
   const labels = await SessionLabels.open(options.dataDir);
   /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
   const update: { version: string | null } = { version: null };
+  const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send });
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
@@ -116,6 +128,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   let stopping: Promise<void> | undefined;
   const stop = () => stopping ??= (async () => {
     clearInterval(idle);
+    specs.close();
     releaseLock(options.dataDir, own);
     await close(server);
     finish();
@@ -127,9 +140,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     else if (Date.now() - lastBusy >= idleMs) void stop();
   }, checkEveryMs);
 
-  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
-    void handle(req, res).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
-  });
+  opened();
 
   async function handle(req: IncomingMessage, res: ServerResponse) {
     // A rebinding DNS name points another site at 127.0.0.1; its requests still carry its own Host.
@@ -161,6 +172,13 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       // A subagent's report is not the session asking the person, and an interrupted turn holds at most half a round:
       // neither is a turn of the round phase.
       if (turn.data.agent !== undefined || turn.data.reason !== 'answer') return send(res, 200, { round: null });
+      // A handed-over spec ends the round phase: what follows is reading the spec, not answering rounds.
+      const spec = await specs.handover({ session, cwd, text });
+      if (spec) {
+        await rounds.endPhase(session);
+        pageChanged();
+        return send(res, 200, { round: null, spec });
+      }
       const round = parseRound(text);
       if (round) {
         const stored = await rounds.add(session, cwd, round);
@@ -247,6 +265,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
     if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, update, pageChanged })) return;
+    if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
   }
 

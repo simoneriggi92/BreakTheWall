@@ -36,6 +36,7 @@
 
 - [Why Break the Wall?](#why-break-the-wall)
 - [How it works](#how-it-works)
+- [Use in Claude Code](#use-in-claude-code)
 - [Try the alpha](#try-the-alpha)
 - [Features](#features)
   - [The exploration](#the-exploration)
@@ -87,6 +88,59 @@ The idea comes from reverse engineering, which takes software apart with evidenc
 | **Explore** | One view with three roles on one shared state: the guide, the structure and the source. Click a block, a link or a line, and the other two follow. |
 
 The prepared explorations start with what happens when you type an address and press Enter, an explanation Claude wrote and explored in one real run, kept as the app saved it. Then come a technical document (the Larkspur importer), a release runbook (Atlas Reader) and an argument (Mill's harm principle): the same view works for any subject. Putting a link under load and reassembling the structure are later additions, not part of the current loop.
+
+## Use in Claude Code
+
+The Claude Code plugin opens one local page beside your session: an agent's question rounds, answered one question at a time, and only your answers go back to the session.
+
+**Requirements:**
+- Claude Code 2.1.330 or later, the version the plugin is checked against;
+- Node.js 22 or later on the `PATH` Claude Code starts with.
+
+**Install** inside Claude Code:
+
+```text
+/plugin marketplace add simoneriggi92/BreakTheWall
+/plugin install break-the-wall@break-the-wall
+```
+
+The second command opens the plugin's details: choose **Install for you**. If the summary ends with "Run /reload-plugins to apply", run `/reload-plugins`, or start a new session. Then `/break-the-wall` opens the page. The plugin carries its server bundled into one file and the built page, so nothing else is downloaded or installed.
+
+**Update.** Auto-update is off for this marketplace, as for every marketplace outside Anthropic's own:
+1. `/plugin marketplace update break-the-wall` reads the latest release;
+2. in `/plugin`, open **break-the-wall** on the **Installed** tab and choose **Update now** (or run `claude plugin update break-the-wall@break-the-wall` in a shell);
+3. `/reload-plugins`, or start a new session.
+
+To get updates on their own, turn auto-update on for `break-the-wall` on the **Marketplaces** tab of `/plugin`.
+
+**To uninstall,** run `/plugin uninstall break-the-wall@break-the-wall`, then `/plugin marketplace remove break-the-wall`. Your history stays (below).
+
+### Nothing opens?
+
+Run `/break-the-wall:doctor`. It asks Claude to check Node, the policy settings and the debug log, and it is there even when a setting blocks the plugin's mod. What it looks for:
+
+| Cause | How to recognise it | What to do |
+|---|---|---|
+| Node missing or older than 22 | `/break-the-wall` says "Break the Wall needs Node ≥ 22 on PATH" | Install Node 22 or later, or start Claude Code from a shell where `node --version` says 22 or later |
+| `disableAllHooks` | `/break-the-wall` is missing from the `/` list while `/break-the-wall:doctor` is there. `claude plugin test`, run in an empty folder, says `hooks modules are turned off here` | Remove it from your own settings (`~/.claude/settings.json`, or the project's `.claude/settings.json` and `.claude/settings.local.json`); in your organization's managed settings, only an administrator can |
+| `allowManagedHooksOnly` (organization) | The same signs as `disableAllHooks`; the debug log says `only managed plugins and built-in plugins run` | Ask your administrator |
+| `allowManagedModsOnly` (organization) | `/break-the-wall` is missing, but `claude plugin test` reports nothing wrong; the debug log says `mods are limited to your organization's by policy (allowManagedModsOnly)` | Ask your administrator |
+| `--safe-mode` | Neither `/break-the-wall` nor `/break-the-wall:doctor` is in the `/` list: safe mode loads no installed plugin | Start Claude Code without `--safe-mode` |
+
+The debug log is written only for a session started with `claude --debug`, under `~/.claude/debug/` (`latest` points to the newest). Search it for `break-the-wall`.
+
+### Where your history lives
+
+Rounds, drafts and answers are kept on your computer, outside every repository, in the `rounds` folder of Break the Wall's data folder:
+- macOS: `~/Library/Application Support/Break the Wall/rounds`
+- Windows: `%APPDATA%\Break the Wall\rounds`
+- Linux: `~/.config/Break the Wall/rounds` (or under `$XDG_CONFIG_HOME`)
+
+It survives uninstalling the plugin. **To delete it,** end your Claude Code sessions and close the page, wait for the local server to stop (10 minutes after the last session and page), then delete the `rounds` folder. The rest of the data folder belongs to the desktop app.
+
+### Platforms
+
+Used on macOS. **Linux and Windows are not verified:** the server's tests run on both in CI, but the plugin has not been used there yet.
 
 ## Try the alpha
 

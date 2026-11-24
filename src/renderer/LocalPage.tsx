@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CurrentView } from '../core/round-phase';
 import { projectName, type History } from '../core/session-history';
+import type { SpecView } from '../core/spec';
 import { App } from './App';
 import { httpBridge, RefusedError, type RoundKey } from './http-bridge';
 import { PreferencesProvider, usePreferences } from './preferences';
 import { FreeBlockPage } from './round/FreeBlockPage';
 import { PageNotices, SessionHistory } from './round/History';
 import { RoundPage } from './round/RoundPage';
+import { newestSpec, SpecPage } from './spec/SpecPage';
 import { browserBridge } from './storage';
 
 const SECRET_KEY = 'btw:page-secret';
@@ -71,6 +73,9 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   };
   const followRef = useRef(follow);
   followRef.current = follow;
+  /** The specs handed over (#104), read with it; the newest opens unless a later turn came after it, or the person closed it. */
+  const [specs, setSpecs] = useState<SpecView[]>([]);
+  const [closedSpec, setClosedSpec] = useState<string>();
 
   useEffect(() => {
     if (!bridge) return;
@@ -88,11 +93,14 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
     if (!bridge || state !== 'open') return;
     const stop = new AbortController();
     // The history column reads alongside: a server that cannot answer it still shows the round.
-    const refresh = () => Promise.all([bridge.getCurrent(), bridge.getHistory().catch(() => null)]).then(([next, column]) => {
-      if (stop.signal.aborted) return;
-      if (column) setHistory(column);
-      followRef.current(next);
-    }, () => {});
+    const refresh = () => {
+      void bridge.listSpecs().then(next => { if (!stop.signal.aborted) setSpecs(next); }, () => {});
+      return Promise.all([bridge.getCurrent(), bridge.getHistory().catch(() => null)]).then(([next, column]) => {
+        if (stop.signal.aborted) return;
+        if (column) setHistory(column);
+        followRef.current(next);
+      }, () => {});
+    };
     void refresh();
     void (async () => {
       while (!stop.signal.aborted) {
@@ -114,6 +122,11 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   }, [bridge, state]);
 
   if (state === 'open' && bridge) {
+    const spec = newestSpec(specs);
+    const shownAt = current?.kind === 'round' ? current.round.receivedAt : current?.block.receivedAt;
+    if (spec && spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt)) {
+      return <PreferencesProvider bridge={bridge}><SpecPage specs={specs} bridge={bridge} onClose={() => setClosedSpec(spec.id)}/></PreferencesProvider>;
+    }
     if (!current) return <App bridge={bridge}/>;
     const openArrived = () => followNow(held.current);
     const openRound = (round: RoundKey) => {

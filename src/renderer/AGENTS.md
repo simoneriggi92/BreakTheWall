@@ -16,6 +16,7 @@ The React interface: library, studio, the exploration view with its three roles 
 | `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline (answered questions folded), one question in focus, "what the agent receives" live, remarks on a passage of its body or recommendation, one Send, read-only once sent; its keys, and the width steps (rail below ~1180 px, drawer below ~860 px) read from `matchMedia` |
 | `round/History.tsx` | The history column (#102): project → session → numbered rounds, a past round opened read-only, a session deleted once confirmed; and the notices of a round held back while the person writes or reads history, and of an update that waits |
 | `round/FreeBlockPage.tsx` | A turn without a round, during the round phase (#99): the turn's text and one response field |
+| `spec/SpecPage.tsx`, `spec.css` | A handed-over spec (#104): its version over the exploration view, the structure being written (cancel, write again), and "superseded · open the new version" on a version a later handover replaced |
 | `round/shared.tsx` | What a round and a free block share: the agent's Markdown, the one-at-a-time saver, the round phase control (top bar; in the drawer below ~860 px) |
 | `round/passages.ts` | A question's passages: a selection as offsets into the rendered text (diagram figures left out), and the `<mark>`s drawn into it again after every render |
 | `markdown.ts`, `diagrams.ts`, `svg-mount.ts`, `use-diagrams.ts` | Rendering a source or a question as a document, and drawing its Mermaid diagrams |
