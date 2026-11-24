@@ -7,15 +7,18 @@ import { renderInlineMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
 import { passageIn, type Passage } from './passages';
 import { Markdown, PhaseControl, useLatestSaver } from './shared';
+import { SideChat, useSideChats } from './SideChat';
 
 /**
  * A round in the page (#95): the turn's text above, the outline of its questions on the left, one question in focus
  * in the middle, and on the right "what the agent receives", worded live by the same function the server sends with.
- * Every change is saved at once; after Send the round is read-only and shows the message as delivered.
+ * Every change is saved at once; after Send the round is read-only and shows the message as delivered. A side chat on
+ * the focused question (#100) takes the right column, follows the focus, and folds the return to a strip.
  */
 export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phaseOpen: boolean; bridge: RoundBridge }) {
   const { t, language } = usePreferences();
   const r = t.page.round;
+  const s = t.page.sideChat;
   const [draft, setDraft] = useState<Draft>(round.draft);
   // Changes read the latest draft from here, so two quick edits never build on the same stale copy.
   const latest = useRef(round.draft);
@@ -107,6 +110,19 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
   const [drawerOpen, setDrawerOpen] = useState(false);
   const showReturn = band !== 'drawer' || drawerOpen;
 
+  // Side chats (#100): one thread per question; the column, once open, shows the thread of the question in focus.
+  const sideChats = useSideChats(bridge, round);
+  const threadOf = (number: number) => sideChats.find(x => x.question === number);
+  const [chatOpen, setChatOpen] = useState(false);
+  /** What the person is typing in each question's side chat, kept while the focus moves. */
+  const [asks, setAsks] = useState<Record<number, string>>({});
+  // In the narrowest layout the column is the drawer, so opening the chat opens it.
+  const openChat = () => { setChatOpen(true); setDrawerOpen(true); };
+  const askSideChat = async (number: number, text: string) => {
+    await bridge.askSideChat(round, number, text);
+    setAsks(kept => ({ ...kept, [number]: '' }));
+  };
+
   const goTo = (number: number) => { setFocus(number); setNoteOpen(null); setSelected(null); setFocusRemark(null); };
   const move = (step: number) => goTo(round.questions[Math.min(round.questions.length - 1, Math.max(0, index + step))].number);
   const canSend = !readOnly && !sending;
@@ -122,9 +138,12 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
     }
     // A focused button inside a closing drawer would vanish with it and drop the focus on the page.
     if (event.key === 'Escape' && band === 'drawer' && drawerOpen) return setDrawerOpen(false), drawerToggle.current?.focus(), true;
+    if (event.key === 'Escape' && chatOpen) return setChatOpen(false), true;
     if (event.ctrlKey || event.metaKey || event.altKey) return false;
     if (event.key === 'j') return move(1), true;
     if (event.key === 'k') return move(-1), true;
+    // Asking is reading, not answering: it works on a sent or superseded round too.
+    if (event.key === 'c') return openChat(), true;
     if (readOnly) return false;
     // "y" only accepts: pressed twice it keeps the answer, unlike the button, which toggles.
     if (event.key === 'y' && question.recommendation) return changeAnswer({ choice: 'recommendation' }), true;
@@ -150,6 +169,27 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
     }
   }
 
+  const drawerBar = band === 'drawer' && <div className="round-drawer-bar">
+    <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>
+    <button type="button" className="subtle round-drawer-close" onClick={() => { setDrawerOpen(false); drawerToggle.current?.focus(); }}>{r.closeReceives}</button>
+  </div>;
+  const generalField = !readOnly && (showGeneral
+    ? (
+      <div className="round-field">
+        <label htmlFor="round-general-note">{r.generalNote}</label>
+        <textarea id="round-general-note" autoFocus={generalOpen} aria-describedby="round-general-hint" value={draft.generalNote} rows={3} onChange={event => { setGeneralOpen(true); change({ ...latest.current, generalNote: event.target.value }); }}/>
+        <small id="round-general-hint">{r.generalNoteHint}</small>
+      </div>
+    )
+    : <button type="button" className="round-write" onClick={() => setGeneralOpen(true)}>{r.writeGeneralNote}</button>);
+  const returnBody = <>
+    <pre className="round-message" data-testid="return-message">{message}</pre>
+    {delivered !== null
+      ? <p role="status">{r.sent}</p>
+      : !round.superseded && <button type="button" className="primary" disabled={sending} onClick={() => void send()}>{sending ? r.sending : r.send}</button>}
+    {failure && delivered === null && <p role="alert">{failure === 'send' ? r.sendFailed : r.saveFailed}</p>}
+  </>;
+
   return (
     <div className="round-page">
       {/* Progress sits in the sticky top bar, so it stays in view at every width, the outline folded or not. */}
@@ -170,6 +210,7 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
               // rail every question is its number, with a tick once answered; the title stays in its name and tooltip.
               const rail = band !== 'wide';
               const collapsed = rail || (done && q.number !== question.number);
+              const asked = threadOf(q.number)?.turns.length ?? 0;
               return (
                 <li key={q.number}>
                   <button
@@ -179,14 +220,18 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
                   >
                     <span className="round-outline-title">{rail ? `${r.number(q.number)}${done ? ' ✓' : ''}` : collapsed ? r.number(q.number) : r.question(q.number, q.title)}</span>
                     {!rail && <span className="round-outline-state">{answerState(a)}</span>}
+                    {asked > 0 && <span className="round-outline-chat" title={s.count(asked)}>💬 {asked}</span>}
                   </button>
                 </li>
               );
             })}
           </ol>
         </nav>
-        <article ref={article} className="round-question" aria-labelledby="round-question-title" onMouseUp={readSelection} onKeyUp={readSelection}>
-          <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
+        <article ref={article} className={`round-question${chatOpen ? ' is-chatting' : ''}`} aria-labelledby="round-question-title" onMouseUp={readSelection} onKeyUp={readSelection}>
+          <div className="round-question-head">
+            <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
+            <button type="button" className="subtle round-chat-open" aria-label={s.open} title={s.open} aria-pressed={chatOpen} aria-keyshortcuts="c" onClick={() => chatOpen ? setChatOpen(false) : openChat()}>{s.openShort}</button>
+          </div>
           <Markdown text={question.body} host={hosts.body} marks={remarks.filter(x => x.part === 'body')}/>
           {question.options.length > 0 && (
             <div className="round-options" role="group" aria-label={r.options}>
@@ -245,33 +290,31 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
               </ol>
             </section>
           )}
-          <p className="round-keys">{keyHint(r.keys, question.options.length, Boolean(question.recommendation), readOnly)}</p>
+          <p className="round-keys">{keyHint(r.keys, s.key, question.options.length, Boolean(question.recommendation), readOnly)}</p>
           {/* Moving is the outline's job and j/k's; the step forward shows up here once the question is answered. */}
           {!readOnly && isAnswered(answer) && index < round.questions.length - 1 && (
             <div className="round-steps"><button type="button" className="primary" onClick={() => move(1)}>{r.next}</button></div>
           )}
         </article>
-        {showReturn && <section id="round-return" className="round-return" aria-label={r.receives}>
-          {band === 'drawer' && <div className="round-drawer-bar">
-            <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>
-            <button type="button" className="subtle round-drawer-close" onClick={() => { setDrawerOpen(false); drawerToggle.current?.focus(); }}>{r.closeReceives}</button>
-          </div>}
-          {!readOnly && (showGeneral
-            ? (
-              <div className="round-field">
-                <label htmlFor="round-general-note">{r.generalNote}</label>
-                <textarea id="round-general-note" autoFocus={generalOpen} aria-describedby="round-general-hint" value={draft.generalNote} rows={3} onChange={event => { setGeneralOpen(true); change({ ...latest.current, generalNote: event.target.value }); }}/>
-                <small id="round-general-hint">{r.generalNoteHint}</small>
-              </div>
-            )
-            : <button type="button" className="round-write" onClick={() => setGeneralOpen(true)}>{r.writeGeneralNote}</button>)}
-          <h2>{r.receives}</h2>
-          <pre className="round-message" data-testid="return-message">{message}</pre>
-          {delivered !== null
-            ? <p role="status">{r.sent}</p>
-            : !round.superseded && <button type="button" className="primary" disabled={sending} onClick={() => void send()}>{sending ? r.sending : r.send}</button>}
-          {failure && delivered === null && <p role="alert">{failure === 'send' ? r.sendFailed : r.saveFailed}</p>}
-        </section>}
+        {showReturn && (chatOpen
+          ? <div className="round-side">
+            {drawerBar}
+            <SideChat
+              question={question} thread={threadOf(question.number)}
+              ask={asks[question.number] ?? ''} onAskChange={text => setAsks(kept => ({ ...kept, [question.number]: text }))}
+              onAsk={text => askSideChat(question.number, text)} onClose={() => setChatOpen(false)}
+            />
+            <details id="round-return" className="round-return-strip" aria-label={r.receives}>
+              <summary>{r.receives} · {r.progress(answered, round.questions.length)}</summary>
+              <div className="round-return-body">{generalField}{returnBody}</div>
+            </details>
+          </div>
+          : <section id="round-return" className="round-return" aria-label={r.receives}>
+            {drawerBar}
+            {generalField}
+            <h2>{r.receives}</h2>
+            {returnBody}
+          </section>)}
       </main>
     </div>
   );
@@ -289,10 +332,10 @@ function below(range: Range, frame: HTMLElement | null): { top: number; left: nu
 }
 
 /** The keys that work on the question in focus, and only those: no pick without options, no accept without a recommendation. */
-function keyHint(keys: Messages['page']['round']['keys'], options: number, accept: boolean, readOnly: boolean): string {
-  if (readOnly) return keys.move;
+function keyHint(keys: Messages['page']['round']['keys'], chat: string, options: number, accept: boolean, readOnly: boolean): string {
+  if (readOnly) return [keys.move, chat].join(' · ');
   const pick = options > 1 ? keys.pick(`1–${options}`) : options === 1 ? keys.pick('1') : null;
-  return [keys.move, pick, accept ? keys.accept : null, keys.note, keys.send].filter(Boolean).join(' · ');
+  return [keys.move, pick, accept ? keys.accept : null, keys.note, chat, keys.send].filter(Boolean).join(' · ');
 }
 
 type WidthBand = 'wide' | 'rail' | 'drawer';

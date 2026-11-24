@@ -3,6 +3,7 @@ import type { DesktopBridge } from '../core/bridge';
 import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
+import { sideChatsViewSchema, type SideChatsView } from '../core/side-chat';
 import { browserBridge } from './storage';
 
 /**
@@ -25,11 +26,19 @@ export interface PageBridge extends DesktopBridge {
   sendResponse(block: FreeBlockKey, response: string): Promise<string>;
   /** The person ends the session's round phase: its next turns without a round stay in the terminal. */
   endPhase(session: string): Promise<void>;
+  /**
+   * A round's side chats (#100). With `after`, the version the page already shows, the server holds the read until
+   * they change past it: a reply streams in this way.
+   */
+  getSideChats(round: RoundKey, after: number | null, signal: AbortSignal): Promise<SideChatsView>;
+  /** Asks in the side chat of one question; the reply arrives through `getSideChats`. */
+  askSideChat(round: RoundKey, question: number, ask: string): Promise<void>;
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
 export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
-export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge;
+export type SideChatBridge = Pick<PageBridge, 'getSideChats' | 'askSideChat'>;
+export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge & SideChatBridge;
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
@@ -83,6 +92,13 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     },
     async endPhase(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}/phase`, { method: 'DELETE' }));
+    },
+    async getSideChats(round, after, signal) {
+      const path = `/api/side-chats/${encodeURIComponent(round.session)}/${round.number}${after === null ? '' : `?after=${after}`}`;
+      return sideChatsViewSchema.parse(await (await ok(await call(path, { signal }))).json());
+    },
+    async askSideChat(round, question, ask) {
+      await ok(await call(`/api/side-chats/${encodeURIComponent(round.session)}/${round.number}/${question}`, json('POST', { ask })));
     },
   };
 }
