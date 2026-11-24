@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach } from 'vitest';
 import { startLocalServer, type LocalServer, type LocalServerOptions } from '../src/server/server';
+import type { SideChatsView } from '../src/core/side-chat';
+import type { SideChatRunner } from '../src/server/side-chats';
 
 /**
  * The local server in process, on temporary folders, for tests that drive it over HTTP (seam ① of #92). Call
@@ -30,7 +32,11 @@ export function useLocalServers() {
     writeFileSync(join(path, 'assets', 'app.js'), 'console.log(1)');
     return path;
   }
-  const options = (overrides: Partial<LocalServerOptions> = {}): LocalServerOptions => ({ dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...overrides });
+  const options = (overrides: Partial<LocalServerOptions> = {}): LocalServerOptions => ({
+    dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...overrides,
+    // No test starts a real `claude`: a test that needs one passes its own fake.
+    runners: { sideChat: refusingSideChat, ...overrides.runners },
+  });
   /** Servers started some other way (a race of several) are stopped after the test too. */
   const track = (...started: LocalServer[]) => { servers.push(...started); };
   async function start(overrides: Partial<LocalServerOptions> = {}) {
@@ -41,6 +47,9 @@ export function useLocalServers() {
   }
   return { folder, pageFolder, options, track, start };
 }
+
+/** A side chat no test asked for: as if `claude` were not installed. */
+const refusingSideChat: SideChatRunner = async () => { throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' }); };
 
 export const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
 export const CWD = '/work/project';
@@ -81,5 +90,12 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
+    /** The mod on `session.start` and every renewal: the session, its folder, its model and the plugin's side-chat model. */
+    register: (more: { model?: string; sideChatModel?: string } = {}, session = SESSION, cwd = CWD) => call('/api/sessions', { method: 'POST', body: { id: session, cwd, ...more } }),
+    /** The page's question in a side chat (#100): answered at once, the reply streams into the round's side chats. */
+    ask: (round: number, question: number, ask: string, session = SESSION) => call(`/api/side-chats/${session}/${round}/${question}`, { method: 'POST', body: { ask } }),
+    /** A round's side chats; with `after`, held until they change past that version. */
+    sideChats: async (round: number, after?: number, session = SESSION): Promise<SideChatsView> =>
+      (await call(`/api/side-chats/${session}/${round}${after === undefined ? '' : `?after=${after}`}`)).json(),
   };
 }

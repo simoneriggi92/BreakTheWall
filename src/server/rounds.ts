@@ -123,8 +123,13 @@ export class RoundStore {
 
   /** The questions of one round, to word its message. */
   questions(session: string, number: number) {
+    return this.round(session, number)?.round.questions;
+  }
+
+  /** One round as the agent asked it, with the working directory of its session. */
+  round(session: string, number: number): { cwd: string; round: Round } | undefined {
     const found = this.entries.get(key(session, 'round', number));
-    return found && 'round' in found ? found.round.questions : undefined;
+    return found && 'round' in found ? { cwd: found.cwd, round: found.round } : undefined;
   }
 
   async saveDraft(session: string, number: number, draft: Draft): Promise<RoundRefusal | null> {
@@ -215,9 +220,7 @@ export class RoundStore {
   }
 
   private sessionDir(x: { cwd: string; session: string }) {
-    // The working directory names the project; hashed, so any path makes a safe folder name.
-    const project = createHash('sha256').update(x.cwd).digest('hex').slice(0, 16);
-    return join(this.dir, project, x.session);
+    return sessionFolder(this.dir, x);
   }
 
   private save(x: Stored): Promise<void> {
@@ -252,15 +255,23 @@ export class RoundStore {
   }
 }
 
+/** A session's folder under `<data>/projects`, where its rounds and everything kept beside them live. */
+export function sessionFolder(projects: string, x: { cwd: string; session: string }) {
+  // The working directory names the project; hashed, so any path makes a safe folder name.
+  const project = createHash('sha256').update(x.cwd).digest('hex').slice(0, 16);
+  return join(projects, project, x.session);
+}
+
 const key = (session: string, kind: Kind, number: number) => `${session}/${deliveryId(kind, number)}`;
 const entryKey = (x: Stored) => key(x.session, kindOf(x), x.number);
 const sentNow = (message: string) => ({ message, at: new Date().toISOString(), deliveredAt: null });
 
-async function entries(dir: string): Promise<string[]> {
+export async function entries(dir: string): Promise<string[]> {
   try { return await readdir(dir); } catch { return []; }
 }
 
-async function atomicWrite(file: string, data: string) {
+/** Written beside the file, then renamed over it: a reader sees the old file or the new one, never half of one. */
+export async function atomicWrite(file: string, data: string) {
   await mkdir(dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${randomBytes(6).toString('hex')}.pending`;
   try {

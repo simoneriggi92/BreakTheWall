@@ -9,6 +9,7 @@ import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
+import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -37,6 +38,8 @@ export interface LocalServerOptions {
    * `$.prompt.submit` first waits for the session to be idle: a shorter lease would deliver twice.
    */
   deliveryLeaseMs?: number;
+  /** The processes the server starts, replaced in tests: `sideChat` streams a side chat's reply (#100). */
+  runners?: { sideChat?: SideChatRunner };
 }
 export interface LocalServer {
   port: number;
@@ -52,7 +55,11 @@ const TYPES: Record<string, string> = {
 };
 
 const cwdSchema = z.string().min(1).max(4096);
-const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema });
+/**
+ * A session as the mod registers it: its id, its folder, the model it runs on, and the side-chat model set in the
+ * plugin, if any (#100).
+ */
+const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema, model: modelSchema.optional(), sideChatModel: modelSchema.optional() });
 /**
  * Every turn as the mod posts it on `turn.complete`, with how it ended and, for a subagent's run, its agent: the server
  * decides whether it holds a round, so the mod decides nothing.
@@ -89,6 +96,13 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const own: ServerLock = { port, pid: process.pid, version: options.version, secret };
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
   const rounds = await RoundStore.open(options.dataDir);
+  /** The models each session registered with, kept past its lease, so a side chat on an ended session still runs on its model. */
+  const models = new Map<string, { model?: string; sideChatModel?: string }>();
+  const sideChats = await sideChatRoutes({
+    dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
+    modelOf: session => { const x = models.get(session); return x?.sideChatModel ?? x?.model; },
+    io: { readJson, send },
+  });
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
@@ -111,6 +125,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   let stopping: Promise<void> | undefined;
   const stop = () => stopping ??= (async () => {
     clearInterval(idle);
+    sideChats.stop();
     releaseLock(options.dataDir, own);
     await close(server);
     finish();
@@ -144,7 +159,9 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'POST' && path === '/api/sessions') {
       const registration = registrationSchema.safeParse(await readJson(req));
       if (!registration.success) return send(res, 400, { error: 'bad-request' });
-      sessions.set(registration.data.id, { cwd: registration.data.cwd, until: Date.now() + sessionTtlMs });
+      const { id, cwd, model, sideChatModel } = registration.data;
+      sessions.set(id, { cwd, until: Date.now() + sessionTtlMs });
+      models.set(id, { model, sideChatModel });
       lastBusy = Date.now();
       return noContent(res);
     }
@@ -239,6 +256,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
+    if (await sideChats.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
   }
 
