@@ -129,6 +129,8 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const sideChats = useSideChats(bridge, round);
   const sideChatOf = (number: number) => sideChats.find(x => x.question === number);
   const [chatOpen, setChatOpen] = useState(false);
+  /** What the agent receives stays open above a side chat unless the person folds it: it is their answer. */
+  const [returnOpen, setReturnOpen] = useState(true);
   /** What the person is typing in each question's side chat, kept while the focus moves. */
   const [asks, setAsks] = useState<Record<number, string>>({});
   /** The passage each question's next side-chat question quotes, chosen with "Ask here" (#101). */
@@ -352,6 +354,13 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         {showReturn && (chatOpen
           ? <div className="round-side">
             {drawerBar}
+            <details
+              id="round-return" className="round-return-strip" aria-label={r.receives} open={returnOpen}
+              onToggle={e => setReturnOpen(e.currentTarget.open)}
+            >
+              <summary>{r.receives} · {r.progress(answered, round.questions.length)}</summary>
+              <div className="round-return-body">{generalField}{returnBody}</div>
+            </details>
             <SideChat
               question={question} sideChat={sideChatOf(question.number)} readOnly={transcriptGone}
               ask={asks[question.number] ?? ''} onAskChange={text => setAsks(kept => ({ ...kept, [question.number]: text }))}
@@ -359,10 +368,6 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
               attached={attachedOf(answer).map(x => x.turn)} onAttach={readOnly ? undefined : toggleAttached}
               onAsk={text => askSideChat(question.number, text)} onClose={() => setChatOpen(false)}
             />
-            <details id="round-return" className="round-return-strip" aria-label={r.receives}>
-              <summary>{r.receives} · {r.progress(answered, round.questions.length)}</summary>
-              <div className="round-return-body">{generalField}{returnBody}</div>
-            </details>
           </div>
           : <section id="round-return" className="round-return" aria-label={r.receives}>
             {drawerBar}

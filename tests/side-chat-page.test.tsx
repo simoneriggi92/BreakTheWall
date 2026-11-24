@@ -90,7 +90,7 @@ const outline = () => screen.getByRole('navigation', { name: 'Questions' });
 const chat = () => screen.getByRole('region', { name: /^Side chat · Q/ });
 
 describe('a side chat on the focused question (#100)', () => {
-  it('opens in the right column beside the whole question, marks the question, and folds the return to a strip', async () => {
+  it('opens in the right column beside the whole question, marks the question, and keeps the return open above it', async () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer().fetch}/>);
     const question = await screen.findByRole('article');
@@ -101,11 +101,14 @@ describe('a side chat on the focused question (#100)', () => {
     expect(chat()).toHaveAccessibleName('Side chat · Q1');
     expect(question).toHaveTextContent('Beside the rounds, or in their own folder.');
     expect(question).toHaveClass('is-chatting');
-    // The return stays one click away, folded.
+    // What the agent receives is the person's answer: it stays open, above the side chat, and folds only on request.
     const strip = screen.getByRole('group', { name: 'What the agent receives' });
     expect(strip.tagName).toBe('DETAILS');
-    expect(strip).not.toHaveAttribute('open');
+    expect(strip).toHaveAttribute('open');
+    expect(strip.compareDocumentPosition(chat()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(strip).getByTestId('return-message')).toHaveTextContent('Q1 · Where do side chats live?');
+    await user.click(within(strip).getByText(/^What the agent receives ·/));
+    expect(strip).not.toHaveAttribute('open');
 
     await user.click(within(chat()).getByRole('button', { name: 'Close the side chat' }));
     expect(screen.queryByRole('region', { name: /^Side chat/ })).toBeNull();

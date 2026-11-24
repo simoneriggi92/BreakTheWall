@@ -174,9 +174,13 @@
 .round-question.is-chatting { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-soft); }
 .round-outline-chat { font-size: 11.5px; font-weight: 700; color: var(--purple); white-space: nowrap; }
 .round-side {
-  grid-area: return; position: sticky; top: var(--round-stick); display: grid; gap: 10px;
-  grid-template-rows: minmax(0, 1fr) auto; height: calc(100vh - var(--round-stick) - 20px);
+  grid-area: return; position: sticky; top: var(--round-stick); display: flex; flex-direction: column; gap: 10px;
+  max-height: calc(100vh - var(--round-stick) - 20px);
 }
+/* What the agent receives comes first and keeps its height; the side chat below grows with its replies up to the
+   space left, then scrolls inside, so an empty side chat is not a tall blank box. */
+.round-side > * { flex: none; }
+.round-side > .side-chat { flex: 0 1 auto; }
 /* A reply is read, not glanced at: while a side chat is open the right column widens, so its prose keeps a readable
    line and a table in a reply does not squeeze into one word a line. */
 .round-layout.is-wide:has(> .round-side) { grid-template-columns: minmax(200px, 240px) minmax(0, 760px) minmax(360px, 520px); }
@@ -217,5 +221,5 @@
 .round-layout.is-drawer .round-side {
   position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); height: auto;
   padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: none;
 }
