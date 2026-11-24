@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach } from 'vitest';
+import { specListSchema } from '../src/core/spec';
 import { startLocalServer, type LocalServer, type LocalServerOptions } from '../src/server/server';
 
 /**
@@ -30,7 +31,11 @@ export function useLocalServers() {
     writeFileSync(join(path, 'assets', 'app.js'), 'console.log(1)');
     return path;
   }
-  const options = (overrides: Partial<LocalServerOptions> = {}): LocalServerOptions => ({ dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...overrides });
+  // No test reaches a real CLI: each process the server starts answers as a failure unless the test passes its own.
+  const options = (overrides: Partial<LocalServerOptions> = {}): LocalServerOptions => ({
+    dataDir: folder(), staticDir: pageFolder(), version: '0.6.0-test', ...overrides,
+    runners: { claude: refusingRunner, gh: refusingRunner, ...overrides.runners },
+  });
   /** Servers started some other way (a race of several) are stopped after the test too. */
   const track = (...started: LocalServer[]) => { servers.push(...started); };
   async function start(overrides: Partial<LocalServerOptions> = {}) {
@@ -41,6 +46,8 @@ export function useLocalServers() {
   }
   return { folder, pageFolder, options, track, start };
 }
+
+const refusingRunner = async () => ({ code: 1, stdout: '', stderr: 'no process runs in tests' });
 
 export const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
 export const CWD = '/work/project';
@@ -81,5 +88,16 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
+    /** The page's specs (#104): every version handed over, newest first. */
+    specs: async () => specListSchema.parse(await (await call('/api/specs')).json()).specs,
+    /** One version, with its text as handed over. */
+    spec: (id: string) => call(`/api/specs/${id}`),
+    specText: async (id: string): Promise<string> => (await (await call(`/api/specs/${id}`)).json()).text,
+    /** The page's "write the structure" for a version, and its cancel. */
+    explore: (id: string) => call(`/api/specs/${id}/exploration`, { method: 'POST' }),
+    cancelExplore: (id: string) => call(`/api/specs/${id}/exploration`, { method: 'DELETE' }),
+    /** The saved explorations, and one of them by id and revision. */
+    explorations: async () => (await (await call('/api/explorations')).json()).explorations as unknown[],
+    exploration: (id: string, revision: string) => call(`/api/explorations/${id}/${revision}`),
   };
 }
