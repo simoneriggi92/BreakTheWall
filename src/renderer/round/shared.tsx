@@ -80,3 +80,37 @@ export function PhaseControl({ session, open, bridge }: { session: string; open:
     </span>
   );
 }
+
+/**
+ * Copies text the page shows (#103): the way out by hand when a message cannot reach the session. The page is served
+ * from 127.0.0.1, a secure context, so the browser's clipboard is open to it; where it still refuses, the person is
+ * told to copy by hand.
+ */
+export function CopyButton({ text, label }: { text: string; label: string }) {
+  const { t } = usePreferences();
+  const x = t.page.session;
+  const [done, setDone] = useState<'copied' | 'failed' | null>(null);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setDone('copied');
+    } catch {
+      setDone('failed');
+    }
+  };
+  return (
+    <span className="round-copy">
+      <button type="button" className="subtle" onClick={() => void copy()}>{label}</button>
+      {done === 'copied' && <span>{x.copied}</span>}
+      {done === 'failed' && <span role="alert">{x.copyFailed}</span>}
+    </span>
+  );
+}
+
+/** A message sent to an ended session waits for it: the command that resumes it, to copy. */
+export function QueuedNotice({ session }: { session: string }) {
+  const { t } = usePreferences();
+  const x = t.page.session;
+  const command = `claude --resume ${session}`;
+  return <p role="status" className="round-queued">{x.queued} <code>{command}</code> <CopyButton text={command} label={x.copyCommand}/></p>;
+}

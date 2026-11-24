@@ -148,8 +148,8 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
     // Keyed by what is shown, so a new round or free block starts with its own draft and focus.
     return <PreferencesProvider bridge={bridge}>
       {current.kind === 'round'
-        ? <RoundPage key={`round/${current.round.session}/${current.round.number}`} round={current.round} phaseOpen={current.phaseOpen} bridge={bridge}/>
-        : <FreeBlockPage key={`free/${current.block.session}/${current.block.number}`} block={current.block} phaseOpen={current.phaseOpen} bridge={bridge}/>}
+        ? <RoundPage key={`round/${current.round.session}/${current.round.number}`} round={current.round} phaseOpen={current.phaseOpen} queued={current.queued} transcriptGone={current.transcriptGone} bridge={bridge}/>
+        : <FreeBlockPage key={`free/${current.block.session}/${current.block.number}`} block={current.block} phaseOpen={current.phaseOpen} queued={current.queued} transcriptGone={current.transcriptGone} bridge={bridge}/>}
       {historyOpen && history && <SessionHistory history={history} shown={shownRound} bridge={bridge} onOpen={openRound} onDeleted={deleted} onClose={() => setHistoryOpen(false)}/>}
       <div className="page-dock">
         {!historyOpen && history && history.projects.length > 0 && <HistoryToggle onOpen={() => setHistoryOpen(true)}/>}

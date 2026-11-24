@@ -39,9 +39,11 @@ export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] 
  * The side chat of the question in focus, in the right column: the person's questions and the replies of a read-only
  * copy of the session, each with what it read. Nothing here reaches the agent.
  */
-export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }: {
+export function SideChat({ question, thread, readOnly = false, ask, onAsk, onAskChange, onClose }: {
   question: Question;
   thread: Thread | undefined;
+  /** Claude Code no longer keeps the session (#103): the thread is read, never continued. */
+  readOnly?: boolean;
   /** What the person is typing for this question, kept while the focus moves. */
   ask: string;
   onAsk: (ask: string) => Promise<void>;
@@ -90,7 +92,7 @@ export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }:
             </li>
           ))}
         </ol>}
-      <form className="side-chat-composer" onSubmit={event => { event.preventDefault(); void submit(); }}>
+      {readOnly ? <p role="note" className="side-chat-note">{t.page.session.sideChatGone}</p> : <form className="side-chat-composer" onSubmit={event => { event.preventDefault(); void submit(); }}>
         <textarea
           aria-label={s.field} placeholder={s.placeholder} rows={2} autoFocus value={ask}
           onChange={event => onAskChange(event.target.value)}
@@ -102,7 +104,7 @@ export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }:
           }}
         />
         <button type="submit" className="primary" disabled={busy}>{s.send}</button>
-      </form>
+      </form>}
       {failed && <p role="alert">{s.askFailed}</p>}
     </section>
   );
