@@ -22,6 +22,7 @@ function engine(on: On) {
   }
   on('session.start', () => ({ cwd: '/work' }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('ui.log', () => ({ value: undefined }))
   on('process.hookEnv', () => ({ value: { CLAUDE_PLUGIN_ROOT: '/plugin' } }))
@@ -111,3 +112,28 @@ test('reads the session id again for each poll, as /clear and /resume change it 
   ])
   expect(server.submitted.map(x => x.text)).toEqual(['after the clear'])
 })
+
+const posted = (server: ReturnType<typeof engine>, path: string) => server.fetched.filter(x => x.method === 'POST' && new URL(x.url).pathname === path).map(x => JSON.parse(x.body ?? '{}'))
+
+test('on /clear, reports the ending session ended and registers the id the session goes on under', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  await $.session.end({ reason: 'clear', sessionId: 'sess-1', resume: { id: 'sess-1' } })
+  expect(posted(server, '/api/sessions/sess-1/end')).toEqual([{ reason: 'clear' }])
+  server.session = 'sess-2'
+  await clock.advance(1_000)
+  expect(posted(server, '/api/sessions').at(-1)).toEqual({ id: 'sess-2', cwd: '/work' })
+})
+
+test('on an exit, reports the session ended and never registers its id again', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  const before = posted(server, '/api/sessions').length
+  await $.session.end({ reason: 'prompt_input_exit', sessionId: 'sess-1', resume: { id: 'sess-1' } })
+  await clock.advance(1_000)
+  expect(posted(server, '/api/sessions/sess-1/end')).toEqual([{ reason: 'prompt_input_exit' }])
+  expect(posted(server, '/api/sessions')).toHaveLength(before)
+})
+
