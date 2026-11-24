@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -109,5 +109,50 @@ describe('a compaction drops the request, so a session that had it is asked agai
     writeFileSync(join(data, 'options-sessions'), 'a file where the folder should be');
     expect(hook(typed('grilling'), data)).toContain('- **(a)** label: consequence');
     expect(hook(started('compact'), data)).toBeUndefined();
+  });
+});
+
+describe('the injection marks the session\'s round phase on the server (#99)', () => {
+  /** The plugin's layout with a launcher that only records how it was run, one line per run. */
+  function plugin() {
+    const root = dataFolder();
+    mkdirSync(join(root, 'hooks'));
+    mkdirSync(join(root, 'server'));
+    copyFileSync(SCRIPT, join(root, 'hooks', 'inject.mjs'));
+    const log = join(root, 'launched.log');
+    writeFileSync(join(root, 'server', 'launcher.cjs'), `require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n');`);
+    const run = (input: Record<string, unknown>) => execFileSync(process.execPath, [join(root, 'hooks', 'inject.mjs')], {
+      input: JSON.stringify(input), env: { ...process.env, CLAUDE_PLUGIN_DATA: join(root, 'data') }, encoding: 'utf8',
+    });
+    /** The launcher runs detached from the hook, so its runs are read once they have had time to land. */
+    const launched = async (expected: number) => {
+      for (let i = 0; i < 100 && (!existsSync(log) || readFileSync(log, 'utf8').trim().split('\n').length < expected); i++) await new Promise(done => setTimeout(done, 20));
+      await new Promise(done => setTimeout(done, 100));
+      return existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line) as string[]) : [];
+    };
+    return { run, launched };
+  }
+  const CWD = '/work/project';
+
+  it('runs the launcher\'s phase command with the session and its working directory when a round skill starts', async () => {
+    const { run, launched } = plugin();
+    expect(run({ ...typed('grilling'), cwd: CWD })).toContain('label: consequence');
+    run({ ...called('grill-me'), cwd: CWD });
+    expect(await launched(2)).toEqual([['phase', SESSION, CWD], ['phase', SESSION, CWD]]);
+  });
+
+  it('runs nothing on a compaction: the server keeps the phase, and one the person ended stays ended', async () => {
+    const { run, launched } = plugin();
+    run({ ...typed('grilling'), cwd: CWD });
+    expect(run({ ...started('compact'), cwd: CWD })).toContain('label: consequence');
+    expect(await launched(2)).toEqual([['phase', SESSION, CWD]]);
+  });
+
+  it('runs nothing for another skill, a session id that is not plain, or a turn with no working directory', async () => {
+    const { run, launched } = plugin();
+    run({ ...typed('tdd'), cwd: CWD });
+    run({ ...typed('grilling', '../escape'), cwd: CWD });
+    run(typed('grilling'));
+    expect(await launched(1)).toEqual([]);
   });
 });

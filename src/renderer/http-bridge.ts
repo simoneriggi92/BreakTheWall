@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { DesktopBridge } from '../core/bridge';
 import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
-import { roundViewSchema, type Draft, type MessageLanguage, type RoundView } from '../core/round-answers';
+import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
+import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
 import { browserBridge } from './storage';
 
 /**
@@ -14,16 +15,24 @@ export interface PageBridge extends DesktopBridge {
    * `'refused'` when it no longer knows the secret (it restarted, or the tab kept an old one).
    */
   poll(signal: AbortSignal): Promise<'answered' | 'refused'>;
-  /** The round the page shows (#95): the latest one received, or null before any. */
-  getRound(): Promise<RoundView | null>;
+  /** What the page shows (#95, #99): the latest round or free block received, or null before any. */
+  getCurrent(): Promise<CurrentView | null>;
   saveDraft(round: RoundKey, draft: Draft): Promise<void>;
   /** One Send for the whole round; resolves to the message exactly as the agent receives it. */
   sendRound(round: RoundKey, draft: Draft, language: MessageLanguage): Promise<string>;
+  saveResponse(block: FreeBlockKey, response: string): Promise<void>;
+  /** The free block's one response; resolves to the message exactly as the agent receives it. */
+  sendResponse(block: FreeBlockKey, response: string): Promise<string>;
+  /** The person ends the session's round phase: its next turns without a round stay in the terminal. */
+  endPhase(session: string): Promise<void>;
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
-export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'>;
+export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
+export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
+export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge;
+export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 
-const roundReplySchema = z.object({ round: roundViewSchema.nullable() });
+const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
 
 export class RefusedError extends Error {}
@@ -34,6 +43,7 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
   const call = (path: string, init: RequestInit = {}) => fetcher(path, { ...init, headers: { ...init.headers, [SECRET_HEADER]: secret }, cache: 'no-store' });
   const json = (method: string, body: unknown): RequestInit => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const roundPath = ({ session, number }: RoundKey) => `/api/rounds/${encodeURIComponent(session)}/${number}`;
+  const freePath = ({ session, number }: FreeBlockKey) => `/api/free/${encodeURIComponent(session)}/${number}`;
   const ok = async (reply: Response) => {
     if (refused(reply)) throw new RefusedError('The server refused the secret.');
     if (!reply.ok) throw new Error(`The server answered ${reply.status}.`);
@@ -56,14 +66,23 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
       await reply.body?.cancel();
       return 'answered';
     },
-    async getRound() {
-      return roundReplySchema.parse(await (await ok(await call('/api/round'))).json()).round;
+    async getCurrent() {
+      return currentReplySchema.parse(await (await ok(await call('/api/current'))).json()).current;
     },
     async saveDraft(round, draft) {
       await ok(await call(`${roundPath(round)}/draft`, json('PUT', draft)));
     },
     async sendRound(round, draft, language) {
       return sentReplySchema.parse(await (await ok(await call(`${roundPath(round)}/send`, json('POST', { draft, language })))).json()).message;
+    },
+    async saveResponse(block, response) {
+      await ok(await call(`${freePath(block)}/response`, json('PUT', { response })));
+    },
+    async sendResponse(block, response) {
+      return sentReplySchema.parse(await (await ok(await call(`${freePath(block)}/send`, json('POST', { response })))).json()).message;
+    },
+    async endPhase(session) {
+      await ok(await call(`/api/sessions/${encodeURIComponent(session)}/phase`, { method: 'DELETE' }));
     },
   };
 }

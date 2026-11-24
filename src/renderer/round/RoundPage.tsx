@@ -1,19 +1,19 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import { answerKind, answerOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, returnMessage, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { RoundBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
-import { renderInlineMarkdown, renderMarkdown } from '../markdown';
+import { renderInlineMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
-import { useDiagrams } from '../use-diagrams';
-import { markPassages, passageIn, type Passage } from './passages';
+import { passageIn, type Passage } from './passages';
+import { Markdown, PhaseControl, useLatestSaver } from './shared';
 
 /**
  * A round in the page (#95): the turn's text above, the outline of its questions on the left, one question in focus
  * in the middle, and on the right "what the agent receives", worded live by the same function the server sends with.
  * Every change is saved at once; after Send the round is read-only and shows the message as delivered.
  */
-export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBridge }) {
+export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phaseOpen: boolean; bridge: RoundBridge }) {
   const { t, language } = usePreferences();
   const r = t.page.round;
   const [draft, setDraft] = useState<Draft>(round.draft);
@@ -23,7 +23,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   const [delivered, setDelivered] = useState<string | null>(round.sent?.message ?? null);
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<'send' | 'save'>();
-  const saver = useDraftSaver(round, bridge, delivered !== null, setFailure);
+  const saver = useLatestSaver((next: Draft) => bridge.saveDraft(round, next), delivered !== null, setFailure);
 
   // A round sent from another tab arrives through the page's poll.
   useEffect(() => { if (round.sent) setDelivered(round.sent.message); }, [round.sent]);
@@ -155,6 +155,8 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
       {/* Progress sits in the sticky top bar, so it stays in view at every width, the outline folded or not. */}
       <header className="topbar"><Brand/><div className="course-title"><strong>{r.title(round.number)}</strong></div><span className="round-progress">{r.progress(answered, round.questions.length)}</span>
         {band === 'drawer' && <button ref={drawerToggle} type="button" className="subtle" aria-expanded={drawerOpen} aria-controls={drawerOpen ? 'round-return' : undefined} onClick={() => setDrawerOpen(open => !open)}>{r.receives}</button>}
+        {/* Below ~860 px the bar has no room for it: it goes into the drawer with the rest of the right column. */}
+        {band !== 'drawer' && <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>}
         <PreferencesMenu/>
       </header>
       <main className={`round-layout is-${band}`}>
@@ -250,7 +252,10 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
           )}
         </article>
         {showReturn && <section id="round-return" className="round-return" aria-label={r.receives}>
-          {band === 'drawer' && <button type="button" className="subtle round-drawer-close" onClick={() => { setDrawerOpen(false); drawerToggle.current?.focus(); }}>{r.closeReceives}</button>}
+          {band === 'drawer' && <div className="round-drawer-bar">
+            <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>
+            <button type="button" className="subtle round-drawer-close" onClick={() => { setDrawerOpen(false); drawerToggle.current?.focus(); }}>{r.closeReceives}</button>
+          </div>}
           {!readOnly && (showGeneral
             ? (
               <div className="round-field">
@@ -271,8 +276,6 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
     </div>
   );
 }
-
-const NO_MARKS: readonly Passage[] = [];
 
 /**
  * Where the "Remark" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts
@@ -331,54 +334,8 @@ function useRoundKeys(handle: (event: KeyboardEvent) => boolean) {
   }, []);
 }
 
-/**
- * Saves the draft on every change, one request at a time and always the newest: a slow save never lands over a
- * later one, and edits made while it runs collapse into the next.
- */
-function useDraftSaver(round: RoundView, bridge: RoundBridge, sent: boolean, setFailure: (failure: 'save' | undefined) => void) {
-  const state = useRef<{ busy: boolean; pending?: Draft }>({ busy: false });
-  const sentRef = useRef(sent);
-  sentRef.current = sent;
-  return (draft: Draft) => {
-    const s = state.current;
-    s.pending = draft;
-    if (s.busy) return;
-    s.busy = true;
-    void (async () => {
-      while (s.pending) {
-        const next = s.pending;
-        s.pending = undefined;
-        try {
-          await bridge.saveDraft(round, next);
-          setFailure(undefined);
-        } catch {
-          // Once sent, the server refuses drafts by design: that is not a failure worth showing.
-          if (!sentRef.current) setFailure('save');
-        }
-      }
-      s.busy = false;
-    })();
-  };
-}
-
 /** An option's label or consequence: inline Markdown only, as it sits inside a button. */
 function Inline({ text, className }: { text: string; className: string }) {
   const html = useMemo(() => renderInlineMarkdown(text), [text]);
   return <span className={className} dangerouslySetInnerHTML={{ __html: html }}/>;
-}
-
-/**
- * The agent's Markdown, rendered with raw HTML off: markup in a round shows as text and never runs. Mermaid fences
- * are drawn in place, so an architecture question is judged from its diagram.
- */
-function Markdown({ text, host: given, marks = NO_MARKS }: { text: string; host?: RefObject<HTMLDivElement | null>; marks?: readonly Passage[] }) {
-  const { t, theme } = usePreferences();
-  const rendered = useMemo(() => renderMarkdown(text), [text]);
-  const own = useRef<HTMLDivElement>(null);
-  const host = given ?? own;
-  useDiagrams(host, rendered, theme, t.d.diagramFailed);
-  // React sets the HTML only when it changes, so the marks are drawn into it after every render that could move them.
-  const marksKey = marks.map(x => `${x.start}:${x.end}:${x.passage}`).join('\n');
-  useLayoutEffect(() => { if (host.current) markPassages(host.current, marks); }, [host, rendered, marksKey]);
-  return <div ref={host} className="round-markdown" dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }

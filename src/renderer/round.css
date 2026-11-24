@@ -81,6 +81,19 @@
 .round-return [role="alert"] { margin: 0; color: var(--bad); }
 .round-return [role="status"] { margin: 0; color: var(--good); }
 .round-drawer-close { justify-self: end; }
+.round-drawer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.round-drawer-bar .round-drawer-close { margin-left: auto; }
+
+/* The round phase in the top bar (#99): pushed right where no progress count does it first. */
+.round-phase { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.course-title + .round-phase { margin-left: auto; }
+.round-phase [role="alert"] { color: var(--bad); }
+/* A free block: the agent's turn and one response, in one column at the prose measure. */
+.free-layout { display: grid; gap: 16px; padding: 20px 24px 40px; max-width: 760px; margin: 0 auto; }
+.free-turn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; line-height: 1.6; }
+.free-layout [role="alert"] { margin: 0; color: var(--bad); }
+.free-layout [role="status"] { margin: 0; color: var(--good); }
+.free-layout [role="note"] { margin: 0; color: var(--muted); }
 .round-markdown > :first-child { margin-top: 0; }
 .round-markdown > :last-child { margin-bottom: 0; }
 .round-markdown pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 10px 12px; font-size: 13px; }

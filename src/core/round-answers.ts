@@ -126,7 +126,16 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
       lines.push(`  - ${quoted(remark.passage)} — ${first}`, ...rest.flatMap(line => indented(line, '    ')));
     }
   }
-  return lines.join('\n');
+  return asText(lines.join('\n'));
 }
+
+/**
+ * A message the session receives as the person's own words, never as a command (#99): typed into Claude Code, a
+ * leading `/` runs a command or a skill and a leading `!` runs a shell command. The mark is escaped as Markdown
+ * escapes it, so the agent reads the words as written.
+ */
+export const asText = (message: string) => startsAsCommand(message) ? `\\${message.trimStart()}` : message;
+/** Whether Claude Code would take the text for a command: the page warns of the escape with the same rule. */
+export const startsAsCommand = (text: string) => /^[/!]/.test(text.trimStart());
 
 const indented = (text: string, by: string) => text.split(/\r?\n/).map(line => line.trim() ? `${by}${line}` : '');

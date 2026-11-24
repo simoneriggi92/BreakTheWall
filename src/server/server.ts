@@ -6,8 +6,9 @@ import { z } from 'zod';
 import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
 import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from '../core/round-answers';
+import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
-import { RoundStore, type RoundRefusal } from './rounds';
+import { RoundStore, type Kind, type RoundRefusal } from './rounds';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -68,9 +69,13 @@ const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TURN_BYTES = 4 * 1024 * 1024;
 const MAX_ANSWER_BYTES = 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
+const responseBodySchema = z.strictObject({ response: responseSchema });
+const phaseSchema = z.strictObject({ cwd: cwdSchema });
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
+const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
+const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
-const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(\d{1,6})$/;
+const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free)-(\d{1,6})$/;
 const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<LocalServer | null> {
@@ -146,14 +151,59 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'POST' && path === '/api/turns') {
       const turn = turnSchema.safeParse(await readJson(req, MAX_TURN_BYTES));
       if (!turn.success) return send(res, 400, { error: 'bad-request' });
-      // A subagent's report is not the session asking the person, and an interrupted turn holds at most half a round.
-      const round = turn.data.agent === undefined && turn.data.reason === 'answer' ? parseRound(turn.data.text) : null;
-      if (!round) return send(res, 200, { round: null });
-      const stored = await rounds.add(turn.data.session, turn.data.cwd, round);
+      const { session, cwd, text } = turn.data;
+      // A subagent's report is not the session asking the person, and an interrupted turn holds at most half a round:
+      // neither is a turn of the round phase.
+      if (turn.data.agent !== undefined || turn.data.reason !== 'answer') return send(res, 200, { round: null });
+      const round = parseRound(text);
+      if (round) {
+        const stored = await rounds.add(session, cwd, round);
+        pageChanged();
+        return send(res, 200, { round: stored.number });
+      }
+      // A turn with nothing to read asks the person nothing.
+      const free = text.trim() === '' ? null : await rounds.addTurn(session, cwd, text);
+      if (!free) return send(res, 200, { round: null });
       pageChanged();
-      return send(res, 200, { round: stored.number });
+      return send(res, 200, { round: null, free: free.number });
     }
-    if (req.method === 'GET' && path === '/api/round') return send(res, 200, { round: rounds.latest() });
+    if (req.method === 'GET' && path === '/api/current') return send(res, 200, { current: rounds.current() });
+    const phasePath = PHASE_PATH.exec(path);
+    if (phasePath && sessionIdSchema.safeParse(phasePath[1]).success) {
+      if (req.method === 'POST') {
+        const body = phaseSchema.safeParse(await readJson(req));
+        if (!body.success) return send(res, 400, { error: 'bad-request' });
+        await rounds.startPhase(phasePath[1], body.data.cwd);
+        pageChanged();
+        return noContent(res);
+      }
+      if (req.method === 'DELETE') {
+        if (!await rounds.endPhase(phasePath[1])) return send(res, 404, { error: 'unknown' });
+        pageChanged();
+        return noContent(res);
+      }
+    }
+    const freePath = FREE_PATH.exec(path);
+    if (freePath && sessionIdSchema.safeParse(freePath[1]).success) {
+      const [, session, number, action] = freePath;
+      const body = responseBodySchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
+      if (req.method === 'PUT' && action === 'response') {
+        if (!body.success) return send(res, 400, { error: 'bad-request' });
+        const refused = await rounds.saveResponse(session, Number(number), body.data.response);
+        if (refused) return send(res, REFUSED[refused], { error: refused });
+        return noContent(res);
+      }
+      if (req.method === 'POST' && action === 'send') {
+        if (!body.success) return send(res, 400, { error: 'bad-request' });
+        const message = freeBlockMessage(body.data.response);
+        // An empty response would hand the agent an empty prompt.
+        if (message === '') return send(res, 400, { error: 'bad-request' });
+        const refused = await rounds.sendResponse(session, Number(number), body.data.response, message);
+        if (refused) return send(res, REFUSED[refused], { error: refused });
+        queued(session);
+        return send(res, 200, { message });
+      }
+    }
     const roundPath = ROUND_PATH.exec(path);
     if (roundPath && sessionIdSchema.safeParse(roundPath[1]).success) {
       const [, session, number, action] = roundPath;
@@ -177,8 +227,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         const message = returnMessage(questions, body.data.draft, body.data.language);
         const refused = await rounds.send(session, Number(number), body.data.draft, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
-        for (const wake of [...deliveryPolls.get(session) ?? []]) wake();
-        pageChanged();
+        queued(session);
         return send(res, 200, { message });
       }
     }
@@ -186,11 +235,17 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && deliveryPath && sessionIdSchema.safeParse(deliveryPath[1]).success) return holdDelivery(deliveryPath[1], req, res);
     const confirmPath = CONFIRM_PATH.exec(path);
     if (req.method === 'POST' && confirmPath && sessionIdSchema.safeParse(confirmPath[1]).success) {
-      if (!await rounds.confirm(confirmPath[1], Number(confirmPath[2]))) return send(res, 404, { error: 'unknown' });
+      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as Kind, Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
     return send(res, 404, { error: 'not-found' });
+  }
+
+  /** A message waits for the session: a poll already waiting takes it, and the page shows it as sent. */
+  function queued(session: string) {
+    for (const wake of [...deliveryPolls.get(session) ?? []]) wake();
+    pageChanged();
   }
 
   /** Held open until it times out, the page goes away, or what the page shows changes (`changed`). */
@@ -212,7 +267,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
 
   /**
    * The mod's long-poll for one session: the oldest message waiting for it, at once or as soon as the person sends
-   * one, or nothing once the hold runs out. The message goes out with its round, which the mod confirms once
+   * one, or nothing once the hold runs out. The message goes out with its id (`round-2`, `free-1`), which the mod confirms once
    * `$.prompt.submit` has taken it.
    */
   function holdDelivery(session: string, req: IncomingMessage, res: ServerResponse) {
@@ -233,7 +288,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       const next = rounds.take(session, deliveryLeaseMs);
       if (!next) return;
       end();
-      send(res, 200, { round: next.number, message: next.message });
+      send(res, 200, next);
     }
     const timer = setTimeout(() => { if (end()) send(res, 200, {}); }, deliveryHoldMs);
     waiting.add(offer);

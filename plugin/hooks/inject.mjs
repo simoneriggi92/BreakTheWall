@@ -1,7 +1,9 @@
 // @ts-check
+import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * The plugin's classic hooks (#96): they ask the skills that write rounds for each question's options as a list the
@@ -13,6 +15,10 @@ import { join } from 'node:path';
  * events runs first and passes them on past every other plugin, so a mod's hook there never runs (witnessed, #96).
  * Plain Node with no dependencies, like the mod: Claude Code's input is checked field by field. A request missed
  * degrades a round to "yes" or a note and never breaks it, so this answers nothing rather than fail.
+ *
+ * A round skill starting is also the injection marker that opens the session's round phase on the local server (#99), so a
+ * clarifying turn before the first round already shows in the page. The launcher, beside the server in this plugin,
+ * finds the server; it runs detached, so the skill's start never waits on it.
  */
 const ROUND_SKILLS = new Set(['grilling', 'grill-me', 'grill-with-docs']);
 /** A marker not refreshed for this long belongs to a session nobody resumes. */
@@ -86,6 +92,18 @@ function asks(event) {
   }
 }
 
+/** `node launcher.cjs phase <session> <cwd>`, left running on its own; a failure only leaves the phase to the first round. */
+function markPhase(/** @type {Record<string, unknown>} */ event) {
+  const { session_id: session, cwd } = event;
+  if (typeof session !== 'string' || !SESSION_ID.test(session) || typeof cwd !== 'string' || cwd === '') return;
+  try {
+    const launcher = join(dirname(dirname(fileURLToPath(import.meta.url))), 'server', 'launcher.cjs');
+    const child = spawn(process.execPath, [launcher, 'phase', session, cwd], { detached: true, stdio: 'ignore', windowsHide: true });
+    child.on('error', () => {});
+    child.unref();
+  } catch { /* No launcher to run: the phase opens at the first round. */ }
+}
+
 let input = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => { input += chunk; });
@@ -93,6 +111,9 @@ process.stdin.on('end', () => {
   try {
     const event = JSON.parse(input);
     if (typeof event !== 'object' || event === null || !asks(event)) return;
+    // A compaction only re-sends the request the summary dropped: the server kept the phase, and one the person ended
+    // must stay ended. Only a round skill starting opens it.
+    if (event.hook_event_name !== 'SessionStart') markPhase(event);
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext: OPTIONS_REQUEST } }));
   } catch { /* Not an event: nothing to add. */ }
 });

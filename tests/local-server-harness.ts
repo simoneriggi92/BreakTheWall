@@ -59,12 +59,24 @@ export function serverClient(server: LocalServer) {
     turn: (text: string, session = SESSION, cwd = CWD, more: { reason?: string; agent?: string } = {}) => call('/api/turns', { method: 'POST', body: { session, cwd, text, reason: 'answer', ...more } }),
     /** The mod's long-poll for its session: the message to submit, or nothing when the hold runs out. */
     delivery: async (session = SESSION, signal?: AbortSignal): Promise<string | undefined> => (await (await call(`/api/sessions/${session}/delivery`, { signal })).json()).message,
-    /** The same poll, with the round the message answers, which the mod confirms once it has submitted it. */
-    take: async (session = SESSION): Promise<{ round?: number; message?: string }> => (await call(`/api/sessions/${session}/delivery`)).json(),
+    /** The same poll, with what the message answers (`round-2`, `free-1`), which the mod confirms once it has submitted it. */
+    take: async (session = SESSION): Promise<{ id?: string; message?: string }> => (await call(`/api/sessions/${session}/delivery`)).json(),
     /** The mod once `$.prompt.submit` has taken the message. */
-    confirm: (round: number, session = SESSION) => call(`/api/sessions/${session}/delivery/${round}`, { method: 'POST' }),
-    /** What the page shows. */
-    round: async () => (await (await call('/api/round')).json()).round,
+    confirm: (id: string, session = SESSION) => call(`/api/sessions/${session}/delivery/${id}`, { method: 'POST' }),
+    /** What the page shows: the latest round or free block, and whether its session is in the round phase. */
+    current: async () => (await (await call('/api/current')).json()).current,
+    /** The round the page shows, or null when it shows a free block or nothing. */
+    round: async () => { const { current } = await (await call('/api/current')).json(); return current?.kind === 'round' ? current.round : null; },
+    /** The free block the page shows, or null when it shows a round or nothing. */
+    free: async () => { const { current } = await (await call('/api/current')).json(); return current?.kind === 'free' ? current.block : null; },
+    /** The plugin's injection hook, through the launcher: the session was asked for rounds (#99). */
+    startPhase: (session = SESSION, cwd = CWD) => call(`/api/sessions/${session}/phase`, { method: 'POST', body: { cwd } }),
+    /** The page's "end the round phase". */
+    endPhase: (session = SESSION) => call(`/api/sessions/${session}/phase`, { method: 'DELETE' }),
+    /** The page on every change to a free block's response. */
+    saveResponse: (number: number, response: string, session = SESSION) => call(`/api/free/${session}/${number}/response`, { method: 'PUT', body: { response } }),
+    /** The page's Send under a free block. */
+    respond: (number: number, response: string, session = SESSION) => call(`/api/free/${session}/${number}/send`, { method: 'POST', body: { response } }),
     /** The page on every change to an answer. */
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */

@@ -11,3 +11,5 @@ coverage/
 plugin/page/
 plugin/server/
 plugin/.claude-plugin/types/
+# Playwright MCP snapshots and console logs from looking at the page: they hold its address with the per-launch secret.
+.playwright-mcp/

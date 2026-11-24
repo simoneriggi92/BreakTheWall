@@ -15,7 +15,7 @@ function engine(on: On) {
     fetched: [] as Fetched[],
     submitted: [] as { text: string; asUser: boolean }[],
     /** Messages the server holds for the session, handed to the next delivery polls in order. */
-    deliveries: [] as { round: number; message: string }[],
+    deliveries: [] as { id: string; message: string }[],
     failSubmit: false,
     /** Every call in the order the mod made it, to read submit-then-confirm. */
     order: [] as string[],
@@ -77,21 +77,21 @@ test('posts every turn\'s final text with its session, how it ended and its agen
 test('submits a delivered message as the person\'s own words, and confirms it only after', async ($, on) => {
   const clock = mock.clock(on)
   const server = engine(on)
-  server.deliveries.push({ round: 3, message: '**Q1 · Where?** recommendation' })
+  server.deliveries.push({ id: 'round-3', message: '**Q1 · Where?** recommendation' })
   await startSession($, clock)
   expect(server.submitted).toEqual([{ text: '**Q1 · Where?** recommendation', asUser: true }])
-  const confirm = 'POST /api/sessions/sess-1/delivery/3'
+  const confirm = 'POST /api/sessions/sess-1/delivery/round-3'
   expect(server.order).toContain(confirm)
   expect(server.order.indexOf('submit')).toBeLessThan(server.order.indexOf(confirm))
-  const confirmed = server.fetched.find(x => x.url.endsWith('/delivery/3'))
-  expect(confirmed?.url).toBe('http://127.0.0.1:4000/api/sessions/sess-1/delivery/3')
+  const confirmed = server.fetched.find(x => x.url.endsWith('/delivery/round-3'))
+  expect(confirmed?.url).toBe('http://127.0.0.1:4000/api/sessions/sess-1/delivery/round-3')
 })
 
 test('leaves a message unconfirmed when its submit fails, so the server offers it again', async ($, on) => {
   const clock = mock.clock(on)
   const server = engine(on)
   server.failSubmit = true
-  server.deliveries.push({ round: 3, message: 'the answers' })
+  server.deliveries.push({ id: 'round-3', message: 'the answers' })
   await startSession($, clock)
   expect(server.order).toContain('submit')
   expect(server.fetched.filter(x => x.method === 'POST' && x.url.includes('/delivery/'))).toEqual([])
@@ -102,7 +102,7 @@ test('reads the session id again for each poll, as /clear and /resume change it 
   const server = engine(on)
   await startSession($, clock)
   server.session = 'sess-2'
-  server.deliveries.push({ round: 1, message: 'after the clear' })
+  server.deliveries.push({ id: 'free-1', message: 'after the clear' })
   // A poll the server answered is followed 1 ms later: one step of the clock is one more poll.
   await clock.advance(1)
   expect(server.fetched.filter(x => x.url.endsWith('/delivery')).map(x => new URL(x.url).pathname)).toEqual([

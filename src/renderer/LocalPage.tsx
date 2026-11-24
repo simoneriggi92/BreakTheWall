@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { RoundView } from '../core/round-answers';
+import type { CurrentView } from '../core/round-phase';
 import { App } from './App';
 import { httpBridge, RefusedError } from './http-bridge';
 import { PreferencesProvider, usePreferences } from './preferences';
+import { FreeBlockPage } from './round/FreeBlockPage';
 import { RoundPage } from './round/RoundPage';
 import { browserBridge } from './storage';
 
@@ -31,8 +32,8 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   const [secret] = useState(takeSecret);
   const bridge = useMemo(() => secret ? httpBridge(secret, fetcher) : undefined, [secret, fetcher]);
   const [state, setState] = useState<'checking' | 'open' | 'refused'>(bridge ? 'checking' : 'refused');
-  /** The latest round the server holds; read again after every poll, which answers early when it changes. */
-  const [round, setRound] = useState<RoundView | null>(null);
+  /** The latest round or free block the server holds; read again after every poll, which answers early when it changes. */
+  const [current, setCurrent] = useState<CurrentView | null>(null);
 
   useEffect(() => {
     if (!bridge) return;
@@ -49,7 +50,7 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   useEffect(() => {
     if (!bridge || state !== 'open') return;
     const stop = new AbortController();
-    const refresh = () => bridge.getRound().then(next => { if (!stop.signal.aborted) setRound(next); }, () => {});
+    const refresh = () => bridge.getCurrent().then(next => { if (!stop.signal.aborted) setCurrent(next); }, () => {});
     void refresh();
     void (async () => {
       while (!stop.signal.aborted) {
@@ -71,9 +72,11 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   }, [bridge, state]);
 
   if (state === 'open' && bridge) {
-    if (!round) return <App bridge={bridge}/>;
-    // Keyed by the round, so a new round starts with its own draft and focus.
-    return <PreferencesProvider bridge={bridge}><RoundPage key={`${round.session}/${round.number}`} round={round} bridge={bridge}/></PreferencesProvider>;
+    if (!current) return <App bridge={bridge}/>;
+    // Keyed by what is shown, so a new round or free block starts with its own draft and focus.
+    return <PreferencesProvider bridge={bridge}>{current.kind === 'round'
+      ? <RoundPage key={`round/${current.round.session}/${current.round.number}`} round={current.round} phaseOpen={current.phaseOpen} bridge={bridge}/>
+      : <FreeBlockPage key={`free/${current.block.session}/${current.block.number}`} block={current.block} phaseOpen={current.phaseOpen} bridge={bridge}/>}</PreferencesProvider>;
   }
   if (state === 'checking') return null;
   return <PreferencesProvider bridge={browserBridge}><Secretless/></PreferencesProvider>;

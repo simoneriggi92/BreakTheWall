@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { SECRET_HEADER } from '../core/local-server';
 import { answers, readLock, serverStatus, type ServerLock } from './lock';
 
 /**
@@ -51,6 +52,22 @@ export async function openPage(options: LaunchOptions & { open?: (url: string) =
   if (status.pageConnected) return { ...lock, opened: false };
   await (options.open ?? openInBrowser)(pageUrl(lock));
   return { ...lock, opened: true };
+}
+
+/**
+ * The plugin asked a skill of this session for rounds (#99): the server opens the session's round phase. Only a
+ * running server is told; starting one here would hold the skill's start, and without one the phase still opens at
+ * the first round.
+ */
+export async function markPhase({ dataDir, session, cwd, timeoutMs = 3000 }: { dataDir: string; session: string; cwd: string; timeoutMs?: number }): Promise<{ marked: boolean }> {
+  const lock = readLock(dataDir);
+  if (!lock) return { marked: false };
+  try {
+    const reply = await fetch(`http://127.0.0.1:${lock.port}/api/sessions/${encodeURIComponent(session)}/phase`, {
+      method: 'POST', headers: { [SECRET_HEADER]: lock.secret, 'content-type': 'application/json' }, body: JSON.stringify({ cwd }), signal: AbortSignal.timeout(timeoutMs),
+    });
+    return { marked: reply.ok };
+  } catch { return { marked: false }; }
 }
 
 /**
