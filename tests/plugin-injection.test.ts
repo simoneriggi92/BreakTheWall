@@ -63,6 +63,28 @@ describe('the options request rides the round skills (#96)', () => {
   });
 });
 
+describe('the round skills are asked to write the turn\'s context as a short list (#127)', () => {
+  /** The shape settled by #122, variant C: a short heading, then 3–6 bullets each opening with a bold label. */
+  const LABELS = ['**Read:**', '**Found:**', '**Carried over:**', '**Open:**', '**Lands in:**'];
+
+  it('asks a round skill, typed, called or after a compaction, for the context before the first question as a short Markdown list', () => {
+    const data = dataFolder();
+    for (const context of [hook(typed('grilling'), data), hook(called('mattpocock-skills:grill-me'), data), hook(started('compact'), data)]) {
+      expect(context).toMatch(/context before the first question/);
+      expect(context).toMatch(/short heading/);
+      expect(context).toMatch(/3 to 6 bullets/);
+      for (const label of LABELS) expect(context).toContain(label);
+      // The skill's own round format and the options list stay as they were.
+      expect(context).toContain('Keep the skill\'s round format and questions as they are');
+      expect(context).toContain('- **(a)** label: consequence');
+    }
+  });
+
+  it('asks the spec skill nothing about the context', () => {
+    expect(hook(typed('to-spec'), dataFolder())).not.toContain('**Carried over:**');
+  });
+});
+
 describe('a compaction drops the request, so a session that had it is asked again (#96)', () => {
   it('asks again on every compaction of a session it asked, and never on another session or another start', () => {
     const data = dataFolder();
