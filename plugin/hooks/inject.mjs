@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url';
  * finds the server; it runs detached, so the skill's start never waits on it.
  *
  * The spec skill (`to-spec`) is asked for a closing `Spec: <location>` line (#104), which the server reads to open the
- * spec in the page. It opens no round phase: the handover ends it.
+ * spec in the page, and for each statement to end with its backing (#106), which the server checks without a model. It
+ * opens no round phase: the handover ends it.
  */
 const ROUND_SKILLS = new Set(['grilling', 'grill-me', 'grill-with-docs']);
 const SPEC_SKILLS = new Set(['to-spec']);
@@ -48,6 +49,14 @@ const SPEC_REQUEST = [
   'Spec: <location>',
   '',
   'where <location> is the GitHub issue\'s URL (or `#<number>` for an issue of this repository), the file\'s path relative to the working directory, or `pasted` when the spec is the text of that same message, above the line. Hand over a revised spec the same way, with the same location: it opens as a new version.',
+  '',
+  'The page also checks what each statement of the spec rests on. A statement is every list item, table row and paragraph, in every section (not headings, not code blocks). End each statement with its backing, one or more references after its last word:',
+  '',
+  '- an answer the person gave in a round: `[R2·Q3]`, round 2 of this session, question 3, rounds numbered from 1 in the order they were asked, as the page shows them;',
+  '- a decision recorded elsewhere: a link to a GitHub issue or comment (its URL, or `#<number>` for an issue of this repository);',
+  '- a fact in the repository: `path:a-b`, the file\'s path relative to the working directory and its lines a to b.',
+  '',
+  'Leave a statement without a reference when no decision stands behind it: the page flags it for the person to judge. Never invent a reference.',
 ].join('\n');
 
 /**
