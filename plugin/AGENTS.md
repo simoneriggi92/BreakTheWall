@@ -6,6 +6,10 @@ The plugin `claude --plugin-dir plugin` loads: a mod (`hooks/register.ts`) that 
 
 Beside the mod, `hooks/hooks.json` declares classic command hooks running `hooks/inject.mjs` (#96): on `UserPromptExpansion`, `PreToolUse` on `Skill` and `SessionStart` on `compact`, it asks the round skills (`grilling`, `grill-me`, `grill-with-docs`) for options as `- **(a)** label: consequence`, and re-asks after a compaction in a session marked under `$CLAUDE_PLUGIN_DATA/options-sessions/`. A round skill starting (not a compaction) is also the injection marker that opens the session's round phase (#99): it runs `server/launcher.cjs phase <session> <cwd>` detached, so the skill's start never waits. `tests/plugin-injection.test.ts` runs it as Claude Code does, stdin to stdout.
 
+`commands/doctor.md` is `/break-the-wall:doctor`, a plain prompt command: it asks Claude to check Node, the policy settings that block mods and the debug log. It holds no code, so it loads when the mod is refused (#107).
+
+A release ships this folder through `scripts/pack-plugin.mjs` (see [development](../docs/development.md#the-local-page-and-the-claude-code-plugin)): everything here except the mod's tests, this file, `tsconfig.json` and `.claude-plugin/types/`. A new development-only file belongs in that script's left-out list; a `package.json` or a lockfile here stops the release, because Claude Code would run an install step.
+
 ## Conventions
 
 - The mod is a thin adapter: logic goes to `src/server`, where Vitest reaches it; the mod forwards what the engine reports and decides nothing. What it still owns is the order of its calls (submit, then confirm), held by `hooks/register.test.ts`.
