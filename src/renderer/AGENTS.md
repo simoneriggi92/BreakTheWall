@@ -23,7 +23,7 @@ The React interface: library, studio, the exploration view with its three roles 
 
 ```bash
 npm run dev:web   # this renderer alone in a browser, for layout only (no generation, no desktop persistence)
-npm run build:plugin && npm run preview:round [-- turn.md]   # one round in the real page: prints its address with the secret
+npm run build:plugin && npm run preview:round [-- round.md [turn.md …]]   # turns of one session in the real page (the last shown): prints its address with the secret
 ```
 
 ## Conventions

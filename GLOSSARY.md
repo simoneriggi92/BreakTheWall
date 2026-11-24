@@ -53,8 +53,20 @@ The agent's conversation in which rounds are asked, named by its agent. It is li
 _Avoid_: conversation, chat, tab
 
 **Round**:
-The questions an agent asks together and waits on before it goes on, each with its context, options and recommendation. Answering rounds is the way into Break the Wall. A round is superseded when a later round of the same session arrives; only the latest round of a session takes answers.
+The questions an agent asks together and waits on before it goes on, each with its context, options and recommendation. Answering rounds is the way into Break the Wall. A round is superseded when a later round or free block of the same session arrives; only the latest of a session is answered.
 _Avoid_: form, questionnaire, prompt
+
+**Round phase**:
+The stretch of a session whose turns come to the page: from its first round or injection marker until the person ends it, or three turns in a row pass without a round. Outside it, the agent's turns stay in the terminal.
+_Avoid_: grilling mode, round mode, page mode
+
+**Injection marker**:
+The sign that the agent was asked to write rounds in the page's format, given when a round skill starts. It opens the round phase before any round arrives.
+_Avoid_: trigger, hook
+
+**Free block**:
+A turn of the agent without a round, during the round phase: its text, whole, and one field for the person's words, which return to the agent as one message.
+_Avoid_: clarification (what it often is, not what it is), message, chat turn
 
 **Answer**:
 What the person gives one question of a round: a choice (the recommendation, an option, or none), an optional note, and the remarks and side-chat replies they attach. A round's answers return to the agent together.
