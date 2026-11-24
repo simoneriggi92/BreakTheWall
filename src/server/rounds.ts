@@ -65,6 +65,8 @@ export type RoundRefusal = 'unknown' | 'sent' | 'superseded';
 const kindOf = (x: Stored): Kind => 'round' in x ? 'round' : 'free';
 const orderOf = (x: Stored) => x.order ?? x.number;
 /** How the mod names what it confirms: `round-2`, `free-1`. */
+/** Where the sessions' folders live, by project, inside the server's data folder. */
+export const projectsDir = (dataDir: string) => join(dataDir, 'projects');
 export const deliveryId = (kind: Kind, number: number) => `${kind}-${number}`;
 
 export class RoundStore {
@@ -77,7 +79,7 @@ export class RoundStore {
   private constructor(private dir: string) {}
 
   static async open(dataDir: string): Promise<RoundStore> {
-    const store = new RoundStore(join(dataDir, 'projects'));
+    const store = new RoundStore(projectsDir(dataDir));
     await store.load();
     return store;
   }
@@ -266,9 +268,7 @@ export class RoundStore {
   }
 
   private sessionDir(x: { cwd: string; session: string }) {
-    // The working directory names the project; hashed, so any path makes a safe folder name.
-    const project = createHash('sha256').update(x.cwd).digest('hex').slice(0, 16);
-    return join(this.dir, project, x.session);
+    return sessionFolder(this.dir, x);
   }
 
   private save(x: Stored): Promise<void> {
@@ -303,15 +303,20 @@ export class RoundStore {
   }
 }
 
+/** `<projects>/<project>/<session>`: the working directory names the project, hashed, so any path makes a safe folder name. */
+export function sessionFolder(projectsDir: string, x: { cwd: string; session: string }) {
+  return join(projectsDir, createHash('sha256').update(x.cwd).digest('hex').slice(0, 16), x.session);
+}
+
 const key = (session: string, kind: Kind, number: number) => `${session}/${deliveryId(kind, number)}`;
 const entryKey = (x: Stored) => key(x.session, kindOf(x), x.number);
 const sentNow = (message: string) => ({ message, at: new Date().toISOString(), deliveredAt: null });
 
-async function entries(dir: string): Promise<string[]> {
+export async function entries(dir: string): Promise<string[]> {
   try { return await readdir(dir); } catch { return []; }
 }
 
-async function atomicWrite(file: string, data: string) {
+export async function atomicWrite(file: string, data: string) {
   await mkdir(dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${randomBytes(6).toString('hex')}.pending`;
   try {

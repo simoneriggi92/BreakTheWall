@@ -126,8 +126,10 @@ describe('the injection marker reaches the server through the launcher (#99)', (
     const userData = dataFolder();
     const server = (await startLocalServer({ dataDir: join(userData, 'rounds'), staticDir: join(root, 'plugin', 'page'), version: '0.6.0-test' }))!;
     servers.push(server);
-    expect(await phase(userData, SESSION, CWD)).toEqual({ marked: true });
+    expect(await phase(userData, SESSION, CWD, 'mattpocock-skills:grilling', 'the history column, #102')).toEqual({ marked: true });
     expect(await (await serverClient(server).turn('Which page do you mean?')).json()).toEqual({ round: null, free: 1 });
+    // The skill and its arguments name the session in the history column.
+    expect((await serverClient(server).history()).projects[0].sessions[0]).toMatchObject({ session: SESSION, skill: 'grilling', ticket: 102 });
   });
 
   it('starts no server when none runs: the phase then opens at the first round', async () => {

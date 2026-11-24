@@ -9,7 +9,7 @@ import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
-import { handleSessions } from './sessions';
+import { handleSessions, SessionLabels } from './sessions';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -71,7 +71,8 @@ const MAX_TURN_BYTES = 4 * 1024 * 1024;
 const MAX_ANSWER_BYTES = 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
 const responseBodySchema = z.strictObject({ response: responseSchema });
-const phaseSchema = z.strictObject({ cwd: cwdSchema });
+/** The injection marker (#99), with the round skill that started and its arguments, which name the session (#102). */
+const phaseSchema = z.strictObject({ cwd: cwdSchema, skill: z.string().min(1).max(200).optional(), args: z.string().max(4000).optional() });
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
 const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
 const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
@@ -90,6 +91,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const own: ServerLock = { port, pid: process.pid, version: options.version, secret };
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
   const rounds = await RoundStore.open(options.dataDir);
+  const labels = await SessionLabels.open(options.dataDir);
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
@@ -175,6 +177,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         const body = phaseSchema.safeParse(await readJson(req));
         if (!body.success) return send(res, 400, { error: 'bad-request' });
         await rounds.startPhase(phasePath[1], body.data.cwd);
+        if (body.data.skill) await labels.mark(phasePath[1], body.data.cwd, body.data.skill, body.data.args);
         pageChanged();
         return noContent(res);
       }
@@ -240,7 +243,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
-    if (await handleSessions(req, res, path, { rounds, leases: sessions, pageChanged })) return;
+    if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, pageChanged })) return;
     return send(res, 404, { error: 'not-found' });
   }
 

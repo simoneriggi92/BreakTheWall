@@ -132,3 +132,37 @@ describe('the person decides what is kept (#102)', () => {
   });
 });
 
+describe('what a session began with (#102)', () => {
+  it('names a session by the round skill that first marked it, and the ticket its arguments name, across a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir });
+    const api = client(first);
+    expect((await api.startPhase(SESSION, CWD, { skill: 'mattpocock-skills:grill-with-docs', args: 'the history column, #102' })).status).toBe(204);
+    await api.turn(round('Where do rounds live?'));
+    await api.startPhase(SESSION, CWD, { skill: 'grilling', args: '#7' });
+    await api.startPhase(OTHER, OTHER_CWD, { skill: '/grill-me', args: '' });
+    await api.turn(round('Which page?'), OTHER, OTHER_CWD);
+    const labels = async (x: typeof api) => (await x.history()).projects.flatMap((p: { sessions: { session: string; skill: string | null; ticket: number | null }[] }) => p.sessions.map(y => [y.session, y.skill, y.ticket]));
+    expect(await labels(api)).toEqual([[OTHER, 'grill-me', null], [SESSION, 'grill-with-docs', 102]]);
+    await first.stop();
+    expect(await labels(client(await start({ dataDir })))).toEqual([[OTHER, 'grill-me', null], [SESSION, 'grill-with-docs', 102]]);
+  });
+
+  it('leaves a session without a marker unnamed, and refuses a skill name that is not one', async () => {
+    const api = client(await start());
+    await api.startPhase();
+    await api.turn(round('Where do rounds live?'));
+    expect((await api.history()).projects[0].sessions[0]).toMatchObject({ skill: null, ticket: null });
+    expect((await api.startPhase(SESSION, CWD, { skill: 'x'.repeat(300) })).status).toBe(400);
+  });
+
+  it('forgets the name of a deleted session', async () => {
+    const api = client(await start());
+    await api.startPhase(SESSION, CWD, { skill: 'grilling', args: '#9' });
+    await api.turn(round('Where do rounds live?'));
+    await api.deleteSession();
+    await api.turn(round('Where do rounds live?'));
+    expect((await api.history()).projects[0].sessions[0]).toMatchObject({ skill: null, ticket: null });
+  });
+});
+

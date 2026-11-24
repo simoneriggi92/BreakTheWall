@@ -69,8 +69,8 @@ export function serverClient(server: LocalServer) {
     round: async () => { const { current } = await (await call('/api/current')).json(); return current?.kind === 'round' ? current.round : null; },
     /** The free block the page shows, or null when it shows a round or nothing. */
     free: async () => { const { current } = await (await call('/api/current')).json(); return current?.kind === 'free' ? current.block : null; },
-    /** The plugin's injection hook, through the launcher: the session was asked for rounds (#99). */
-    startPhase: (session = SESSION, cwd = CWD) => call(`/api/sessions/${session}/phase`, { method: 'POST', body: { cwd } }),
+    /** The plugin's injection hook, through the launcher: the session was asked for rounds (#99), by a skill started with its arguments (#102). */
+    startPhase: (session = SESSION, cwd = CWD, marker: { skill?: string; args?: string } = {}) => call(`/api/sessions/${session}/phase`, { method: 'POST', body: { cwd, ...marker } }),
     /** The page's "end the round phase". */
     endPhase: (session = SESSION) => call(`/api/sessions/${session}/phase`, { method: 'DELETE' }),
     /** The page on every change to a free block's response. */
