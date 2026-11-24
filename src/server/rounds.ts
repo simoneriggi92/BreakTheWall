@@ -37,6 +37,8 @@ const entryFields = {
   order: z.number().int().min(1).optional(),
   receivedAt: z.iso.datetime(),
   sent: sentSchema.nullable(),
+  /** The person folded the agent's text (#126); absent until they fold it, as in an entry kept before it existed. */
+  turnFolded: z.boolean().optional(),
 };
 const storedRoundSchema = z.strictObject({ ...entryFields, round: roundSchema, draft: draftSchema });
 const storedFreeSchema = z.strictObject({ ...entryFields, kind: z.literal('free'), text: z.string().max(1_000_000), response: responseSchema });
@@ -174,7 +176,7 @@ export class RoundStore {
     const phaseOpen = this.phaseOf(x.session)?.open ?? false;
     const superseded = this.ofSession(x.session).some(y => orderOf(y) > orderOf(x));
     const sent = x.sent ? { message: x.sent.message, at: x.sent.at } : null;
-    const base = { session: x.session, number: x.number, receivedAt: x.receivedAt, sent, superseded };
+    const base = { session: x.session, cwd: x.cwd, number: x.number, receivedAt: x.receivedAt, sent, superseded, turnFolded: x.turnFolded ?? false };
     const transcriptGone = this.standing.transcriptGone(x.session);
     const standing = { phaseOpen, queued: this.queued(x), transcriptGone };
     if ('round' in x) {
@@ -225,6 +227,17 @@ export class RoundStore {
     if (typeof found === 'string') return found;
     await this.save({ ...found, response });
     return null;
+  }
+
+  /**
+   * The person folded or unfolded the agent's text of a round or free block (#126). Kept beside its draft, on a sent or
+   * superseded entry too: folding is reading, not answering. False for an entry the store does not have.
+   */
+  async foldTurn(session: string, kind: Kind, number: number, folded: boolean): Promise<boolean> {
+    const found = this.entries.get(key(session, kind, number));
+    if (!found) return false;
+    if ((found.turnFolded ?? false) !== folded) await this.save({ ...found, turnFolded: folded });
+    return true;
   }
 
   /** Records the round as sent with its message, which then waits in the session's queue. */

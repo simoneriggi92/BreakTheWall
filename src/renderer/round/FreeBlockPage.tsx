@@ -4,7 +4,7 @@ import type { FreeBlockView } from '../../core/round-phase';
 import type { FreeBlockBridge } from '../http-bridge';
 import { Brand } from '../icons';
 import { PreferencesMenu, usePreferences } from '../preferences';
-import { Markdown, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
+import { AgentText, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
 
 /**
  * A turn without a round, during the round phase (#99): the agent's text, read-only, and one response field, returned as
@@ -55,7 +55,10 @@ export function FreeBlockPage({ block, phaseOpen, queued = false, transcriptGone
         <PreferencesMenu/>
       </header>
       <main className="free-layout">
-        <section className="free-turn" aria-label={f.title}><Markdown text={block.text}/></section>
+        <AgentText
+          entry={{ kind: 'free', session: block.session, number: block.number }} cwd={block.cwd} text={block.text}
+          folded={block.turnFolded ?? false} label={f.title} className="free-turn" bridge={bridge}
+        />
         {/* A card of its own, so what follows the turn is read on the surface and never on the grid (#123). */}
         <div className="free-reply">
         {delivered !== null

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import type { PhaseBridge } from '../http-bridge';
+import { projectName } from '../../core/session-history';
+import type { FoldBridge, PhaseBridge, TurnKey } from '../http-bridge';
 import { renderMarkdown } from '../markdown';
 import { usePreferences } from '../preferences';
 import { useDiagrams } from '../use-diagrams';
@@ -24,6 +25,47 @@ export function Markdown({ text, host: given, marks = NO_MARKS }: { text: string
   useLayoutEffect(() => { if (host.current) markPassages(host.current, marks); }, [host, rendered, marksKey]);
   return <div ref={host} className="round-markdown" dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }
+
+/**
+ * The agent's text at the head of a round or a free block (#126), read like a page: a static chip says where it came
+ * from (the project, the session's first 8 characters, the round), then the text. Folded, it is one line: the chip,
+ * the text's first line cut, the control. The fold is kept with the entry on the server, so it holds for that round
+ * alone; it is reading, not answering, so it works on a sent or superseded entry too.
+ */
+export function AgentText({ entry, cwd, text, round, folded: kept, label, className, bridge }: {
+  entry: TurnKey;
+  cwd: string;
+  text: string;
+  /** The chip's last part, on a round: "Round n". A free block is not a round and has none. */
+  round?: string;
+  folded: boolean;
+  label: string;
+  className: string;
+  bridge: FoldBridge;
+}) {
+  const { t } = usePreferences();
+  const f = t.page.round.folds;
+  const [folded, setFolded] = useState(kept);
+  const toggle = () => {
+    const next = !folded;
+    setFolded(next);
+    // A fold the server did not keep still holds on this page: it is a way of reading, with nothing to lose.
+    bridge.foldTurn(entry, next).catch(() => {});
+  };
+  const chip = [projectName(cwd), entry.session.slice(0, 8), round].filter(Boolean).join(' · ');
+  return (
+    <section className={`${className} agent-text${folded ? ' is-folded' : ''}`} aria-label={label}>
+      <p className="turn-chip" title={entry.session}>{chip}</p>
+      {folded && <p className="turn-line">{firstLine(text)}</p>}
+      <button type="button" className="subtle round-fold turn-fold" aria-expanded={!folded} onClick={toggle}>{folded ? f.showTurn : f.hideTurn}</button>
+      {!folded && <Markdown text={text}/>}
+    </section>
+  );
+}
+
+/** The text folded to one line: its first line with the Markdown marks that open a line or wrap words taken off. */
+const firstLine = (text: string) => (text.split('\n').find(x => x.trim() !== '') ?? '')
+  .replace(/^\s*(?:#{1,6}\s|>\s?|[-*+]\s|\d+[.)]\s|`{3,}\S*)*/, '').replace(/[*_`]/g, '').trim();
 
 /**
  * Saves on every change, one request at a time and always the newest: a slow save never lands over a later one, and

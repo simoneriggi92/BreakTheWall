@@ -28,6 +28,8 @@ export interface PageBridge extends DesktopBridge {
   saveResponse(block: FreeBlockKey, response: string): Promise<void>;
   /** The free block's one response; resolves to the message exactly as the agent receives it. */
   sendResponse(block: FreeBlockKey, response: string): Promise<string>;
+  /** The person folded or unfolded the agent's text of a round or a free block (#126), kept with it on the server. */
+  foldTurn(entry: TurnKey, folded: boolean): Promise<void>;
   /** The person ends the session's round phase: its next turns without a round stay in the terminal. */
   endPhase(session: string): Promise<void>;
   /** The history column (#102): project → session → numbered rounds, and an update waiting for the other sessions. */
@@ -64,10 +66,13 @@ export interface PageBridge extends DesktopBridge {
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
+/** A round or a free block, as the agent's text at its head names it (#126). */
+export type TurnKey = { kind: 'round' | 'free'; session: string; number: number };
 export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
+export type FoldBridge = Pick<PageBridge, 'foldTurn'>;
 export type SideChatBridge = Pick<PageBridge, 'getSideChats' | 'askSideChat'>;
-export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge & SideChatBridge;
-export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
+export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge & FoldBridge & SideChatBridge;
+export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge & FoldBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
 export type SpecRemarksBridge = Pick<PageBridge, 'getSpecRemarks' | 'saveSpecRemarks' | 'sendSpecRemarks'>;
 export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration' | 'getSpecBacking'> & SpecRemarksBridge;
@@ -126,6 +131,9 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     },
     async sendResponse(block, response) {
       return sentReplySchema.parse(await (await ok(await call(`${freePath(block)}/send`, json('POST', { response })))).json()).message;
+    },
+    async foldTurn({ kind, ...entry }, folded) {
+      await ok(await call(`${kind === 'round' ? roundPath(entry) : freePath(entry)}/fold`, json('PUT', { folded })));
     },
     async endPhase(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}/phase`, { method: 'DELETE' }));

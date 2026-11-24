@@ -11,7 +11,7 @@ const SECRET = 'a'.repeat(43);
 const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
 
 const ROUND: RoundView = {
-  session: SESSION,
+  session: SESSION, cwd: '/work/BreakTheWall',
   number: 1,
   receivedAt: '2026-11-24T10:00:00.000Z',
   turnText: '',
