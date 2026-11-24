@@ -261,7 +261,7 @@ describe('remarks ride in the round that awaits answers (#105)', () => {
     await user.click(await screen.findByRole('button', { name: 'Spec · The night bakery' }));
     selectText(await source(), 'loses water');
     expect(screen.getByRole('button', { name: 'Remark' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Back to your library' }));
+    await user.click(screen.getByRole('button', { name: 'Close the spec' }));
     expect(await screen.findByTestId('return-message')).toBeInTheDocument();
   });
 });

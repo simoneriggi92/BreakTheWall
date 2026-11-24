@@ -82,7 +82,8 @@ describe('a handed-over spec opens in the page (#104)', () => {
     const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one')] });
     render(<LocalPage fetch={server.fetch}/>);
     await title();
-    await user.click(screen.getByRole('button', { name: 'Back to your library' }));
+    expect(screen.queryByRole('button', { name: 'Back to your library' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Close the spec' }));
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('One decision is open.');
   });
 
@@ -152,5 +153,6 @@ describe('a superseded version (#104)', () => {
     const server = fakeServer({ specs: [version({ id: V2, number: 2, latest: V2 }), version({ superseded: true, latest: V2, handedOverAt: '2026-11-24T12:00:00.000Z' })], explorations: [await explored('x-one')] });
     render(<LocalPage fetch={server.fetch}/>);
     expect((await screen.findByRole('button', { name: 'apri la nuova versione' })).closest('[role="status"]')).toHaveTextContent('superata · apri la nuova versione');
+    expect(await screen.findByRole('button', { name: 'Chiudi la specifica' })).toBeInTheDocument();
   });
 });

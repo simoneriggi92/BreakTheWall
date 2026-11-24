@@ -132,6 +132,7 @@ export const en: Messages = {
       version: (n: number, location: string) => `Version ${n} · ${location}`,
       superseded: 'superseded',
       openNew: 'open the new version',
+      close: 'Close the spec',
       writing: 'Claude Code is writing the spec’s structure…',
       repairing: 'Claude Code is repairing the spec’s structure…',
       cancel: 'Cancel',

@@ -143,6 +143,8 @@ export const it = {
       /** Followed by `openNew`, as one line: "superseded · open the new version". */
       superseded: 'superata',
       openNew: 'apri la nuova versione',
+      /** The brand button over the spec: it closes the spec, back to the round or the library. */
+      close: 'Chiudi la specifica',
       writing: 'Claude Code sta scrivendo la struttura della specifica…',
       repairing: 'Claude Code sta correggendo la struttura della specifica…',
       cancel: 'Annulla',
