@@ -10,10 +10,11 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 /**
  * The mark (docs/images/brand/mark.svg): four lines of text, the second one's end pulled out and still linked to its
  * place. Its colours come from the theme's brand tokens, so paper and blueprint both work; the piece is decorative.
+ * `tagline={false}` leaves the tagline out where the bar is a tool's, not a welcome (the round page's 48 px bar, #123).
  */
-export function Brand() {
+export function Brand({ tagline = true }: { tagline?: boolean }) {
   const { t } = usePreferences();
-  return <span className="brand"><BrandMark/><span>Break the Wall<small>{t.common.brandTagline}</small></span></span>;
+  return <span className="brand"><BrandMark/><span>Break the Wall{tagline && <small>{t.common.brandTagline}</small>}</span></span>;
 }
 /** The mark alone, for the player's top bar, where the name would only add weight. */
 export function BrandMark() {
