@@ -2,7 +2,7 @@
 
 ## Overview
 
-The plugin `claude --plugin-dir plugin` loads: a mod (`hooks/register.ts`) that checks Node, runs `server/launcher.cjs`, keeps the session registered, serves `/break-the-wall`, posts every turn's final text on `turn.complete`, and long-polls the server for answers it submits with `$.prompt.submit({ asUser: true })` and then confirms. `server/` and `page/` are build output of `npm run build:plugin`.
+The plugin `claude --plugin-dir plugin` loads: a mod (`hooks/register.ts`) that checks Node, runs `server/launcher.cjs`, keeps the session registered, serves `/break-the-wall`, posts every turn's final text on `turn.complete`, reports a session's end on `session.end` and registers the id `/clear` or `/resume` goes on under (#102), and long-polls the server for answers it submits with `$.prompt.submit({ asUser: true })` and then confirms. `server/` and `page/` are build output of `npm run build:plugin`.
 
 Beside the mod, `hooks/hooks.json` declares classic command hooks running `hooks/inject.mjs` (#96): on `UserPromptExpansion`, `PreToolUse` on `Skill` and `SessionStart` on `compact`, it asks the round skills (`grilling`, `grill-me`, `grill-with-docs`) for options as `- **(a)** label: consequence`, and re-asks after a compaction in a session marked under `$CLAUDE_PLUGIN_DATA/options-sessions/`. A round skill starting (not a compaction) is also the injection marker that opens the session's round phase (#99): it runs `server/launcher.cjs phase <session> <cwd>` detached, so the skill's start never waits. `tests/plugin-injection.test.ts` runs it as Claude Code does, stdin to stdout.
 
