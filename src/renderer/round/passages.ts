@@ -3,8 +3,10 @@
  * show remarked passages again. Offsets count the characters of the host's text nodes, so the same Markdown gives the
  * same offsets on every render. A diagram's figure is left out: its text changes once it is drawn.
  */
+import type { Remark } from '../../core/round-answers';
 
-export interface Passage { start: number; end: number; passage: string }
+/** Where a remark's words stand in one part of the question, as the remark keeps it. */
+export type Passage = Pick<Remark, 'start' | 'end' | 'passage'>;
 
 const MARK = 'round-remark-mark';
 const skipped = (node: Node) => node.parentElement?.closest('.md-diagram') != null;
@@ -45,7 +47,8 @@ export function passageIn(host: HTMLElement, range: Range): Passage | null {
 
 /**
  * Marks each passage in `host`, replacing the marks drawn before. A passage whose offsets no longer hold its words
- * (the agent's text read differently) is looked for by its words; one not found is left unmarked, never guessed.
+ * (the text renders differently since it was kept) is looked for by its words, and marked only where they stand
+ * once: between two places it is left unmarked rather than guessed.
  */
 export function markPassages(host: HTMLElement, passages: readonly Passage[]) {
   host.querySelectorAll(`mark.${MARK}`).forEach(mark => mark.replaceWith(...mark.childNodes));
@@ -53,7 +56,10 @@ export function markPassages(host: HTMLElement, passages: readonly Passage[]) {
   for (const passage of passages) {
     const text = textNodes(host).map(x => x.data).join('');
     let start = passage.start;
-    if (text.slice(start, passage.end) !== passage.passage) start = text.indexOf(passage.passage);
+    if (text.slice(start, passage.end) !== passage.passage) {
+      start = text.indexOf(passage.passage);
+      if (start !== text.lastIndexOf(passage.passage)) continue;
+    }
     if (start < 0) continue;
     wrap(host, start, start + passage.passage.length);
   }

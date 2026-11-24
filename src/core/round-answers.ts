@@ -86,10 +86,14 @@ export function fitsQuestions(questions: readonly Question[], draft: Draft): boo
 /** A passage as the message and the page quote it: on one line, as it reads, however many lines it crossed. */
 export const quoted = (passage: string) => `«${passage.replace(/\s+/g, ' ').trim()}»`;
 
-const PARTS: readonly RemarkPart[] = remarkPartSchema.options;
-/** A question's remarks in the order their passages stand: the body's first, then the recommendation's. */
-export const remarksOf = (answer: Answer | undefined): Remark[] =>
-  [...answer?.remarks ?? []].sort((a, b) => PARTS.indexOf(a.part) - PARTS.indexOf(b.part) || a.start - b.start || a.end - b.end);
+/** The parts of a question a remark can sit in, in the order they stand. */
+export const REMARK_PARTS: readonly RemarkPart[] = remarkPartSchema.options;
+/** Remarks in the order their passages stand: the body's first, then the recommendation's. */
+export const sortRemarks = (remarks: readonly Remark[]): Remark[] =>
+  [...remarks].sort((a, b) => REMARK_PARTS.indexOf(a.part) - REMARK_PARTS.indexOf(b.part) || a.start - b.start || a.end - b.end);
+export const remarksOf = (answer: Answer | undefined): Remark[] => sortRemarks(answer?.remarks ?? []);
+/** A remark is known by where it stands: one passage takes one remark. */
+export const remarkKey = (x: Pick<Remark, 'part' | 'start' | 'end'>) => `${x.part}:${x.start}:${x.end}`;
 export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
 
 /** The words on a question's title line, in the page's interface language; a note alone puts none there. */

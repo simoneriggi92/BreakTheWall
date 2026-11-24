@@ -552,6 +552,15 @@ describe('remarks on a question\'s passage (#98)', () => {
     expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
   });
 
+  it('marks a kept passage whose place moved by its words only when they stand once, never guessing between two', async () => {
+    // Offsets that no longer hold their words, in "In the per-user data folder.": "data" stands once, "er" three times.
+    const moved = { part: 'recommendation' as const, start: 0, end: 4, passage: 'data', text: '' };
+    const twice = { part: 'recommendation' as const, start: 0, end: 2, passage: 'er', text: '' };
+    render(<LocalPage fetch={fakeServer({ ...ROUND, draft: { generalNote: '', answers: { '1': { note: '', remarks: [moved, twice] } } } }).fetch}/>);
+    await screen.findByRole('article');
+    expect(marks()).toEqual(['data']);
+  });
+
   it('words remarks in Italian when the page is in Italian', async () => {
     setLanguage('it-IT');
     const user = userEvent.setup();

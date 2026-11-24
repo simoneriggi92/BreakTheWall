@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
-import { answerKind, answerOf, isAnswered, quoted, remarksOf, returnMessage, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
+import { answerKind, answerOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, returnMessage, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { RoundBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
@@ -70,11 +70,12 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   const article = useRef<HTMLElement>(null);
   const hosts: Record<RemarkPart, RefObject<HTMLDivElement | null>> = { body: useRef(null), recommendation: useRef(null) };
   const [selected, setSelected] = useState<Passage & { part: RemarkPart; top: number; left: number } | null>(null);
-  const [fresh, setFresh] = useState<string | null>(null);
+  /** The remark whose field opens focused: the one just made, or the one its passage already had. */
+  const [focusRemark, setFocusRemark] = useState<string | null>(null);
   const readSelection = () => {
     const selection = document.getSelection();
     const range = !readOnly && selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    for (const part of ['body', 'recommendation'] as const) {
+    for (const part of REMARK_PARTS) {
       const host = hosts[part].current;
       const passage = range && host ? passageIn(host, range) : null;
       if (passage) return setSelected({ part, ...passage, ...below(range!, article.current) });
@@ -87,14 +88,15 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
     document.addEventListener('selectionchange', cleared);
     return () => document.removeEventListener('selectionchange', cleared);
   }, []);
-  const changeRemarks = (next: Remark[]) => changeAnswer({ remarks: remarksOf({ note: '', remarks: next }) });
+  const changeRemarks = (next: Remark[]) => changeAnswer({ remarks: sortRemarks(next) });
   const addRemark = () => {
     if (!selected) return;
     const { part, start, end, passage } = selected;
     const kept = remarksOf(answerOf(latest.current, question));
     // The same passage twice is one remark: selecting it again only opens its field.
-    if (!kept.some(x => x.part === part && x.start === start && x.end === end)) changeRemarks([...kept, { part, start, end, passage, text: '' }]);
-    setFresh(remarkKey({ part, start, end }));
+    const key = remarkKey(selected);
+    if (!kept.some(x => remarkKey(x) === key)) changeRemarks([...kept, { part, start, end, passage, text: '' }]);
+    setFocusRemark(key);
     setSelected(null);
     document.getSelection()?.removeAllRanges();
   };
@@ -105,7 +107,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   const [drawerOpen, setDrawerOpen] = useState(false);
   const showReturn = band !== 'drawer' || drawerOpen;
 
-  const goTo = (number: number) => { setFocus(number); setNoteOpen(null); setSelected(null); setFresh(null); };
+  const goTo = (number: number) => { setFocus(number); setNoteOpen(null); setSelected(null); setFocusRemark(null); };
   const move = (step: number) => goTo(round.questions[Math.min(round.questions.length - 1, Math.max(0, index + step))].number);
   const canSend = !readOnly && !sending;
   const drawerToggle = useRef<HTMLButtonElement>(null);
@@ -232,7 +234,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
                       {readOnly
                         ? <p className="round-remark-text">{remark.text}</p>
                         : <>
-                          <textarea aria-label={r.remarkOn(quote)} autoFocus={fresh === remarkKey(remark)} value={remark.text} rows={2} onChange={event => editRemark(remark, { text: event.target.value })}/>
+                          <textarea aria-label={r.remarkOn(quote)} autoFocus={focusRemark === remarkKey(remark)} value={remark.text} rows={2} onChange={event => editRemark(remark, { text: event.target.value })}/>
                           <button type="button" className="subtle" aria-label={r.removeRemarkOn(quote)} onClick={() => editRemark(remark, null)}>{r.removeRemark}</button>
                         </>}
                     </li>
@@ -271,9 +273,11 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
 }
 
 const NO_MARKS: readonly Passage[] = [];
-const remarkKey = (x: Pick<Remark, 'part' | 'start' | 'end'>) => `${x.part}:${x.start}:${x.end}`;
 
-/** Where the "Remark" offer goes: just under the selection's end, in the question's own coordinates. */
+/**
+ * Where the "Remark" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts
+ * on; measured against the question, which positions it, so scrolling the page never leaves it behind.
+ */
 function below(range: Range, frame: HTMLElement | null): { top: number; left: number } {
   // jsdom lays nothing out and has no rectangle for a range.
   if (!frame || typeof range.getBoundingClientRect !== 'function') return { top: 0, left: 0 };
@@ -374,7 +378,7 @@ function Markdown({ text, host: given, marks = NO_MARKS }: { text: string; host?
   const host = given ?? own;
   useDiagrams(host, rendered, theme, t.d.diagramFailed);
   // React sets the HTML only when it changes, so the marks are drawn into it after every render that could move them.
-  const drawn = marks.map(x => `${x.start}:${x.end}:${x.passage}`).join('\n');
-  useLayoutEffect(() => { if (host.current) markPassages(host.current, marks); }, [host, rendered, drawn]);
+  const marksKey = marks.map(x => `${x.start}:${x.end}:${x.passage}`).join('\n');
+  useLayoutEffect(() => { if (host.current) markPassages(host.current, marks); }, [host, rendered, marksKey]);
   return <div ref={host} className="round-markdown" dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }
