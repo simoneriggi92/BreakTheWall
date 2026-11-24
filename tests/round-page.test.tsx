@@ -407,7 +407,8 @@ describe('folding the parts of a round', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
     expect(outline()).not.toHaveTextContent('Where do rounds live?');
-    expect(within(outline()).getByRole('button', { name: /^Q1 · Where do rounds live\?/ })).toHaveTextContent('Q1');
+    // Folded by hand on a wide window, the outline is the same rail as below ~1180 px: the ruler's ticks (#124).
+    expect(within(outline()).getByRole('button', { name: /^01 · Where do rounds live\?/ })).toHaveTextContent('01');
 
     await user.click(screen.getByRole('button', { name: 'Unfold the questions' }));
     expect(outline()).toHaveTextContent('Where do rounds live?');
@@ -539,11 +540,7 @@ describe('the round beside a terminal (#97)', () => {
     expect(within(outline()).getAllByRole('button')[1]).toHaveTextContent('Q2 · Who recognises a round?no answer');
 
     browser.resize(1100);
-    const rail = within(outline()).getAllByRole('button');
-    expect(rail.map(x => x.textContent)).toEqual(['Q1', 'Q2']);
-    expect(rail[1]).toHaveAccessibleName('Q2 · Who recognises a round? · no answer');
-    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
-    expect(within(outline()).getAllByRole('button')[0]).toHaveTextContent('Q1 ✓');
+    expect(within(outline()).getAllByRole('button')[1]).toHaveAccessibleName('02 · Who recognises a round? · no answer');
     await user.click(within(outline()).getByRole('button', { name: /Who recognises a round/ }));
     expect(screen.getByRole('article')).toHaveTextContent('The mod or the server.');
     // The right column is still a column at this width.
@@ -592,6 +589,75 @@ describe('the round beside a terminal (#97)', () => {
     expect(server.requests.some(x => x.method === 'POST')).toBe(true);
     expect(await within(receives()).findByText('as delivered by the server (en)')).toBeInTheDocument();
     expect(within(receives()).getByRole('status')).toHaveTextContent('Sent.');
+  });
+});
+
+describe('the rail as a ruler (#124)', () => {
+  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+  const ticks = () => within(outline()).getAllByRole('button');
+
+  it('shows one numbered tick per question, each current, answered or open, and moves with the keys as before', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1100);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    expect(ticks().map(x => x.textContent)).toEqual(['01', '02']);
+    // Current and open: the first question has the focus, the second waits.
+    expect(ticks()[0]).toHaveAttribute('aria-current', 'true');
+    expect(ticks()[0]).toHaveAccessibleName('01 · Where do rounds live? · no answer');
+    expect(ticks()[1]).not.toHaveAttribute('aria-current');
+    expect(ticks()[1]).toHaveAccessibleName('02 · Who recognises a round? · no answer');
+
+    // Answered: the tick keeps its number with no mark beside it; its state is drawn by the tick and said by its name.
+    await user.keyboard('yj');
+    expect(ticks().map(x => x.textContent)).toEqual(['01', '02']);
+    expect(ticks()[0]).not.toHaveAttribute('aria-current');
+    expect(ticks()[0]).toHaveAccessibleName('01 · Where do rounds live? · recommendation');
+    expect(ticks()[1]).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('heading', { level: 2, name: 'Q2 · Who recognises a round?' })).toBeInTheDocument();
+  });
+
+  it('runs the current question\'s title under the ticks, in the rail only, for the eye only', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1100);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    // The heading already says it to a screen reader: the rail's copy is hidden from it, and sits after the ticks.
+    const title = screen.getByText('Where do rounds live?');
+    expect(title).toHaveAttribute('aria-hidden', 'true');
+    expect(outline().compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.keyboard('j');
+    expect(screen.queryByText('Where do rounds live?')).toBeNull();
+    expect(screen.getByText('Who recognises a round?')).toHaveAttribute('aria-hidden', 'true');
+
+    // The drawer's rail has it too; the wide outline, with its titles, does not.
+    browser.resize(700);
+    expect(screen.getByText('Who recognises a round?')).toHaveAttribute('aria-hidden', 'true');
+    browser.resize(1400);
+    expect(screen.queryByText('Who recognises a round?')).toBeNull();
+  });
+
+  it('stands the question\'s number large behind its heading on the wide layout, outline folded or not, and nowhere else', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    const numeral = () => within(screen.getByRole('article')).queryByText(/^\d\d$/);
+    // A figure for the eye: the real number stays in the heading, the one a screen reader hears.
+    expect(numeral()).toHaveTextContent('01');
+    expect(numeral()).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('heading', { level: 2, name: 'Q1 · Where do rounds live?' })).toBeInTheDocument();
+
+    await user.keyboard('j');
+    expect(numeral()).toHaveTextContent('02');
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    expect(numeral()).toHaveTextContent('02');
+
+    browser.resize(1100);
+    expect(numeral()).toBeNull();
+    browser.resize(700);
+    expect(numeral()).toBeNull();
   });
 });
 

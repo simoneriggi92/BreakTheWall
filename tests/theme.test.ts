@@ -153,3 +153,49 @@ describe('the round page as a drafting sheet (#123)', () => {
     expect(css.replace(/var\(--[a-z0-9-]+/g, 'var(').match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi)).toBeNull();
   });
 });
+
+describe('the rail as a ruler and the question\'s numeral (#124)', () => {
+  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+    .map(m => m[2]).join(';');
+  /** `fg` laid over `bg` at `share` percent, as `color-mix(in srgb, fg share%, transparent)` draws it on that ground. */
+  const over = (fg: string, share: number, bg: string) => '#' + [1, 3, 5]
+    .map(i => Math.round(parseInt(fg.slice(i, i + 2), 16) * share / 100 + parseInt(bg.slice(i, i + 2), 16) * (1 - share / 100)))
+    .map(x => x.toString(16).padStart(2, '0')).join('');
+  const THEMES = [[':root, :root[data-theme="paper"]'], [':root[data-theme="blueprint"]']];
+
+  it('draws the numeral huge and outlined only, in the display face, behind the card\'s content', () => {
+    const numeral = declarations('.round-numeral');
+    expect(numeral).toMatch(/color: transparent/);
+    expect(numeral).toMatch(/-webkit-text-stroke: 1\.25px color-mix\(in srgb, var\(--ink\) 18%, transparent\)/);
+    expect(numeral).toMatch(/font-family: var\(--f-display\)/);
+    expect(numeral).toMatch(/font-weight: 800/);
+    expect(numeral).toMatch(/font-size: 250px/);
+    expect(numeral).toMatch(/pointer-events: none/);
+    expect(numeral).toMatch(/user-select: none/);
+  });
+
+  it.each(THEMES)('%s keeps the numeral faint and the text over it at AA', selector => {
+    // The numeral is decorative, not a text pair: it stays well under the 3:1 of anything meant to be seen, while the
+    // heading and the body's ink, drawn over its stroke, keep AA.
+    const t = tokens(selector);
+    const share = Number(/-webkit-text-stroke: [^;]*var\(--ink\) (\d+)%/.exec(declarations('.round-numeral'))?.[1]);
+    const stroke = over(t.ink, share, t.surface);
+    expect(contrast(stroke, t.surface)).toBeLessThan(2);
+    expect(contrast(t.ink, stroke)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('runs the rail\'s title bottom to top on one line, cut with an ellipsis, never wrapped', () => {
+    const title = declarations('.round-rail-title');
+    expect(title).toMatch(/writing-mode: vertical-rl/);
+    expect(title).toMatch(/transform: rotate\(180deg\)/);
+    expect(title).toMatch(/white-space: nowrap/);
+    expect(title).toMatch(/overflow: hidden/);
+    expect(title).toMatch(/text-overflow: ellipsis/);
+    expect(title).toMatch(/max-height: 32vh/);
+    expect(title).toMatch(/font: [^;]*var\(--f-mono\)/);
+    expect(title).toMatch(/text-transform: uppercase/);
+    expect(title).toMatch(/color: var\(--accent\)/);
+  });
+});
