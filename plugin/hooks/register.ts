@@ -29,8 +29,11 @@ let server: Server | undefined
 let renewal: ReturnType<EngineInterface['clock']['every']> | undefined
 /** Whether this module load already long-polls for deliveries: one chain of polls, never two. */
 let delivering = false
+/** The plugin's side-chat model (`userConfig.sideChatModel`), handed to the server as set; empty when the person set none. */
+let sideChatModel = ''
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  sideChatModel = typeof options.sideChatModel === 'string' ? options.sideChatModel.trim() : ''
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({ name: COMMAND, description: t.description })
@@ -85,10 +88,14 @@ export const register: Register = on => {
   })
 }
 
-/** Re-reads the session id each time: `/clear` and `/resume` change it without a new `session.start`. */
+/**
+ * Re-reads the session id each time: `/clear` and `/resume` change it without a new `session.start`. The session's
+ * model, and the plugin's side-chat model when set, go with it: the server picks which one a side chat runs on.
+ */
 async function registerSession($: EngineInterface) {
   if (!server) return
-  await post($, '/api/sessions', JSON.stringify({ id: await $.session.id(), cwd: await $.session.cwd() }))
+  const body = { id: await $.session.id(), cwd: await $.session.cwd(), model: await $.session.model(), ...(sideChatModel ? { sideChatModel } : {}) }
+  await post($, '/api/sessions', JSON.stringify(body))
 }
 
 /** The session that went on after `ended`; none when the process is leaving and the id is still the ending one. */

@@ -4,6 +4,7 @@ import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
 import { historySchema, type History } from '../core/session-history';
+import { sideChatsViewSchema, type SideChatsView } from '../core/side-chat';
 import { specListSchema, type SpecView } from '../core/spec';
 import { browserBridge } from './storage';
 
@@ -33,6 +34,13 @@ export interface PageBridge extends DesktopBridge {
   getRound(round: RoundKey): Promise<CurrentView>;
   /** The person deletes a session, its rounds and drafts with it. */
   deleteSession(session: string): Promise<void>;
+  /**
+   * A round's side chats (#100). With `after`, the version the page already shows, the server holds the read until
+   * they change past it: a reply streams in this way.
+   */
+  getSideChats(round: RoundKey, after: number | null, signal: AbortSignal): Promise<SideChatsView>;
+  /** Asks in the side chat of one question; the reply arrives through `getSideChats`. */
+  askSideChat(round: RoundKey, question: number, ask: string): Promise<void>;
   /** Every version of every spec handed over (#104), newest first. */
   listSpecs(): Promise<SpecView[]>;
   /** Writes a version's structure again, after a failure or a cancel; the page follows it through its poll. */
@@ -44,7 +52,8 @@ export interface PageBridge extends DesktopBridge {
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
 export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
-export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge;
+export type SideChatBridge = Pick<PageBridge, 'getSideChats' | 'askSideChat'>;
+export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge & SideChatBridge;
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
 export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration'>;
@@ -110,6 +119,13 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     },
     async deleteSession(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}`, { method: 'DELETE' }));
+    },
+    async getSideChats(round, after, signal) {
+      const path = `/api/side-chats/${encodeURIComponent(round.session)}/${round.number}${after === null ? '' : `?after=${after}`}`;
+      return sideChatsViewSchema.parse(await (await ok(await call(path, { signal }))).json());
+    },
+    async askSideChat(round, question, ask) {
+      await ok(await call(`/api/side-chats/${encodeURIComponent(round.session)}/${round.number}/${question}`, json('POST', { ask })));
     },
     async listSpecs() {
       return specListSchema.parse(await (await ok(await call('/api/specs'))).json()).specs;

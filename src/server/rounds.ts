@@ -143,8 +143,13 @@ export class RoundStore {
 
   /** The questions of one round, to word its message. */
   questions(session: string, number: number) {
+    return this.asked(session, number)?.round.questions;
+  }
+
+  /** One round as the agent asked it, with the working directory of its session (#100). */
+  asked(session: string, number: number): { cwd: string; round: Round } | undefined {
     const found = this.entries.get(key(session, 'round', number));
-    return found && 'round' in found ? found.round.questions : undefined;
+    return found && 'round' in found ? { cwd: found.cwd, round: found.round } : undefined;
   }
 
   async saveDraft(session: string, number: number, draft: Draft): Promise<RoundRefusal | null> {
@@ -316,6 +321,7 @@ export async function entries(dir: string): Promise<string[]> {
   try { return await readdir(dir); } catch { return []; }
 }
 
+/** Written beside the file, then renamed over it: a reader sees the old file or the new one, never half of one. */
 export async function atomicWrite(file: string, data: string) {
   await mkdir(dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${randomBytes(6).toString('hex')}.pending`;

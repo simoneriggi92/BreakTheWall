@@ -10,6 +10,7 @@ import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
 import { handleSessions, SessionLabels } from './sessions';
+import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
 import { openSpecs, type GhRunner } from './specs';
 import type { ClaudeRunner } from '../desktop/claude/completer';
 
@@ -40,8 +41,11 @@ export interface LocalServerOptions {
    * `$.prompt.submit` first waits for the session to be idle: a shorter lease would deliver twice.
    */
   deliveryLeaseMs?: number;
-  /** The processes the server starts: the real CLIs unless a test passes fakes. `claude` writes a spec's structure, `gh` reads a spec from an issue (#104). */
-  runners?: { claude?: ClaudeRunner; gh?: GhRunner };
+  /**
+   * The processes the server starts: the real CLIs unless a test passes fakes. `claude` writes a spec's structure, `gh`
+   * reads a spec from an issue (#104), `sideChat` streams a side chat's reply (#100).
+   */
+  runners?: { claude?: ClaudeRunner; gh?: GhRunner; sideChat?: SideChatRunner };
 }
 export interface LocalServer {
   port: number;
@@ -57,7 +61,12 @@ const TYPES: Record<string, string> = {
 };
 
 const cwdSchema = z.string().min(1).max(4096);
-const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema });
+/**
+ * A session as the mod registers it: its id, its folder, the model it runs on, and the side-chat model set in the
+ * plugin, if any (#100). A model name `--model` could not take is dropped, never the session with it.
+ */
+const registeredModelSchema = modelSchema.optional().catch(undefined);
+const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema, model: registeredModelSchema, sideChatModel: registeredModelSchema });
 /**
  * Every turn as the mod posts it on `turn.complete`, with how it ended and, for a subagent's run, its agent: the server
  * decides whether it holds a round, so the mod decides nothing.
@@ -105,6 +114,13 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const labels = await SessionLabels.open(options.dataDir);
   /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
   const update: { version: string | null } = { version: null };
+  /** The models each session registered with, kept past its lease, so a side chat on an ended session still runs on its model. */
+  const models = new Map<string, { model?: string; sideChatModel?: string }>();
+  const sideChats = sideChatRoutes({
+    dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
+    modelOf: session => { const x = models.get(session); return x?.sideChatModel ?? x?.model; },
+    io: { readJson, send },
+  });
   const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send });
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
@@ -128,6 +144,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   let stopping: Promise<void> | undefined;
   const stop = () => stopping ??= (async () => {
     clearInterval(idle);
+    sideChats.stop();
     specs.close();
     releaseLock(options.dataDir, own);
     await close(server);
@@ -161,7 +178,9 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'POST' && path === '/api/sessions') {
       const registration = registrationSchema.safeParse(await readJson(req));
       if (!registration.success) return send(res, 400, { error: 'bad-request' });
-      sessions.set(registration.data.id, { cwd: registration.data.cwd, until: Date.now() + sessionTtlMs });
+      const { id, cwd, model, sideChatModel } = registration.data;
+      sessions.set(id, { cwd, until: Date.now() + sessionTtlMs });
+      models.set(id, { model, sideChatModel });
       lastBusy = Date.now();
       return noContent(res);
     }
@@ -265,6 +284,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
     if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, update, pageChanged })) return;
+    if (await sideChats.handle(req, res, path)) return;
     if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
   }

@@ -336,11 +336,12 @@ describe('reading one question comfortably (#97)', () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
     const question = await screen.findByRole('article');
-    // At first: the options, the recommendation, no choice, two small "write" buttons, and Send. No text fields.
+    // At first: the side chat's opener (#100), the options, the recommendation, no choice, two small "write" buttons,
+    // and Send. No text fields.
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /Previous question|Next question/ })).toBeNull();
     expect(within(question).getAllByRole('button').map(x => x.textContent)).toEqual([
-      expect.stringContaining('(a)'), expect.stringContaining('(b)'), expect.stringContaining('(c)'),
+      '💬 Ask', expect.stringContaining('(a)'), expect.stringContaining('(b)'), expect.stringContaining('(c)'),
       'Accept the recommendation', 'No choice', 'Write a note',
     ]);
 
@@ -361,11 +362,11 @@ describe('reading one question comfortably (#97)', () => {
 
   it('shows the keys on the question in focus, in both languages', async () => {
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
-    expect(within(await screen.findByRole('article')).getByText('j/k move · 1–3 pick · y accept · n note · Ctrl+Enter send')).toBeInTheDocument();
+    expect(within(await screen.findByRole('article')).getByText('j/k move · 1–3 pick · y accept · n note · c side chat · Ctrl+Enter send')).toBeInTheDocument();
     cleanup();
     setLanguage('it-IT');
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
-    expect(within(await screen.findByRole('article')).getByText('j/k sposta · 1–3 scegli · y accetta · n nota · Ctrl+Invio invia')).toBeInTheDocument();
+    expect(within(await screen.findByRole('article')).getByText('j/k sposta · 1–3 scegli · y accetta · n nota · c chat laterale · Ctrl+Invio invia')).toBeInTheDocument();
   });
 });
 
