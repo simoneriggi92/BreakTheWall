@@ -60,6 +60,8 @@ export const it = {
       generalNote: 'Nota generale',
       generalNoteHint: 'Torna in cima al messaggio.',
       receives: 'Cosa riceve l’agente',
+      /** The right column's head while a side chat is open (#123): the answer folded above, the chat below. */
+      withSideChat: 'Risposta e chat laterale',
       closeReceives: 'Chiudi',
       send: 'Invia',
       sending: 'Invio…',

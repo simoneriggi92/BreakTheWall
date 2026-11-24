@@ -59,6 +59,7 @@ export const en: Messages = {
       generalNote: 'General note',
       generalNoteHint: 'Returns at the top of the message.',
       receives: 'What the agent receives',
+      withSideChat: 'Answer and side chat',
       closeReceives: 'Close',
       send: 'Send',
       sending: 'Sending…',

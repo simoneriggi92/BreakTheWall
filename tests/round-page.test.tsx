@@ -932,10 +932,27 @@ describe('the round page as a drafting sheet (#123)', () => {
     expect(follows(receiving, foldSide)).toBe(true);
     expect(follows(foldSide, within(receives()).getByRole('button', { name: 'Add a general note' }))).toBe(true);
 
+    // With a side chat open the column keeps a head row, its fold in it, above what the agent receives and the chat.
+    await user.click(screen.getByRole('button', { name: 'Ask about this question' }));
+    const column = screen.getByRole('heading', { level: 2, name: 'Answer and side chat' });
+    const foldColumn = screen.getByRole('button', { name: 'Fold the right column' });
+    expect(column.parentElement).toHaveClass('round-panel-head');
+    expect(foldColumn.parentElement).toBe(column.parentElement);
+    expect(follows(foldColumn, screen.getByText(/^What the agent receives ·/))).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Close the side chat' }));
+
     // Folded to a rail, the outline keeps only its button: the numbers below need no name above them.
     await user.click(foldQuestions);
     expect(screen.queryByRole('heading', { level: 2, name: 'Questions' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Unfold the questions' })).toBeInTheDocument();
+  });
+
+  it('names the column with a side chat open in Italian', async () => {
+    const user = userEvent.setup();
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await user.click(await screen.findByRole('button', { name: 'Chiedi su questa domanda' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Risposta e chat laterale' })).toBeInTheDocument();
   });
 });
 

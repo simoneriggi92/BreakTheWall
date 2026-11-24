@@ -222,6 +222,28 @@ describe('the progress strip at the window\'s foot (#125)', () => {
     expect(declarations('.round-page.has-strip')).toMatch(/--strip-h: 42px/);
   });
 
+  it('runs the ruler\'s baseline across the window, under the count too, as #122 settled', () => {
+    const baseline = declarations('.round-strip::after');
+    expect(baseline).toMatch(/position: absolute/);
+    expect(baseline).toMatch(/left: 0/);
+    expect(baseline).toMatch(/right: 0/);
+    expect(baseline).toMatch(/height: 1px/);
+    // The segments' own line would stop where the count starts.
+    expect(declarations('.round-strip ol')).not.toMatch(/border-bottom/);
+  });
+
+  it.each([[':root, :root[data-theme="paper"]'], [':root[data-theme="blueprint"]']])('%s tells an answered segment from an open one at 3:1, as WCAG asks of a graphic', selector => {
+    const t = tokens(selector);
+    // The owner's --accent-soft fill is too faint against the strip for that (about 1.2:1), and darkening the token
+    // would break accent text on it elsewhere; an accent line along the baseline under each answered span carries it.
+    expect(contrast(t['accent-soft'], t.surface)).toBeLessThan(3);
+    const mark = /box-shadow: inset 0 -(\d+)px 0 var\(--([a-z-]+)\)/.exec(declarations('.round-strip li.is-answered'));
+    expect(Number(mark?.[1])).toBeGreaterThanOrEqual(2);
+    const line = t[mark?.[2] ?? ''];
+    expect(line).toBeDefined();
+    expect(contrast(line, t.surface)).toBeGreaterThanOrEqual(3);
+  });
+
   it('reserves the strip\'s height, so it covers no control or content', () => {
     // The canvas ends above it; the panels already subtract --strip-h (#123).
     expect(declarations('.round-page.has-strip')).toMatch(/padding-bottom: var\(--strip-h\)/);

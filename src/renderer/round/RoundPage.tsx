@@ -407,7 +407,10 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         </aside>}
         {showReturn && !sideFolded && (chatOpen
           ? <div className="round-side">
-            {drawerBar}{sideFold}{sideEdge}
+            {drawerBar}
+            {/* Named in its head row with its fold, as without a side chat (#123): it holds the answer and the chat. */}
+            <div className="round-panel-head"><h2>{r.withSideChat}</h2>{sideFold}</div>
+            {sideEdge}
             <details
               id="round-return" className="round-return-strip" aria-label={r.receives} open={returnOpen}
               onToggle={e => setReturnOpen(e.currentTarget.open)}

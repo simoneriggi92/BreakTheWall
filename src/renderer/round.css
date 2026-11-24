@@ -58,7 +58,6 @@
   height: calc(100vh - var(--round-stick) - var(--strip-h)); overflow: auto; border-left: 1px solid var(--line);
 }
 .round-layout:not(.is-drawer) .round-return, .round-layout:not(.is-drawer) .round-side { padding: 0 16px 16px; }
-.round-layout:not(.is-drawer) .round-side { padding-top: 12px; }
 .round-layout:not(.is-drawer) .round-side-folded .round-fold-strip { border: 0; border-radius: 0; width: 100%; height: 100%; }
 /* A panel's head row: its name as a label, and its fold. The fold is a control, so it keeps the body face. */
 .round-panel-head {
@@ -348,7 +347,10 @@ body.is-resizing { cursor: col-resize; user-select: none; }
   display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-top: 1px solid var(--line);
   font-family: var(--f-mono);
 }
-.round-strip ol { list-style: none; flex: 1; min-width: 0; align-self: stretch; display: flex; margin: 6px 0 8px; padding: 0; border-bottom: 1px solid var(--muted); }
+.round-strip ol { list-style: none; flex: 1; min-width: 0; align-self: stretch; display: flex; margin: 6px 0 9px; padding: 0; }
+/* The baseline runs the window's whole width, under the count too, right below the ticks: the strip is a ruler that
+   continues past the last question, not a bar that stops where the count starts. */
+.round-strip::after { content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 1px; background: var(--muted); }
 /* The minor ticks: a line at the end of each fifth of a segment; the fifth one falls on the next question's major tick. */
 .round-strip li {
   flex: 1; position: relative;
@@ -359,7 +361,9 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .round-strip li::before { left: 0; }
 .round-strip li:last-child::after { right: 0; }
 .round-strip li span { position: absolute; left: 5px; top: 0; font-size: 10.5px; line-height: 1; color: var(--muted); }
-.round-strip li.is-answered { background-color: var(--accent-soft); }
+/* The fill is the owner's (#122); alone it stands about 1.2:1 off the strip, under the 3:1 a graphic needs, so an
+   accent line along the baseline says "answered" too. */
+.round-strip li.is-answered { background-color: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
 .round-strip li.is-answered span { color: var(--ink); }
 .round-strip li.is-current span { color: var(--accent); font-weight: 700; }
 .round-strip li.is-current::before { width: 2px; height: 100%; background: var(--accent); }
