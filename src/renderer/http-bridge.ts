@@ -3,6 +3,7 @@ import type { DesktopBridge } from '../core/bridge';
 import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
+import { historySchema, type History } from '../core/session-history';
 import { browserBridge } from './storage';
 
 /**
@@ -25,12 +26,19 @@ export interface PageBridge extends DesktopBridge {
   sendResponse(block: FreeBlockKey, response: string): Promise<string>;
   /** The person ends the session's round phase: its next turns without a round stay in the terminal. */
   endPhase(session: string): Promise<void>;
+  /** The history column (#102): project → session → numbered rounds, and an update waiting for the other sessions. */
+  getHistory(): Promise<History>;
+  /** A round of any session, opened from the history column. */
+  getRound(round: RoundKey): Promise<CurrentView>;
+  /** The person deletes a session, its rounds and drafts with it. */
+  deleteSession(session: string): Promise<void>;
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
 export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
 export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge;
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
+export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
@@ -83,6 +91,15 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     },
     async endPhase(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}/phase`, { method: 'DELETE' }));
+    },
+    async getHistory() {
+      return historySchema.parse(await (await ok(await call('/api/history'))).json());
+    },
+    async getRound(round) {
+      return currentViewSchema.parse(await (await ok(await call(roundPath(round)))).json());
+    },
+    async deleteSession(session) {
+      await ok(await call(`/api/sessions/${encodeURIComponent(session)}`, { method: 'DELETE' }));
     },
   };
 }
