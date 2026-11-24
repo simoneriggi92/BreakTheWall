@@ -134,12 +134,18 @@ describe('the injection marks the session\'s round phase on the server (#99)', (
   }
   const CWD = '/work/project';
 
-  it('runs the launcher\'s phase command with the session and its working directory whenever it asks a skill for rounds', async () => {
+  it('runs the launcher\'s phase command with the session and its working directory when a round skill starts', async () => {
     const { run, launched } = plugin();
     expect(run({ ...typed('grilling'), cwd: CWD })).toContain('label: consequence');
     run({ ...called('grill-me'), cwd: CWD });
-    run({ ...started('compact'), cwd: CWD });
-    expect(await launched(3)).toEqual([['phase', SESSION, CWD], ['phase', SESSION, CWD], ['phase', SESSION, CWD]]);
+    expect(await launched(2)).toEqual([['phase', SESSION, CWD], ['phase', SESSION, CWD]]);
+  });
+
+  it('runs nothing on a compaction: the server keeps the phase, and one the person ended stays ended', async () => {
+    const { run, launched } = plugin();
+    run({ ...typed('grilling'), cwd: CWD });
+    expect(run({ ...started('compact'), cwd: CWD })).toContain('label: consequence');
+    expect(await launched(2)).toEqual([['phase', SESSION, CWD]]);
   });
 
   it('runs nothing for another skill, a session id that is not plain, or a turn with no working directory', async () => {

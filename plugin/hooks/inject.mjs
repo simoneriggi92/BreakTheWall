@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
  * Plain Node with no dependencies, like the mod: Claude Code's input is checked field by field. A request missed
  * degrades a round to "yes" or a note and never breaks it, so this answers nothing rather than fail.
  *
- * Each request is also the injection marker that opens the session's round phase on the local server (#99), so a
+ * A round skill starting is also the injection marker that opens the session's round phase on the local server (#99), so a
  * clarifying turn before the first round already shows in the page. The launcher, beside the server in this plugin,
  * finds the server; it runs detached, so the skill's start never waits on it.
  */
@@ -111,7 +111,9 @@ process.stdin.on('end', () => {
   try {
     const event = JSON.parse(input);
     if (typeof event !== 'object' || event === null || !asks(event)) return;
-    markPhase(event);
+    // A compaction only re-sends the request the summary dropped: the server kept the phase, and one the person ended
+    // must stay ended. Only a round skill starting opens it.
+    if (event.hook_event_name !== 'SessionStart') markPhase(event);
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext: OPTIONS_REQUEST } }));
   } catch { /* Not an event: nothing to add. */ }
 });

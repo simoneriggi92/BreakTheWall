@@ -8,7 +8,7 @@ import { parseRound } from '../core/round';
 import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from '../core/round-answers';
 import { freeBlockMessage, replySchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
-import { RoundStore, type RoundRefusal } from './rounds';
+import { RoundStore, type Kind, type RoundRefusal } from './rounds';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -200,7 +200,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         if (message === '') return send(res, 400, { error: 'bad-request' });
         const refused = await rounds.sendReply(session, Number(number), body.data.reply, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
-        delivered(session);
+        queued(session);
         return send(res, 200, { message });
       }
     }
@@ -227,7 +227,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         const message = returnMessage(questions, body.data.draft, body.data.language);
         const refused = await rounds.send(session, Number(number), body.data.draft, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
-        delivered(session);
+        queued(session);
         return send(res, 200, { message });
       }
     }
@@ -235,7 +235,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && deliveryPath && sessionIdSchema.safeParse(deliveryPath[1]).success) return holdDelivery(deliveryPath[1], req, res);
     const confirmPath = CONFIRM_PATH.exec(path);
     if (req.method === 'POST' && confirmPath && sessionIdSchema.safeParse(confirmPath[1]).success) {
-      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as 'round' | 'free', Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
+      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as Kind, Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
@@ -243,7 +243,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   }
 
   /** A message waits for the session: a poll already waiting takes it, and the page shows it as sent. */
-  function delivered(session: string) {
+  function queued(session: string) {
     for (const wake of [...deliveryPolls.get(session) ?? []]) wake();
     pageChanged();
   }

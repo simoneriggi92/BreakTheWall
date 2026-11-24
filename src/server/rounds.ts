@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import { draftSchema, emptyDraft, type Draft, type RoundView } from '../core/round-answers';
 import { roundSchema, type Round } from '../core/round';
-import { afterTurn, OPEN_PHASE, replySchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
+import { afterTurn, CLOSED_PHASE, OPEN_PHASE, replySchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
 
 /**
  * What the page shows of each session (#95, #99): its rounds with their drafts, its free blocks with their replies,
@@ -46,7 +46,9 @@ type StoredRound = z.infer<typeof storedRoundSchema>;
 type StoredFree = z.infer<typeof storedFreeSchema>;
 type Stored = StoredRound | StoredFree;
 type StoredPhase = z.infer<typeof storedPhaseSchema>;
-type Kind = 'round' | 'free';
+/** A round or a free block: numbered apart, so the kind and the number together name an entry. */
+export type Kind = 'round' | 'free';
+type EntryOf<K extends Kind> = K extends 'round' ? StoredRound : StoredFree;
 
 /** Why a change to a round or a free block was refused; the server answers each with its own status. */
 export type RoundRefusal = 'unknown' | 'sent' | 'superseded';
@@ -98,7 +100,7 @@ export class RoundStore {
   async endPhase(session: string): Promise<boolean> {
     const cwd = this.phases.get(session)?.cwd ?? this.ofSession(session)[0]?.cwd;
     if (cwd === undefined) return false;
-    await this.setPhase(session, cwd, { open: false, quietTurns: 0 });
+    await this.setPhase(session, cwd, CLOSED_PHASE);
     return true;
   }
 
@@ -128,14 +130,14 @@ export class RoundStore {
   async saveDraft(session: string, number: number, draft: Draft): Promise<RoundRefusal | null> {
     const found = this.answerable(session, 'round', number);
     if (typeof found === 'string') return found;
-    await this.save({ ...(found as StoredRound), draft });
+    await this.save({ ...found, draft });
     return null;
   }
 
   async saveReply(session: string, number: number, reply: string): Promise<RoundRefusal | null> {
     const found = this.answerable(session, 'free', number);
     if (typeof found === 'string') return found;
-    await this.save({ ...(found as StoredFree), reply });
+    await this.save({ ...found, reply });
     return null;
   }
 
@@ -143,7 +145,7 @@ export class RoundStore {
   async send(session: string, number: number, draft: Draft, message: string): Promise<RoundRefusal | null> {
     const found = this.answerable(session, 'round', number);
     if (typeof found === 'string') return found;
-    await this.save({ ...(found as StoredRound), draft, sent: sentNow(message) });
+    await this.save({ ...found, draft, sent: sentNow(message) });
     return null;
   }
 
@@ -151,7 +153,7 @@ export class RoundStore {
   async sendReply(session: string, number: number, reply: string, message: string): Promise<RoundRefusal | null> {
     const found = this.answerable(session, 'free', number);
     if (typeof found === 'string') return found;
-    await this.save({ ...(found as StoredFree), reply, sent: sentNow(message) });
+    await this.save({ ...found, reply, sent: sentNow(message) });
     return null;
   }
 
@@ -186,8 +188,9 @@ export class RoundStore {
     return { version: 1 as const, session, cwd, number, order, receivedAt: new Date().toISOString(), sent: null };
   }
 
-  private answerable(session: string, kind: Kind, number: number): Stored | RoundRefusal {
-    const found = this.entries.get(key(session, kind, number));
+  private answerable<K extends Kind>(session: string, kind: K, number: number): EntryOf<K> | RoundRefusal {
+    // The key carries the kind, so what it finds is of that kind.
+    const found = this.entries.get(key(session, kind, number)) as EntryOf<K> | undefined;
     if (!found) return 'unknown';
     if (found.sent) return 'sent';
     // Only the latest round or free block of a session takes answers; the agent is waiting on that one.

@@ -16,7 +16,7 @@ export interface Phase {
   quietTurns: number;
 }
 export const OPEN_PHASE: Phase = { open: true, quietTurns: 0 };
-const CLOSED_PHASE: Phase = { open: false, quietTurns: 0 };
+export const CLOSED_PHASE: Phase = { open: false, quietTurns: 0 };
 
 /**
  * What a turn of the session's main loop does to its phase, and whether the page shows it as a free block. A round

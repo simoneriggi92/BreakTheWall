@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { startsAsCommand } from '../../core/round-answers';
 import type { FreeBlockView } from '../../core/round-phase';
 import type { FreeBlockBridge } from '../http-bridge';
 import { Brand } from '../icons';
@@ -25,7 +26,7 @@ export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockVi
 
   const readOnly = delivered !== null || block.superseded;
   const canSend = !readOnly && !sending && reply.trim() !== '';
-  const looksLikeCommand = /^[/!]/.test(reply.trimStart());
+  const looksLikeCommand = startsAsCommand(reply);
 
   async function send() {
     if (!canSend) return;

@@ -134,6 +134,8 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
  * leading `/` runs a command or a skill and a leading `!` runs a shell command. The mark is escaped as Markdown
  * escapes it, so the agent reads the words as written.
  */
-export const asText = (message: string) => /^[/!]/.test(message) ? `\\${message}` : message;
+export const asText = (message: string) => startsAsCommand(message) ? `\\${message.trimStart()}` : message;
+/** Whether Claude Code would take the text for a command: the page warns of the escape with the same rule. */
+export const startsAsCommand = (text: string) => /^[/!]/.test(text.trimStart());
 
 const indented = (text: string, by: string) => text.split(/\r?\n/).map(line => line.trim() ? `${by}${line}` : '');
