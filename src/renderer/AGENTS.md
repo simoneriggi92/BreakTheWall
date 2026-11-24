@@ -14,6 +14,7 @@ The React interface: library, studio, the exploration view with its three roles 
 | `i18n/` | Text catalogs: `it.ts` and `en.ts` for the app, `x-it.ts` and `x-en.ts` for the exploration, `devices.ts` for words that name the computer |
 | `LocalPage.tsx`, `http-bridge.ts` | The local page's entry (`vite build --mode page`): the secret from the fragment, the HTTP bridge, the page's poll, which reads what the page shows (a round or a free block) again whenever it answers |
 | `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline (answered questions folded), one question in focus, "what the agent receives" live, remarks on a passage of its body or recommendation, one Send, read-only once sent; its keys, and the width steps (rail below ~1180 px, drawer below ~860 px) read from `matchMedia` |
+| `round/SideChat.tsx` | A side chat on the focused question (#100), in the right column: the person's questions, the streamed replies with what each read, and the held read that keeps a round's side chats current |
 | `round/FreeBlockPage.tsx` | A turn without a round, during the round phase (#99): the turn's text and one response field |
 | `spec/SpecPage.tsx`, `spec.css` | A handed-over spec (#104): its version over the exploration view, the structure being written (cancel, write again), and "superseded · open the new version" on a version a later handover replaced |
 | `round/shared.tsx` | What a round and a free block share: the agent's Markdown, the one-at-a-time saver, the round phase control (top bar; in the drawer below ~860 px) |
