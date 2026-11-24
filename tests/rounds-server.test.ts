@@ -395,8 +395,8 @@ describe('remarks on a question\'s passage (#98)', () => {
             remark('body', 4, 'server keeps every round', 'Every one, forever?\nEven the superseded ones?'),
           ],
         },
-        // Remarks are not an answer: the title line still reads "no answer".
-        '2': { note: '', remarks: [remark('body', 4, 'mod  or\nthe server', '')] },
+        // Remarks are not an answer: the title line still reads "no answer". A remark with no words yet stays out.
+        '2': { note: '', remarks: [remark('body', 4, 'mod  or\nthe server', 'Or both?'), remark('body', 0, 'The', '  \n ')] },
       },
     });
     expect(await api.delivery()).toBe([
@@ -406,8 +406,8 @@ describe('remarks on a question\'s passage (#98)', () => {
       '    Even the superseded ones?',
       '  - «the per-user data folder» — Which one on Linux?',
       '**Q2 · Who recognises a round?** no answer',
-      // A passage across lines reads as one line; a remark with no words yet still points at it.
-      '  - «mod or the server»',
+      // A passage across lines reads as one line.
+      '  - «mod or the server» — Or both?',
     ].join('\n'));
   });
 

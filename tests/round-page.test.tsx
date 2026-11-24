@@ -473,6 +473,8 @@ describe('remarks on a question\'s passage (#98)', () => {
     expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
     const field = screen.getByRole('textbox', { name: 'Remark on «server keeps every round»' });
     expect(field).toHaveFocus();
+    // Until it has words, the remark is only a mark: nothing of it reaches the agent.
+    expect(returnText()).toBe('**Q1 · Where do rounds live?** no answer\n**Q2 · Who recognises a round?** no answer');
     await user.type(field, 'Every one, forever?');
 
     // A remark is not an answer: the question still reads "no answer".

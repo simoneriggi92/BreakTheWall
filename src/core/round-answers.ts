@@ -105,7 +105,7 @@ const TITLE_WORDS: Record<MessageLanguage, Record<Exclude<AnswerKind, 'option'>,
 /**
  * Plain Markdown that reads as the person's own words: the general note first, then every question by number and
  * title, so it still reads after compaction, the choice on the title line ("recommendation", the option's letter, "no
- * choice" or "no answer"), the note indented below, then its remarks as `- «passage» — text`.
+ * choice" or "no answer"), the note indented below, then its remarks that have words, as `- «passage» — text`.
  */
 export function returnMessage(questions: readonly Question[], draft: Draft, language: MessageLanguage): string {
   const lines: string[] = [];
@@ -120,10 +120,10 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
     lines.push(word ? `${title} ${word}` : title);
     const note = answer?.note.trim();
     if (note) lines.push(...indented(note, '  '));
-    for (const remark of remarksOf(answer)) {
-      const quote = quoted(remark.passage);
-      const [first = '', ...rest] = remark.text.trim().split(/\r?\n/);
-      lines.push(first ? `  - ${quote} — ${first}` : `  - ${quote}`, ...rest.flatMap(line => indented(line, '    ')));
+    // A remark with no words yet is only a mark on the page: a bare quote would ask the agent to guess why.
+    for (const remark of remarksOf(answer).filter(x => x.text.trim() !== '')) {
+      const [first, ...rest] = remark.text.trim().split(/\r?\n/);
+      lines.push(`  - ${quoted(remark.passage)} — ${first}`, ...rest.flatMap(line => indented(line, '    ')));
     }
   }
   return lines.join('\n');
