@@ -12,6 +12,8 @@ interface Fetched { url: string; method: string; body?: string }
 function engine(on: On) {
   const state = {
     session: 'sess-1',
+    /** Where Claude Code keeps the session's transcript; empty where it keeps none. */
+    transcript: '/home/me/.claude/projects/-work/sess-1.jsonl',
     fetched: [] as Fetched[],
     /** Every launcher run, its arguments after the script. */
     launched: [] as string[][],
@@ -38,6 +40,7 @@ function engine(on: On) {
   on('session.id', () => ({ value: state.session }))
   on('session.cwd', () => ({ value: '/work' }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.info', () => ({ value: { transcriptPath: state.transcript, platform: 'macos' as const, isHosted: false } }))
   on('http.fetch', (_, e) => {
     const method = e.init?.method ?? 'GET'
     state.fetched.push({ url: e.url, method, body: e.init?.body as string | undefined })
@@ -127,7 +130,7 @@ test('on /clear, reports the ending session ended and registers the id the sessi
   expect(posted(server, '/api/sessions/sess-1/end')).toEqual([{ reason: 'clear' }])
   server.session = 'sess-2'
   await clock.advance(1_000)
-  expect(posted(server, '/api/sessions').at(-1)).toEqual({ id: 'sess-2', cwd: '/work', model: 'claude-opus-5-5' })
+  expect(posted(server, '/api/sessions').at(-1)).toEqual({ id: 'sess-2', cwd: '/work', model: 'claude-opus-5-5', transcript: '/home/me/.claude/projects/-work/sess-1.jsonl' })
 })
 
 test('on an exit, reports the session ended and never registers its id again', async ($, on) => {
@@ -155,12 +158,32 @@ test('registers the session with its model and the side-chat model set in the pl
   const clock = mock.clock(on)
   const server = engine(on)
   await startSession($, clock)
-  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5', sideChatModel: 'haiku' })
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5', transcript: '/home/me/.claude/projects/-work/sess-1.jsonl', sideChatModel: 'haiku' })
 })
 
 test('leaves the side-chat model to the server\'s default when the plugin sets none', async ($, on) => {
   const clock = mock.clock(on)
   const server = engine(on)
   await startSession($, clock)
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5', transcript: '/home/me/.claude/projects/-work/sess-1.jsonl' })
+})
+
+test('registers the session with where Claude Code keeps its transcript, so the server knows when it is gone (#103)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  server.transcript = ''
+  await startSession($, clock)
+  // A session that keeps no transcript here names none: the server then never turns it read-only.
   expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5' })
+})
+
+test('delivers what was queued for a session resumed with claude --resume <id> as soon as it starts, before the person types (#103)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  server.session = 'sess-ended'
+  server.deliveries.push({ id: 'round-2', message: 'answered while the terminal was closed' })
+  await startSession($, clock)
+  expect(server.fetched.find(x => x.url.endsWith('/delivery'))?.url).toBe('http://127.0.0.1:4000/api/sessions/sess-ended/delivery')
+  expect(server.submitted).toEqual([{ text: 'answered while the terminal was closed', asUser: true }])
+  expect(server.order).toContain('POST /api/sessions/sess-ended/delivery/round-2')
 })
