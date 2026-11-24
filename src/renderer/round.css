@@ -245,3 +245,16 @@
 .round-turn-fold { float: right; margin: 0 0 6px 12px; }
 .round-turn.is-folded { padding-top: 0; padding-bottom: 0; }
 .round-turn.is-folded .round-turn-fold { float: none; margin: 0; }
+
+/* The edges between columns (dragged, or moved with ← → once focused). Each sits in the 28 px gap beside its column,
+   a thin line that shows on hover, focus and while dragging. The sticky columns run the window's height, so the edge
+   can be taken anywhere along it, not only beside the column's content. */
+.round-layout:not(.is-drawer) :is(.round-outline, .round-return, .round-side) { min-height: calc(100vh - var(--round-stick) - 40px); }
+.round-return { align-content: start; }
+.round-edge { position: absolute; top: 0; bottom: 0; width: 12px; z-index: 2; cursor: col-resize; touch-action: none; }
+.round-edge.grows-right { right: -20px; }
+.round-edge.grows-left { left: -20px; }
+.round-edge::after { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; border-radius: 2px; background: transparent; transition: background .15s; }
+.round-edge:hover::after, .round-edge:focus-visible::after, body.is-resizing .round-edge::after { background: var(--accent); }
+.round-edge:focus-visible { outline: none; }
+body.is-resizing { cursor: col-resize; user-select: none; }

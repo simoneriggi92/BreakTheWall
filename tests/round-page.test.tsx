@@ -461,6 +461,73 @@ describe('folding the parts of a round', () => {
   });
 });
 
+describe('resizing the columns by their edge', () => {
+  const layout = () => screen.getByRole('main');
+  const resizeQuestions = () => screen.getByRole('separator', { name: 'Resize the questions' });
+  const resizeRight = () => screen.getByRole('separator', { name: 'Resize the right column' });
+
+  it('widens and narrows the outline from the keyboard, within bounds', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '240');
+    expect(resizeQuestions()).toHaveAttribute('aria-orientation', 'vertical');
+
+    resizeQuestions().focus();
+    await user.keyboard('{ArrowRight}');
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '256');
+    expect(layout().style.getPropertyValue('--col-left')).toBe('min(256px, 22vw)');
+
+    for (let i = 0; i < 30; i++) await user.keyboard('{ArrowLeft}');
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '160');
+  });
+
+  it('widens the right column when its edge is dragged to the left, and remembers it', async () => {
+    const first = render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(resizeRight()).toHaveAttribute('aria-valuenow', '360');
+
+    fireEvent.pointerDown(resizeRight(), { clientX: 1000, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 900, pointerId: 1 });
+    expect(resizeRight()).toHaveAttribute('aria-valuenow', '460');
+    expect(layout().style.getPropertyValue('--col-right')).toBe('min(460px, 32vw)');
+    first.unmount();
+
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(resizeRight()).toHaveAttribute('aria-valuenow', '460');
+  });
+
+  it('goes back to the default width on a double click', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    resizeQuestions().focus();
+    await user.keyboard('{ArrowRight}');
+    await user.dblClick(resizeQuestions());
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '240');
+    expect(layout().style.getPropertyValue('--col-left')).toBe('');
+  });
+
+  it('offers no edge on a folded column', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    await user.click(screen.getByRole('button', { name: 'Fold the right column' }));
+    expect(screen.queryByRole('separator')).toBeNull();
+  });
+
+  it('names the edges in Italian', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(screen.getByRole('separator', { name: 'Ridimensiona le domande' })).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Ridimensiona la colonna destra' })).toBeInTheDocument();
+  });
+});
+
 describe('the round beside a terminal (#97)', () => {
   afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
 

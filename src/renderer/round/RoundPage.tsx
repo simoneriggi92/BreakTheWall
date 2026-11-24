@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { z } from 'zod';
 import { answerKind, answerOf, attachedOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { SideChatPassage } from '../../core/side-chat';
@@ -130,7 +130,8 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const sideChats = useSideChats(bridge, round);
   const sideChatOf = (number: number) => sideChats.find(x => x.question === number);
   const [chatOpen, setChatOpen] = useState(false);
-  const [folds, fold] = useFolds();
+  const [folds, fold] = useStored(FOLDS_KEY, foldsSchema);
+  const [widths, resize] = useStored(WIDTHS_KEY, widthsSchema);
   const f = r.folds;
   // The outline folds by itself below ~1180 px; the person's own choice, once made, wins at every width.
   const outlineFolded = folds.outline ?? band !== 'wide';
@@ -223,6 +224,21 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     }
   }
 
+  // The edges between columns (dragged, or moved with ← →): widths the person chose, kept like the folds. The right
+  // column keeps one width with a side chat open and one without, since a reply needs more room than the message.
+  const sideKey = chatOpen ? 'chat' : 'right';
+  const sideDefault = chatOpen ? (band === 'rail' ? 420 : 520) : band === 'rail' ? 300 : 360;
+  const outlineEdge = band !== 'drawer' && !outlineFolded && (
+    <ColumnEdge label={f.resizeOutline} hint={f.resizeHint} grows="right" width={widths.left} fallback={240} bounds={LEFT_BOUNDS} onResize={left => resize({ left })}/>
+  );
+  const sideEdge = band !== 'drawer' && (
+    <ColumnEdge label={f.resizeSide} hint={f.resizeHint} grows="left" width={widths[sideKey]} fallback={sideDefault} bounds={SIDE_BOUNDS} onResize={w => resize({ [sideKey]: w })}/>
+  );
+  // A share of the window caps each chosen width, so the question keeps its room when the window narrows later.
+  const columnWidths = {
+    ...(outlineEdge && widths.left !== undefined ? { '--col-left': `min(${widths.left}px, 22vw)` } : {}),
+    ...(sideEdge && !sideFolded && widths[sideKey] !== undefined ? { '--col-right': `min(${widths[sideKey]}px, 32vw)` } : {}),
+  } as CSSProperties;
   const sideFold = band !== 'drawer' && (
     <button type="button" className="subtle round-fold round-side-fold" aria-expanded aria-label={f.foldSide} title={f.foldSide} onClick={() => fold({ side: true })}>»</button>
   );
@@ -260,7 +276,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         {band !== 'drawer' && <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>}
         <PreferencesMenu/>
       </header>
-      <main className={`round-layout is-${band}${outlineFolded ? ' is-outline-folded' : ''}${sideFolded ? ' is-side-folded' : ''}`}>
+      <main className={`round-layout is-${band}${outlineFolded ? ' is-outline-folded' : ''}${sideFolded ? ' is-side-folded' : ''}`} style={columnWidths}>
         {round.turnText && <section className={`round-turn${folds.turn ? ' is-folded' : ''}`} aria-label={r.turnText}>
           <button type="button" className="subtle round-fold round-turn-fold" aria-expanded={!folds.turn} onClick={() => fold({ turn: !folds.turn })}>{folds.turn ? f.showTurn : f.hideTurn}</button>
           {!folds.turn && <Markdown text={round.turnText}/>}
@@ -270,6 +286,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
           type="button" className="subtle round-fold" aria-expanded={!outlineFolded} aria-label={outlineFolded ? f.unfoldOutline : f.foldOutline}
           title={outlineFolded ? f.unfoldOutline : f.foldOutline} onClick={() => fold({ outline: !outlineFolded })}
         >{outlineFolded ? '»' : '«'}</button>
+        {outlineEdge}
         <nav aria-label={r.outline}>
           <ol>
             {round.questions.map(q => {
@@ -377,7 +394,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         </aside>}
         {showReturn && !sideFolded && (chatOpen
           ? <div className="round-side">
-            {drawerBar}{sideFold}
+            {drawerBar}{sideFold}{sideEdge}
             <details
               id="round-return" className="round-return-strip" aria-label={r.receives} open={returnOpen}
               onToggle={e => setReturnOpen(e.currentTarget.open)}
@@ -394,7 +411,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             />
           </div>
           : <section id="round-return" className="round-return" aria-label={r.receives}>
-            {drawerBar}{sideFold}
+            {drawerBar}{sideFold}{sideEdge}
             {generalField}
             <h2>{r.receives}</h2>
             {returnBody}
@@ -408,30 +425,92 @@ const NO_RIDING: readonly SpecRemarksSection[] = [];
 
 /** Which parts of a round the person folded. Unset means the page decides (the outline folds by itself when narrow). */
 const foldsSchema = z.object({ outline: z.boolean().optional(), side: z.boolean().optional(), turn: z.boolean().optional() });
-type Folds = z.infer<typeof foldsSchema>;
 const FOLDS_KEY = 'btw:round-folds';
+/** The widths the person dragged the columns to, in pixels; unset means the column's own width for the band. */
+const widthsSchema = z.object({ left: z.number().optional(), right: z.number().optional(), chat: z.number().optional() });
+const WIDTHS_KEY = 'btw:round-widths';
+const LEFT_BOUNDS = { min: 160, max: 480 };
+const SIDE_BOUNDS = { min: 240, max: 800 };
 
 /**
- * The folds, kept in this browser so every round opens the way the person left the last one. Storage may be refused
- * (a private window, blocked site data): the page then folds as asked and forgets on reload.
+ * A small record kept in this browser, so every round opens the way the person left the last one. What is read back
+ * goes through its schema; storage may be refused (a private window, blocked site data), and the page then keeps the
+ * change for itself and forgets it on reload. A key set to undefined goes back to the page's own choice.
  */
-function useFolds(): [Folds, (change: Folds) => void] {
-  const [folds, setFolds] = useState<Folds>(readFolds);
-  const fold = (change: Folds) => setFolds(kept => {
-    const next = { ...kept, ...change };
-    try { localStorage.setItem(FOLDS_KEY, JSON.stringify(next)); } catch { /* storage refused: folded for this page only */ }
-    return next;
+function useStored<T extends Record<string, unknown>>(key: string, schema: z.ZodType<T>): [T, (change: Partial<T>) => void] {
+  const [value, setValue] = useState<T>(() => readStored(key, schema));
+  const change = (next: Partial<T>) => setValue(kept => {
+    const merged = { ...kept, ...next };
+    try { localStorage.setItem(key, JSON.stringify(merged)); } catch { /* storage refused: kept for this page only */ }
+    return merged;
   });
-  return [folds, fold];
+  return [value, change];
 }
 
-function readFolds(): Folds {
-  try {
-    const parsed = foldsSchema.safeParse(JSON.parse(localStorage.getItem(FOLDS_KEY) ?? '{}'));
-    return parsed.success ? parsed.data : {};
-  } catch {
-    return {};
-  }
+function readStored<T>(key: string, schema: z.ZodType<T>): T {
+  let raw: unknown = {};
+  try { raw = JSON.parse(localStorage.getItem(key) ?? '{}'); } catch { /* unreadable or refused: start from nothing */ }
+  const parsed = schema.safeParse(raw);
+  return parsed.success ? parsed.data : schema.parse({});
+}
+
+const RESIZE_STEP = 16;
+
+/** The room the centred grid leaves unused inside the layout's padding, as laid out; 0 where nothing is laid out. */
+function freeWidth(layout: Element | null): number {
+  if (!(layout instanceof HTMLElement)) return 0;
+  const style = getComputedStyle(layout);
+  const tracks = style.gridTemplateColumns.split(' ').map(parseFloat);
+  const gaps = parseFloat(style.columnGap) * (tracks.length - 1);
+  const inner = layout.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const free = inner - tracks.reduce((sum, x) => sum + x, 0) - gaps;
+  return Number.isFinite(free) && free > 0 ? free : 0;
+}
+
+/**
+ * The edge between two columns: dragged with the pointer, or moved with ← → once focused; a double click gives the
+ * column back its own width. `grows` is the direction that widens the column the edge belongs to.
+ */
+function ColumnEdge({ label, hint, grows, width, fallback, bounds, onResize }: {
+  label: string; hint: string; grows: 'left' | 'right'; width: number | undefined; fallback: number;
+  bounds: { min: number; max: number }; onResize: (width: number | undefined) => void;
+}) {
+  const current = width ?? fallback;
+  const sign = grows === 'right' ? 1 : -1;
+  const clamp = (w: number) => Math.round(Math.min(bounds.max, Math.max(bounds.min, w)));
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    // The column as drawn, where a browser lays it out; the width it was given otherwise (jsdom lays nothing out).
+    const drawn = event.currentTarget.parentElement?.getBoundingClientRect().width ?? 0;
+    const start = drawn > 0 ? drawn : current;
+    const free = freeWidth(event.currentTarget.closest('main'));
+    const from = event.clientX;
+    // The grid is centred: while it has room to spare, a column that widens by w moves its edge by only w/2, so the
+    // edge stays under the pointer only if the width grows twice as fast until the spare room is used up.
+    const widen = (dx: number) => free <= 1 ? dx : dx < 0 ? 2 * dx : dx <= free / 2 ? 2 * dx : dx + free / 2;
+    const move = (m: PointerEvent) => onResize(clamp(start + widen(sign * (m.clientX - from))));
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      document.body.classList.remove('is-resizing');
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    document.body.classList.add('is-resizing');
+  };
+  const step = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const by = event.key === 'ArrowRight' ? RESIZE_STEP : event.key === 'ArrowLeft' ? -RESIZE_STEP : 0;
+    if (by === 0) return;
+    event.preventDefault();
+    onResize(clamp(current + sign * by));
+  };
+  return (
+    <div
+      role="separator" aria-orientation="vertical" aria-label={label} title={hint} tabIndex={0}
+      aria-valuenow={current} aria-valuemin={bounds.min} aria-valuemax={bounds.max}
+      className={`round-edge grows-${grows}`} onPointerDown={startDrag} onKeyDown={step} onDoubleClick={() => onResize(undefined)}
+    />
+  );
 }
 
 /**

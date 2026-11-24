@@ -23,6 +23,8 @@ export const en: Messages = {
         foldOutline: 'Fold the questions', unfoldOutline: 'Unfold the questions',
         foldSide: 'Fold the right column', unfoldSide: 'Unfold the right column',
         hideTurn: 'Hide the agent’s text', showTurn: 'Show the agent’s text',
+        resizeOutline: 'Resize the questions', resizeSide: 'Resize the right column',
+        resizeHint: 'Drag or use ← → to resize · double click for the starting width',
       },
       outline: 'Questions',
       progress: (answered: number, total: number) => `${answered}/${total} answered`,

@@ -22,6 +22,8 @@ export const it = {
         foldOutline: 'Comprimi le domande', unfoldOutline: 'Espandi le domande',
         foldSide: 'Comprimi la colonna destra', unfoldSide: 'Espandi la colonna destra',
         hideTurn: 'Nascondi il testo dell’agente', showTurn: 'Mostra il testo dell’agente',
+        resizeOutline: 'Ridimensiona le domande', resizeSide: 'Ridimensiona la colonna destra',
+        resizeHint: 'Trascina o usa ← → per ridimensionare · doppio clic per la larghezza iniziale',
       },
       outline: 'Domande',
       progress: (answered: number, total: number) => `${answered}/${total} con risposta`,
