@@ -370,7 +370,19 @@ describe('reading one question comfortably (#97)', () => {
   });
 });
 
-/** A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. */
+/**
+ * The round on screen and listening to the window's width. It subscribes in an effect, which under load can run after
+ * the article is on screen: a resize or a count before then misses the page's listeners.
+ */
+async function shownAt(browser: ReturnType<typeof viewport>) {
+  await screen.findByRole('article');
+  await waitFor(() => expect(browser.subscriptions()).toBeGreaterThanOrEqual(2));
+}
+
+/**
+ * A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. It counts
+ * the listeners on the width only: the colour scheme's belong to the preferences, mounted again when the page appears.
+ */
 function viewport(width: number) {
   const lists = new Set<{ query: string; listeners: Set<() => void> }>();
   let subscribed = 0;
@@ -380,7 +392,7 @@ function viewport(width: number) {
     lists.add(list);
     return {
       get matches() { return matches(query); }, media: query,
-      addEventListener: (_: string, f: () => void) => { subscribed++; list.listeners.add(f); }, removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
+      addEventListener: (_: string, f: () => void) => { if (/max-width/.test(query)) subscribed++; list.listeners.add(f); }, removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
     };
   }) as unknown as typeof window.matchMedia;
   return { resize: (next: number) => { width = next; act(() => lists.forEach(l => l.listeners.forEach(f => f()))); }, subscriptions: () => subscribed };
@@ -393,7 +405,7 @@ describe('the round beside a terminal (#97)', () => {
     const user = userEvent.setup();
     const browser = viewport(1400);
     render(<LocalPage fetch={fakeServer().fetch}/>);
-    await screen.findByRole('article');
+    await shownAt(browser);
     expect(within(outline()).getAllByRole('button')[1]).toHaveTextContent('Q2 · Who recognises a round?no answer');
 
     browser.resize(1100);
@@ -412,7 +424,7 @@ describe('the round beside a terminal (#97)', () => {
     const user = userEvent.setup();
     const browser = viewport(1400);
     render(<LocalPage fetch={fakeServer().fetch}/>);
-    await screen.findByRole('article');
+    await shownAt(browser);
     const before = browser.subscriptions();
     await user.keyboard('yjy');
     expect(browser.subscriptions()).toBe(before);

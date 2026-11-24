@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -314,6 +314,22 @@ describe('a side chat on one question (#100)', () => {
     const again = client(await start({ dataDir, runners: { sideChat: fakeClaude().runner } }));
     expect((await again.sideChats(1)).sideChats).toEqual([
       { question: 1, turns: [expect.objectContaining({ ask: 'Before the restart.', status: 'failed' })] },
+    ]);
+  });
+
+  it('has written a reply that finished before it stopped, so a restart shows it done', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir, runners: { sideChat: fakeClaude().runner } });
+    const api = client(first);
+    await api.turn(ROUND);
+    await api.ask(1, 1, 'Just before the stop.');
+    await settled(api);
+    await first.stop();
+
+    // Read at once, as the next server would: a write still on its way has lost the reply.
+    const [file] = readdirSync(dataDir, { recursive: true, encoding: 'utf8' }).filter(x => x.endsWith('side-chat-1-1.json'));
+    expect(JSON.parse(readFileSync(join(dataDir, file), 'utf8')).turns).toEqual([
+      expect.objectContaining({ ask: 'Just before the stop.', status: 'done', reply: 'Beside the rounds.' }),
     ]);
   });
 

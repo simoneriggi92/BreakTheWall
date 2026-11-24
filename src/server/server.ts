@@ -162,7 +162,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   let stopping: Promise<void> | undefined;
   const stop = () => stopping ??= (async () => {
     clearInterval(idle);
-    sideChats.stop();
+    // Before the lock goes: the next server reads the side chats back as soon as it holds it.
+    await sideChats.stop();
     specs.close();
     releaseLock(options.dataDir, own);
     await close(server);

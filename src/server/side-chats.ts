@@ -350,8 +350,15 @@ export function sideChatRoutes(deps: SideChatDeps) {
 
   return {
     handle,
-    /** The server stops: every reply still running stops with it. */
-    stop() { for (const x of running.keys()) x.abort(); },
+    /**
+     * The server stops: every reply still running stops with it, and this settles once every change already made has
+     * landed on disk. A reply that finished just before is otherwise still `running` in its file, and the next server
+     * reads it back as failed.
+     */
+    async stop() {
+      for (const x of running.keys()) x.abort();
+      await writes.settle(() => true);
+    },
     /**
      * The session was deleted: its replies still running stop, and its side chats are forgotten once their last writes
      * have landed, so nothing is written back into its folder and a round of the same number starts with none.
