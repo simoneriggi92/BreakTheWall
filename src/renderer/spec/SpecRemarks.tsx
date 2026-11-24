@@ -75,6 +75,8 @@ export function useSpecRemarks(id: string, refresh: unknown, bridge: SpecRemarks
     setSending(true);
     setFailure(undefined);
     try {
+      // A save still on its way would land after the Send and put what it sends back into the draft (#105).
+      await saver.settle();
       setJustSent(await bridge.sendSpecRemarks(id, latest.current, language));
       take(await bridge.getSpecRemarks(id), true);
     } catch (error) {

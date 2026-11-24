@@ -109,6 +109,21 @@ describe('sent remarks stay as sent (#105)', () => {
     expect((await again.sendRemarks(spec.id, { generalNote: '', remarks: [marked] })).status).toBe(400);
   });
 
+  it('keeps a save that left before the Send from bringing sent remarks back into the draft', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start());
+    const spec = await handedOver(api, cwd);
+    const asked = quote(1, 4, 4, 'loses water', 'Why?');
+    const draft = { generalNote: 'One more thing.', remarks: [asked] };
+    expect((await api.sendRemarks(spec.id, draft)).status).toBe(200);
+    // The page's save of the same draft, in flight when Send went out, lands after it.
+    const late = quote(1, 8, 8, 'cold room', 'And this?');
+    expect((await api.saveRemarks(spec.id, { generalNote: 'One more thing.', remarks: [asked, late] })).status).toBe(204);
+    expect((await api.remarks(spec.id)).draft).toEqual({ generalNote: '', remarks: [late] });
+    // What goes out next is only what was not sent yet.
+    expect((await (await api.sendRemarks(spec.id, (await api.remarks(spec.id)).draft)).json()).message).not.toContain('loses water');
+  });
+
   it('refuses a remark outside the version\'s lines, on a version the spec does not have, or on an id that names no spec', async () => {
     const cwd = project({ 'docs/spec.md': BAKERY });
     const api = serverClient(await start());

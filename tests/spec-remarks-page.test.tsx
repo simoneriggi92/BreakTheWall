@@ -32,9 +32,11 @@ const noRemarks = (): SpecRemarksView => ({ draft: { generalNote: '', remarks: [
 
 type Request = { method: string; url: string; body?: unknown };
 /** The local server as the page sees it: the specs, their explorations and remarks, the latest round, and a poll. */
-function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; round?: RoundView; riding?: SpecRemarksSection[]; explorations: Exploration[]; sendReply?: () => Response }) {
+function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; round?: RoundView; riding?: SpecRemarksSection[]; explorations: Exploration[]; sendReply?: () => Response; holdSaves?: boolean }) {
   let remarks = initial.remarks ?? noRemarks();
   const requests: Request[] = [];
+  /** Saves held as a slow network would hold them, until the test lets them land. */
+  const heldSaves: (() => void)[] = [];
   const polls = new Set<(reply: Response) => void>();
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input), method = init?.method ?? 'GET';
@@ -51,6 +53,7 @@ function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; rou
     }
     if (/^\/api\/specs\/[^/]+\/remarks$/.test(url)) {
       if (method === 'GET') return Response.json(remarks);
+      if (initial.holdSaves) await new Promise<void>(land => heldSaves.push(land));
       remarks = { ...remarks, draft: JSON.parse(String(init?.body)) };
       return new Response(null, { status: 204 });
     }
@@ -66,7 +69,8 @@ function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; rou
     });
     return new Response('{}', { status: 404 });
   });
-  return { fetch: fetch as unknown as typeof window.fetch, requests, saved: () => requests.filter(x => x.method === 'PUT').at(-1)?.body };
+  const landSaves = () => { for (const land of heldSaves.splice(0)) land(); };
+  return { fetch: fetch as unknown as typeof window.fetch, requests, landSaves, saved: () => requests.filter(x => x.method === 'PUT').at(-1)?.body };
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
@@ -164,6 +168,26 @@ describe('one Send returns every remark so far (#105)', () => {
     expect(sent).toHaveTextContent('Why?');
     expect(within(sent).queryByRole('textbox')).toBeNull();
     expect(within(panel()).queryByRole('textbox', { name: 'Remark on line 4 «loses water»' })).toBeNull();
+  });
+
+  it('lets a save still on its way land before Send, and saves nothing after it', async () => {
+    const user = userEvent.setup();
+    const draft = { generalNote: '', remarks: [{ version: 1, from: 4, to: 4, passage: 'loses water', text: 'Why?' }] };
+    const server = fakeServer({ specs: [version()], remarks: { ...noRemarks(), draft }, explorations: [await explored('x-one')], holdSaves: true });
+    render(<LocalPage fetch={server.fetch}/>);
+    await source();
+    await user.click(screen.getByRole('button', { name: 'Remarks · 1' }));
+    // The first letter's save is on its way; the later ones wait behind it.
+    await user.type(within(panel()).getByRole('textbox', { name: 'General note' }), 'Thin.');
+    await user.click(within(panel()).getByRole('button', { name: 'Send' }));
+    expect(server.requests.some(x => x.method === 'POST')).toBe(false);
+    server.landSaves();
+    expect(await within(panel()).findByText('Sent. The agent receives exactly this message.')).toBeInTheDocument();
+    server.landSaves();
+    await new Promise(done => setTimeout(done, 20));
+    const writes = server.requests.filter(x => x.method !== 'GET').map(x => x.method);
+    expect(writes.at(-1)).toBe('POST');
+    expect(server.requests.find(x => x.method === 'POST')?.body).toEqual({ draft: { ...draft, generalNote: 'Thin.' }, language: 'en' });
   });
 
   it('shows remarks sent to an ended session as queued, with the command that resumes it', async () => {
