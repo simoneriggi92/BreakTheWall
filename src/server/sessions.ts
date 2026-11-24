@@ -8,6 +8,7 @@ import { isAbsolute, join } from 'node:path';
 import { sessionFolders, WriteQueue } from './files';
 import { noContent, readJson, send } from './http';
 import { projectsDir, sessionFolder, type RoundStore } from './rounds';
+import { modelSchema } from './side-chats';
 
 /**
  * Sessions across projects (#102): the history column the page reads, a past round it opens, a session the person
@@ -17,6 +18,7 @@ export interface SessionsContext {
   rounds: RoundStore;
   labels: SessionLabels;
   transcripts: SessionTranscripts;
+  models: SessionModels;
   /** The side chats, whose replies still running stop when their session is deleted (#103). */
   sideChats: { forget(session: string): Promise<void> };
   /** The registrations the mod renews, by session id: a session is live while its lease runs. */
@@ -38,7 +40,7 @@ const SESSION_PATH = /^\/api\/sessions\/([^/]+)$/;
 const PAST_ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})$/;
 
 export async function handleSessions(req: IncomingMessage, res: ServerResponse, path: string, context: SessionsContext): Promise<boolean> {
-  const { rounds, labels, transcripts, sideChats, leases, update, pageChanged } = context;
+  const { rounds, labels, transcripts, models, sideChats, leases, update, pageChanged } = context;
   if (req.method === 'GET' && path === '/api/history') {
     send(res, 200, history(context));
     return true;
@@ -73,7 +75,7 @@ export async function handleSessions(req: IncomingMessage, res: ServerResponse, 
   if (req.method === 'DELETE' && sessionPath) {
     const session = sessionPath[1];
     // A reply still streaming, or a label or transcript still being written, would put a file back into the folder.
-    if (sessionIdSchema.safeParse(session).success && (await Promise.all([labels.forget(session), transcripts.forget(session), sideChats.forget(session)]), await rounds.deleteSession(session))) {
+    if (sessionIdSchema.safeParse(session).success && (await Promise.all([labels.forget(session), transcripts.forget(session), models.forget(session), sideChats.forget(session)]), await rounds.deleteSession(session))) {
       pageChanged();
       noContent(res);
     } else send(res, 404, { error: 'unknown' });
@@ -220,6 +222,69 @@ export class SessionTranscripts {
   async forget(session: string): Promise<void> {
     await this.writes.settle(key => key === session);
     this.paths.delete(session);
+    this.kept.delete(session);
+  }
+}
+
+const storedModelsSchema = z.strictObject({
+  version: z.literal(1),
+  session: sessionIdSchema,
+  cwd: z.string().min(1).max(4096),
+  model: modelSchema.optional(),
+  sideChatModel: modelSchema.optional(),
+});
+type Models = Pick<z.infer<typeof storedModelsSchema>, 'model' | 'sideChatModel'>;
+
+/**
+ * The models each session registered with (#100): the session's own and the plugin's `sideChatModel`, kept past its
+ * lease and across a restart, so a side chat on an ended session still runs on its model. Kept as `models.json` beside
+ * the rounds once the session has a folder, like its transcript's path.
+ */
+export class SessionModels {
+  private models = new Map<string, Models>();
+  private kept = new Map<string, string>();
+  private writes = new WriteQueue();
+
+  private constructor(private dir: string, private rounds: RoundStore) {}
+
+  static async open(dataDir: string, rounds: RoundStore): Promise<SessionModels> {
+    const store = new SessionModels(projectsDir(dataDir), rounds);
+    for (const folder of await sessionFolders(store.dir)) {
+      try {
+        const { session, model, sideChatModel } = storedModelsSchema.parse(JSON.parse(await readFile(join(folder, 'models.json'), 'utf8')));
+        const models = { model, sideChatModel };
+        store.models.set(session, models);
+        store.kept.set(session, JSON.stringify(models));
+      } catch { /* None, or one that does not parse: side chats run on `claude`'s default until the session registers. */ }
+    }
+    return store;
+  }
+
+  /** The mod registered the session, with the models it runs on. */
+  async remember(session: string, models: Models): Promise<void> {
+    this.models.set(session, { model: models.model, sideChatModel: models.sideChatModel });
+    await this.keep(session);
+  }
+
+  /** Kept on disk once the session has a folder: after its first round or free block, or at once when it has one. */
+  async keep(session: string): Promise<void> {
+    const models = this.models.get(session);
+    const cwd = this.rounds.cwdOf(session);
+    if (models === undefined || cwd === undefined || this.kept.get(session) === JSON.stringify(models)) return;
+    this.kept.set(session, JSON.stringify(models));
+    const stored = { version: 1 as const, session, cwd, ...models };
+    await this.writes.write(session, join(sessionFolder(this.dir, stored), 'models.json'), stored);
+  }
+
+  /** The model a side chat of the session runs on: the plugin's setting, else the session's; none when unknown. */
+  sideChatModel(session: string): string | undefined {
+    const x = this.models.get(session);
+    return x?.sideChatModel ?? x?.model;
+  }
+
+  async forget(session: string): Promise<void> {
+    await this.writes.settle(key => key === session);
+    this.models.delete(session);
     this.kept.delete(session);
   }
 }

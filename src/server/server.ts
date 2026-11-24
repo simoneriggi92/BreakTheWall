@@ -12,7 +12,7 @@ import type { GhRunner } from './gh';
 import { noContent, readJson, send, TRANSCRIPT_GONE } from './http';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type DeliveryKind, type RoundRefusal } from './rounds';
-import { handleSessions, SessionLabels, SessionTranscripts, transcriptPathSchema } from './sessions';
+import { handleSessions, SessionLabels, SessionModels, SessionTranscripts, transcriptPathSchema } from './sessions';
 import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
 import { specRemarkRoutes } from './spec-remarks';
 import { openSpecs } from './specs';
@@ -132,11 +132,10 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const transcripts = await SessionTranscripts.open(options.dataDir, rounds);
   /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
   const update: { version: string | null } = { version: null };
-  /** The models each session registered with, kept past its lease, so a side chat on an ended session still runs on its model. */
-  const models = new Map<string, { model?: string; sideChatModel?: string }>();
+  const models = await SessionModels.open(options.dataDir, rounds);
   const sideChats = sideChatRoutes({
     dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
-    modelOf: session => { const x = models.get(session); return x?.sideChatModel ?? x?.model; },
+    modelOf: session => models.sideChatModel(session),
     readOnly: session => transcripts.gone(session),
   });
   const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: pageChanged, rounds });
@@ -196,7 +195,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       const { id, cwd, model, sideChatModel, transcript } = registration.data;
       const resumed = !live(id);
       sessions.set(id, { cwd, until: Date.now() + sessionTtlMs });
-      models.set(id, { model, sideChatModel });
+      await models.remember(id, { model, sideChatModel });
       if (transcript !== undefined) await transcripts.remember(id, transcript);
       // A session coming back with `claude --resume`: what it had queued is no longer shown as waiting.
       if (resumed) pageChanged();
@@ -220,14 +219,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       const round = parseRound(text);
       if (round) {
         const stored = await rounds.add(session, cwd, round);
-        await transcripts.keep(session);
+        await kept(session);
         pageChanged();
         return send(res, 200, { round: stored.number });
       }
       // A turn with nothing to read asks the person nothing.
       const free = text.trim() === '' ? null : await rounds.addTurn(session, cwd, text);
       if (!free) return send(res, 200, { round: null });
-      await transcripts.keep(session);
+      await kept(session);
       pageChanged();
       return send(res, 200, { round: null, free: free.number });
     }
@@ -308,11 +307,16 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
-    if (await handleSessions(req, res, path, { rounds, labels, transcripts, sideChats, leases: sessions, live, update, pageChanged })) return;
+    if (await handleSessions(req, res, path, { rounds, labels, transcripts, models, sideChats, leases: sessions, live, update, pageChanged })) return;
     if (await sideChats.handle(req, res, path)) return;
     if (await remarks.handle(req, res, path)) return;
     if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
+  }
+
+  /** The session has a folder now: how its mod registered it is kept there too. */
+  async function kept(session: string) {
+    await Promise.all([transcripts.keep(session), models.keep(session)]);
   }
 
   /** A message waits for the session: a poll already waiting takes it, and the page shows it as sent. */

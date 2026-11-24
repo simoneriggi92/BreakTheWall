@@ -7,6 +7,7 @@ import { spawnSideChat, type SideChatRun } from '../src/server/side-chats';
 import { CWD, serverClient as client, SESSION, useLocalServers } from './local-server-harness';
 
 const { folder, start } = useLocalServers();
+const OTHER = 'c0ffee00-0000-4000-8000-000000000002';
 
 const ROUND = `I read the server. Two decisions are open.
 
@@ -265,6 +266,26 @@ describe('a side chat on one question (#100)', () => {
     await api.ask(1, 2, 'And now?');
     await settled(api);
     expect(claude.runs[1].args.slice(-2)).toEqual(['--model', 'haiku']);
+  });
+
+  it('keeps the models a session registered with across a restart', async () => {
+    const dataDir = folder();
+    const server = await start({ dataDir });
+    const first = client(server);
+    // Registered before the session's first round, as the mod does on `session.start`.
+    await first.register(SESSION, CWD, { model: 'claude-opus-5-5', sideChatModel: 'haiku' });
+    await first.turn(ROUND);
+    await first.register(OTHER, CWD, { model: 'claude-opus-5-5' });
+    await first.turn(ROUND, OTHER);
+    await server.stop();
+
+    const claude = fakeClaude();
+    const again = client(await start({ dataDir, runners: { sideChat: claude.runner } }));
+    await again.ask(1, 1, 'Which model?');
+    await settled(again);
+    await again.ask(1, 1, 'And here?', OTHER);
+    await until(() => claude.runs.length === 2);
+    expect(claude.runs.map(x => x.args.slice(-2))).toEqual([['--model', 'haiku'], ['--model', 'claude-opus-5-5']]);
   });
 
   it('never passes a model that would read as an option, and still registers the session', async () => {
