@@ -5,7 +5,7 @@ import type { RoundView } from '../src/core/round-answers';
 import { LocalPage } from '../src/renderer/LocalPage';
 
 // jsdom cannot lay out a Mermaid diagram: the renderer is replaced, and a diagram whose code says "broken" fails.
-const renderDiagram = vi.hoisted(() => vi.fn(async (code: string) => {
+const renderDiagram = vi.hoisted(() => vi.fn(async (code: string, _theme: string, _box: HTMLElement) => {
   if (code.includes('broken')) throw new Error('Parse error');
   return `<svg role="img" aria-label="drawn: ${code.split('\n')[0]}"><text>diagram</text></svg>`;
 }));
@@ -253,7 +253,10 @@ describe('reading one question comfortably (#97)', () => {
     render(<LocalPage fetch={fakeServer(WITH_DIAGRAM).fetch}/>);
     const question = await screen.findByRole('article');
     await waitFor(() => expect(within(question).getByRole('img', { name: 'drawn: flowchart LR' })).toBeInTheDocument());
-    expect(renderDiagram).toHaveBeenCalledWith('flowchart LR\n  Mod --> Server\n', expect.stringMatching(/^(paper|blueprint)$/));
+    expect(renderDiagram).toHaveBeenCalledWith('flowchart LR\n  Mod --> Server\n', expect.stringMatching(/^(paper|blueprint)$/), expect.any(HTMLElement));
+    // Measured where it is shown (#114), inside the question.
+    const call = renderDiagram.mock.calls.find(([code]) => code.startsWith('flowchart'))!;
+    expect(call[2]).toBe(within(question).getByRole('img', { name: 'drawn: flowchart LR' }).parentElement);
     expect(await within(question).findByText('This diagram does not draw: its code is shown instead.')).toBeInTheDocument();
     expect(question).toHaveTextContent('broken diagram');
   });

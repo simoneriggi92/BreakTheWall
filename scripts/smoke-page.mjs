@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -68,7 +69,32 @@ try {
   const line = await settle(stray.read, 'document.querySelector("main.secretless")?.textContent');
   if (!line?.includes('/break-the-wall')) fail('a tab without the secret does not say to open it from Claude Code');
 
-  if (!process.exitCode) console.log(`smoke:page: the page opens with the secret (${label}), and a tab without it says: ${line}`);
+  // A round with diagrams (#114): Mermaid measures labels while the production policy refuses its styles, so a label
+  // measured in one font and shown in another is clipped. Only a real browser under that policy shows it. Every HTML
+  // label counts: edge labels in a flowchart, bold titles in a class diagram.
+  const turn = await fetch(`${base}/api/turns`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-btw-secret': server.secret },
+    body: JSON.stringify({ session: randomUUID(), cwd: process.cwd(), text: readFileSync('scripts/fixtures/preview-round.md', 'utf8'), reason: 'answer' }),
+  });
+  if (!turn.ok) throw new Error(`the server refused the preview round (${turn.status})`);
+  // Q1 holds a flowchart and Q3 a class diagram; only the question in focus is drawn.
+  const drawnLabels = () => settle(opened.read, `(() => {
+    const labels = [...document.querySelectorAll('.md-diagram.drawn foreignObject')].filter(fo => fo.textContent.trim());
+    if (!labels.length) return null;
+    return labels.map(fo => {
+      const box = fo.getBoundingClientRect(), inner = fo.querySelector('span, p') ?? fo.firstElementChild, text = inner?.getBoundingClientRect();
+      return { label: fo.textContent.trim(), clipped: !text || Math.max(text.width, inner.scrollWidth) > box.width + 0.5 || text.height > box.height + 0.5 };
+    });
+  })()`);
+  const first = await drawnLabels();
+  await opened.read(`document.querySelectorAll('nav .round-outline-item')[2]?.click()`);
+  await wait(200);
+  const third = first && await drawnLabels();
+  const labels = first && third && [...first, ...third];
+  if (!labels) fail('the round\'s diagrams did not draw');
+  else if (labels.some(l => l.clipped)) fail(`diagram labels are clipped: ${labels.filter(l => l.clipped).map(l => l.label).join(', ')}`);
+
+  if (!process.exitCode) console.log(`smoke:page: the page opens with the secret (${label}), a tab without it says: ${line}, and a round's diagrams draw ${labels.length} labels whole`);
   opened.close(); stray.close();
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
