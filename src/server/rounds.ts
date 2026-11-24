@@ -17,8 +17,10 @@ import { entries, sessionFolders, WriteQueue } from './files';
  * and for the phase (`phase.json`), rewritten whole and replaced atomically on every change, and checked with Zod when
  * read back: a file that does not parse is left alone.
  */
+/** The longest message a round, a free block or remarks keep: a Send that would word a longer one is refused. */
+export const MESSAGE_MAX = 8_000_000;
 const sentSchema = z.strictObject({
-  message: z.string().max(2_000_000),
+  message: z.string().max(MESSAGE_MAX),
   at: z.iso.datetime(),
   /** When the mod confirmed it submitted it to the session; null while it waits or is in flight. */
   deliveredAt: z.iso.datetime().nullable(),

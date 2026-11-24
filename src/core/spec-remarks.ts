@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Question } from './round';
-import { asText, messageLanguageSchema, quoted, returnMessage, type Draft, type MessageLanguage } from './round-answers';
+import { append, asText, messageLanguageSchema, quoted, returnMessage, type Draft, type MessageLanguage } from './round-answers';
 
 /**
  * Remarks on a handed-over spec (#105): what the person notices while exploring it, anchored to the lines of one
@@ -132,7 +132,8 @@ export function specRemarksMessage(section: SpecRemarksSection, language: Messag
     for (const remark of own) {
       const anchor = remark.missing ? words.missing : quoted(remark.passage ?? '');
       const [first, ...rest] = remark.text.trim().split(/\r?\n/);
-      lines.push(`- ${words.lines(remark.from, remark.to)} ${anchor} — ${first}`, ...rest.map(line => line.trim() ? `  ${line}` : ''));
+      lines.push(`- ${words.lines(remark.from, remark.to)} ${anchor} — ${first}`);
+      append(lines, rest.map(line => line.trim() ? `  ${line}` : ''));
     }
   });
   return lines.join('\n');

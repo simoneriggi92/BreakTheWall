@@ -11,7 +11,7 @@ import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import type { GhRunner } from './gh';
 import { noContent, readJson, send, TRANSCRIPT_GONE } from './http';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
-import { RoundStore, type DeliveryKind, type RoundRefusal } from './rounds';
+import { MESSAGE_MAX, RoundStore, type DeliveryKind, type RoundRefusal } from './rounds';
 import { handleSessions, SessionLabels, SessionModels, SessionTranscripts, transcriptPathSchema } from './sessions';
 import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
 import { specRemarkRoutes } from './spec-remarks';
@@ -88,7 +88,11 @@ const turnSchema = z.strictObject({
 });
 /** A turn's text, with room for the JSON escaping of a long round. */
 const MAX_TURN_BYTES = 4 * 1024 * 1024;
-const MAX_ANSWER_BYTES = 1024 * 1024;
+/**
+ * A draft or a Send: room for a side chat's longest reply attached whole, at up to six bytes a character as JSON
+ * escapes a control character, and the rest of the draft beside it.
+ */
+const MAX_ANSWER_BYTES = 8 * 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
 const responseBodySchema = z.strictObject({ response: responseSchema });
 /** The injection marker (#99), with the round skill that started and its arguments, which name the session (#102). */
@@ -292,6 +296,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         // what the agent receives. Remarks on a spec written while the round awaited answers ride after them (#105).
         const riding = rounds.awaiting(session) === Number(number) ? remarks.riding(session) : [];
         const message = answersWithRemarks(questions, body.data.draft, body.data.language, riding.map(x => x.section));
+        // Kept longer, the round would not read back at the next start.
+        if (message.length > MESSAGE_MAX) return send(res, 400, { error: 'too-long' });
         const refused = await rounds.send(session, Number(number), body.data.draft, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
         await remarks.rodeWith(session, Number(number), riding);

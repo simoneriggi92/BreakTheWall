@@ -22,6 +22,9 @@ export const remarkSchema = z.strictObject({
 }).refine(x => x.end > x.start);
 export type Remark = z.infer<typeof remarkSchema>;
 
+/** The longest reply a side chat keeps (#100), and so the longest one an answer takes attached whole (#101). */
+export const SIDE_CHAT_REPLY_MAX = 1_000_000;
+
 /**
  * One exchange of a question's side chat the person attached to their answer (#101): what they asked, the passage
  * they asked about if any, and the reply, copied whole from the side chat when attached. Kept in the draft, so the page's
@@ -32,7 +35,7 @@ export const attachedSchema = z.strictObject({
   turn: z.number().int().min(1),
   ask: z.string().max(20_000),
   passage: z.string().max(5_000).optional(),
-  reply: z.string().max(200_000),
+  reply: z.string().max(SIDE_CHAT_REPLY_MAX),
 });
 export type Attached = z.infer<typeof attachedSchema>;
 
@@ -145,21 +148,22 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
     const title = `**Q${question.number} · ${question.title}**`;
     lines.push(word ? `${title} ${word}` : title);
     const note = answer?.note.trim();
-    if (note) lines.push(...indented(note, '  '));
+    if (note) append(lines, indented(note, '  '));
     // A remark with no words yet is only a mark on the page: a bare quote would ask the agent to guess why.
     for (const remark of remarksOf(answer).filter(x => x.text.trim() !== '')) {
       const [first, ...rest] = remark.text.trim().split(/\r?\n/);
-      lines.push(`  - ${quoted(remark.passage)} — ${first}`, ...rest.flatMap(line => indented(line, '    ')));
+      lines.push(`  - ${quoted(remark.passage)} — ${first}`);
+      append(lines, rest.flatMap(line => indented(line, '    ')));
     }
     const words = SIDE_CHAT_WORDS[language];
     for (const x of attachedOf(answer)) {
       const [ask, ...askRest] = x.ask.trim().split(/\r?\n/);
       const about = x.passage ? `${quoted(x.passage)} — ` : '';
       const [reply, ...replyRest] = x.reply.trim().split(/\r?\n/);
-      lines.push(
-        `  - ${words.question} ${about}${ask}`, ...askRest.flatMap(line => indented(line, '    ')),
-        `    ${words.reply} ${reply}`, ...replyRest.flatMap(line => indented(line, '    ')),
-      );
+      lines.push(`  - ${words.question} ${about}${ask}`);
+      append(lines, askRest.flatMap(line => indented(line, '    ')));
+      lines.push(`    ${words.reply} ${reply}`);
+      append(lines, replyRest.flatMap(line => indented(line, '    ')));
     }
   }
   return asText(lines.join('\n'));
@@ -173,5 +177,13 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
 export const asText = (message: string) => startsAsCommand(message) ? `\\${message.trimStart()}` : message;
 /** Whether Claude Code would take the text for a command: the page warns of the escape with the same rule. */
 export const startsAsCommand = (text: string) => /^[/!]/.test(text.trimStart());
+
+/**
+ * Adds every line, one at a time: a reply attached whole can run to hundreds of thousands of lines, more arguments
+ * than a spread into `push` can pass.
+ */
+export function append(lines: string[], more: readonly string[]) {
+  for (const line of more) lines.push(line);
+}
 
 const indented = (text: string, by: string) => text.split(/\r?\n/).map(line => line.trim() ? `${by}${line}` : '');

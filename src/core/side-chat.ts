@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { remarkPartSchema } from './round-answers';
+import { remarkPartSchema, SIDE_CHAT_REPLY_MAX } from './round-answers';
 
 /**
  * Side chats (#100): one per question of a round, each a list of turns the person asked and the replies a read-only
@@ -27,7 +27,7 @@ export const sideChatTurnSchema = z.strictObject({
   /** Absent on a turn that asks about the whole question, and on every turn kept before #101. */
   passage: sideChatPassageSchema.optional(),
   /** The reply as it streamed; once done, the fork's final answer. */
-  reply: z.string().max(1_000_000),
+  reply: z.string().max(SIDE_CHAT_REPLY_MAX),
   /** What the reply read, in order: a file (`src/a.ts`, `src/a.ts:10-40`) or a search (`grep "x" in src`, `glob "*.ts"`). */
   files: z.array(z.string().max(4_200)).max(500),
   status: z.enum(['running', 'done', 'failed']),
