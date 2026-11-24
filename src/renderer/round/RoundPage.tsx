@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
-import { answerKind, answerOf, attachedOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, returnMessage, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
+import { answerKind, answerOf, attachedOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { SideChatPassage } from '../../core/side-chat';
+import { answersWithRemarks, type SpecRemarksSection } from '../../core/spec-remarks';
 import type { RoundBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
@@ -18,11 +19,13 @@ import { SideChat, useSideChats } from './SideChat';
  * of an ended session still takes answers, which wait queued for `claude --resume <id>`; once Claude Code no longer
  * keeps the session's transcript it is read-only, its side chats too (#103). Every round copies as Markdown.
  */
-export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = false, bridge }: {
+export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = false, riding = NO_RIDING, bridge }: {
   round: RoundView;
   phaseOpen: boolean;
   queued?: boolean;
   transcriptGone?: boolean;
+  /** Remarks on a spec written while this round awaits answers (#105): they ride in its message, after the answers. */
+  riding?: readonly SpecRemarksSection[];
   bridge: RoundBridge;
 }) {
   const { t, language } = usePreferences();
@@ -42,7 +45,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   useEffect(() => { if (round.sent) setDelivered(round.sent.message); }, [round.sent]);
 
   const readOnly = delivered !== null || round.superseded || transcriptGone;
-  const message = delivered ?? returnMessage(round.questions, draft, language);
+  const message = delivered ?? answersWithRemarks(round.questions, draft, language, riding);
   const index = Math.max(0, round.questions.findIndex(q => q.number === focus));
   const question = round.questions[index];
   const answer = answerOf(draft, question);
@@ -371,6 +374,8 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     </div>
   );
 }
+
+const NO_RIDING: readonly SpecRemarksSection[] = [];
 
 /**
  * Where the "Remark" and "Ask here" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts

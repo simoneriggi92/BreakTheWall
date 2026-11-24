@@ -76,6 +76,8 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   /** The specs handed over (#104), read with it; the newest opens unless a later turn came after it, or the person closed it. */
   const [specs, setSpecs] = useState<SpecView[]>([]);
   const [closedSpec, setClosedSpec] = useState<string>();
+  /** The person opened the spec again from a round (#105), to write remarks while the round waits. */
+  const [specOpened, setSpecOpened] = useState(false);
 
   useEffect(() => {
     if (!bridge) return;
@@ -124,8 +126,9 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   if (state === 'open' && bridge) {
     const spec = newestSpec(specs);
     const shownAt = current?.kind === 'round' ? current.round.receivedAt : current?.block.receivedAt;
-    if (spec && spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt)) {
-      return <PreferencesProvider bridge={bridge}><SpecPage specs={specs} bridge={bridge} onClose={() => setClosedSpec(spec.id)}/></PreferencesProvider>;
+    if (spec && (specOpened || (spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt)))) {
+      const close = () => { setSpecOpened(false); setClosedSpec(spec.id); };
+      return <PreferencesProvider bridge={bridge}><SpecPage specs={specs} bridge={bridge} onClose={close}/></PreferencesProvider>;
     }
     if (!current) return <App bridge={bridge}/>;
     const openArrived = () => followNow(held.current);
@@ -148,11 +151,12 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
     // Keyed by what is shown, so a new round or free block starts with its own draft and focus.
     return <PreferencesProvider bridge={bridge}>
       {current.kind === 'round'
-        ? <RoundPage key={`round/${current.round.session}/${current.round.number}`} round={current.round} phaseOpen={current.phaseOpen} queued={current.queued} transcriptGone={current.transcriptGone} bridge={bridge}/>
+        ? <RoundPage key={`round/${current.round.session}/${current.round.number}`} round={current.round} phaseOpen={current.phaseOpen} queued={current.queued} transcriptGone={current.transcriptGone} riding={current.riding} bridge={bridge}/>
         : <FreeBlockPage key={`free/${current.block.session}/${current.block.number}`} block={current.block} phaseOpen={current.phaseOpen} queued={current.queued} transcriptGone={current.transcriptGone} bridge={bridge}/>}
       {historyOpen && history && <SessionHistory history={history} shown={shownRound} bridge={bridge} onOpen={openRound} onDeleted={deleted} onClose={() => setHistoryOpen(false)}/>}
       <div className="page-dock">
         {!historyOpen && history && history.projects.length > 0 && <HistoryToggle onOpen={() => setHistoryOpen(true)}/>}
+        {spec && <SpecToggle title={spec.title} onOpen={() => setSpecOpened(true)}/>}
         <PageNotices arrived={arrived?.kind ?? null} project={arrivedProject ? projectName(arrivedProject) : null} update={history?.update ?? null} onOpen={openArrived}/>
       </div>
     </PreferencesProvider>;
@@ -164,6 +168,12 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
 function HistoryToggle({ onOpen }: { onOpen(): void }) {
   const { t } = usePreferences();
   return <button type="button" className="subtle page-history-toggle" aria-expanded={false} onClick={onOpen}>{t.page.history.open}</button>;
+}
+
+/** The newest spec, opened again from a round. */
+function SpecToggle({ title, onOpen }: { title: string; onOpen(): void }) {
+  const { t } = usePreferences();
+  return <button type="button" className="subtle page-history-toggle" onClick={onOpen}>{t.page.spec.open(title)}</button>;
 }
 
 const viewKey = (view: CurrentView | null) => view && (view.kind === 'round' ? `round/${view.round.session}/${view.round.number}` : `free/${view.block.session}/${view.block.number}`);
