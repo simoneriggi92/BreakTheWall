@@ -6,6 +6,7 @@ import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core
 import { historySchema, type History } from '../core/session-history';
 import { sideChatsViewSchema, type SideChatPassage, type SideChatsView } from '../core/side-chat';
 import { specListSchema, type SpecView } from '../core/spec';
+import { specRemarksViewSchema, type SpecRemarksDraft, type SpecRemarksView } from '../core/spec-remarks';
 import { browserBridge } from './storage';
 
 /**
@@ -48,6 +49,14 @@ export interface PageBridge extends DesktopBridge {
   cancelSpec(id: string): Promise<void>;
   /** A saved exploration, unchecked: the page validates it before showing it. Null when the server has none. */
   findExploration(key: { id: string; revision: string }): Promise<unknown | null>;
+  /** The remarks on a spec (#105), named by any of its versions: the draft, what was sent, the round they ride with. */
+  getSpecRemarks(id: string): Promise<SpecRemarksView>;
+  saveSpecRemarks(id: string, draft: SpecRemarksDraft): Promise<void>;
+  /**
+   * One Send for every remark so far; resolves to the message exactly as the agent receives it. Rejects with
+   * `RidesError` when a round awaits answers: the remarks then go with that round's message.
+   */
+  sendSpecRemarks(id: string, draft: SpecRemarksDraft, language: MessageLanguage): Promise<string>;
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
@@ -56,13 +65,19 @@ export type SideChatBridge = Pick<PageBridge, 'getSideChats' | 'askSideChat'>;
 export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge & SideChatBridge;
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
-export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration'>;
+export type SpecRemarksBridge = Pick<PageBridge, 'getSpecRemarks' | 'saveSpecRemarks' | 'sendSpecRemarks'>;
+export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration'> & SpecRemarksBridge;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
 const explorationReplySchema = z.object({ exploration: z.unknown() });
 
 export class RefusedError extends Error {}
+/** The remarks were not sent alone: a round awaits answers, and they ride in its message. */
+export class RidesError extends Error {
+  constructor(readonly round: number) { super(`The remarks ride with round ${round}.`); }
+}
+const ridesSchema = z.object({ error: z.literal('rides'), round: z.number().int().min(1) });
 /** The server no longer knows this secret: it restarted, or the tab kept an old one. */
 const refused = (reply: Response) => reply.status === 401 || reply.status === 403;
 
@@ -140,6 +155,20 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
       const reply = await call(`/api/explorations/${encodeURIComponent(id)}/${encodeURIComponent(revision)}`);
       if (reply.status === 404) return null;
       return explorationReplySchema.parse(await (await ok(reply)).json()).exploration;
+    },
+    async getSpecRemarks(id) {
+      return specRemarksViewSchema.parse(await (await ok(await call(`/api/specs/${encodeURIComponent(id)}/remarks`))).json());
+    },
+    async saveSpecRemarks(id, draft) {
+      await ok(await call(`/api/specs/${encodeURIComponent(id)}/remarks`, json('PUT', draft)));
+    },
+    async sendSpecRemarks(id, draft, language) {
+      const reply = await call(`/api/specs/${encodeURIComponent(id)}/remarks/send`, json('POST', { draft, language }));
+      if (reply.status === 409) {
+        const rides = ridesSchema.safeParse(await reply.clone().json().catch(() => null));
+        if (rides.success) throw new RidesError(rides.data.round);
+      }
+      return sentReplySchema.parse(await (await ok(reply)).json()).message;
     },
   };
 }

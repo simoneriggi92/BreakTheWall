@@ -118,6 +118,12 @@ export function serverClient(server: LocalServer) {
     /** The saved explorations, and one of them by id and revision. */
     explorations: async () => (await (await call('/api/explorations')).json()).explorations as unknown[],
     exploration: (id: string, revision: string) => call(`/api/explorations/${id}/${revision}`),
+    /** The page's remarks on a spec (#105), named by any of its versions: the draft, what was sent, and the round they ride with. */
+    remarks: async (id: string) => (await call(`/api/specs/${id}/remarks`)).json(),
+    /** The page on every change to the spec's remarks. */
+    saveRemarks: (id: string, draft: unknown) => call(`/api/specs/${id}/remarks`, { method: 'PUT', body: draft }),
+    /** The page's one Send for every remark so far. */
+    sendRemarks: (id: string, draft: unknown, language = 'en') => call(`/api/specs/${id}/remarks/send`, { method: 'POST', body: { draft, language } }),
     /** The page's question in a side chat (#100): answered at once, the reply streams into the round's side chats. */
     ask: (round: number, question: number, ask: string, session = SESSION) => call(`/api/side-chats/${session}/${round}/${question}`, { method: 'POST', body: { ask } }),
     /** The page's "Ask here" on a selected passage (#101): the question quotes the passage. */

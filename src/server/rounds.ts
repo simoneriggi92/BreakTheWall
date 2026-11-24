@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import { draftSchema, emptyDraft, type Draft, type RoundView } from '../core/round-answers';
 import { roundSchema, type Round } from '../core/round';
+import type { SpecRemarksSection } from '../core/spec-remarks';
 import type { HistoryRoundState } from '../core/session-history';
 import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
 
@@ -47,8 +48,23 @@ type StoredRound = z.infer<typeof storedRoundSchema>;
 type StoredFree = z.infer<typeof storedFreeSchema>;
 type Stored = StoredRound | StoredFree;
 type StoredPhase = z.infer<typeof storedPhaseSchema>;
+/**
+ * Remarks on a spec sent alone (#105): no entry the page shows as a round, only a message waiting in the session's
+ * queue, numbered apart (`remarks-<n>.json`).
+ */
+const storedRemarksSchema = z.strictObject({
+  version: z.literal(1),
+  kind: z.literal('remarks'),
+  session: sessionIdSchema,
+  cwd: z.string().min(1).max(4096),
+  number: z.number().int().min(1),
+  sent: sentSchema,
+});
+type StoredRemarks = z.infer<typeof storedRemarksSchema>;
 /** A round or a free block: numbered apart, so the kind and the number together name an entry. */
 export type Kind = 'round' | 'free';
+/** What a delivery answers: a round, a free block, or remarks on a spec sent alone. */
+export type DeliveryKind = Kind | 'remarks';
 type EntryOf<K extends Kind> = K extends 'round' ? StoredRound : StoredFree;
 
 export interface SessionSummary {
@@ -66,6 +82,8 @@ export interface SessionSummary {
 export interface Standing {
   live(session: string): boolean;
   transcriptGone(session: string): boolean;
+  /** The remarks on specs the session handed over that would ride in the message of its round awaiting answers (#105). */
+  riding?(session: string): SpecRemarksSection[];
 }
 const NO_STANDING: Standing = { live: () => false, transcriptGone: () => false };
 
@@ -77,10 +95,12 @@ const orderOf = (x: Stored) => x.order ?? x.number;
 /** How the mod names what it confirms: `round-2`, `free-1`. */
 /** Where the sessions' folders live, by project, inside the server's data folder. */
 export const projectsDir = (dataDir: string) => join(dataDir, 'projects');
-export const deliveryId = (kind: Kind, number: number) => `${kind}-${number}`;
+export const deliveryId = (kind: DeliveryKind, number: number) => `${kind}-${number}`;
 
 export class RoundStore {
   private entries = new Map<string, Stored>();
+  /** Remarks on a spec sent alone, by `<session>/remarks-<n>` (#105). */
+  private remarks = new Map<string, StoredRemarks>();
   private phases = new Map<string, StoredPhase>();
   private writes = new Map<string, Promise<void>>();
   /** Messages handed to a poll and not yet confirmed, until when; kept in memory, so a restart offers them again. */
@@ -143,13 +163,15 @@ export class RoundStore {
     const superseded = this.ofSession(x.session).some(y => orderOf(y) > orderOf(x));
     const sent = x.sent ? { message: x.sent.message, at: x.sent.at } : null;
     const base = { session: x.session, number: x.number, receivedAt: x.receivedAt, sent, superseded };
-    const standing = { phaseOpen, queued: this.queued(x), transcriptGone: this.standing.transcriptGone(x.session) };
+    const transcriptGone = this.standing.transcriptGone(x.session);
+    const standing = { phaseOpen, queued: this.queued(x), transcriptGone };
     if ('round' in x) {
       const round: RoundView = { ...base, ...x.round, draft: x.draft };
-      return { kind: 'round', round, ...standing };
+      const answerable = !x.sent && !superseded && !transcriptGone;
+      return { kind: 'round', round, ...standing, riding: answerable ? this.standing.riding?.(x.session) ?? [] : [] };
     }
     const block: FreeBlockView = { ...base, text: x.text, response: x.response };
-    return { kind: 'free', block, ...standing };
+    return { kind: 'free', block, ...standing, riding: [] };
   }
 
   /** Sent, not yet delivered, and its session ended: it waits for `claude --resume <id>`. */
@@ -199,18 +221,53 @@ export class RoundStore {
   }
 
   /**
+   * Remarks on a spec sent alone (#105): their message waits in the session's queue like a round's answers, under
+   * the next `remarks-<n>`. Returns that number.
+   */
+  async sendRemarks(session: string, cwd: string, message: string): Promise<number> {
+    const number = [...this.remarks.values()].filter(x => x.session === session).reduce((most, x) => Math.max(most, x.number), 0) + 1;
+    const stored: StoredRemarks = { version: 1, kind: 'remarks', session, cwd: this.cwdOf(session) ?? cwd, number, sent: sentNow(message) };
+    this.remarks.set(key(session, 'remarks', number), stored);
+    await this.write(key(session, 'remarks', number), join(this.sessionDir(stored), `remarks-${number}.json`), stored);
+    return number;
+  }
+
+  /** The round of a session that awaits answers: its latest, unsent. Remarks written meanwhile ride in its message (#105). */
+  awaiting(session: string): number | undefined {
+    const latest = this.ofSession(session).reduce<Stored | undefined>((a, b) => !a || orderOf(b) > orderOf(a) ? b : a, undefined);
+    return latest && 'round' in latest && !latest.sent ? latest.number : undefined;
+  }
+
+  /**
+   * Whether a message sent to a session waits for its resume: sent, not delivered, the session ended. False once
+   * delivered, and for a message the store no longer has.
+   */
+  waitsForResume(session: string, kind: DeliveryKind, number: number): boolean {
+    const found = kind === 'remarks' ? this.remarks.get(key(session, kind, number)) : this.entries.get(key(session, kind, number));
+    return Boolean(found?.sent && !found.sent.deliveredAt && !this.standing.live(session));
+  }
+
+  /**
    * The oldest message waiting for a session, leased to the poll that takes it: not offered again until the lease
    * runs out, and lost only once the mod confirms it submitted it. A mod that died or failed to submit leaves the
    * message to come back.
    */
   take(session: string, leaseMs: number): { id: string; message: string } | undefined {
     const now = Date.now();
-    const waiting = this.ofSession(session)
-      .filter(x => x.sent && !x.sent.deliveredAt && (this.leases.get(entryKey(x)) ?? 0) <= now)
-      .sort((a, b) => orderOf(a) - orderOf(b))[0];
-    if (!waiting?.sent) return undefined;
-    this.leases.set(entryKey(waiting), now + leaseMs);
-    return { id: deliveryId(kindOf(waiting), waiting.number), message: waiting.sent.message };
+    const waiting = this.outgoing(session)
+      .filter(x => !x.sent.deliveredAt && (this.leases.get(x.key) ?? 0) <= now)
+      .sort((a, b) => a.sent.at.localeCompare(b.sent.at) || a.order - b.order)[0];
+    if (!waiting) return undefined;
+    this.leases.set(waiting.key, now + leaseMs);
+    return { id: waiting.id, message: waiting.sent.message };
+  }
+
+  /** Every message sent to a session, with its key, its delivery id and its place. */
+  private outgoing(session: string) {
+    const answered = this.ofSession(session).flatMap(x => x.sent ? [{ key: entryKey(x), id: deliveryId(kindOf(x), x.number), sent: x.sent, order: orderOf(x) }] : []);
+    const remarks = [...this.remarks.values()].filter(x => x.session === session)
+      .map(x => ({ key: key(session, 'remarks', x.number), id: deliveryId('remarks', x.number), sent: x.sent, order: Infinity }));
+    return [...answered, ...remarks];
   }
 
   /**
@@ -218,7 +275,7 @@ export class RoundStore {
    * as soon as the session is resumed, not once its lease runs out.
    */
   release(session: string): void {
-    for (const x of this.ofSession(session)) this.leases.delete(entryKey(x));
+    for (const x of this.outgoing(session)) this.leases.delete(x.key);
   }
 
   /** The working directory a session's rounds were kept under; undefined for a session the page never showed. */
@@ -227,7 +284,18 @@ export class RoundStore {
   }
 
   /** The mod submitted the message: it is delivered and never offered again. False when the entry sent nothing. */
-  async confirm(session: string, kind: Kind, number: number): Promise<boolean> {
+  async confirm(session: string, kind: DeliveryKind, number: number): Promise<boolean> {
+    if (kind === 'remarks') {
+      const remarks = this.remarks.get(key(session, kind, number));
+      if (!remarks) return false;
+      this.leases.delete(key(session, kind, number));
+      if (!remarks.sent.deliveredAt) {
+        const delivered: StoredRemarks = { ...remarks, sent: { ...remarks.sent, deliveredAt: new Date().toISOString() } };
+        this.remarks.set(key(session, kind, number), delivered);
+        await this.write(key(session, kind, number), join(this.sessionDir(delivered), `remarks-${number}.json`), delivered);
+      }
+      return true;
+    }
     const found = this.entries.get(key(session, kind, number));
     if (!found?.sent) return false;
     this.leases.delete(entryKey(found));
@@ -258,9 +326,12 @@ export class RoundStore {
    * go, on disk with every other file of its folder. False for a session the page never showed.
    */
   async deleteSession(session: string): Promise<boolean> {
-    const kept = [...this.ofSession(session), ...this.phases.has(session) ? [this.phases.get(session)!] : []];
+    const remarks = [...this.remarks.values()].filter(x => x.session === session);
+    const kept = [...this.ofSession(session), ...remarks, ...this.phases.has(session) ? [this.phases.get(session)!] : []];
     if (kept.length === 0) return false;
-    for (const x of this.ofSession(session)) { this.entries.delete(entryKey(x)); this.leases.delete(entryKey(x)); }
+    for (const x of this.outgoing(session)) this.leases.delete(x.key);
+    for (const x of this.ofSession(session)) this.entries.delete(entryKey(x));
+    for (const x of remarks) this.remarks.delete(key(session, 'remarks', x.number));
     this.phases.delete(session);
     // A write still on its way would put a file back into the folder after it is gone.
     await Promise.all([...this.writes].filter(([id]) => id.startsWith(`${session}/`)).map(([, write]) => write.catch(() => {})));
@@ -324,11 +395,13 @@ export class RoundStore {
     for (const project of await entries(this.dir)) {
       for (const session of await entries(join(this.dir, project))) {
         for (const name of await entries(join(this.dir, project, session))) {
-          const schema = /^round-\d+\.json$/.test(name) ? storedRoundSchema : /^free-\d+\.json$/.test(name) ? storedFreeSchema : name === 'phase.json' ? storedPhaseSchema : null;
+          const schema = /^round-\d+\.json$/.test(name) ? storedRoundSchema : /^free-\d+\.json$/.test(name) ? storedFreeSchema
+            : /^remarks-\d+\.json$/.test(name) ? storedRemarksSchema : name === 'phase.json' ? storedPhaseSchema : null;
           if (!schema) continue;
           try {
             const x = schema.parse(JSON.parse(await readFile(join(this.dir, project, session, name), 'utf8')));
             if ('open' in x) this.phases.set(x.session, x);
+            else if ('kind' in x && x.kind === 'remarks') this.remarks.set(key(x.session, 'remarks', x.number), x);
             else this.entries.set(entryKey(x), x);
           } catch { /* A file that does not parse is left on disk untouched. */ }
         }
@@ -342,7 +415,7 @@ export function sessionFolder(projectsDir: string, x: { cwd: string; session: st
   return join(projectsDir, createHash('sha256').update(x.cwd).digest('hex').slice(0, 16), x.session);
 }
 
-const key = (session: string, kind: Kind, number: number) => `${session}/${deliveryId(kind, number)}`;
+const key = (session: string, kind: DeliveryKind, number: number) => `${session}/${deliveryId(kind, number)}`;
 const entryKey = (x: Stored) => key(x.session, kindOf(x), x.number);
 const sentNow = (message: string) => ({ message, at: new Date().toISOString(), deliveredAt: null });
 

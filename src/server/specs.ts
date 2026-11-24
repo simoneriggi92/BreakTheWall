@@ -14,6 +14,7 @@ import { claudeCompleter, spawnClaude, type ClaudeRunner } from '../desktop/clau
 import type { Completer } from '../desktop/completion';
 import { ExplorationStore } from '../desktop/exploration-store';
 import { Generator } from '../desktop/generator';
+import { specRemarkRoutes, type RemarkedSpec, type Riding, type SpecRemarksContext } from './spec-remarks';
 
 /**
  * Specs handed over with `Spec: <location>` (#104): read as they were at handover, kept as numbered versions of their
@@ -63,6 +64,10 @@ export interface SpecRoutes {
   handle(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean>;
   /** Stops every structure still being written. */
   close(): void;
+  /** The remarks with words on the specs `session` handed over, which ride in the message of its round (#105). */
+  riding(session: string): Riding[];
+  /** The round's message carried those remarks: they are sent with it. */
+  rodeWith(session: string, round: number, carried: readonly Riding[]): Promise<void>;
 }
 
 const SPEC_PATH = /^\/api\/specs\/([^/]+)$/;
@@ -76,6 +81,8 @@ export async function openSpecs(options: {
   changed: () => void;
   send: (res: ServerResponse, status: number, body: unknown) => void;
   now?: () => Date;
+  /** Where remarks on a spec go (#105): the sessions' queues, and what the server knows of each session. */
+  remarks: Pick<SpecRemarksContext, 'rounds' | 'transcriptGone' | 'queued' | 'readJson'>;
 }): Promise<SpecRoutes> {
   const { changed, send, now = () => new Date() } = options;
   const claude = options.runners?.claude ?? spawnClaude();
@@ -167,6 +174,7 @@ export async function openSpecs(options: {
   }
 
   async function handle(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean> {
+    if (await remarks.handle(req, res, path)) return true;
     if (req.method === 'GET' && path === '/api/specs') {
       send(res, 200, { specs: [...specs.values()].sort((a, b) => b.handedOverAt.localeCompare(a.handedOverAt) || b.number - a.number).map(view) });
       return true;
@@ -233,8 +241,18 @@ export async function openSpecs(options: {
     }
   }
 
+  /** A spec as its remarks see it: every version of the location a version id names. */
+  const remarked = (key: string): RemarkedSpec => ({
+    key, folder: join(dir, hash(key)),
+    versions: versionsOf(key).map(x => ({ number: x.number, location: x.location, handedOverAt: x.handedOverAt, title: x.title, session: x.session, cwd: x.cwd, lines: x.text.split('\n').length })),
+  });
   await load();
-  return { handover, handle, close };
+  const remarks = await specRemarkRoutes({
+    ...options.remarks, send, changed,
+    specOf: id => { const x = specs.get(id); return x && remarked(x.key); },
+    allSpecs: () => [...new Set([...specs.values()].map(x => x.key))].map(remarked),
+  });
+  return { handover, handle, close, riding: remarks.riding, rodeWith: remarks.rodeWith };
 }
 
 /** The spec's own first heading names it; without one, the file's name or a plain word. */

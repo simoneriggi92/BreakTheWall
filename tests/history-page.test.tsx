@@ -17,7 +17,7 @@ const roundOf = (session: string, number: number, title: string, more: Partial<R
   questions: [{ number: 1, title, body: `About ${title.toLowerCase()}`, options: [], recommended: null, recommendation: 'The simple one.' }],
   draft: { generalNote: '', answers: {} }, sent: null, superseded: false, ...more,
 });
-const asView = (round: RoundView): CurrentView => ({ kind: 'round', round, phaseOpen: true, queued: false, transcriptGone: false });
+const asView = (round: RoundView): CurrentView => ({ kind: 'round', round, phaseOpen: true, queued: false, transcriptGone: false, riding: [] });
 const sessionOf = (session: string, rounds: HistorySession['rounds'], more: Partial<HistorySession> = {}): HistorySession =>
   ({ session, startedAt: '2026-11-23T10:00:00.000Z', live: true, skill: null, ticket: null, transcriptGone: false, rounds, ...more });
 
