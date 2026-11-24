@@ -309,6 +309,39 @@ describe('a side chat on one question (#100)', () => {
   });
 });
 
+describe('asking about a passage (#101)', () => {
+  const PASSAGE = { part: 'body', start: 0, end: 17, passage: 'Beside the rounds' } as const;
+
+  it('quotes the passage to the fork, and keeps it on the turn so the page marks it again', async () => {
+    const claude = fakeClaude();
+    const api = client(await start({ runners: { sideChat: claude.runner } }));
+    await api.turn(ROUND);
+    expect((await api.askAbout(1, 1, 'Why here?', PASSAGE)).status).toBe(202);
+    const [thread] = await settled(api);
+    expect(thread.turns[0]).toMatchObject({ ask: 'Why here?', passage: PASSAGE, status: 'done' });
+    expect(claude.runs[0].input).toContain('The person asks about this passage of the question: «Beside the rounds»\nWhy here?');
+  });
+
+  it('gives the fork the passage of an earlier turn too', async () => {
+    const claude = fakeClaude();
+    const api = client(await start({ runners: { sideChat: claude.runner } }));
+    await api.turn(ROUND);
+    await api.askAbout(1, 1, 'Why here?', PASSAGE);
+    await settled(api);
+    await api.ask(1, 1, 'And then?');
+    await until(async () => claude.runs.length === 2);
+    expect(claude.runs[1].input).toContain('The person asked about this passage of the question: «Beside the rounds»\nWhy here?');
+  });
+
+  it('refuses a passage that is empty, ends before it starts, or sits in no part of a question', async () => {
+    const api = client(await start({ runners: { sideChat: fakeClaude().runner } }));
+    await api.turn(ROUND);
+    expect((await api.askAbout(1, 1, 'Why?', { ...PASSAGE, passage: '  ' })).status).toBe(400);
+    expect((await api.askAbout(1, 1, 'Why?', { ...PASSAGE, end: 0 })).status).toBe(400);
+    expect((await api.askAbout(1, 1, 'Why?', { ...PASSAGE, part: 'title' })).status).toBe(400);
+  });
+});
+
 describe('the side chat\'s process (#100)', () => {
   const fixture = fileURLToPath(new URL('./fixtures/fake-claude-stream.mjs', import.meta.url));
   const project = () => {

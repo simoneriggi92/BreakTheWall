@@ -20,7 +20,7 @@ export function Markdown({ text, host: given, marks = NO_MARKS }: { text: string
   const host = given ?? own;
   useDiagrams(host, rendered, theme, t.d.diagramFailed);
   // React sets the HTML only when it changes, so the marks are drawn into it after every render that could move them.
-  const marksKey = marks.map(x => `${x.start}:${x.end}:${x.passage}`).join('\n');
+  const marksKey = marks.map(x => `${x.kind ?? 'remark'}:${x.start}:${x.end}:${x.passage}`).join('\n');
   useLayoutEffect(() => { if (host.current) markPassages(host.current, marks); }, [host, rendered, marksKey]);
   return <div ref={host} className="round-markdown" dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }

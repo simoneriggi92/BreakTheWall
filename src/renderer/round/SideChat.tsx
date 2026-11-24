@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Question } from '../../core/round';
-import type { SideChat as Thread } from '../../core/side-chat';
+import { quoted } from '../../core/round-answers';
+import type { SideChatPassage, SideChat as Thread } from '../../core/side-chat';
 import type { RoundKey, SideChatBridge } from '../http-bridge';
 import { usePreferences } from '../preferences';
 import { Markdown } from './shared';
@@ -37,15 +38,23 @@ export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] 
 
 /**
  * The side chat of the question in focus, in the right column: the person's questions and the replies of a read-only
- * copy of the session, each with what it read. Nothing here reaches the agent.
+ * copy of the session, each with what it read. Nothing here reaches the agent unless the person attaches a reply to
+ * their answer with 📎 (#101).
  */
-export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }: {
+export function SideChat({ question, thread, ask, passage, attached, onAsk, onAskChange, onDropPassage, onAttach, onClose }: {
   question: Question;
   thread: Thread | undefined;
   /** What the person is typing for this question, kept while the focus moves. */
   ask: string;
+  /** The passage chosen with "Ask here", which the next question quotes (#101). */
+  passage: SideChatPassage | undefined;
+  /** The turns whose exchange is attached to the answer. */
+  attached: readonly number[];
   onAsk: (ask: string) => Promise<void>;
   onAskChange: (ask: string) => void;
+  onDropPassage: () => void;
+  /** Attaches a turn's exchange, or takes it back; absent where the answer can no longer change. */
+  onAttach?: (turn: number) => void;
   onClose: () => void;
 }) {
   const { t } = usePreferences();
@@ -55,6 +64,9 @@ export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }:
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
   const busy = running || sending;
+  const field = useRef<HTMLTextAreaElement>(null);
+  // A passage chosen while the chat is already open hands it the focus, as opening it does.
+  useEffect(() => { if (passage) field.current?.focus(); }, [passage]);
 
   const submit = async () => {
     if (busy || ask.trim() === '') return;
@@ -75,12 +87,18 @@ export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }:
         : <ol className="side-chat-turns">
           {turns.map(turn => (
             <li key={turn.number}>
-              <p className="side-chat-ask"><span className="sr-only">{s.you}: </span><span>{turn.ask}</span></p>
+              <p className="side-chat-ask"><span className="sr-only">{s.you}: </span>
+                {turn.passage && <q className="side-chat-passage">{quoted(turn.passage.passage)}</q>}
+                <span>{turn.ask}</span>
+              </p>
               <div className="side-chat-reply"><span className="sr-only">{s.reply}:</span>
                 {turn.reply !== '' && <Markdown text={turn.reply}/>}
                 {turn.status === 'running' && <p className="side-chat-running" role="status">{s.running}</p>}
                 {turn.status === 'failed' && <p role="alert">{s.failed}</p>}
                 {turn.route === 'fresh' && <p className="side-chat-note">{s.fresh}</p>}
+                {onAttach && turn.status === 'done' && (
+                  <button type="button" className="subtle side-chat-attach" aria-pressed={attached.includes(turn.number)} onClick={() => onAttach(turn.number)}>{s.attach}</button>
+                )}
                 {turn.files.length > 0 && (
                   <ul className="side-chat-read" aria-label={s.read}>
                     {turn.files.map(file => <li key={file}>{file}</li>)}
@@ -90,9 +108,15 @@ export function SideChat({ question, thread, ask, onAsk, onAskChange, onClose }:
             </li>
           ))}
         </ol>}
+      {passage && (
+        <figure className="side-chat-asking" aria-label={s.askingAbout}>
+          <q className="side-chat-passage">{quoted(passage.passage)}</q>
+          <button type="button" className="subtle" aria-label={s.wholeQuestion} title={s.wholeQuestion} onClick={onDropPassage}>×</button>
+        </figure>
+      )}
       <form className="side-chat-composer" onSubmit={event => { event.preventDefault(); void submit(); }}>
         <textarea
-          aria-label={s.field} placeholder={s.placeholder} rows={2} autoFocus value={ask}
+          ref={field} aria-label={s.field} placeholder={s.placeholder} rows={2} autoFocus value={ask}
           onChange={event => onAskChange(event.target.value)}
           onKeyDown={event => {
             // Enter asks, Shift+Enter starts a new line; Ctrl+Enter is left to the round's Send.

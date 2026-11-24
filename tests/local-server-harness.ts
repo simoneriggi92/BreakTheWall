@@ -117,6 +117,8 @@ export function serverClient(server: LocalServer) {
     exploration: (id: string, revision: string) => call(`/api/explorations/${id}/${revision}`),
     /** The page's question in a side chat (#100): answered at once, the reply streams into the round's side chats. */
     ask: (round: number, question: number, ask: string, session = SESSION) => call(`/api/side-chats/${session}/${round}/${question}`, { method: 'POST', body: { ask } }),
+    /** The page's "Ask here" on a selected passage (#101): the question quotes the passage. */
+    askAbout: (round: number, question: number, ask: string, passage: unknown, session = SESSION) => call(`/api/side-chats/${session}/${round}/${question}`, { method: 'POST', body: { ask, passage } }),
     /** A round's side chats; with `after`, held until they change past that version. */
     sideChats: async (round: number, after?: number, session = SESSION): Promise<SideChatsView> =>
       (await call(`/api/side-chats/${session}/${round}${after === undefined ? '' : `?after=${after}`}`)).json(),
