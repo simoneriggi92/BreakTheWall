@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { ClaudeExit, ClaudeRun } from '../src/desktop/claude/completer';
@@ -270,5 +270,66 @@ describe('the structure is written through the claude route and saved with the e
     }
     expect((await client.exploration('..', 'v1')).status).toBe(404);
     for (const path of ['/api/specs', '/api/explorations']) expect((await fetch(`http://127.0.0.1:${server.port}${path}`)).status).toBe(401);
+  });
+});
+
+const ROUND = `One decision before I write it.
+
+❓ **Q1** - **Where does the spec live?**: A file or an issue.
+
+➡️ A file.`;
+
+describe('deleting a session (#102) takes the specs it handed over with it', () => {
+  it('deletes its versions, their remarks and explorations, stops a structure being written, and leaves other sessions\' specs', async () => {
+    const dataDir = folder();
+    const cwd = project({ 'docs/spec.md': BAKERY, 'other.md': BAKERY });
+    let hold = false;
+    const claude = fakeClaude(run => hold
+      ? new Promise((_, fail) => run.signal.addEventListener('abort', () => fail(Object.assign(new Error('aborted'), { name: 'AbortError' }))))
+      : structureAnswer());
+    const client = serverClient(await start({ dataDir, runners: { claude: claude.runner } }));
+    await client.turn(ROUND, SESSION, cwd);
+    const first = (await (await client.turn(handover('docs/spec.md'), SESSION, cwd)).json()).spec as string;
+    const explored = (await settled(client, first)).exploration!;
+    expect((await client.saveRemarks(first, { generalNote: 'Thin.', remarks: [] })).status).toBe(204);
+    hold = true;
+    writeFileSync(join(cwd, 'docs/spec.md'), `${BAKERY}\nOne more line.\n`);
+    const second = (await (await client.turn(handover('docs/spec.md'), SESSION, cwd)).json()).spec as string;
+    await vi.waitFor(() => expect(claude.runs).toHaveLength(2));
+    hold = false;
+    await client.turn(ROUND, OTHER, cwd);
+    const kept = (await (await client.turn(handover('other.md'), OTHER, cwd)).json()).spec as string;
+    const keptExploration = (await settled(client, kept)).exploration!;
+
+    expect((await client.deleteSession(SESSION)).status).toBe(204);
+    expect(claude.runs[1].signal.aborted).toBe(true);
+    expect((await client.specs()).map(x => x.id)).toEqual([kept]);
+    for (const id of [first, second]) {
+      expect((await client.spec(id)).status).toBe(404);
+      expect((await client.call(`/api/specs/${id}/remarks`)).status).toBe(404);
+    }
+    expect((await client.exploration(explored.id, explored.revision)).status).toBe(404);
+    expect((await client.explorations()).map(x => (x as { id: string }).id)).toEqual([keptExploration.id]);
+    // On disk only the other session's spec is left.
+    expect(readdirSync(join(dataDir, 'specs'))).toHaveLength(1);
+    expect(readdirSync(join(dataDir, 'explorations'))).toEqual([keptExploration.id]);
+  });
+
+  it('keeps the versions another session handed over, with the remarks on them only', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const client = serverClient(await start({ runners: { claude: fakeClaude().runner } }));
+    await client.turn(ROUND, OTHER, cwd);
+    const older = (await (await client.turn(handover('docs/spec.md'), OTHER, cwd)).json()).spec as string;
+    const onOlder = { version: 1, from: 4, to: 4, passage: 'loses water', text: 'Still?' };
+    expect((await client.saveRemarks(older, { generalNote: '', remarks: [onOlder] })).status).toBe(204);
+    await client.turn(ROUND, SESSION, cwd);
+    writeFileSync(join(cwd, 'docs/spec.md'), `${BAKERY}\nOne more line.\n`);
+    const newer = (await (await client.turn(handover('docs/spec.md'), SESSION, cwd)).json()).spec as string;
+    const onNewer = { version: 2, from: 6, to: 6, passage: 'The dough', text: 'New?' };
+    expect((await client.saveRemarks(newer, { generalNote: '', remarks: [onOlder, onNewer] })).status).toBe(204);
+
+    expect((await client.deleteSession(SESSION)).status).toBe(204);
+    expect((await client.specs()).map(x => [x.id, x.superseded])).toEqual([[older, false]]);
+    expect((await client.remarks(older)).draft).toEqual({ generalNote: '', remarks: [onOlder] });
   });
 });

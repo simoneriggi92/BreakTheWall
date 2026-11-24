@@ -21,6 +21,8 @@ export interface SessionsContext {
   models: SessionModels;
   /** The side chats, whose replies still running stop when their session is deleted (#103). */
   sideChats: { forget(session: string): Promise<void> };
+  /** The specs the session handed over, deleted with it; true when it had any. */
+  specs: { forget(session: string): Promise<boolean> };
   /** The registrations the mod renews, by session id: a session is live while its lease runs. */
   leases: Map<string, { cwd: string; until: number }>;
   live(session: string): boolean;
@@ -40,7 +42,7 @@ const SESSION_PATH = /^\/api\/sessions\/([^/]+)$/;
 const PAST_ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})$/;
 
 export async function handleSessions(req: IncomingMessage, res: ServerResponse, path: string, context: SessionsContext): Promise<boolean> {
-  const { rounds, labels, transcripts, models, sideChats, leases, update, pageChanged } = context;
+  const { rounds, labels, transcripts, models, sideChats, specs, leases, update, pageChanged } = context;
   if (req.method === 'GET' && path === '/api/history') {
     send(res, 200, history(context));
     return true;
@@ -74,8 +76,10 @@ export async function handleSessions(req: IncomingMessage, res: ServerResponse, 
   const sessionPath = SESSION_PATH.exec(path);
   if (req.method === 'DELETE' && sessionPath) {
     const session = sessionPath[1];
+    if (!sessionIdSchema.safeParse(session).success) { send(res, 404, { error: 'unknown' }); return true; }
     // A reply still streaming, or a label or transcript still being written, would put a file back into the folder.
-    if (sessionIdSchema.safeParse(session).success && (await Promise.all([labels.forget(session), transcripts.forget(session), models.forget(session), sideChats.forget(session)]), await rounds.deleteSession(session))) {
+    const [, , , , handedOver] = await Promise.all([labels.forget(session), transcripts.forget(session), models.forget(session), sideChats.forget(session), specs.forget(session)]);
+    if (await rounds.deleteSession(session) || handedOver) {
       pageChanged();
       noContent(res);
     } else send(res, 404, { error: 'unknown' });

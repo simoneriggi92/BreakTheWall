@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -203,6 +203,28 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
     return false;
   }
 
-  return { handle, riding, rodeWith };
+  /**
+   * The session was deleted with the versions it handed over (#102): remarks on those versions go from the draft and
+   * from what was sent, and so does what was sent to it; a spec with no version left loses its folder.
+   */
+  async function forget(session: string, gone: readonly { key: string; folder: string; numbers: number[]; whole: boolean }[]) {
+    for (const x of gone) {
+      await writes.settle(key => key === x.key);
+      if (x.whole) {
+        stored.delete(x.key);
+        await rm(x.folder, { recursive: true, force: true });
+        continue;
+      }
+      const before = stored.get(x.key);
+      if (!before) continue;
+      const kept = (remark: { version: number }) => !x.numbers.includes(remark.version);
+      const sent = before.sent.filter(b => b.session !== session).map(b => ({ ...b, remarks: b.remarks.filter(kept) }))
+        .filter(b => b.remarks.length > 0 || b.generalNote !== '');
+      const spec = context.allSpecs().find(y => y.key === x.key);
+      if (spec) await save(spec, { ...before, draft: { ...before.draft, remarks: before.draft.remarks.filter(kept) }, sent });
+    }
+  }
+
+  return { handle, riding, rodeWith, forget };
 }
 export type SpecRemarkRoutes = Awaited<ReturnType<typeof specRemarkRoutes>>;

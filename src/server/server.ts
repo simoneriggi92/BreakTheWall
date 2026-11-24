@@ -307,11 +307,18 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
-    if (await handleSessions(req, res, path, { rounds, labels, transcripts, models, sideChats, leases: sessions, live, update, pageChanged })) return;
+    if (await handleSessions(req, res, path, { rounds, labels, transcripts, models, sideChats, specs: { forget: forgetSpecs }, leases: sessions, live, update, pageChanged })) return;
     if (await sideChats.handle(req, res, path)) return;
     if (await remarks.handle(req, res, path)) return;
     if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
+  }
+
+  /** A deleted session's specs go with their remarks (#102); true when it had handed any over. */
+  async function forgetSpecs(session: string) {
+    const gone = await specs.forget(session);
+    await remarks.forget(session, gone);
+    return gone.length > 0;
   }
 
   /** The session has a folder now: how its mod registered it is kept there too. */

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
@@ -64,7 +64,15 @@ export interface SpecRoutes {
   specOf(id: string): RemarkedSpec | undefined;
   /** Every spec handed over, as its remarks see it. */
   allSpecs(): RemarkedSpec[];
+  /**
+   * The session was deleted (#102): the versions it handed over go, with their explorations, and a structure still being
+   * written for one stops. What went, by spec, for its remarks to follow.
+   */
+  forget(session: string): Promise<ForgottenVersions[]>;
 }
+
+/** The versions of one spec a deleted session took with it; `whole` when the spec has none left. */
+export interface ForgottenVersions { key: string; folder: string; numbers: number[]; whole: boolean }
 
 const SPEC_PATH = /^\/api\/specs\/([^/]+)$/;
 const EXPLORE_PATH = /^\/api\/specs\/([^/]+)\/exploration$/;
@@ -165,7 +173,9 @@ export async function openSpecs(options: {
           runs.set(id, { run: { state: 'running', repairing: progress.repairing }, generator });
           changed();
         });
-        if (result.ok) await save({ ...specs.get(id) ?? spec, exploration: { id: result.exploration.id, revision: result.exploration.revision } });
+        // A version deleted with its session meanwhile keeps no structure: its exploration goes too.
+        if (result.ok && !specs.has(id)) await explorations.remove(result.exploration.id);
+        else if (result.ok) await save({ ...specs.get(id) ?? spec, exploration: { id: result.exploration.id, revision: result.exploration.revision } });
         else ended = result.failure;
       } catch (error) {
         ended = error instanceof ProviderError ? error.failure : failure('unsupported', { message: (error as Error)?.message ?? 'The spec could not be explored.' });
@@ -233,6 +243,27 @@ export async function openSpecs(options: {
     return false;
   }
 
+  async function forget(session: string): Promise<ForgottenVersions[]> {
+    unreadable.delete(session);
+    const gone = [...specs.values()].filter(x => x.session === session);
+    for (const x of gone) {
+      const id = idOf(x);
+      runs.get(id)?.generator?.cancel();
+      runs.delete(id);
+      specs.delete(id);
+    }
+    const ids = new Set(gone.map(idOf));
+    await writes.settle(id => ids.has(id));
+    await Promise.all(gone.map(async x => {
+      await rm(join(dir, hash(x.key), `v${x.number}.json`), { force: true });
+      if (x.exploration) await explorations.remove(x.exploration.id);
+    }));
+    if (gone.length > 0) changed();
+    return [...new Set(gone.map(x => x.key))].map(key => ({
+      key, folder: join(dir, hash(key)), numbers: gone.filter(x => x.key === key).map(x => x.number), whole: versionsOf(key).length === 0,
+    }));
+  }
+
   function close() {
     for (const { generator } of runs.values()) generator?.cancel();
   }
@@ -261,7 +292,7 @@ export async function openSpecs(options: {
   });
   await load();
   return {
-    handover, handle, close,
+    handover, handle, close, forget,
     specOf: id => { const x = specs.get(id); return x && remarked(x.key); },
     allSpecs: () => [...new Set([...specs.values()].map(x => x.key))].map(remarked),
   };
