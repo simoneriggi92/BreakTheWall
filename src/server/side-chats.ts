@@ -8,13 +8,15 @@ import { sessionIdSchema } from '../core/local-server';
 import type { Question, Round } from '../core/round';
 import { quoted } from '../core/round-answers';
 import { sideChatAskSchema, sideChatPassageSchema, sideChatTurnSchema, type SideChat, type SideChatTurn, type SideChatsView } from '../core/side-chat';
-import { atomicWrite, entries, sessionFolder, type RoundStore } from './rounds';
+import { entries, sessionFolders, WriteQueue } from './files';
+import { readJson, send, TRANSCRIPT_GONE } from './http';
+import { sessionFolder, type RoundStore } from './rounds';
 
 /**
  * Side chats (#100): a question of a round asked about in a throwaway, read-only fork of the agent's session, started
  * only when the person asks. The fork knows the conversation as of the question; the prompt adds the question and this
  * question's own earlier turns, never another question's side chat or an unsent draft. Nothing it says reaches the
- * agent. Threads are kept beside the session's rounds (`side-chat-<round>-<question>.json`).
+ * agent. Side chats are kept beside the session's rounds (`side-chat-<round>-<question>.json`).
  */
 
 /** One run of `claude`: what it is told (stdin) and allowed (arguments), in which folder; each stdout line as it comes. */
@@ -172,7 +174,7 @@ export function spawnSideChat(command = 'claude', leading: string[] = []): SideC
   });
 }
 
-const storedThreadSchema = z.strictObject({
+const storedSideChatSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
   cwd: z.string().min(1).max(4096),
@@ -180,7 +182,7 @@ const storedThreadSchema = z.strictObject({
   question: z.number().int().min(1),
   turns: z.array(sideChatTurnSchema),
 });
-type StoredThread = z.infer<typeof storedThreadSchema>;
+type StoredSideChat = z.infer<typeof storedSideChatSchema>;
 const FILE = /^side-chat-(\d+)-(\d+)\.json$/;
 const askBodySchema = z.strictObject({ ask: sideChatAskSchema, passage: sideChatPassageSchema.optional() });
 const ROUND_CHATS_PATH = /^\/api\/side-chats\/([^/]+)\/(\d{1,6})$/;
@@ -196,21 +198,17 @@ export interface SideChatDeps {
   readOnly: (session: string) => boolean;
   /** How long a read of the side chats that names the version it has is held. */
   holdMs: number;
-  io: {
-    readJson: (req: IncomingMessage, maxBytes?: number) => Promise<unknown>;
-    send: (res: ServerResponse, status: number, body: unknown) => void;
-  };
 }
 
 /**
  * The side chats' routes, for the server's guarded `handle`: true when the request was theirs. Created at once, the
- * kept threads read in the background: the server's start never waits on them, as a rival probing it for the lock
+ * kept side chats read in the background: the server's start never waits on them, as a rival probing it for the lock
  * would otherwise find it holding the lock and not answering.
  */
 export function sideChatRoutes(deps: SideChatDeps) {
   const projects = join(deps.dataDir, 'projects');
-  const threads = new Map<string, StoredThread>();
-  const writes = new Map<string, Promise<void>>();
+  const sideChats = new Map<string, StoredSideChat>();
+  const writes = new WriteQueue();
   /** The replies still running, with the session each belongs to. */
   const running = new Map<AbortController, string>();
   /** Grows on every change, from the start time, so a version read before a restart is never ahead of one after it. */
@@ -220,16 +218,14 @@ export function sideChatRoutes(deps: SideChatDeps) {
   const waiting = new Map<string, Set<() => void>>();
 
   const loaded = (async () => {
-    for (const project of await entries(projects)) {
-      for (const session of await entries(join(projects, project))) {
-        for (const name of await entries(join(projects, project, session))) {
-          if (!FILE.test(name)) continue;
-          try {
-            const x = storedThreadSchema.parse(JSON.parse(await readFile(join(projects, project, session, name), 'utf8')));
-            // A reply the last server was still streaming when it stopped will never finish.
-            threads.set(threadKey(x.session, x.round, x.question), { ...x, turns: x.turns.map(t => t.status === 'running' ? { ...t, status: 'failed' } : t) });
-          } catch { /* A file that does not parse is left on disk untouched. */ }
-        }
+    for (const folder of await sessionFolders(projects)) {
+      for (const name of await entries(folder)) {
+        if (!FILE.test(name)) continue;
+        try {
+          const x = storedSideChatSchema.parse(JSON.parse(await readFile(join(folder, name), 'utf8')));
+          // A reply the last server was still streaming when it stopped will never finish.
+          sideChats.set(sideChatKey(x.session, x.round, x.question), { ...x, turns: x.turns.map(t => t.status === 'running' ? { ...t, status: 'failed' } : t) });
+        } catch { /* A file that does not parse is left on disk untouched. */ }
       }
     }
   })();
@@ -237,28 +233,25 @@ export function sideChatRoutes(deps: SideChatDeps) {
   const roundKey = (session: string, round: number) => `${session}/${round}`;
   const view = (session: string, round: number): SideChatsView => ({
     version: versions.get(roundKey(session, round)) ?? started,
-    sideChats: [...threads.values()].filter(x => x.session === session && x.round === round)
+    sideChats: [...sideChats.values()].filter(x => x.session === session && x.round === round)
       .sort((a, b) => a.question - b.question)
       .map((x): SideChat => ({ question: x.question, turns: x.turns })),
   });
-  const changed = (x: StoredThread) => {
+  const changed = (x: StoredSideChat) => {
     const key = roundKey(x.session, x.round);
     versions.set(key, ++clock);
     for (const wake of [...waiting.get(key) ?? []]) wake();
   };
-  const save = (x: StoredThread) => {
-    const key = threadKey(x.session, x.round, x.question);
-    const file = join(sessionFolder(projects, x), `side-chat-${x.round}-${x.question}.json`);
-    const write = (writes.get(key) ?? Promise.resolve()).catch(() => {}).then(() => atomicWrite(file, JSON.stringify(x, null, 2)));
-    writes.set(key, write);
-    return write.catch(() => {});
+  const save = (x: StoredSideChat) => {
+    const key = sideChatKey(x.session, x.round, x.question);
+    return writes.write(key, join(sessionFolder(projects, x), `side-chat-${x.round}-${x.question}.json`), x).catch(() => {});
   };
-  /** The thread's turn, changed in memory at once and on disk when `persist`; every change reaches a held read. */
+  /** The side chat's turn, changed in memory at once and on disk when `persist`; every change reaches a held read. */
   const update = (key: string, number: number, patch: Partial<SideChatTurn>, persist: boolean) => {
-    const thread = threads.get(key);
-    if (!thread) return;
-    const next = { ...thread, turns: thread.turns.map(t => t.number === number ? { ...t, ...patch } : t) };
-    threads.set(key, next);
+    const sideChat = sideChats.get(key);
+    if (!sideChat) return;
+    const next = { ...sideChat, turns: sideChat.turns.map(t => t.number === number ? { ...t, ...patch } : t) };
+    sideChats.set(key, next);
     changed(next);
     if (persist) void save(next);
   };
@@ -300,34 +293,34 @@ export function sideChatRoutes(deps: SideChatDeps) {
     const chats = ROUND_CHATS_PATH.exec(path);
     if (req.method === 'GET' && chats && sessionIdSchema.safeParse(chats[1]).success) {
       const session = chats[1], round = Number(chats[2]);
-      if (!deps.rounds.asked(session, round)) return deps.io.send(res, 404, { error: 'unknown' }), true;
+      if (!deps.rounds.asked(session, round)) return send(res, 404, { error: 'unknown' }), true;
       const after = new URL(req.url ?? '/', 'http://local').searchParams.get('after');
-      if (after !== null && !/^\d{1,16}$/.test(after)) return deps.io.send(res, 400, { error: 'bad-request' }), true;
+      if (after !== null && !/^\d{1,16}$/.test(after)) return send(res, 400, { error: 'bad-request' }), true;
       hold(req, res, session, round, after === null ? -1 : Number(after));
       return true;
     }
     const ask = ASK_PATH.exec(path);
     if (req.method === 'POST' && ask && sessionIdSchema.safeParse(ask[1]).success) {
       const session = ask[1], round = Number(ask[2]), number = Number(ask[3]);
-      const body = askBodySchema.safeParse(await deps.io.readJson(req));
-      if (!body.success) return deps.io.send(res, 400, { error: 'bad-request' }), true;
+      const body = askBodySchema.safeParse(await readJson(req));
+      if (!body.success) return send(res, 400, { error: 'bad-request' }), true;
       const found = deps.rounds.asked(session, round);
       const question = found?.round.questions.find(q => q.number === number);
-      if (!found || !question) return deps.io.send(res, 404, { error: 'unknown' }), true;
-      if (deps.readOnly(session)) return deps.io.send(res, 409, { error: 'transcript-gone' }), true;
-      const key = threadKey(session, round, number);
-      const thread = threads.get(key) ?? { version: 1 as const, session, cwd: found.cwd, round, question: number, turns: [] };
+      if (!found || !question) return send(res, 404, { error: 'unknown' }), true;
+      if (deps.readOnly(session)) return send(res, 409, TRANSCRIPT_GONE), true;
+      const key = sideChatKey(session, round, number);
+      const sideChat = sideChats.get(key) ?? { version: 1 as const, session, cwd: found.cwd, round, question: number, turns: [] };
       // One reply at a time per question: the next question's prompt carries this one's reply.
-      if (thread.turns.some(t => t.status === 'running')) return deps.io.send(res, 409, { error: 'busy' }), true;
-      const turn: SideChatTurn = { number: thread.turns.length + 1, ask: body.data.ask, ...(body.data.passage ? { passage: body.data.passage } : {}), reply: '', files: [], status: 'running', route: 'fork', at: new Date().toISOString() };
-      const next = { ...thread, turns: [...thread.turns, turn] };
-      threads.set(key, next);
+      if (sideChat.turns.some(t => t.status === 'running')) return send(res, 409, { error: 'busy' }), true;
+      const turn: SideChatTurn = { number: sideChat.turns.length + 1, ask: body.data.ask, ...(body.data.passage ? { passage: body.data.passage } : {}), reply: '', files: [], status: 'running', route: 'fork', at: new Date().toISOString() };
+      const next = { ...sideChat, turns: [...sideChat.turns, turn] };
+      sideChats.set(key, next);
       changed(next);
       await save(next);
-      const earlier = thread.turns.filter(t => t.status === 'done').map(t => ({ ask: t.ask, reply: t.reply, passage: t.passage }));
+      const earlier = sideChat.turns.filter(t => t.status === 'done').map(t => ({ ask: t.ask, reply: t.reply, passage: t.passage }));
       const model = deps.modelOf(session);
       void answer(key, turn.number, { session, round: { number: round, ...found.round }, question, earlier, ask: turn.ask, passage: turn.passage, ...(model ? { model } : {}) }, found.cwd);
-      deps.io.send(res, 202, { turn: turn.number });
+      send(res, 202, { turn: turn.number });
       return true;
     }
     return false;
@@ -336,7 +329,7 @@ export function sideChatRoutes(deps: SideChatDeps) {
   /** Answers at once when the side chats changed past `after`, else when they next change or the hold runs out. */
   function hold(req: IncomingMessage, res: ServerResponse, session: string, round: number, after: number) {
     const key = roundKey(session, round);
-    if (view(session, round).version > after) return deps.io.send(res, 200, view(session, round));
+    if (view(session, round).version > after) return send(res, 200, view(session, round));
     const wakers = waiting.get(key) ?? new Set<() => void>();
     waiting.set(key, wakers);
     let ended = false;
@@ -348,7 +341,7 @@ export function sideChatRoutes(deps: SideChatDeps) {
       if (wakers.size === 0) waiting.delete(key);
       return true;
     };
-    const wake = () => { if (end()) deps.io.send(res, 200, view(session, round)); };
+    const wake = () => { if (end()) send(res, 200, view(session, round)); };
     const timer = setTimeout(wake, deps.holdMs);
     wakers.add(wake);
     req.on('close', end);
@@ -360,18 +353,18 @@ export function sideChatRoutes(deps: SideChatDeps) {
     /** The server stops: every reply still running stops with it. */
     stop() { for (const x of running.keys()) x.abort(); },
     /**
-     * The session was deleted: its replies still running stop, and its threads are forgotten once their last writes
+     * The session was deleted: its replies still running stop, and its side chats are forgotten once their last writes
      * have landed, so nothing is written back into its folder and a round of the same number starts with none.
      */
     async forget(session: string) {
       await loaded;
       for (const [x, of] of running) if (of === session) x.abort();
-      const gone = [...threads.values()].filter(x => x.session === session);
-      for (const x of gone) threads.delete(threadKey(x.session, x.round, x.question));
-      await Promise.all(gone.map(x => writes.get(threadKey(x.session, x.round, x.question))?.catch(() => {})));
-      for (const x of gone) { writes.delete(threadKey(x.session, x.round, x.question)); changed(x); }
+      const gone = [...sideChats.values()].filter(x => x.session === session);
+      for (const x of gone) sideChats.delete(sideChatKey(x.session, x.round, x.question));
+      await writes.settle(key => key.startsWith(`${session}/`));
+      for (const x of gone) changed(x);
     },
   };
 }
 
-const threadKey = (session: string, round: number, question: number) => `${session}/${round}/${question}`;
+const sideChatKey = (session: string, round: number, question: number) => `${session}/${round}/${question}`;

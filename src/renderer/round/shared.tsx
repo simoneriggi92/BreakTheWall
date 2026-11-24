@@ -27,20 +27,20 @@ export function Markdown({ text, host: given, marks = NO_MARKS }: { text: string
 
 /**
  * Saves on every change, one request at a time and always the newest: a slow save never lands over a later one, and
- * edits made while it runs collapse into the next.
+ * edits made while it runs collapse into the next. `settle` is for a Send that carries the newest value itself: what
+ * has not left yet is dropped, and it resolves once the save on its way has landed, so no save arrives after the Send.
  */
 export function useLatestSaver<T>(save: (value: T) => Promise<void>, sent: boolean, setFailure: (failure: 'save' | undefined) => void) {
-  const state = useRef<{ busy: boolean; pending?: { value: T } }>({ busy: false });
+  const state = useRef<{ running: Promise<void> | null; pending?: { value: T } }>({ running: null });
   const sentRef = useRef(sent);
   sentRef.current = sent;
   const saveRef = useRef(save);
   saveRef.current = save;
-  return (value: T) => {
+  const saver = (value: T) => {
     const s = state.current;
     s.pending = { value };
-    if (s.busy) return;
-    s.busy = true;
-    void (async () => {
+    if (s.running) return;
+    s.running = (async () => {
       while (s.pending) {
         const next = s.pending.value;
         s.pending = undefined;
@@ -52,9 +52,14 @@ export function useLatestSaver<T>(save: (value: T) => Promise<void>, sent: boole
           if (!sentRef.current) setFailure('save');
         }
       }
-      s.busy = false;
+      s.running = null;
     })();
   };
+  const settle = (): Promise<void> => {
+    state.current.pending = undefined;
+    return state.current.running ?? Promise.resolve();
+  };
+  return Object.assign(saver, { settle });
 }
 
 /**

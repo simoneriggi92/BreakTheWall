@@ -125,9 +125,9 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const [drawerOpen, setDrawerOpen] = useState(false);
   const showReturn = band !== 'drawer' || drawerOpen;
 
-  // Side chats (#100): one thread per question; the column, once open, shows the thread of the question in focus.
+  // Side chats (#100): one per question; the column, once open, shows the side chat of the question in focus.
   const sideChats = useSideChats(bridge, round);
-  const threadOf = (number: number) => sideChats.find(x => x.question === number);
+  const sideChatOf = (number: number) => sideChats.find(x => x.question === number);
   const [chatOpen, setChatOpen] = useState(false);
   /** What the person is typing in each question's side chat, kept while the focus moves. */
   const [asks, setAsks] = useState<Record<number, string>>({});
@@ -148,7 +148,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     setAsking(kept => ({ ...kept, [number]: undefined }));
   };
   // The passages asked about are marked in the question in the side chat's colour, apart from remarks.
-  const askedPassages = [...threadOf(question.number)?.turns.map(x => x.passage) ?? [], asking[question.number]]
+  const askedPassages = [...sideChatOf(question.number)?.turns.map(x => x.passage) ?? [], asking[question.number]]
     .filter((x): x is SideChatPassage => x !== undefined);
   const marksIn = (part: RemarkPart) => [
     ...remarks.filter(x => x.part === part),
@@ -156,7 +156,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   ];
   /** 📎 (#101): attaches a finished reply to the question's answer, copied whole, or takes it back. */
   const toggleAttached = (number: number) => {
-    const turn = threadOf(question.number)?.turns.find(x => x.number === number);
+    const turn = sideChatOf(question.number)?.turns.find(x => x.number === number);
     if (!turn || turn.status !== 'done') return;
     const kept = attachedOf(answerOf(latest.current, question));
     changeAnswer({
@@ -259,7 +259,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
               // rail every question is its number, with a tick once answered; the title stays in its name and tooltip.
               const rail = band !== 'wide';
               const collapsed = rail || (done && q.number !== question.number);
-              const asked = threadOf(q.number)?.turns.length ?? 0;
+              const asked = sideChatOf(q.number)?.turns.length ?? 0;
               return (
                 <li key={q.number}>
                   <button
@@ -353,7 +353,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
           ? <div className="round-side">
             {drawerBar}
             <SideChat
-              question={question} thread={threadOf(question.number)} readOnly={transcriptGone}
+              question={question} sideChat={sideChatOf(question.number)} readOnly={transcriptGone}
               ask={asks[question.number] ?? ''} onAskChange={text => setAsks(kept => ({ ...kept, [question.number]: text }))}
               passage={asking[question.number]} onDropPassage={() => setAsking(kept => ({ ...kept, [question.number]: undefined }))}
               attached={attachedOf(answer).map(x => x.turn)} onAttach={readOnly ? undefined : toggleAttached}

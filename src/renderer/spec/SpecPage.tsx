@@ -87,7 +87,7 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     <div className="spec-main">
     {exploration
       ? <div ref={body} className="spec-body" onMouseUp={readSelection} onKeyUp={readSelection}>
-        <ExplorationView key={key} x={exploration} goHome={onClose} extras={extras}/>
+        <ExplorationView key={key} x={exploration} goHome={onClose} backLabel={s.close} extras={extras}/>
         {offer && <div className="round-selection-offer spec-selection-offer" style={{ top: offer.top, left: offer.left }} onMouseDown={event => event.preventDefault()}>
           <button type="button" className="round-remark-offer" onClick={() => remark(false)}>{t.page.specRemarks.remark}</button>
           <button type="button" className="round-remark-offer" onClick={() => remark(true)}>{t.page.specRemarks.missingHere}</button>

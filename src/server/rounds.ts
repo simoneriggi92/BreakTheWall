@@ -1,6 +1,6 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import { answerOf, draftSchema, emptyDraft, type Answer, type Draft, type RoundView } from '../core/round-answers';
@@ -8,6 +8,7 @@ import { roundSchema, type Question, type Round } from '../core/round';
 import type { SpecRemarksSection } from '../core/spec-remarks';
 import type { HistoryRoundState } from '../core/session-history';
 import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
+import { entries, sessionFolders, WriteQueue } from './files';
 
 /**
  * What the page shows of each session (#95, #99): its rounds with their drafts, its free blocks with their responses,
@@ -16,8 +17,10 @@ import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, 
  * and for the phase (`phase.json`), rewritten whole and replaced atomically on every change, and checked with Zod when
  * read back: a file that does not parse is left alone.
  */
+/** The longest message a round, a free block or remarks keep: a Send that would word a longer one is refused. */
+export const MESSAGE_MAX = 8_000_000;
 const sentSchema = z.strictObject({
-  message: z.string().max(2_000_000),
+  message: z.string().max(MESSAGE_MAX),
   at: z.iso.datetime(),
   /** When the mod confirmed it submitted it to the session; null while it waits or is in flight. */
   deliveredAt: z.iso.datetime().nullable(),
@@ -92,9 +95,9 @@ export type RoundRefusal = 'unknown' | 'sent' | 'superseded';
 
 const kindOf = (x: Stored): Kind => 'round' in x ? 'round' : 'free';
 const orderOf = (x: Stored) => x.order ?? x.number;
-/** How the mod names what it confirms: `round-2`, `free-1`. */
 /** Where the sessions' folders live, by project, inside the server's data folder. */
 export const projectsDir = (dataDir: string) => join(dataDir, 'projects');
+/** How the mod names what it confirms: `round-2`, `free-1`. */
 export const deliveryId = (kind: DeliveryKind, number: number) => `${kind}-${number}`;
 
 export class RoundStore {
@@ -102,16 +105,25 @@ export class RoundStore {
   /** Remarks on a spec sent alone, by `<session>/remarks-<n>` (#105). */
   private remarks = new Map<string, StoredRemarks>();
   private phases = new Map<string, StoredPhase>();
-  private writes = new Map<string, Promise<void>>();
+  private writes = new WriteQueue();
   /** Messages handed to a poll and not yet confirmed, until when; kept in memory, so a restart offers them again. */
   private leases = new Map<string, number>();
+  private standing: Standing = NO_STANDING;
 
-  private constructor(private dir: string, private standing: Standing) {}
+  private constructor(private dir: string) {}
 
-  static async open(dataDir: string, standing: Standing = NO_STANDING): Promise<RoundStore> {
-    const store = new RoundStore(projectsDir(dataDir), standing);
+  static async open(dataDir: string): Promise<RoundStore> {
+    const store = new RoundStore(projectsDir(dataDir));
     await store.load();
     return store;
+  }
+
+  /**
+   * Where each session stands, read whenever a round is shown. Given once the stores it reads are open, which
+   * themselves read this store: the server opens them all first, then ties them together.
+   */
+  standOn(standing: Standing): void {
+    this.standing = standing;
   }
 
   /** A new round of a session, numbered after the session's earlier rounds; it opens the round phase. */
@@ -345,7 +357,7 @@ export class RoundStore {
     for (const x of remarks) this.remarks.delete(key(session, 'remarks', x.number));
     this.phases.delete(session);
     // A write still on its way would put a file back into the folder after it is gone.
-    await Promise.all([...this.writes].filter(([id]) => id.startsWith(`${session}/`)).map(([, write]) => write.catch(() => {})));
+    await this.writes.settle(id => id.startsWith(`${session}/`));
     await Promise.all([...new Set(kept.map(x => this.sessionDir(x)))].map(dir => rm(dir, { recursive: true, force: true })));
     return true;
   }
@@ -392,30 +404,23 @@ export class RoundStore {
     return this.write(entryKey(x), join(this.sessionDir(x), `${kindOf(x)}-${x.number}.json`), x);
   }
 
-  /**
-   * Memory first, so a read right after a change sees it; the files follow in order, one write at a time per file,
-   * so a slower earlier write never lands over a later one.
-   */
+  /** Memory first, so a read right after a change sees it; the files follow in order, one write at a time per file. */
   private write(id: string, file: string, data: unknown): Promise<void> {
-    const write = (this.writes.get(id) ?? Promise.resolve()).catch(() => {}).then(() => atomicWrite(file, JSON.stringify(data, null, 2)));
-    this.writes.set(id, write);
-    return write;
+    return this.writes.write(id, file, data);
   }
 
   private async load() {
-    for (const project of await entries(this.dir)) {
-      for (const session of await entries(join(this.dir, project))) {
-        for (const name of await entries(join(this.dir, project, session))) {
-          const schema = /^round-\d+\.json$/.test(name) ? storedRoundSchema : /^free-\d+\.json$/.test(name) ? storedFreeSchema
-            : /^remarks-\d+\.json$/.test(name) ? storedRemarksSchema : name === 'phase.json' ? storedPhaseSchema : null;
-          if (!schema) continue;
-          try {
-            const x = schema.parse(JSON.parse(await readFile(join(this.dir, project, session, name), 'utf8')));
-            if ('open' in x) this.phases.set(x.session, x);
-            else if ('kind' in x && x.kind === 'remarks') this.remarks.set(key(x.session, 'remarks', x.number), x);
-            else this.entries.set(entryKey(x), x);
-          } catch { /* A file that does not parse is left on disk untouched. */ }
-        }
+    for (const folder of await sessionFolders(this.dir)) {
+      for (const name of await entries(folder)) {
+        const schema = /^round-\d+\.json$/.test(name) ? storedRoundSchema : /^free-\d+\.json$/.test(name) ? storedFreeSchema
+          : /^remarks-\d+\.json$/.test(name) ? storedRemarksSchema : name === 'phase.json' ? storedPhaseSchema : null;
+        if (!schema) continue;
+        try {
+          const x = schema.parse(JSON.parse(await readFile(join(folder, name), 'utf8')));
+          if ('open' in x) this.phases.set(x.session, x);
+          else if ('kind' in x && x.kind === 'remarks') this.remarks.set(key(x.session, 'remarks', x.number), x);
+          else this.entries.set(entryKey(x), x);
+        } catch { /* A file that does not parse is left on disk untouched. */ }
       }
     }
   }
@@ -429,20 +434,3 @@ export function sessionFolder(projectsDir: string, x: { cwd: string; session: st
 const key = (session: string, kind: DeliveryKind, number: number) => `${session}/${deliveryId(kind, number)}`;
 const entryKey = (x: Stored) => key(x.session, kindOf(x), x.number);
 const sentNow = (message: string) => ({ message, at: new Date().toISOString(), deliveredAt: null });
-
-export async function entries(dir: string): Promise<string[]> {
-  try { return await readdir(dir); } catch { return []; }
-}
-
-/** Written beside the file, then renamed over it: a reader sees the old file or the new one, never half of one. */
-export async function atomicWrite(file: string, data: string) {
-  await mkdir(dirname(file), { recursive: true, mode: 0o700 });
-  const temp = `${file}.${randomBytes(6).toString('hex')}.pending`;
-  try {
-    await writeFile(temp, data, { mode: 0o600 });
-    await rename(temp, file);
-  } catch (error) {
-    await rm(temp, { force: true });
-    throw error;
-  }
-}

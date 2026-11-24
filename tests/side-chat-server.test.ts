@@ -7,6 +7,7 @@ import { spawnSideChat, type SideChatRun } from '../src/server/side-chats';
 import { CWD, serverClient as client, SESSION, useLocalServers } from './local-server-harness';
 
 const { folder, start } = useLocalServers();
+const OTHER = 'c0ffee00-0000-4000-8000-000000000002';
 
 const ROUND = `I read the server. Two decisions are open.
 
@@ -140,7 +141,7 @@ describe('a side chat on one question (#100)', () => {
     expect(third.indexOf('First reply on Q1.')).toBeLessThan(third.indexOf('Second ask on Q1.'));
   });
 
-  it('keeps one thread per question, each turn with its reply and the files the fork read', async () => {
+  it('keeps one side chat per question, each turn with its reply and the files the fork read', async () => {
     const claude = fakeClaude(async run => {
       run.onLine(line.tool('Read', { file_path: `${run.cwd}/src/server/rounds.ts`, offset: 60, limit: 40 }));
       run.onLine(line.tool('Grep', { pattern: 'sessionDir', path: `${run.cwd}/src` }));
@@ -194,7 +195,7 @@ describe('a side chat on one question (#100)', () => {
     expect((await settled(api)).map(x => x.turns[0].status)).toEqual(['done', 'done']);
   });
 
-  it('refuses a second question on a thread whose reply still runs', async () => {
+  it('refuses a second question on a side chat whose reply still runs', async () => {
     const claude = heldClaude();
     const api = client(await start({ runners: { sideChat: claude.runner } }));
     await api.turn(ROUND);
@@ -267,6 +268,26 @@ describe('a side chat on one question (#100)', () => {
     expect(claude.runs[1].args.slice(-2)).toEqual(['--model', 'haiku']);
   });
 
+  it('keeps the models a session registered with across a restart', async () => {
+    const dataDir = folder();
+    const server = await start({ dataDir });
+    const first = client(server);
+    // Registered before the session's first round, as the mod does on `session.start`.
+    await first.register(SESSION, CWD, { model: 'claude-opus-5-5', sideChatModel: 'haiku' });
+    await first.turn(ROUND);
+    await first.register(OTHER, CWD, { model: 'claude-opus-5-5' });
+    await first.turn(ROUND, OTHER);
+    await server.stop();
+
+    const claude = fakeClaude();
+    const again = client(await start({ dataDir, runners: { sideChat: claude.runner } }));
+    await again.ask(1, 1, 'Which model?');
+    await settled(again);
+    await again.ask(1, 1, 'And here?', OTHER);
+    await until(() => claude.runs.length === 2);
+    expect(claude.runs.map(x => x.args.slice(-2))).toEqual([['--model', 'haiku'], ['--model', 'claude-opus-5-5']]);
+  });
+
   it('never passes a model that would read as an option, and still registers the session', async () => {
     const claude = fakeClaude();
     const api = client(await start({ runners: { sideChat: claude.runner } }));
@@ -278,7 +299,7 @@ describe('a side chat on one question (#100)', () => {
     expect(claude.runs[0].args).not.toContain('--dangerously-skip-permissions');
   });
 
-  it('keeps the threads across a restart, and a reply cut short by it shows as failed', async () => {
+  it('keeps the side chats across a restart, and a reply cut short by it shows as failed', async () => {
     const dataDir = folder();
     const claude = heldClaude();
     const first = await start({ dataDir, runners: { sideChat: claude.runner } });
@@ -317,8 +338,8 @@ describe('asking about a passage (#101)', () => {
     const api = client(await start({ runners: { sideChat: claude.runner } }));
     await api.turn(ROUND);
     expect((await api.askAbout(1, 1, 'Why here?', PASSAGE)).status).toBe(202);
-    const [thread] = await settled(api);
-    expect(thread.turns[0]).toMatchObject({ ask: 'Why here?', passage: PASSAGE, status: 'done' });
+    const [sideChat] = await settled(api);
+    expect(sideChat.turns[0]).toMatchObject({ ask: 'Why here?', passage: PASSAGE, status: 'done' });
     expect(claude.runs[0].input).toContain('The person asks about this passage of the question: «Beside the rounds»\nWhy here?');
   });
 

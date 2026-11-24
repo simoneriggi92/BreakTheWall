@@ -109,6 +109,8 @@ export function serverClient(server: LocalServer) {
     updateWaits: (version: string) => call('/api/update', { method: 'POST', body: { version } }),
     /** The page's specs (#104): every version handed over, newest first. */
     specs: async () => specListSchema.parse(await (await call('/api/specs')).json()).specs,
+    /** The handovers that could not be read, the latest of each session, with why: the page says so (#104). */
+    unreadable: async () => specListSchema.parse(await (await call('/api/specs')).json()).unreadable,
     /** One version, with its text as handed over. */
     spec: (id: string) => call(`/api/specs/${id}`),
     specText: async (id: string): Promise<string> => (await (await call(`/api/specs/${id}`)).json()).text,

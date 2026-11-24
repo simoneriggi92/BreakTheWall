@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { acceptExploration } from '../src/core/exploration-generation';
 import type { Exploration } from '../src/core/exploration';
 import type { RoundView } from '../src/core/round-answers';
-import type { SpecView } from '../src/core/spec';
+import type { SpecView, UnreadableHandover } from '../src/core/spec';
 import { importSource } from '../src/core/source';
 import { LocalPage } from '../src/renderer/LocalPage';
 import { BAKERY, bakery, toAnswer } from './explorations';
@@ -28,8 +28,9 @@ const ROUND: RoundView = {
 };
 
 /** The local server as the page sees it: the latest round, the specs handed over, their explorations, and a poll. */
-function fakeServer(initial: { specs: SpecView[]; round?: RoundView; explorations: Exploration[] }) {
+function fakeServer(initial: { specs: SpecView[]; round?: RoundView; explorations: Exploration[]; unreadable?: UnreadableHandover[] }) {
   let { specs } = initial;
+  const unreadable = initial.unreadable ?? [];
   const requests: { method: string; url: string }[] = [];
   const polls = new Set<(reply: Response) => void>();
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -38,7 +39,7 @@ function fakeServer(initial: { specs: SpecView[]; round?: RoundView; exploration
     if (new Headers(init?.headers).get('x-btw-secret') !== SECRET) return new Response('{}', { status: 401 });
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
     if (url === '/api/current') return Response.json({ current: initial.round ? { kind: 'round', round: initial.round, phaseOpen: false } : null });
-    if (url === '/api/specs') return Response.json({ specs });
+    if (url === '/api/specs') return Response.json({ specs, unreadable });
     const found = /^\/api\/explorations\/([^/]+)\/([^/]+)$/.exec(url);
     if (found) {
       const x = initial.explorations.find(y => y.id === found[1] && y.revision === found[2]);
@@ -82,8 +83,25 @@ describe('a handed-over spec opens in the page (#104)', () => {
     const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one')] });
     render(<LocalPage fetch={server.fetch}/>);
     await title();
-    await user.click(screen.getByRole('button', { name: 'Back to your library' }));
+    expect(screen.queryByRole('button', { name: 'Back to your library' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Close the spec' }));
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('One decision is open.');
+  });
+
+  it('holds a spec handed over while the person writes in the round, says so, and opens it on request', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [], round: ROUND, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('One decision is open.');
+    await user.click(screen.getByRole('button', { name: 'Write a note' }));
+    const field = screen.getByRole('textbox', { name: 'Note' });
+    await user.type(field, 'Half a tho');
+    server.changeSpecs([version({ handedOverAt: '2026-11-24T10:00:00.000Z' })]);
+    const notice = await screen.findByRole('status', { name: 'New spec in' });
+    expect(screen.getByRole('region', { name: 'The turn’s text' })).toBeInTheDocument();
+    expect(field).toHaveFocus();
+    await user.click(within(notice).getByRole('button', { name: 'Open' }));
+    await title();
   });
 
   it('keeps the round in front when the round came after the spec', async () => {
@@ -106,6 +124,27 @@ describe('a handed-over spec opens in the page (#104)', () => {
     await user.click(screen.getByRole('button', { name: 'Write the structure again' }));
     expect(server.requests).toContainEqual({ method: 'POST', url: `/api/specs/${V1}/exploration` });
     expect(await screen.findByText('Claude Code is writing the spec’s structure…')).toBeInTheDocument();
+  });
+});
+
+describe('a handover that could not be read (#104)', () => {
+  const unreadable = (location: string, why: UnreadableHandover['why']): UnreadableHandover => ({ location, session: SESSION, at: '2026-11-24T10:00:00.000Z', why });
+
+  it('says which location could not be read and why, beside the round, until the person closes it', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [], round: ROUND, explorations: [], unreadable: [unreadable('../elsewhere/spec.md', 'outside')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent('The spec at ../elsewhere/spec.md could not be read: the file is outside the session’s folder. No spec was handed over; the round phase does not end.');
+    expect(screen.getByRole('region', { name: 'The turn’s text' })).toBeInTheDocument();
+    await user.click(within(notice).getByRole('button', { name: 'Close notice' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says it in Italian too', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer({ specs: [], round: ROUND, explorations: [], unreadable: [unreadable('#7', 'gh-failed')] }).fetch}/>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('La specifica in #7 non si è potuta leggere: gh non l’ha trovata o non ha risposto. Nessuna specifica è stata consegnata; la fase dei round non finisce.');
   });
 });
 
@@ -136,5 +175,6 @@ describe('a superseded version (#104)', () => {
     const server = fakeServer({ specs: [version({ id: V2, number: 2, latest: V2 }), version({ superseded: true, latest: V2, handedOverAt: '2026-11-24T12:00:00.000Z' })], explorations: [await explored('x-one')] });
     render(<LocalPage fetch={server.fetch}/>);
     expect((await screen.findByRole('button', { name: 'apri la nuova versione' })).closest('[role="status"]')).toHaveTextContent('superata · apri la nuova versione');
+    expect(await screen.findByRole('button', { name: 'Chiudi la specifica' })).toBeInTheDocument();
   });
 });

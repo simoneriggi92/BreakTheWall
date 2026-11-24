@@ -489,6 +489,31 @@ describe('side-chat replies attached to an answer (#101)', () => {
     ].join('\n'));
   });
 
+  it('takes the longest reply a side chat can give, attached whole, and keeps the round it was sent with across a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir, deliveryHoldMs: 50 });
+    await client(first).turn(ROUND);
+    // A side chat's reply runs up to a million characters; three bytes each in UTF-8, the widest a BMP character takes.
+    const reply = '界'.repeat(1_000_000);
+    const draft = { generalNote: '', answers: { '1': { note: '', attached: [{ turn: 1, ask: 'Everything?', reply }] } } };
+    expect((await client(first).saveDraft(1, draft)).status).toBe(204);
+    expect((await client(first).send(1, draft)).status).toBe(200);
+    expect(await client(first).delivery()).toContain(reply);
+    await first.stop();
+    const api = client(await start({ dataDir }));
+    expect((await api.round())?.sent?.message).toContain(reply);
+  });
+
+  it('refuses a Send whose message would be too long to keep, rather than lose the round at the next start', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    // Each line of an attached reply is indented in the message: three replies of short lines outgrow what a round keeps.
+    const attached = [1, 2, 3].map(turn => ({ turn, ask: 'More?', reply: 'a\n'.repeat(500_000) }));
+    const draft = { generalNote: '', answers: { '1': { note: '', attached } } };
+    expect(await (await api.send(1, draft)).json()).toEqual({ error: 'too-long' });
+    expect((await api.round())?.sent).toBeNull();
+  });
+
   it('keeps attached exchanges in the draft across a restart, and refuses one on a question the round does not have, or one turn twice', async () => {
     const dataDir = folder();
     const first = await start({ dataDir });

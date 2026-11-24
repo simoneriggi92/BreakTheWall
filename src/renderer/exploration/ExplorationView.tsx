@@ -27,13 +27,14 @@ const DURATION = 320, EASE = 'cubic-bezier(.2, .8, .2, 1)';
  */
 export interface SourceExtras { flagOf?: (from: number, to: number) => string | undefined; readings?: MoreReading[] }
 
-export function ExplorationView({ x, goHome, extras }: { x: Exploration; goHome: () => void; extras?: SourceExtras }) {
+/** `backLabel` names where the brand button leads when it is not the library: a spec closes back to its round (#104). */
+export function ExplorationView({ x, goHome, backLabel, extras }: { x: Exploration; goHome: () => void; backLabel?: string; extras?: SourceExtras }) {
   const m = useMemo(() => modelOf(x), [x]);
   const [s, dispatch] = useReducer((state: ViewState, action: Action) => reduce(m, state, action), m, initialState);
-  return <ExplorationBody m={m} s={s} dispatch={dispatch} goHome={goHome} extras={extras}/>;
+  return <ExplorationBody m={m} s={s} dispatch={dispatch} goHome={goHome} backLabel={backLabel} extras={extras}/>;
 }
 
-export function ExplorationBody({ m, s, dispatch, goHome, extras }: { m: Model; s: ViewState; dispatch: (a: Action) => void; goHome: () => void; extras?: SourceExtras }) {
+export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: { m: Model; s: ViewState; dispatch: (a: Action) => void; goHome: () => void; backLabel?: string; extras?: SourceExtras }) {
   const { t } = usePreferences(), xt = t.x, x = m.x;
   const view = useMemo(() => shown(m, s.guide, s.all, new Set(s.visited)), [m, s.guide, s.all, s.visited]);
   const focus = s.explore ?? guided(m, s.guide, view) ?? null;
@@ -329,7 +330,7 @@ export function ExplorationBody({ m, s, dispatch, goHome, extras }: { m: Model; 
 
   return <div className="xp" lang={x.language}>
     <header className="xp-bar">
-      <button className="brand-button" onClick={goHome} aria-label={xt.back}><Brand/></button>
+      <button className="brand-button" onClick={goHome} aria-label={backLabel ?? xt.back}><Brand/></button>
       <div className="xp-title"><h1 title={x.title}>{x.title}</h1><p className="xp-meta" title={x.whole}>{x.whole}</p></div>
       <span className="xp-tag" title={origin}>{origin}</span>
       <button className={`xp-how ${s.report ? 'xp-on' : ''}`} aria-pressed={s.report} onClick={() => dispatch({ type: 'report', on: !s.report })}>{s.report ? xt.howBack : xt.how}</button>

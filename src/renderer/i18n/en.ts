@@ -98,6 +98,17 @@ export const en: Messages = {
     notice: {
       newRound: 'New round in',
       newTurn: 'The agent’s new turn in',
+      newSpec: 'New spec in',
+      unreadable: (location: string, why: string) => `The spec at ${location} could not be read: ${why}. No spec was handed over; the round phase does not end.`,
+      unreadableWhy: {
+        'gh-failed': 'gh did not find it or did not answer',
+        missing: 'there is no such file in the session’s folder',
+        outside: 'the file is outside the session’s folder',
+        'not-a-file': 'it is a folder, not a file',
+        'too-large': 'the file is too large',
+        'not-text': 'the file is not UTF-8 text',
+        empty: 'the spec is empty',
+      },
       open: 'Open',
       update: (version: string) => `Break the Wall ${version} is ready: the update comes once the other sessions end.`,
     },
@@ -123,7 +134,7 @@ export const en: Messages = {
       askingAbout: 'Asking about',
       wholeQuestion: 'Ask about the whole question',
       attach: '📎 Attach to answer',
-      /** Before Send: threads none of whose replies the person attached. */
+      /** Before Send: side chats none of whose replies the person attached. */
       unattached: (n: number) => n === 1 ? '1 side chat with no reply attached' : `${n} side chats with no reply attached`,
       key: 'c side chat',
     },
@@ -131,6 +142,7 @@ export const en: Messages = {
       version: (n: number, location: string) => `Version ${n} · ${location}`,
       superseded: 'superseded',
       openNew: 'open the new version',
+      close: 'Close the spec',
       writing: 'Claude Code is writing the spec’s structure…',
       repairing: 'Claude Code is repairing the spec’s structure…',
       cancel: 'Cancel',

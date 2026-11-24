@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -8,7 +8,8 @@ import {
 } from '../core/spec-remarks';
 import { sessionIdSchema } from '../core/local-server';
 import { specIdSchema } from '../core/spec';
-import { atomicWrite } from './rounds';
+import { WriteQueue } from './files';
+import { noContent, readJson, send, TRANSCRIPT_GONE } from './http';
 import type { RoundStore } from './rounds';
 
 /**
@@ -41,8 +42,6 @@ export interface SpecRemarksContext {
   queued(session: string): void;
   /** What the page shows changed. */
   changed(): void;
-  readJson(req: IncomingMessage, maxBytes?: number): Promise<unknown>;
-  send(res: ServerResponse, status: number, body: unknown): void;
 }
 
 const sentBatchSchema = z.strictObject({
@@ -62,6 +61,8 @@ const storedSchema = z.strictObject({
 });
 type Stored = z.infer<typeof storedSchema>;
 
+const sameRemark = (x: SpecRemarksDraft['remarks'][number]) => `${specRemarkKey(x)}\n${x.text.trim()}`;
+
 /** Remarks riding with a round: the spec they are on and how the message words them. */
 export interface Riding { key: string; section: SpecRemarksSection }
 
@@ -69,9 +70,9 @@ const REMARKS_PATH = /^\/api\/specs\/([^/]+)\/remarks(\/send)?$/;
 const MAX_REMARKS_BYTES = 1024 * 1024;
 
 export async function specRemarkRoutes(context: SpecRemarksContext) {
-  const { rounds, send } = context;
+  const { rounds } = context;
   const stored = new Map<string, Stored>();
-  const writes = new Map<string, Promise<void>>();
+  const writes = new WriteQueue();
   for (const spec of context.allSpecs()) await load(spec);
 
   async function load(spec: RemarkedSpec) {
@@ -83,9 +84,7 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
   const of = (key: string): Stored => stored.get(key) ?? { version: 1, key, draft: emptySpecRemarks(), sent: [] };
   function save(spec: RemarkedSpec, x: Stored): Promise<void> {
     stored.set(spec.key, x);
-    const write = (writes.get(spec.key) ?? Promise.resolve()).catch(() => {}).then(() => atomicWrite(join(spec.folder, 'remarks.json'), JSON.stringify(x, null, 2)));
-    writes.set(spec.key, write);
-    return write;
+    return writes.write(spec.key, join(spec.folder, 'remarks.json'), x);
   }
   const newest = (spec: RemarkedSpec) => spec.versions.reduce((a, b) => b.number > a.number ? b : a);
   const sectionOf = (spec: RemarkedSpec, draft: SpecRemarksDraft): SpecRemarksSection => {
@@ -106,6 +105,21 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
       if (remark.version !== latest && !kept.has(specRemarkKey(remark))) return 'superseded';
     }
     return new Set(draft.remarks.map(specRemarkKey)).size === draft.remarks.length ? null : 'bad-request';
+  }
+
+  /**
+   * The draft without what a Send already took: the page's save of a draft can leave before a Send and land after it,
+   * and must not put the sent remarks and note back, to go out a second time. A remark is the same one when its anchor
+   * and its words are.
+   */
+  function unsent(spec: RemarkedSpec, draft: SpecRemarksDraft): SpecRemarksDraft {
+    const { sent } = of(spec.key);
+    const remarks = new Set(sent.flatMap(b => b.remarks.map(sameRemark)));
+    const notes = new Set(sent.map(b => b.generalNote).filter(x => x !== ''));
+    return {
+      generalNote: notes.has(draft.generalNote.trim()) ? '' : draft.generalNote,
+      remarks: draft.remarks.filter(x => !hasWords(x) || !remarks.has(sameRemark(x))),
+    };
   }
 
   /** What a Send takes: the general note and the remarks with words. Remarks without words stay in the draft. */
@@ -157,29 +171,31 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
     if (req.method === 'GET' && !sending) { send(res, 200, view(spec)); return true; }
     const target = newest(spec);
     if (req.method === 'PUT' && !sending) {
-      const draft = specRemarksDraftSchema.safeParse(await context.readJson(req, MAX_REMARKS_BYTES));
-      if (!draft.success) { send(res, 400, { error: 'bad-request' }); return true; }
-      const refused = check(spec, draft.data);
+      const parsed = specRemarksDraftSchema.safeParse(await readJson(req, MAX_REMARKS_BYTES));
+      if (!parsed.success) { send(res, 400, { error: 'bad-request' }); return true; }
+      const draft = unsent(spec, parsed.data);
+      const refused = check(spec, draft);
       if (refused) { send(res, refused === 'superseded' ? 409 : 400, { error: refused }); return true; }
-      await save(spec, { ...of(spec.key), draft: draft.data });
+      await save(spec, { ...of(spec.key), draft });
       context.changed();
-      res.writeHead(204, { 'cache-control': 'no-store' }).end();
+      noContent(res);
       return true;
     }
     if (req.method === 'POST' && sending) {
-      const body = sendSpecRemarksSchema.safeParse(await context.readJson(req, MAX_REMARKS_BYTES));
+      const body = sendSpecRemarksSchema.safeParse(await readJson(req, MAX_REMARKS_BYTES));
       if (!body.success) { send(res, 400, { error: 'bad-request' }); return true; }
-      const refused = check(spec, body.data.draft);
+      const draft = unsent(spec, body.data.draft);
+      const refused = check(spec, draft);
       if (refused) { send(res, refused === 'superseded' ? 409 : 400, { error: refused }); return true; }
-      if (context.transcriptGone(target.session)) { send(res, 409, { error: 'transcript-gone' }); return true; }
-      await save(spec, { ...of(spec.key), draft: body.data.draft });
+      if (context.transcriptGone(target.session)) { send(res, 409, TRANSCRIPT_GONE); return true; }
+      await save(spec, { ...of(spec.key), draft });
       // The agent waits on a round: the remarks go with its answers, so one turn carries everything.
       const awaiting = rounds.awaiting(target.session);
       if (awaiting !== undefined) { context.changed(); send(res, 409, { error: 'rides', round: awaiting }); return true; }
-      const message = specRemarksMessage(sectionOf(spec, body.data.draft), body.data.language);
+      const message = specRemarksMessage(sectionOf(spec, draft), body.data.language);
       if (message === '') { send(res, 400, { error: 'bad-request' }); return true; }
       const number = await rounds.sendRemarks(target.session, target.cwd, message);
-      await markSent(spec, body.data.draft, target.session, { kind: 'remarks', number });
+      await markSent(spec, draft, target.session, { kind: 'remarks', number });
       context.queued(target.session);
       send(res, 200, { message });
       return true;
@@ -187,6 +203,28 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
     return false;
   }
 
-  return { handle, riding, rodeWith };
+  /**
+   * The session was deleted with the versions it handed over (#102): remarks on those versions go from the draft and
+   * from what was sent, and so does what was sent to it; a spec with no version left loses its folder.
+   */
+  async function forget(session: string, gone: readonly { key: string; folder: string; numbers: number[]; whole: boolean }[]) {
+    for (const x of gone) {
+      await writes.settle(key => key === x.key);
+      if (x.whole) {
+        stored.delete(x.key);
+        await rm(x.folder, { recursive: true, force: true });
+        continue;
+      }
+      const before = stored.get(x.key);
+      if (!before) continue;
+      const kept = (remark: { version: number }) => !x.numbers.includes(remark.version);
+      const sent = before.sent.filter(b => b.session !== session).map(b => ({ ...b, remarks: b.remarks.filter(kept) }))
+        .filter(b => b.remarks.length > 0 || b.generalNote !== '');
+      const spec = context.allSpecs().find(y => y.key === x.key);
+      if (spec) await save(spec, { ...before, draft: { ...before.draft, remarks: before.draft.remarks.filter(kept) }, sent });
+    }
+  }
+
+  return { handle, riding, rodeWith, forget };
 }
 export type SpecRemarkRoutes = Awaited<ReturnType<typeof specRemarkRoutes>>;

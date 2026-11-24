@@ -83,4 +83,22 @@ export const specViewSchema = z.strictObject({
   run: specRunSchema,
 });
 export type SpecView = z.infer<typeof specViewSchema>;
-export const specListSchema = z.object({ specs: z.array(specViewSchema) });
+
+/**
+ * Why a handover could not be read: `gh` failed or found no issue, the file is missing, outside the session's folder,
+ * a folder, too large or not UTF-8 text, or the spec is empty. No version is kept and the round phase stays open.
+ */
+export const unreadableWhySchema = z.enum(['gh-failed', 'missing', 'outside', 'not-a-file', 'too-large', 'not-text', 'empty']);
+export type UnreadableWhy = z.infer<typeof unreadableWhySchema>;
+/** A handover that could not be read, as the page says it: the location as the agent wrote it, and why. */
+export const unreadableHandoverSchema = z.strictObject({
+  location: z.string().min(1).max(MAX_PATH),
+  session: sessionIdSchema,
+  at: z.iso.datetime(),
+  why: unreadableWhySchema,
+});
+export type UnreadableHandover = z.infer<typeof unreadableHandoverSchema>;
+
+/** Every version handed over, and the latest handover of each session that could not be read since its last read one. */
+export const specListSchema = z.object({ specs: z.array(specViewSchema), unreadable: z.array(unreadableHandoverSchema).max(1_000).default([]) });
+export type SpecList = z.infer<typeof specListSchema>;

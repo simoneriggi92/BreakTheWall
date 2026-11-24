@@ -104,6 +104,19 @@ export const it = {
       /** Followed by the project's name, emphasised. */
       newRound: 'Nuovo round in',
       newTurn: 'Nuovo turno dell’agente in',
+      /** A spec handed over while the person writes or reads history (#104). */
+      newSpec: 'Nuova specifica in',
+      /** A handover the server could not read (#104): the location as the agent wrote it, and why. */
+      unreadable: (location: string, why: string) => `La specifica in ${location} non si è potuta leggere: ${why}. Nessuna specifica è stata consegnata; la fase dei round non finisce.`,
+      unreadableWhy: {
+        'gh-failed': 'gh non l’ha trovata o non ha risposto',
+        missing: 'nella cartella della sessione non c’è questo file',
+        outside: 'il file è fuori dalla cartella della sessione',
+        'not-a-file': 'è una cartella, non un file',
+        'too-large': 'il file è troppo grande',
+        'not-text': 'il file non è testo UTF-8',
+        empty: 'la specifica è vuota',
+      },
       open: 'Apri',
       update: (version: string) => `Break the Wall ${version} è pronto: l’aggiornamento arriva quando le altre sessioni finiscono.`,
     },
@@ -130,7 +143,7 @@ export const it = {
       askingAbout: 'Chiedi su',
       wholeQuestion: 'Chiedi sull’intera domanda',
       attach: '📎 Allega alla risposta',
-      /** Before Send: threads none of whose replies the person attached. */
+      /** Before Send: side chats none of whose replies the person attached. */
       unattached: (n: number) => n === 1 ? '1 chat laterale senza una risposta allegata' : `${n} chat laterali senza una risposta allegata`,
       key: 'c chat laterale',
     },
@@ -141,6 +154,8 @@ export const it = {
       /** Followed by `openNew`, as one line: "superseded · open the new version". */
       superseded: 'superata',
       openNew: 'apri la nuova versione',
+      /** The brand button over the spec: it closes the spec, back to the round or the library. */
+      close: 'Chiudi la specifica',
       writing: 'Claude Code sta scrivendo la struttura della specifica…',
       repairing: 'Claude Code sta correggendo la struttura della specifica…',
       cancel: 'Annulla',

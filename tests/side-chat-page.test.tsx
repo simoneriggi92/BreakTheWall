@@ -60,9 +60,9 @@ function fakeServer(initial: SideChat[] = [], round: RoundView = ROUND) {
       const body = JSON.parse(String(init?.body)) as { ask: string; passage?: SideChatTurn['passage'] };
       const text = body.ask;
       asked.push({ question, ask: text, ...(body.passage ? { passage: body.passage } : {}) });
-      const thread = chats.find(x => x.question === question) ?? { question, turns: [] };
-      const turn: SideChatTurn = { number: thread.turns.length + 1, ask: text, ...(body.passage ? { passage: body.passage } : {}), reply: '', files: [], status: 'running', route: 'fork', at: '2026-11-24T10:01:00.000Z' };
-      change(question, [...thread.turns, turn]);
+      const sideChat = chats.find(x => x.question === question) ?? { question, turns: [] };
+      const turn: SideChatTurn = { number: sideChat.turns.length + 1, ask: text, ...(body.passage ? { passage: body.passage } : {}), reply: '', files: [], status: 'running', route: 'fork', at: '2026-11-24T10:01:00.000Z' };
+      change(question, [...sideChat.turns, turn]);
       return Response.json({ turn: turn.number }, { status: 202 });
     }
     return new Response('{}', { status: 404 });
@@ -123,7 +123,7 @@ describe('a side chat on the focused question (#100)', () => {
     expect(server.asked).toEqual([{ question: 1, ask: 'Why not their own folder?' }]);
     expect(await within(chat()).findByText('Why not their own folder?')).toBeInTheDocument();
     expect(within(chat()).getByRole('textbox', { name: 'Ask in the side chat' })).toHaveValue('');
-    // While the reply runs, the thread takes no second question.
+    // While the reply runs, the side chat takes no second question.
     expect(within(chat()).getByRole('button', { name: 'Ask' })).toBeDisabled();
 
     server.stream(1, { reply: 'Deleting a session ', files: ['src/server/rounds.ts'] });
@@ -135,7 +135,7 @@ describe('a side chat on the focused question (#100)', () => {
     expect(within(chat()).getByRole('button', { name: 'Ask' })).toBeEnabled();
   });
 
-  it('follows the focus: each question shows its own thread, and the outline marks questions with one', async () => {
+  it('follows the focus: each question shows its own side chat, and the outline marks questions with one', async () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer([{ question: 2, turns: [turn({ ask: 'Why the server?', reply: 'Tests reach it.' }), turn({ number: 2, ask: 'And the mod?', reply: 'It stays thin.' })] }]).fetch}/>);
     await screen.findByRole('article');
@@ -268,7 +268,7 @@ describe('asking about a passage (#101)', () => {
 
 describe('attaching side-chat replies to the answer (#101)', () => {
   const PASSAGE = { part: 'body' as const, start: 25, end: 41, passage: 'their own folder' };
-  const threads = (): SideChat[] => [
+  const kept = (): SideChat[] => [
     { question: 1, turns: [turn({ ask: 'Why not their own folder?', passage: PASSAGE, reply: 'Deleting a session\ndeletes its side chats.' }), turn({ number: 2, ask: 'Still running?', reply: 'Half', status: 'running' })] },
     { question: 2, turns: [turn({ ask: 'Why the server?', reply: 'Tests reach it.' })] },
   ];
@@ -276,7 +276,7 @@ describe('attaching side-chat replies to the answer (#101)', () => {
 
   it('attaches a finished reply with 📎: the exchange shows verbatim under its question in what the agent receives, and Send carries it', async () => {
     const user = userEvent.setup();
-    const server = fakeServer(threads());
+    const server = fakeServer(kept());
     render(<LocalPage fetch={server.fetch}/>);
     await user.click(await screen.findByRole('button', { name: 'Ask about this question' }));
     await within(chat()).findByText('Why not their own folder?');
@@ -301,7 +301,7 @@ describe('attaching side-chat replies to the answer (#101)', () => {
 
   it('takes an attached reply back with a second press, and attaches nothing on a sent round', async () => {
     const user = userEvent.setup();
-    render(<LocalPage fetch={fakeServer(threads()).fetch}/>);
+    render(<LocalPage fetch={fakeServer(kept()).fetch}/>);
     await user.click(await screen.findByRole('button', { name: 'Ask about this question' }));
     await within(chat()).findByText('Why not their own folder?');
     await user.click(attach()[0]);
@@ -309,7 +309,7 @@ describe('attaching side-chat replies to the answer (#101)', () => {
     expect(attach()[0]).toHaveAttribute('aria-pressed', 'false');
     expect(receives()).not.toContain('Side chat');
     cleanup();
-    render(<LocalPage fetch={fakeServer(threads(), { ...ROUND, sent: SENT }).fetch}/>);
+    render(<LocalPage fetch={fakeServer(kept(), { ...ROUND, sent: SENT }).fetch}/>);
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Ask about this question' }));
     await within(chat()).findByText('Why not their own folder?');
     expect(within(chat()).queryByRole('button', { name: '📎 Attach to answer' })).toBeNull();
@@ -317,7 +317,7 @@ describe('attaching side-chat replies to the answer (#101)', () => {
 
   it('counts, before Send, the side chats with no reply attached', async () => {
     const user = userEvent.setup();
-    render(<LocalPage fetch={fakeServer(threads()).fetch}/>);
+    render(<LocalPage fetch={fakeServer(kept()).fetch}/>);
     const review = await screen.findByRole('region', { name: 'What the agent receives' });
     expect(await within(review).findByText('2 side chats with no reply attached')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Ask about this question' }));
@@ -333,7 +333,7 @@ describe('attaching side-chat replies to the answer (#101)', () => {
   it('words "Ask here", 📎 and the count in Italian when the page is in Italian', async () => {
     setLanguage('it-IT');
     const user = userEvent.setup();
-    render(<LocalPage fetch={fakeServer(threads()).fetch}/>);
+    render(<LocalPage fetch={fakeServer(kept()).fetch}/>);
     const review = await screen.findByRole('region', { name: 'Cosa riceve l’agente' });
     expect(await within(review).findByText('2 chat laterali senza una risposta allegata')).toBeInTheDocument();
     selectText(screen.getByRole('article'), 'their own folder');
