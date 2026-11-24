@@ -60,8 +60,8 @@ const line = z.number().int().min(1);
 export const checkedStatementSchema = z.strictObject({
   from: line,
   to: line,
-  /** The title of the section it stands in; empty before the first section. */
-  section: z.string(),
+  /** The section it stands in, named by its line, as `sections` lists it: 1 before the first section. */
+  section: line,
   quote: z.string().max(5_000),
   state: backingStateSchema,
   references: z.array(checkedReferenceSchema),
@@ -103,13 +103,12 @@ export async function checkBacking(text: string, resolve: Resolve): Promise<Back
       return { kind: 'lines', written: reference.written, found: found.found };
     }));
     const state: BackingState = references.length === 0 ? 'unbacked' : references.every(x => x.found) ? 'backed' : 'broken';
-    return { from: statement.from, to: statement.to, section: sectionAt(index, statement.from)?.title ?? '', quote: statement.quote, state, references };
+    return { from: statement.from, to: statement.to, section: sectionAt(index, statement.from)?.line ?? 1, quote: statement.quote, state, references };
   }));
   const sections: BackingSection[] = [];
   for (const statement of checked) {
-    const line = sectionAt(index, statement.from)?.line ?? 1;
-    let section = sections.find(x => x.line === line);
-    if (!section) sections.push(section = { title: statement.section, line, statements: 0, unbacked: 0, broken: 0 });
+    let section = sections.find(x => x.line === statement.section);
+    if (!section) sections.push(section = { title: index.find(x => x.line === statement.section)?.title ?? '', line: statement.section, statements: 0, unbacked: 0, broken: 0 });
     section.statements++;
     if (statement.state === 'unbacked') section.unbacked++;
     if (statement.state === 'broken') section.broken++;

@@ -10,7 +10,10 @@ import type { Model } from './model';
  * a grid with one cell per line, the legend with counts, and five readings in words. The numbers are X6's; this only
  * words them.
  */
-export function Report({ m, onLine, onLink }: { m: Model; onLine: (line: number) => void; onLink: (l: ExplorationLink) => void }) {
+/** A reading a host adds after the view's own, worded already: a spec's backing (#106). */
+export interface MoreReading { title: string; head: string; body: string }
+
+export function Report({ m, onLine, onLink, more = [] }: { m: Model; onLine: (line: number) => void; onLink: (l: ExplorationLink) => void; more?: MoreReading[] }) {
   const { t, n } = usePreferences(), r = t.x.report;
   const x: Exploration = m.x;
   const report = useMemo(() => readingReport(x, shapeOf(x), m.index), [x, m.index]);
@@ -29,6 +32,7 @@ export function Report({ m, onLine, onLink }: { m: Model; onLine: (line: number)
       report.entry.code === 'trace' && trace ? r.entryTraceBody(trace.question, pct(report.entry.covered ?? 0, 1)) : report.entry.code === 'source' ? r.entrySourceBody : r.entryLayersBody],
     [r.order, order === null ? r.orderNone : order >= 0.75 ? r.orderFollows : order >= 0.5 ? r.orderPartly : r.orderJumps,
       (order === null ? '' : r.orderBody(Math.round(order * 100), report.order.sections)) + (points.points ? r.points(pct(points.inside, points.points)) : '')],
+    ...more.map((x): [string, string, string] => [x.title, x.head, x.body]),
   ];
   return <section className="xp-report xp-panel" aria-label={r.title}>
     <div className="xp-rep-main">

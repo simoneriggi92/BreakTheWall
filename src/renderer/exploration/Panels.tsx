@@ -163,7 +163,7 @@ function IndexLegend({ m, walked, unextracted }: { m: Model; walked: boolean; un
  * "Righe" shows them. Either way each block or line carries `data-from` and `data-to`, so the same code marks the
  * selection's lines, colours each gutter with the part that cites it, and answers a click with its first line.
  */
-export function SourcePanel({ m, cites, view, onLine }: { m: Model; cites: ExplorationCite[]; view: 'document' | 'lines'; onLine: (line: number) => void }) {
+export function SourcePanel({ m, cites, view, onLine, flagOf }: { m: Model; cites: ExplorationCite[]; view: 'document' | 'lines'; onLine: (line: number) => void; flagOf?: (from: number, to: number) => string | undefined }) {
   const host = useRef<HTMLDivElement>(null);
   const source = m.x.source;
   const lines = view === 'lines' || !isProse(source);
@@ -174,6 +174,7 @@ export function SourcePanel({ m, cites, view, onLine }: { m: Model; cites: Explo
       const p = citing(roles, Number(b.dataset.from));
       b.dataset.role = !p ? 'none' : p.kind === 'part' ? 'main' : p.kind === 'prerequisite' ? 'prerequisite' : p.kind === 'annotation' ? 'annotation' : 'aside';
       const tone = p && m.tone(p.id); if (tone) b.dataset.tone = tone; else delete b.dataset.tone;
+      const flag = flagOf?.(Number(b.dataset.from), Number(b.dataset.to ?? b.dataset.from)); if (flag) b.dataset.backing = flag; else delete b.dataset.backing;
     });
   });
   return <div ref={host} className="xp-source" onClick={e => {
