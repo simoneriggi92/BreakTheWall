@@ -112,11 +112,12 @@ async function pollDelivery($: EngineInterface) {
       const reply = await $.http.fetch(`http://127.0.0.1:${server.port}/api/sessions/${encodeURIComponent(id)}/delivery`, { headers: { 'x-btw-secret': server.secret } })
       if (reply.ok) {
         wait = 1
-        const { round, message } = JSON.parse(reply.text) as { round?: unknown; message?: unknown }
-        if (typeof round === 'number' && typeof message === 'string' && message !== '') {
+        // `delivery` names what the message answers, a round or a free block (`round-2`, `free-1`): the mod only hands it back.
+        const { id: delivery, message } = JSON.parse(reply.text) as { id?: unknown; message?: unknown }
+        if (typeof delivery === 'string' && typeof message === 'string' && message !== '') {
           await $.prompt.submit({ text: message, asUser: true })
           // Confirmed only once submitted: a submit that fails leaves the message to come back after its lease.
-          await $.http.fetch(`http://127.0.0.1:${server.port}/api/sessions/${encodeURIComponent(id)}/delivery/${round}`, { method: 'POST', headers: { 'x-btw-secret': server.secret } })
+          await $.http.fetch(`http://127.0.0.1:${server.port}/api/sessions/${encodeURIComponent(id)}/delivery/${encodeURIComponent(delivery)}`, { method: 'POST', headers: { 'x-btw-secret': server.secret } })
         }
       }
     }

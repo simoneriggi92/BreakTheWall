@@ -8,13 +8,13 @@ The one local server per person behind the page `/break-the-wall` opens: its loc
 
 | File | Owns |
 |---|---|
-| `server.ts` | `startLocalServer`: the guard (Host, Origin, secret, no CORS), static page, presence (session leases, page polls), idle stop, and the round API: turns in, the latest round, drafts, Send, the mod's delivery long-poll |
-| `rounds.ts` | `RoundStore`: rounds, drafts and sent messages under `<userData>/rounds/projects/<hash of cwd>/<session>/round-<n>.json`, one versioned file per round, replaced atomically, Zod-checked on read |
+| `server.ts` | `startLocalServer`: the guard (Host, Origin, secret, no CORS), static page, presence (session leases, page polls), idle stop, and the round API: turns in, what the page shows (`/api/current`), drafts and replies, Send, the round phase, the mod's delivery long-poll |
+| `rounds.ts` | `RoundStore`: rounds, free blocks, their drafts and sent messages, and each session's round phase, under `<userData>/rounds/projects/<hash of cwd>/<session>/` (`round-<n>.json`, `free-<n>.json`, `phase.json`), one versioned file each, replaced atomically, Zod-checked on read |
 | `lock.ts` | `<userData>/rounds/server.lock` (port, pid, version, secret; `0600`), created whole by hard link, and `serverStatus` |
-| `launch.ts`, `launcher.ts` | `node launcher.cjs start \| open`: find or start the server detached, open a tab only when no page polls |
+| `launch.ts`, `launcher.ts` | `node launcher.cjs start \| open \| phase <session> <cwd>`: find or start the server detached, open a tab only when no page polls; `phase` (the injection hook's) opens a session's round phase on a running server, never starting one |
 | `main.ts` | The detached server process; serves `../page` beside its bundle |
 
-The status contract and the secret header are in `src/core/local-server.ts`, shared with the page. The round format (`src/core/round.ts`) and the answers, the page's view of a round and the return message (`src/core/round-answers.ts`) are shared with the page too: the page previews the message with the function the server sends it with.
+The status contract and the secret header are in `src/core/local-server.ts`, shared with the page. The round format (`src/core/round.ts`), the answers, the page's view of a round and the return message (`src/core/round-answers.ts`), and the round phase, free blocks and the page's current view (`src/core/round-phase.ts`) are shared with the page too: the page previews the message with the function the server sends it with.
 
 ## Conventions
 
@@ -29,6 +29,8 @@ The status contract and the secret header are in `src/core/local-server.ts`, sha
 - `BTW_USER_DATA_DIR` isolates the data folder, as in the app; tests and `smoke:page` rely on it.
 - The delivery poll is held 20 s, below `$.http.fetch`'s 30 s per call. A message handed to a poll is leased (10 minutes, in memory) and counts as delivered only when the mod confirms it submitted it; unconfirmed, it comes back after the lease or a restart. The lease is long because `$.prompt.submit` first waits for the session to be idle.
 - A session id names a folder, so every route that takes one checks it against `sessionIdSchema` first.
+- Rounds and free blocks are numbered apart (a round's number is what `[R2·Q3]` backing names) but share one `order` per session: supersession and the delivery queue follow it. A delivery goes out with its id (`round-2`, `free-1`), which the mod confirms. A round kept before free blocks existed has no `order`; its number stands in.
+- Every message passes through `asText`: a leading `/` or `!` would run as a command, a skill or a shell line once `$.prompt.submit` takes it, so it is escaped with a backslash.
 
 ## Related
 

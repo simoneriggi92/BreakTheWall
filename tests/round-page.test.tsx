@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RoundView } from '../src/core/round-answers';
+import type { FreeBlockView } from '../src/core/round-phase';
 import { LocalPage } from '../src/renderer/LocalPage';
 
 // jsdom cannot lay out a Mermaid diagram: the renderer is replaced, and a diagram whose code says "broken" fails.
@@ -31,9 +32,14 @@ type View = RoundView;
 
 interface Request { method: string; url: string; body: unknown }
 
-/** The local server as the page sees it, with one round and a poll that answers when the round changes. */
-function fakeServer(initial: View | null = ROUND) {
+/**
+ * The local server as the page sees it: one round, or a free block shown over it, whether the session is in the round
+ * phase, and a poll that answers when any of them changes.
+ */
+function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; phaseOpen?: boolean } = {}) {
   let round = initial;
+  let free = more.free ?? null;
+  let phaseOpen = more.phaseOpen ?? true;
   const requests: Request[] = [];
   const polls = new Set<(reply: Response) => void>();
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -42,7 +48,14 @@ function fakeServer(initial: View | null = ROUND) {
     requests.push({ method, url, body });
     if (new Headers(init?.headers).get('x-btw-secret') !== SECRET) return new Response('{}', { status: 401 });
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
-    if (url === '/api/round') return Response.json({ round });
+    if (url === '/api/current') return Response.json({ current: free ? { kind: 'free', block: free, phaseOpen } : round ? { kind: 'round', round, phaseOpen } : null });
+    if (method === 'DELETE' && url === `/api/sessions/${SESSION}/phase`) { phaseOpen = false; wake(); return new Response(null, { status: 204 }); }
+    if (method === 'PUT' && url === `/api/free/${SESSION}/1/reply`) return new Response(null, { status: 204 });
+    if (method === 'POST' && url === `/api/free/${SESSION}/1/send`) {
+      const message = `as delivered by the server: ${(body as { reply: string }).reply.trim()}`;
+      free = free && { ...free, reply: (body as { reply: string }).reply, sent: { message, at: '2026-11-23T10:06:00.000Z' } };
+      return Response.json({ message });
+    }
     if (url === '/api/page/poll') return new Promise<Response>((done, fail) => {
       polls.add(done);
       init?.signal?.addEventListener('abort', () => fail(new DOMException('aborted', 'AbortError')));
@@ -56,8 +69,10 @@ function fakeServer(initial: View | null = ROUND) {
     }
     return new Response('{}', { status: 404 });
   });
-  const changeRound = (next: View) => { round = next; for (const done of polls) done(Response.json({ changed: true })); polls.clear(); };
-  return { fetch: fetch as unknown as typeof window.fetch, requests, changeRound };
+  function wake() { for (const done of polls) done(Response.json({ changed: true })); polls.clear(); }
+  const changeRound = (next: View) => { round = next; wake(); };
+  const changeFree = (next: FreeBlockView) => { free = next; wake(); };
+  return { fetch: fetch as unknown as typeof window.fetch, requests, changeRound, changeFree };
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
@@ -571,5 +586,110 @@ describe('remarks on a question\'s passage (#98)', () => {
     await user.click(screen.getByRole('button', { name: 'Osservazione' }));
     expect(screen.getByRole('textbox', { name: 'Osservazione su «server»' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Togli l’osservazione su «server»' })).toBeInTheDocument();
+  });
+});
+
+const FREE: FreeBlockView = {
+  session: SESSION,
+  number: 1,
+  receivedAt: '2026-11-23T10:04:00.000Z',
+  text: 'Before the next round: do you mean **the page** or the terminal when you say "the view"?',
+  reply: '',
+  sent: null,
+  superseded: false,
+};
+const freeBlock = () => screen.getByRole('region', { name: 'The agent’s turn' });
+
+describe('a free block in the page (#99)', () => {
+  it('shows a turn without a round as its text and one reply field, saves the reply, and sends it as one message', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(ROUND, { free: FREE });
+    render(<LocalPage fetch={server.fetch}/>);
+    expect(await screen.findByRole('region', { name: 'The agent’s turn' })).toHaveTextContent('do you mean the page or the terminal');
+    expect(within(freeBlock()).getByText('the page').tagName).toBe('STRONG');
+    expect(screen.queryByRole('navigation', { name: 'Questions' })).toBeNull();
+    await user.type(screen.getByRole('textbox', { name: 'Your reply' }), 'The page.');
+    await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({ reply: 'The page.' }));
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Sent.');
+    expect(screen.getByTestId('free-message')).toHaveTextContent('as delivered by the server: The page.');
+    expect(screen.queryByRole('textbox', { name: 'Your reply' })).toBeNull();
+  });
+
+  it('sends with Ctrl+Enter, and not while the reply is empty', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(ROUND, { free: FREE });
+    render(<LocalPage fetch={server.fetch}/>);
+    const field = await screen.findByRole('textbox', { name: 'Your reply' });
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    await user.type(field, 'Yes.');
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() => expect(server.requests.some(x => x.method === 'POST' && x.url.endsWith('/send'))).toBe(true));
+  });
+
+  it('shows a free block that arrives while a round is open', async () => {
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('navigation', { name: 'Questions' });
+    await act(async () => server.changeFree(FREE));
+    expect(await screen.findByRole('region', { name: 'The agent’s turn' })).toBeInTheDocument();
+  });
+
+  it('takes no reply once a later turn of the session superseded it', async () => {
+    render(<LocalPage fetch={fakeServer(ROUND, { free: { ...FREE, superseded: true } }).fetch}/>);
+    await screen.findByRole('region', { name: 'The agent’s turn' });
+    expect(screen.queryByRole('textbox', { name: 'Your reply' })).toBeNull();
+    expect(screen.getByText(/A later turn of this session arrived/)).toBeInTheDocument();
+  });
+
+  it('keeps a typed reply that starts with / as text, and says so', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(ROUND, { free: FREE });
+    render(<LocalPage fetch={server.fetch}/>);
+    await user.type(await screen.findByRole('textbox', { name: 'Your reply' }), '/clear');
+    expect(screen.getByText(/sent as text/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(server.requests.find(x => x.method === 'POST' && x.url.endsWith('/send'))?.body).toEqual({ reply: '/clear' }));
+  });
+});
+
+describe('the round phase in the page (#99)', () => {
+  it('ends the phase from a round or a free block, and then says new turns stay in the terminal', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    await user.click(await screen.findByRole('button', { name: 'End the round phase' }));
+    expect(server.requests.some(x => x.method === 'DELETE' && x.url === `/api/sessions/${SESSION}/phase`)).toBe(true);
+    expect(await screen.findByText(/Round phase ended/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'End the round phase' })).toBeNull();
+    // The round the agent waits on still takes its answers.
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
+  it('moves the end into the drawer below ~860 px, where the top bar has no room for it', async () => {
+    const user = userEvent.setup();
+    viewport(700);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'End the round phase' })).toBeNull();
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'What the agent receives' }));
+    await user.click(within(receives()).getByRole('button', { name: 'End the round phase' }));
+    expect(await within(receives()).findByText('Round phase ended')).toBeInTheDocument();
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  it('offers the same end under a free block', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(ROUND, { free: FREE });
+    render(<LocalPage fetch={server.fetch}/>);
+    await user.click(await screen.findByRole('button', { name: 'End the round phase' }));
+    expect(await screen.findByText(/Round phase ended/)).toBeInTheDocument();
+  });
+
+  it('says in Italian that the phase ended', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer(ROUND, { free: FREE, phaseOpen: false }).fetch}/>);
+    expect(await screen.findByText(/Fase dei round conclusa/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'La tua risposta' })).toBeInTheDocument();
   });
 });

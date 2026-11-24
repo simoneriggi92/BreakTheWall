@@ -50,6 +50,26 @@ export const it = {
       sendFailed: 'Invio non riuscito. Riprova.',
       saveFailed: 'L’ultima modifica non è stata salvata.',
     },
+    /** A turn without a round, during the round phase (#99). */
+    free: {
+      title: 'Il turno dell’agente',
+      reply: 'La tua risposta',
+      asText: 'Inizia con / o !: viene inviata come testo, Claude Code non esegue comandi né skill.',
+      send: 'Invia',
+      sending: 'Invio…',
+      sent: 'Inviata. L’agente riceve esattamente questo messaggio.',
+      superseded: 'È arrivato un turno successivo di questa sessione: questo non accetta più risposte.',
+      sendFailed: 'Invio non riuscito. Riprova.',
+      saveFailed: 'L’ultima modifica non è stata salvata.',
+    },
+    /** The session's round phase (#99). */
+    phase: {
+      end: 'Chiudi la fase dei round',
+      endHint: 'I prossimi turni dell’agente senza un round restano nel terminale.',
+      ended: 'Fase dei round conclusa',
+      endedHint: 'I prossimi turni dell’agente senza un round restano nel terminale.',
+      endFailed: 'La fase non si è chiusa. Riprova.',
+    },
   },
   assistants: {
     label: 'Usa con Claude', title: 'Usa Break the Wall da Claude',

@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { browserCommand, openPage, pageUrl } from '../src/server/launch';
 import { readLock } from '../src/server/lock';
 import { startLocalServer, type LocalServer } from '../src/server/server';
+import { CWD, serverClient, SESSION } from './local-server-harness';
 
 const run = promisify(execFile);
 let root: string;
@@ -114,6 +115,25 @@ describe('/break-the-wall opens a tab only when no page is connected (#94)', () 
     poll.destroy();
     expect(result.opened).toBe(false);
     expect(opened).toEqual([]);
+  });
+});
+
+describe('the injection marker reaches the server through the launcher (#99)', () => {
+  const phase = async (userData: string, ...args: string[]) =>
+    JSON.parse((await run(process.execPath, [join(root, 'plugin', 'server', 'launcher.cjs'), 'phase', ...args], { env: { ...process.env, BTW_USER_DATA_DIR: userData }, timeout: 20_000 })).stdout);
+
+  it('opens the round phase of the session on the running server', async () => {
+    const userData = dataFolder();
+    const server = (await startLocalServer({ dataDir: join(userData, 'rounds'), staticDir: join(root, 'plugin', 'page'), version: '0.6.0-test' }))!;
+    servers.push(server);
+    expect(await phase(userData, SESSION, CWD)).toEqual({ marked: true });
+    expect(await (await serverClient(server).turn('Which page do you mean?')).json()).toEqual({ round: null, free: 1 });
+  });
+
+  it('starts no server when none runs: the phase then opens at the first round', async () => {
+    const userData = dataFolder();
+    expect(await phase(userData, SESSION, CWD)).toEqual({ marked: false });
+    expect(readLock(join(userData, 'rounds'))).toBeNull();
   });
 });
 
