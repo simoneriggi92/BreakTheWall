@@ -70,6 +70,24 @@ export const it = {
       endedHint: 'I prossimi turni dell’agente senza un round restano nel terminale.',
       endFailed: 'La fase non si è chiusa. Riprova.',
     },
+    /** A spec the agent handed over (#104), opened as a source. */
+    spec: {
+      /** The version's number and its location as the agent wrote it. */
+      version: (n: number, location: string) => `Versione ${n} · ${location}`,
+      /** Followed by `openNew`, as one line: "superseded · open the new version". */
+      superseded: 'superata',
+      openNew: 'apri la nuova versione',
+      writing: 'Claude Code sta scrivendo la struttura della specifica…',
+      repairing: 'Claude Code sta correggendo la struttura della specifica…',
+      cancel: 'Annulla',
+      failed: 'La struttura della specifica non è stata scritta.',
+      cancelled: 'La scrittura della struttura è stata annullata.',
+      retry: 'Scrivi di nuovo la struttura',
+      notWritten: 'La struttura della specifica non è ancora stata scritta.',
+      write: 'Scrivi la struttura',
+      unreadable: 'Non è stato possibile leggere l’esplorazione della specifica.',
+      actionFailed: 'Il server non ha accettato la richiesta. Riprova.',
+    },
   },
   assistants: {
     label: 'Usa con Claude', title: 'Usa Break the Wall da Claude',
