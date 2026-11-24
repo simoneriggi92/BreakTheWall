@@ -98,3 +98,58 @@ describe('the exploration stylesheet (X11)', () => {
     expect(reduce.slice(0, reduce.indexOf('}'))).toMatch(/--x-dur: 0ms; --x-flow: 0ms;/);
   });
 });
+
+describe('the round page as a drafting sheet (#123)', () => {
+  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  /** The declarations of every rule whose selector list names `selector` as one of its members, in source order. */
+  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+    .map(m => m[2]).join(';');
+
+  it('draws the strong grid behind a round and a free block: fine lines every 20 px, major ones every 100 px', () => {
+    const page = declarations('.round-page');
+    expect(page).toMatch(/background-color: var\(--bg\)/);
+    expect(page).toMatch(/--major: color-mix\(in srgb, var\(--ink\) 20%, transparent\)/);
+    expect(page).toMatch(/linear-gradient\(var\(--major\) 1px, transparent 1px\), linear-gradient\(90deg, var\(--major\) 1px, transparent 1px\)/);
+    expect(page).toMatch(/linear-gradient\(var\(--grid-major\) 1px, transparent 1px\), linear-gradient\(90deg, var\(--grid-major\) 1px, transparent 1px\)/);
+    expect(page).toMatch(/background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px/);
+  });
+
+  it('keeps every text off the grid, on --surface: the bar, the cards and the panels', () => {
+    // A major line under muted text drops it to 4.3:1 on paper: below AA, so no text is drawn on the canvas itself.
+    const onSurface = ['.round-page > .topbar', '.round-turn', '.round-question', '.round-outline', '.round-return', '.round-side', '.round-side-folded', '.free-turn', '.free-reply'];
+    expect(onSurface.filter(x => !/background(-color)?: var\(--surface\)/.test(declarations(x)))).toEqual([]);
+  });
+
+  it('docks the frame: a 48 px bar, the panels below it, the round in cards centred on the canvas', () => {
+    expect(declarations('.round-page > .topbar')).toMatch(/min-height: 48px/);
+    expect(declarations('.round-layout')).toMatch(/--round-stick: 48px/);
+    const cards = declarations('.round-question');
+    expect(cards).toMatch(/width: min\(100% - 128px, 800px\)/);
+    expect(cards).toMatch(/border-radius: 14px/);
+    expect(cards).toMatch(/padding: 32px 44px/);
+    expect(declarations('.round-layout.is-rail .round-question')).toMatch(/width: min\(100% - 48px, 800px\)/);
+    expect(declarations('.round-layout.is-drawer .round-question')).toMatch(/width: calc\(100% - 24px\)/);
+    // The drawer keeps its overlay.
+    expect(declarations('.round-layout.is-drawer .round-return')).toMatch(/position: fixed/);
+  });
+
+  it('gives each face one job: mono for labels and metadata, display for headings', () => {
+    const labels = ['.round-outline-state', '.round-option-letter', '.round-option-badge', '.round-recommendation h3', '.round-remarks h3',
+      '.round-panel-head', '.round-return-strip summary', '.round-fold-strip', '.round-outline-chat', '.round-unattached', '.round-keys'];
+    expect(labels.filter(x => !/font(-family)?: [^;]*var\(--f-mono\)/.test(declarations(x)))).toEqual([]);
+    expect(declarations('.round-panel-head')).toMatch(/text-transform: uppercase/);
+    expect(declarations('.round-panel-head')).toMatch(/11\.5px/);
+    expect(declarations('.round-page .course-title strong')).toMatch(/font-family: var\(--f-display\)/);
+  });
+
+  it('requests no font and names no face of its own', () => {
+    expect(css).not.toMatch(/@font-face|@import|url\(/);
+    const faces = [...css.matchAll(/font(?:-family)?:\s*([^;}]+)/g)].map(m => m[1]);
+    expect(faces.filter(x => /["']|\b(serif|sans-serif|monospace)\b/.test(x))).toEqual([]);
+  });
+
+  it('uses tokens only: no literal colour', () => {
+    expect(css.replace(/var\(--[a-z0-9-]+/g, 'var(').match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi)).toBeNull();
+  });
+});

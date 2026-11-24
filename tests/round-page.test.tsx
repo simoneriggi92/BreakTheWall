@@ -836,3 +836,39 @@ describe('the round phase in the page (#99)', () => {
     expect(screen.getByRole('textbox', { name: 'La tua risposta' })).toBeInTheDocument();
   });
 });
+
+describe('the round page as a drafting sheet (#123)', () => {
+  it('keeps the top bar to the brand, without its tagline, on a round and on a free block', async () => {
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('banner')).getByText('Break the Wall')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByText('Take the text apart.')).toBeNull();
+
+    server.changeFree(FREE);
+    await screen.findByRole('region', { name: 'The agent’s turn' });
+    expect(within(screen.getByRole('banner')).queryByText('Take the text apart.')).toBeNull();
+  });
+
+  it('heads each side panel with its name, its fold button in the head, before what the panel holds', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    const follows = (a: HTMLElement, b: HTMLElement) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    const questions = screen.getByRole('heading', { level: 2, name: 'Questions' });
+    const foldQuestions = screen.getByRole('button', { name: 'Fold the questions' });
+    expect(follows(questions, foldQuestions)).toBe(true);
+    expect(follows(foldQuestions, outline())).toBe(true);
+
+    const receiving = within(receives()).getByRole('heading', { level: 2, name: 'What the agent receives' });
+    const foldSide = within(receives()).getByRole('button', { name: 'Fold the right column' });
+    expect(follows(receiving, foldSide)).toBe(true);
+    expect(follows(foldSide, within(receives()).getByRole('button', { name: 'Add a general note' }))).toBe(true);
+
+    // Folded to a rail, the outline keeps only its button: the numbers below need no name above them.
+    await user.click(foldQuestions);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Questions' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Unfold the questions' })).toBeInTheDocument();
+  });
+});

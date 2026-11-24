@@ -270,7 +270,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   return (
     <div className="round-page">
       {/* Progress sits in the sticky top bar, so it stays in view at every width, the outline folded or not. */}
-      <header className="topbar"><Brand/><div className="course-title"><strong>{r.title(round.number)}</strong></div><span className="round-progress">{r.progress(answered, round.questions.length)}</span>
+      <header className="topbar"><Brand tagline={false}/><div className="course-title"><strong>{r.title(round.number)}</strong></div><span className="round-progress">{r.progress(answered, round.questions.length)}</span>
         {band === 'drawer' && <button ref={drawerToggle} type="button" className="subtle" aria-expanded={drawerOpen} aria-controls={drawerOpen ? 'round-return' : undefined} onClick={() => setDrawerOpen(open => !open)}>{r.receives}</button>}
         {/* Below ~860 px the bar has no room for it: it goes into the drawer with the rest of the right column. */}
         {band !== 'drawer' && <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>}
@@ -282,10 +282,14 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
           {!folds.turn && <Markdown text={round.turnText}/>}
         </section>}
         <div className="round-outline">
-        <button
-          type="button" className="subtle round-fold" aria-expanded={!outlineFolded} aria-label={outlineFolded ? f.unfoldOutline : f.foldOutline}
-          title={outlineFolded ? f.unfoldOutline : f.foldOutline} onClick={() => fold({ outline: !outlineFolded })}
-        >{outlineFolded ? '»' : '«'}</button>
+        {/* The panel's head row names it and holds its fold; folded to a rail, the numbers need no name above them. */}
+        <div className="round-panel-head">
+          {!outlineFolded && <h2>{r.outline}</h2>}
+          <button
+            type="button" className="subtle round-fold" aria-expanded={!outlineFolded} aria-label={outlineFolded ? f.unfoldOutline : f.foldOutline}
+            title={outlineFolded ? f.unfoldOutline : f.foldOutline} onClick={() => fold({ outline: !outlineFolded })}
+          >{outlineFolded ? '»' : '«'}</button>
+        </div>
         {outlineEdge}
         <nav aria-label={r.outline}>
           <ol>
@@ -411,9 +415,11 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             />
           </div>
           : <section id="round-return" className="round-return" aria-label={r.receives}>
-            {drawerBar}{sideFold}{sideEdge}
+            {drawerBar}
+            {/* The column is named in its head row, with its fold, before the general note it then holds (#123). */}
+            <div className="round-panel-head"><h2>{r.receives}</h2>{sideFold}</div>
+            {sideEdge}
             {generalField}
-            <h2>{r.receives}</h2>
             {returnBody}
           </section>)}
       </main>

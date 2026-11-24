@@ -2,18 +2,35 @@
    the agent receives on the right. Theme tokens only, so both themes hold their checked contrast. The width steps
    come from RoundPage (`is-wide`, `is-rail`, `is-drawer`), not from media queries here, so what the page shows and
    how it is laid out never disagree. */
-.round-page { min-height: 100vh; background: var(--bg); color: var(--ink); }
-/* Where the side columns stick: below the sticky top bar (about 74 px) and the layout's 20 px of padding, so they
-   start where they stood before the page scrolled and never slide under the bar. */
-.round-layout { --round-stick: 94px; }
+/* The technical sheet (#123): a round and a free block sit on exploration's drafting grid, in the strong form the owner
+   chose (#122, variant C): fine lines every 20 px, major ones every 100 px. No text is drawn on it: a major line under
+   muted text drops it below AA, so every text sits on --surface, in the bar, a card or a panel. `--strip-h` is the
+   height a strip fixed at the window's foot takes from the panels; none yet. */
+.round-page {
+  --strip-h: 0px;
+  --major: color-mix(in srgb, var(--ink) 20%, transparent);
+  min-height: 100vh; color: var(--ink); background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--major) 1px, transparent 1px), linear-gradient(90deg, var(--major) 1px, transparent 1px),
+    linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+}
+/* The docked frame (#123, after the owner's Plannotator reference): a 48 px bar, a tool's and not a welcome, so the
+   brand goes without its tagline; the panels against the window's edges below it, the round in cards between them. */
+.round-page > .topbar { min-height: 48px; padding: 6px 16px; gap: 14px; background: var(--surface); }
+.round-page > .topbar .brand > span { font-size: 15px; }
+.round-page > .topbar .brand-mark { width: 26px; height: 22px; }
+.round-page .course-title strong { font-family: var(--f-display); }
 .round-progress { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* The turn's text sits in the question's column, so both read on one left edge; outline and return span both rows and
-   stay beside them from the top. The middle column is capped and the grid centred, so a wide window adds margin
-   around the round instead of a gap between the question and what the agent receives. */
+   stay beside them from the top. The middle column takes what the panels leave, and the cards in it are capped and
+   centred, so a wide window adds canvas around the round, not a gap between the panels and the window's edges. */
 .round-layout {
-  display: grid; gap: 20px 28px; padding: 20px 24px 40px; align-items: start; justify-content: center;
+  /* Where the panels stick: right below the 48 px bar, so they never slide under it. */
+  --round-stick: 48px;
+  display: grid; gap: 0; padding: 0; align-items: start; justify-content: stretch;
   /* Each column's width is a variable the bands and the folds set, so any mix of them composes without a rule each. */
-  --col-left: minmax(200px, 240px); --col-mid: 760px; --col-right: minmax(280px, 360px);
+  --col-left: minmax(200px, 240px); --col-mid: 1fr; --col-right: minmax(280px, 360px);
   grid-template-columns: var(--col-left) minmax(0, var(--col-mid)) var(--col-right);
   grid-template-areas: "outline turn return" "outline question return";
   /* The side chat is as tall as the window; its extra height goes to the question's row, never between the turn's
@@ -25,9 +42,35 @@
    32em holds about 72. Prose keeps that measure; diagrams and options may use the question's full width. */
 /* The turn's text is context, not the question: it takes the column's width rather than the prose measure, so a
    long preamble stays short and lines up with the question below it. */
-.round-turn { grid-area: turn; color: var(--muted); border-left: 3px solid var(--line); padding: 2px 0 2px 16px; line-height: 1.6; }
+.round-turn, .round-question { justify-self: center; width: min(100% - 128px, 800px); }
+.round-turn {
+  grid-area: turn; margin-top: 32px; color: var(--muted); line-height: 1.6;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 24px;
+}
 .round-turn .round-markdown > * { max-width: none; }
-.round-outline { grid-area: outline; position: sticky; top: var(--round-stick); }
+/* The panels: full height between the bar and the window's foot, scrolling inside, divided from the canvas by a
+   hairline. The outline is one at every width; the right column only where it is not the drawer's overlay. */
+.round-outline {
+  grid-area: outline; position: sticky; top: var(--round-stick); height: calc(100vh - var(--round-stick) - var(--strip-h));
+  overflow: auto; background: var(--surface); border-right: 1px solid var(--line); padding: 0 8px 12px;
+}
+.round-layout:not(.is-drawer) .round-return,
+.round-layout:not(.is-drawer) .round-side,
+.round-layout:not(.is-drawer) .round-side-folded {
+  height: calc(100vh - var(--round-stick) - var(--strip-h)); overflow: auto; border-left: 1px solid var(--line);
+}
+.round-layout:not(.is-drawer) .round-return, .round-layout:not(.is-drawer) .round-side { padding: 0 16px 16px; }
+.round-layout:not(.is-drawer) .round-side { padding-top: 12px; }
+.round-layout:not(.is-drawer) .round-side-folded .round-fold-strip { border: 0; border-radius: 0; width: 100%; height: 100%; }
+/* A panel's head row: its name as a label, and its fold. The fold is a control, so it keeps the body face. */
+.round-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -16px 4px; padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--line); font: 600 11.5px/17px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.round-panel-head h2 { margin: 0; font: inherit; letter-spacing: inherit; color: inherit; }
+.round-panel-head .round-fold { flex: none; margin: 0; font-family: var(--f-body); letter-spacing: 0; text-transform: none; }
+.round-outline > .round-panel-head { margin: 0 -8px 8px; }
+.round-layout.is-outline-folded .round-outline > .round-panel-head { justify-content: center; padding: 8px 0; }
 .round-outline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .round-outline-item {
   display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px;
@@ -36,20 +79,26 @@
 .round-outline-item:hover { border-color: var(--line); }
 .round-outline-item[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .round-outline-title { font-size: 14px; font-weight: 600; }
-.round-outline-state { font-size: 12px; color: var(--muted); }
+.round-outline-state { font-size: 11.5px; color: var(--muted); }
+/* One job per face (#123): mono for labels and metadata (states, letters, badges, section labels, counts), display for
+   headings (the global h1–h3 and the bar's title), body for text; controls keep the body face. Only the three system
+   faces, so the content policy needs no font request. */
+.round-outline-state, .round-option-letter, .round-option-badge, .round-recommendation h3, .round-remarks h3,
+.round-return-strip summary, .round-fold-strip, .round-outline-chat, .round-unattached { font-family: var(--f-mono); }
 .round-outline-item.is-answered .round-outline-state { color: var(--good); }
 /* Folded: one line, number then answer, so the questions still open stand out. */
 .round-outline-item.is-collapsed { display: flex; align-items: baseline; gap: 10px; padding: 5px 10px; }
 .round-outline-item.is-collapsed .round-outline-title { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-outline-item.is-collapsed.is-answered .round-outline-title { color: var(--good); }
 .round-question {
-  grid-area: question; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: 20px 24px; line-height: 1.6;
+  grid-area: question; margin: 16px 0 48px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 32px 44px; line-height: 1.6;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 70%, transparent), 0 10px 30px color-mix(in srgb, var(--shadow) 45%, transparent);
 }
 .round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; max-width: 32em; }
 .round-markdown > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { max-width: 32em; }
 .round-recommendation { margin-top: 16px; padding: 12px 14px; border-radius: 9px; background: var(--accent-soft); }
-.round-recommendation h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.round-recommendation h3 { margin: 0 0 4px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
 .round-recommendation p { margin: 0; }
 .round-options { margin-top: 16px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .round-option {
@@ -61,7 +110,7 @@
 .round-option[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .round-option-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-weight: 700; }
 .round-option-letter { color: var(--accent); }
-.round-option-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 1px 7px; }
+.round-option-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 1px 7px; }
 .round-option-consequence { font-size: 14px; color: var(--muted); }
 .round-answer { margin-top: 18px; display: grid; gap: 12px; justify-items: start; }
 .round-answer .round-field { justify-self: stretch; }
@@ -82,7 +131,7 @@
 .round-ask-offer { background: var(--purple); }
 .round-ask-mark { background: var(--purple-soft); color: inherit; border-bottom: 2px solid var(--purple); border-radius: 2px; }
 .round-remarks { margin-top: 16px; }
-.round-remarks h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); }
+.round-remarks h3 { margin: 0 0 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); }
 .round-remarks ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .round-remarks li { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; padding-left: 10px; border-left: 3px solid var(--amber); }
 .round-remark-passage { grid-column: 1 / -1; color: var(--muted); font-style: italic; quotes: none; }
@@ -90,8 +139,7 @@
 .round-remark-text { grid-column: 1 / -1; margin: 0; white-space: pre-wrap; }
 .round-keys { margin: 16px 0 0; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-steps { margin-top: 14px; display: flex; justify-content: flex-end; }
-.round-return { grid-area: return; position: sticky; top: var(--round-stick); display: grid; gap: 12px; }
-.round-return h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.round-return { grid-area: return; position: sticky; top: var(--round-stick); display: grid; gap: 12px; background: var(--surface); }
 .round-message {
   margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--f-mono); font-size: 13px; line-height: 1.55;
   background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 12px 14px; max-height: 50vh; overflow: auto;
@@ -111,9 +159,11 @@
 .round-phase { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .course-title + .round-phase { margin-left: auto; }
 .round-phase [role="alert"] { color: var(--bad); }
-/* A free block: the agent's turn and one response, in one column at the prose measure. */
-.free-layout { display: grid; gap: 16px; padding: 20px 24px 40px; max-width: 760px; margin: 0 auto; }
-.free-turn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; line-height: 1.6; }
+/* A free block: the agent's turn and one response, in one column at the prose measure, on the grid. Both are cards,
+   the response with what follows its Send, so no text sits on the canvas. */
+.free-layout { display: grid; gap: 16px; padding: 32px 24px 48px; max-width: 760px; margin: 0 auto; }
+.free-turn, .free-reply { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; line-height: 1.6; }
+.free-reply { display: grid; gap: 12px; }
 .free-layout [role="alert"] { margin: 0; color: var(--bad); }
 .free-layout [role="status"] { margin: 0; color: var(--good); }
 .free-layout [role="note"] { margin: 0; color: var(--muted); }
@@ -124,15 +174,19 @@
 
 /* Below ~1180 px: the outline is a rail of question numbers. */
 .round-layout.is-rail { --col-right: minmax(240px, 300px); }
+.round-layout.is-rail .round-turn, .round-layout.is-rail .round-question { width: min(100% - 48px, 800px); }
+.round-layout.is-rail .round-question { padding: 24px 28px; }
 .round-layout.is-outline-folded { --col-left: 64px; }
 .round-layout.is-outline-folded .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
 .round-layout.is-outline-folded .round-outline-title { white-space: nowrap; }
 
 /* Below ~860 px: the rail and the question; the right column slides over as a drawer from the top bar. */
 .round-layout.is-drawer {
-  grid-template-columns: var(--col-left) minmax(0, 1fr); grid-template-areas: "outline turn" "outline question"; justify-content: stretch; padding: 16px 16px 32px 8px; gap: 16px 12px;
+  grid-template-columns: var(--col-left) minmax(0, 1fr); grid-template-areas: "outline turn" "outline question"; justify-content: stretch;
 }
-.round-layout.is-drawer .round-question { padding: 16px 18px; }
+.round-layout.is-drawer .round-turn, .round-layout.is-drawer .round-question { width: calc(100% - 24px); }
+.round-layout.is-drawer .round-turn { margin-top: 16px; }
+.round-layout.is-drawer .round-question { padding: 18px; margin-bottom: 24px; }
 .round-layout.is-drawer .round-return {
   position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(360px, 92vw); overflow: auto; align-content: start;
   padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
@@ -176,10 +230,7 @@
 .round-chat-open[aria-pressed="true"] { border-color: var(--purple); color: var(--purple); }
 .round-question.is-chatting { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-soft); }
 .round-outline-chat { font-size: 11.5px; font-weight: 700; color: var(--purple); white-space: nowrap; }
-.round-side {
-  grid-area: return; position: sticky; top: var(--round-stick); display: flex; flex-direction: column; gap: 10px;
-  max-height: calc(100vh - var(--round-stick) - 20px);
-}
+.round-side { grid-area: return; position: sticky; top: var(--round-stick); display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
 /* What the agent receives comes first and keeps its height; the side chat below grows with its replies up to the
    space left, then scrolls inside, so an empty side chat is not a tall blank box. */
 .round-side > * { flex: none; }
@@ -231,29 +282,26 @@
    right column is a narrow strip that still says how many questions are answered; the question takes the room it
    leaves, while its prose keeps the measure. */
 .round-layout.is-drawer.is-outline-folded { --col-left: 56px; }
-.round-layout.is-side-folded { --col-right: 44px; --col-mid: 920px; }
+.round-layout.is-side-folded { --col-right: 44px; }
 .round-fold { padding: 2px 9px; font-size: 13px; line-height: 1.4; color: var(--muted); }
-.round-outline > .round-fold { display: block; margin: 0 0 8px auto; }
-.round-layout.is-outline-folded .round-outline > .round-fold { margin: 0 auto 8px; }
 .round-side-fold { align-self: flex-end; justify-self: end; }
-.round-side-folded { grid-area: return; position: sticky; top: var(--round-stick); }
+.round-side-folded { grid-area: return; position: sticky; top: var(--round-stick); background: var(--surface); }
 .round-fold-strip {
   writing-mode: vertical-rl; width: 44px; padding: 14px 0; font-size: 12.5px; font-weight: 700; color: var(--muted);
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
 }
 .round-fold-strip:hover { color: var(--ink); border-color: var(--accent); }
 .round-turn-fold { float: right; margin: 0 0 6px 12px; }
-.round-turn.is-folded { padding-top: 0; padding-bottom: 0; }
+.round-turn.is-folded { padding: 8px 12px 8px 16px; }
 .round-turn.is-folded .round-turn-fold { float: none; margin: 0; }
 
-/* The edges between columns (dragged, or moved with ← → once focused). Each sits in the 28 px gap beside its column,
-   a thin line that shows on hover, focus and while dragging. The sticky columns run the window's height, so the edge
-   can be taken anywhere along it, not only beside the column's content. */
-.round-layout:not(.is-drawer) :is(.round-outline, .round-return, .round-side) { min-height: calc(100vh - var(--round-stick) - 40px); }
+/* The edges between columns (dragged, or moved with ← → once focused): a thin line that shows on hover, focus and
+   while dragging. With no gap between the panels and the canvas, each sits on its panel's hairline, inside the
+   panel, which scrolls; the panels run the window's height, so the edge can be taken anywhere along it. */
 .round-return { align-content: start; }
 .round-edge { position: absolute; top: 0; bottom: 0; width: 12px; z-index: 2; cursor: col-resize; touch-action: none; }
-.round-edge.grows-right { right: -20px; }
-.round-edge.grows-left { left: -20px; }
+.round-edge.grows-right { right: 0; }
+.round-edge.grows-left { left: 0; }
 .round-edge::after { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; border-radius: 2px; background: transparent; transition: background .15s; }
 .round-edge:hover::after, .round-edge:focus-visible::after, body.is-resizing .round-edge::after { background: var(--accent); }
 .round-edge:focus-visible { outline: none; }
