@@ -378,3 +378,57 @@ describe('a question\'s options sit side by side (#96)', () => {
     expect((await api.saveDraft(2, ANSWERED)).status).toBe(204);
   });
 });
+
+describe('remarks on a question\'s passage (#98)', () => {
+  const remark = (part: string, start: number, passage: string, text: string) => ({ part, start, end: start + passage.length, passage, text });
+
+  it('returns each remark indented under its question as «passage» — text, in the order the passages stand, after the note', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    await api.send(1, {
+      generalNote: '',
+      answers: {
+        '1': {
+          choice: 'recommendation', note: 'Fine by me.',
+          remarks: [
+            remark('recommendation', 3, 'the per-user data folder', 'Which one on Linux?'),
+            remark('body', 4, 'server keeps every round', 'Every one, forever?\nEven the superseded ones?'),
+          ],
+        },
+        // Remarks are not an answer: the title line still reads "no answer".
+        '2': { note: '', remarks: [remark('body', 4, 'mod  or\nthe server', '')] },
+      },
+    });
+    expect(await api.delivery()).toBe([
+      '**Q1 · Where do rounds live?** recommendation',
+      '  Fine by me.',
+      '  - «server keeps every round» — Every one, forever?',
+      '    Even the superseded ones?',
+      '  - «the per-user data folder» — Which one on Linux?',
+      '**Q2 · Who recognises a round?** no answer',
+      // A passage across lines reads as one line; a remark with no words yet still points at it.
+      '  - «mod or the server»',
+    ].join('\n'));
+  });
+
+  it('keeps remarks in the draft, across a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir });
+    await client(first).turn(ROUND);
+    const draft = { generalNote: '', answers: { '1': { note: '', remarks: [remark('body', 4, 'server', 'Which server?')] } } };
+    expect((await client(first).saveDraft(1, draft)).status).toBe(204);
+    await first.stop();
+    expect((await client(await start({ dataDir })).round()).draft).toEqual(draft);
+  });
+
+  it('refuses a remark without a passage, one whose end is not after its start, and one on a question the round does not have', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    const refused = async (remarks: unknown[], question = '1') => (await api.saveDraft(1, { generalNote: '', answers: { [question]: { note: '', remarks } } })).status;
+    expect(await refused([remark('body', 4, '  ', 'Blank.')])).toBe(400);
+    expect(await refused([{ ...remark('body', 4, 'server', 'Backwards.'), end: 4 }])).toBe(400);
+    expect(await refused([remark('title', 0, 'Where', 'Not a part.')])).toBe(400);
+    expect(await refused([remark('body', 4, 'server', 'No such question.')], '9')).toBe(400);
+    expect(await refused([remark('body', 4, 'server', 'Fine.')])).toBe(204);
+  });
+});

@@ -13,7 +13,8 @@ The React interface: library, studio, the exploration view with its three roles 
 | `disassembly/` | The disassembly player (run and reassemble), kept readable |
 | `i18n/` | Text catalogs: `it.ts` and `en.ts` for the app, `x-it.ts` and `x-en.ts` for the exploration, `devices.ts` for words that name the computer |
 | `LocalPage.tsx`, `http-bridge.ts` | The local page's entry (`vite build --mode page`): the secret from the fragment, the HTTP bridge, the page's poll, which reads the latest round again whenever it answers |
-| `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline (answered questions folded), one question in focus, "what the agent receives" live, one Send, read-only once sent; its keys, and the width steps (rail below ~1180 px, drawer below ~860 px) read from `matchMedia` |
+| `round/RoundPage.tsx`, `round.css` | A round: the turn's text, the outline (answered questions folded), one question in focus, "what the agent receives" live, remarks on a passage of its body or recommendation, one Send, read-only once sent; its keys, and the width steps (rail below ~1180 px, drawer below ~860 px) read from `matchMedia` |
+| `round/passages.ts` | A question's passages: a selection as offsets into the rendered text (diagram figures left out), and the `<mark>`s drawn into it again after every render |
 | `markdown.ts`, `diagrams.ts`, `svg-mount.ts`, `use-diagrams.ts` | Rendering a source or a question as a document, and drawing its Mermaid diagrams |
 
 ## Commands
