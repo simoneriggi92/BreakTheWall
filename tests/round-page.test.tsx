@@ -50,10 +50,10 @@ function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; 
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
     if (url === '/api/current') return Response.json({ current: free ? { kind: 'free', block: free, phaseOpen } : round ? { kind: 'round', round, phaseOpen } : null });
     if (method === 'DELETE' && url === `/api/sessions/${SESSION}/phase`) { phaseOpen = false; wake(); return new Response(null, { status: 204 }); }
-    if (method === 'PUT' && url === `/api/free/${SESSION}/1/reply`) return new Response(null, { status: 204 });
+    if (method === 'PUT' && url === `/api/free/${SESSION}/1/response`) return new Response(null, { status: 204 });
     if (method === 'POST' && url === `/api/free/${SESSION}/1/send`) {
-      const message = `as delivered by the server: ${(body as { reply: string }).reply.trim()}`;
-      free = free && { ...free, reply: (body as { reply: string }).reply, sent: { message, at: '2026-11-23T10:06:00.000Z' } };
+      const message = `as delivered by the server: ${(body as { response: string }).response.trim()}`;
+      free = free && { ...free, response: (body as { response: string }).response, sent: { message, at: '2026-11-23T10:06:00.000Z' } };
       return Response.json({ message });
     }
     if (url === '/api/page/poll') return new Promise<Response>((done, fail) => {
@@ -594,33 +594,33 @@ const FREE: FreeBlockView = {
   number: 1,
   receivedAt: '2026-11-23T10:04:00.000Z',
   text: 'Before the next round: do you mean **the page** or the terminal when you say "the view"?',
-  reply: '',
+  response: '',
   sent: null,
   superseded: false,
 };
 const freeBlock = () => screen.getByRole('region', { name: 'The agent’s turn' });
 
 describe('a free block in the page (#99)', () => {
-  it('shows a turn without a round as its text and one reply field, saves the reply, and sends it as one message', async () => {
+  it('shows a turn without a round as its text and one response field, saves the response, and sends it as one message', async () => {
     const user = userEvent.setup();
     const server = fakeServer(ROUND, { free: FREE });
     render(<LocalPage fetch={server.fetch}/>);
     expect(await screen.findByRole('region', { name: 'The agent’s turn' })).toHaveTextContent('do you mean the page or the terminal');
     expect(within(freeBlock()).getByText('the page').tagName).toBe('STRONG');
     expect(screen.queryByRole('navigation', { name: 'Questions' })).toBeNull();
-    await user.type(screen.getByRole('textbox', { name: 'Your reply' }), 'The page.');
-    await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({ reply: 'The page.' }));
+    await user.type(screen.getByRole('textbox', { name: 'Your response' }), 'The page.');
+    await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({ response: 'The page.' }));
     await user.click(screen.getByRole('button', { name: 'Send' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Sent.');
     expect(screen.getByTestId('free-message')).toHaveTextContent('as delivered by the server: The page.');
-    expect(screen.queryByRole('textbox', { name: 'Your reply' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Your response' })).toBeNull();
   });
 
-  it('sends with Ctrl+Enter, and not while the reply is empty', async () => {
+  it('sends with Ctrl+Enter, and not while the response is empty', async () => {
     const user = userEvent.setup();
     const server = fakeServer(ROUND, { free: FREE });
     render(<LocalPage fetch={server.fetch}/>);
-    const field = await screen.findByRole('textbox', { name: 'Your reply' });
+    const field = await screen.findByRole('textbox', { name: 'Your response' });
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
     await user.type(field, 'Yes.');
     await user.keyboard('{Control>}{Enter}{/Control}');
@@ -635,21 +635,21 @@ describe('a free block in the page (#99)', () => {
     expect(await screen.findByRole('region', { name: 'The agent’s turn' })).toBeInTheDocument();
   });
 
-  it('takes no reply once a later turn of the session superseded it', async () => {
+  it('takes no response once a later turn of the session superseded it', async () => {
     render(<LocalPage fetch={fakeServer(ROUND, { free: { ...FREE, superseded: true } }).fetch}/>);
     await screen.findByRole('region', { name: 'The agent’s turn' });
-    expect(screen.queryByRole('textbox', { name: 'Your reply' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Your response' })).toBeNull();
     expect(screen.getByText(/A later turn of this session arrived/)).toBeInTheDocument();
   });
 
-  it('keeps a typed reply that starts with / as text, and says so', async () => {
+  it('keeps a typed response that starts with / as text, and says so', async () => {
     const user = userEvent.setup();
     const server = fakeServer(ROUND, { free: FREE });
     render(<LocalPage fetch={server.fetch}/>);
-    await user.type(await screen.findByRole('textbox', { name: 'Your reply' }), '/clear');
+    await user.type(await screen.findByRole('textbox', { name: 'Your response' }), '/clear');
     expect(screen.getByText(/sent as text/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send' }));
-    await waitFor(() => expect(server.requests.find(x => x.method === 'POST' && x.url.endsWith('/send'))?.body).toEqual({ reply: '/clear' }));
+    await waitFor(() => expect(server.requests.find(x => x.method === 'POST' && x.url.endsWith('/send'))?.body).toEqual({ response: '/clear' }));
   });
 });
 

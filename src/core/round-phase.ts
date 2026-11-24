@@ -5,7 +5,7 @@ import { asText, roundViewSchema } from './round-answers';
 /**
  * The round phase of a session (#99): from the first round, or from the plugin asking a skill for rounds, until the
  * person ends it from the page or three turns in a row pass without a round. Within it, a turn without a round is a
- * free block: the turn's text and one reply field, so a clarifying turn does not send the person back to the terminal.
+ * free block: the turn's text and one response field, so a clarifying turn does not send the person back to the terminal.
  * Outside it, turns stay in the terminal.
  */
 export const QUIET_TURNS_END_PHASE = 3;
@@ -30,7 +30,7 @@ export function afterTurn(phase: Phase | undefined, hasRound: boolean): { phase:
   return { phase: { open: quietTurns < QUIET_TURNS_END_PHASE, quietTurns }, free: true };
 }
 
-export const replySchema = z.string().max(50_000);
+export const responseSchema = z.string().max(50_000);
 
 /** A free block as the page reads it. */
 export const freeBlockViewSchema = z.strictObject({
@@ -39,10 +39,10 @@ export const freeBlockViewSchema = z.strictObject({
   receivedAt: z.iso.datetime(),
   /** The agent's turn, whole: nothing in it is parsed. */
   text: z.string(),
-  /** The reply as drafted, kept across a reload. */
-  reply: z.string(),
+  /** The response as drafted, kept across a reload. */
+  response: z.string(),
   sent: z.strictObject({ message: z.string(), at: z.iso.datetime() }).nullable(),
-  /** A later turn of the same session arrived on the page: this one no longer takes a reply. */
+  /** A later turn of the same session arrived on the page: this one no longer takes a response. */
   superseded: z.boolean(),
 });
 export type FreeBlockView = z.infer<typeof freeBlockViewSchema>;
@@ -54,5 +54,5 @@ export const currentViewSchema = z.discriminatedUnion('kind', [
 ]);
 export type CurrentView = z.infer<typeof currentViewSchema>;
 
-/** The reply as the agent receives it: the person's own words, never a command. */
-export const freeBlockMessage = (reply: string) => asText(reply.trim());
+/** The response as the agent receives it: the person's own words, never a command. */
+export const freeBlockMessage = (response: string) => asText(response.trim());

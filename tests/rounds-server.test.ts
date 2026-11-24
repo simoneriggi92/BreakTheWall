@@ -437,13 +437,13 @@ describe('remarks on a question\'s passage (#98)', () => {
 const CLARIFICATION = 'Before the next round: do you mean the page or the terminal when you say "the view"?';
 
 describe('a turn without a round, in the round phase, is a free block (#99)', () => {
-  it('shows the turn\'s text after a round, and returns its reply as one message', async () => {
+  it('shows the turn\'s text after a round, and returns its response as one message', async () => {
     const api = client(await start());
     await api.turn(ROUND);
     expect(await (await api.turn(CLARIFICATION)).json()).toEqual({ round: null, free: 1 });
     expect(await api.current()).toMatchObject({ kind: 'free', phaseOpen: true });
-    expect(await api.free()).toMatchObject({ session: SESSION, number: 1, text: CLARIFICATION, reply: '', sent: null, superseded: false });
-    const sent = await api.reply(1, 'The page.\nThe terminal stays for code.');
+    expect(await api.free()).toMatchObject({ session: SESSION, number: 1, text: CLARIFICATION, response: '', sent: null, superseded: false });
+    const sent = await api.respond(1, 'The page.\nThe terminal stays for code.');
     expect(await sent.json()).toEqual({ message: 'The page.\nThe terminal stays for code.' });
     expect(await api.delivery()).toBe('The page.\nThe terminal stays for code.');
   });
@@ -497,8 +497,8 @@ describe('the round phase ends (#99)', () => {
     expect(await (await api.turn(`${CLARIFICATION} (3)`)).json()).toEqual({ round: null, free: 3 });
     expect(await api.current()).toMatchObject({ kind: 'free', phaseOpen: false, block: { number: 3, superseded: false } });
     expect(await (await api.turn('Now I write the code.')).json()).toEqual({ round: null });
-    // The last free block still takes its reply: the agent is waiting on it.
-    expect((await api.reply(3, 'Go on.')).status).toBe(200);
+    // The last free block still takes its response: the agent is waiting on it.
+    expect((await api.respond(3, 'Go on.')).status).toBe(200);
   });
 
   it('counts the turns in a row: a round in between starts the count again', async () => {
@@ -558,35 +558,35 @@ describe('the round phase ends (#99)', () => {
   });
 });
 
-describe('a free block takes one reply (#99)', () => {
-  it('keeps the reply as it is typed, across a restart', async () => {
+describe('a free block takes one response (#99)', () => {
+  it('keeps the response as it is typed, across a restart', async () => {
     const dataDir = folder();
     const first = await start({ dataDir });
     await client(first).turn(ROUND);
     await client(first).turn(CLARIFICATION);
-    expect((await client(first).saveReply(1, 'The page, I think')).status).toBe(204);
+    expect((await client(first).saveResponse(1, 'The page, I think')).status).toBe(204);
     await first.stop();
-    expect(await client(await start({ dataDir })).free()).toMatchObject({ number: 1, reply: 'The page, I think', sent: null });
+    expect(await client(await start({ dataDir })).free()).toMatchObject({ number: 1, response: 'The page, I think', sent: null });
   });
 
-  it('shows the message as delivered once sent, and refuses a new reply or a second Send', async () => {
+  it('shows the message as delivered once sent, and refuses a new response or a second Send', async () => {
     const api = client(await start());
     await api.turn(ROUND);
     await api.turn(CLARIFICATION);
-    await api.reply(1, '  The page.  ');
-    expect(await api.free()).toMatchObject({ reply: '  The page.  ', sent: { message: 'The page.' } });
-    expect((await api.saveReply(1, 'again')).status).toBe(409);
-    expect((await api.reply(1, 'again')).status).toBe(409);
+    await api.respond(1, '  The page.  ');
+    expect(await api.free()).toMatchObject({ response: '  The page.  ', sent: { message: 'The page.' } });
+    expect((await api.saveResponse(1, 'again')).status).toBe(409);
+    expect((await api.respond(1, 'again')).status).toBe(409);
   });
 
-  it('refuses an empty reply, a reply that is not one, and a free block that does not exist', async () => {
+  it('refuses an empty response, a response that is not one, and a free block that does not exist', async () => {
     const api = client(await start());
     await api.turn(ROUND);
     await api.turn(CLARIFICATION);
-    expect((await api.reply(1, ' \n ')).status).toBe(400);
-    expect((await api.call(`/api/free/${SESSION}/1/send`, { method: 'POST', body: { reply: 3 } })).status).toBe(400);
-    expect((await api.reply(2, 'Yes.')).status).toBe(404);
-    expect((await api.saveReply(2, 'Yes.')).status).toBe(404);
+    expect((await api.respond(1, ' \n ')).status).toBe(400);
+    expect((await api.call(`/api/free/${SESSION}/1/send`, { method: 'POST', body: { response: 3 } })).status).toBe(400);
+    expect((await api.respond(2, 'Yes.')).status).toBe(404);
+    expect((await api.saveResponse(2, 'Yes.')).status).toBe(404);
   });
 
   it('is superseded by the session\'s next round or free block, and a free block supersedes the round before it', async () => {
@@ -595,17 +595,17 @@ describe('a free block takes one reply (#99)', () => {
     await api.turn(CLARIFICATION);
     expect((await api.send(1, ANSWERED)).status).toBe(409);
     await api.turn('And one more thing: is the terminal ever the main surface?');
-    expect((await api.reply(1, 'Yes.')).status).toBe(409);
+    expect((await api.respond(1, 'Yes.')).status).toBe(409);
     await api.turn(ROUND);
     expect(await api.round()).toMatchObject({ number: 2, superseded: false });
-    expect((await api.reply(2, 'No.')).status).toBe(409);
+    expect((await api.respond(2, 'No.')).status).toBe(409);
   });
 
   it('goes out in the order the session asked, and is confirmed by its own id', async () => {
     const api = client(await start({ deliveryHoldMs: 100, deliveryLeaseMs: 200 }));
     await api.turn(ROUND);
     await api.turn(CLARIFICATION);
-    await api.reply(1, 'The page.');
+    await api.respond(1, 'The page.');
     const taken = await api.take();
     expect(taken).toEqual({ id: 'free-1', message: 'The page.' });
     expect((await api.confirm('free-1')).status).toBe(204);
@@ -614,14 +614,14 @@ describe('a free block takes one reply (#99)', () => {
   });
 });
 
-describe('a reply is sent as text, never as a command (#99)', () => {
-  it('escapes a leading / or ! in a free block\'s reply, so Claude Code runs no command, skill or shell', async () => {
+describe('a response is sent as text, never as a command (#99)', () => {
+  it('escapes a leading / or ! in a free block\'s response, so Claude Code runs no command, skill or shell', async () => {
     const api = client(await start());
     await api.turn(ROUND);
     await api.turn(CLARIFICATION);
-    expect(await (await api.reply(1, '/clear the old notes first')).json()).toEqual({ message: '\\/clear the old notes first' });
+    expect(await (await api.respond(1, '/clear the old notes first')).json()).toEqual({ message: '\\/clear the old notes first' });
     await api.turn(CLARIFICATION);
-    expect(await (await api.reply(2, '  !rm is not what I meant')).json()).toEqual({ message: '\\!rm is not what I meant' });
+    expect(await (await api.respond(2, '  !rm is not what I meant')).json()).toEqual({ message: '\\!rm is not what I meant' });
   });
 
   it('escapes a round\'s message that would start with /, and leaves a / inside the text alone', async () => {

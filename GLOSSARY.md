@@ -65,8 +65,12 @@ The sign that the agent was asked to write rounds in the page's format, given wh
 _Avoid_: trigger, hook
 
 **Free block**:
-A turn of the agent without a round, during the round phase: its text, whole, and one field for the person's words, which return to the agent as one message.
+A turn of the agent without a round, during the round phase: its text, whole, and the person's response to it.
 _Avoid_: clarification (what it often is, not what it is), message, chat turn
+
+**Response**:
+What the person writes under a free block, in their own words, returned to the agent as one message.
+_Avoid_: reply (a side chat's), answer (a question's)
 
 **Answer**:
 What the person gives one question of a round: a choice (the recommendation, an option, or none), an optional note, and the remarks and side-chat replies they attach. A round's answers return to the agent together.

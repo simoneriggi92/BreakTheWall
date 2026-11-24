@@ -8,7 +8,7 @@ The one local server per person behind the page `/break-the-wall` opens: its loc
 
 | File | Owns |
 |---|---|
-| `server.ts` | `startLocalServer`: the guard (Host, Origin, secret, no CORS), static page, presence (session leases, page polls), idle stop, and the round API: turns in, what the page shows (`/api/current`), drafts and replies, Send, the round phase, the mod's delivery long-poll |
+| `server.ts` | `startLocalServer`: the guard (Host, Origin, secret, no CORS), static page, presence (session leases, page polls), idle stop, and the round API: turns in, what the page shows (`/api/current`), drafts and responses, Send, the round phase, the mod's delivery long-poll |
 | `rounds.ts` | `RoundStore`: rounds, free blocks, their drafts and sent messages, and each session's round phase, under `<userData>/rounds/projects/<hash of cwd>/<session>/` (`round-<n>.json`, `free-<n>.json`, `phase.json`), one versioned file each, replaced atomically, Zod-checked on read |
 | `lock.ts` | `<userData>/rounds/server.lock` (port, pid, version, secret; `0600`), created whole by hard link, and `serverStatus` |
 | `launch.ts`, `launcher.ts` | `node launcher.cjs start \| open \| phase <session> <cwd>`: find or start the server detached, open a tab only when no page polls; `phase` (the injection hook's) opens a session's round phase on a running server, never starting one |

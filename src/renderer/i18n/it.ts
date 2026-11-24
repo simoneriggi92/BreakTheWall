@@ -53,7 +53,7 @@ export const it = {
     /** A turn without a round, during the round phase (#99). */
     free: {
       title: 'Il turno dell’agente',
-      reply: 'La tua risposta',
+      response: 'La tua risposta',
       asText: 'Inizia con / o !: viene inviata come testo, Claude Code non esegue comandi né skill.',
       send: 'Invia',
       sending: 'Invio…',

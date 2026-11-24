@@ -7,33 +7,33 @@ import { PreferencesMenu, usePreferences } from '../preferences';
 import { Markdown, PhaseControl, useLatestSaver } from './shared';
 
 /**
- * A turn without a round, during the round phase (#99): the agent's text, read-only, and one reply field, returned as
- * one message. Nothing in the text is parsed, and the reply is the person's own words: what Claude Code would take
+ * A turn without a round, during the round phase (#99): the agent's text, read-only, and one response field, returned as
+ * one message. Nothing in the text is parsed, and the response is the person's own words: what Claude Code would take
  * for a command, the server sends as text.
  */
 export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockView; phaseOpen: boolean; bridge: FreeBlockBridge }) {
   const { t } = usePreferences();
   const f = t.page.free;
-  const [reply, setReply] = useState(block.reply);
-  const latest = useRef(block.reply);
+  const [response, setResponse] = useState(block.response);
+  const latest = useRef(block.response);
   const [delivered, setDelivered] = useState<string | null>(block.sent?.message ?? null);
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<'send' | 'save'>();
-  const saver = useLatestSaver((next: string) => bridge.saveReply(block, next), delivered !== null, setFailure);
+  const saver = useLatestSaver((next: string) => bridge.saveResponse(block, next), delivered !== null, setFailure);
 
-  // A reply sent from another tab arrives through the page's poll.
+  // A response sent from another tab arrives through the page's poll.
   useEffect(() => { if (block.sent) setDelivered(block.sent.message); }, [block.sent]);
 
   const readOnly = delivered !== null || block.superseded;
-  const canSend = !readOnly && !sending && reply.trim() !== '';
-  const looksLikeCommand = startsAsCommand(reply);
+  const canSend = !readOnly && !sending && response.trim() !== '';
+  const looksLikeCommand = startsAsCommand(response);
 
   async function send() {
     if (!canSend) return;
     setSending(true);
     setFailure(undefined);
     try {
-      setDelivered(await bridge.sendReply(block, latest.current));
+      setDelivered(await bridge.sendResponse(block, latest.current));
     } catch {
       setFailure('send');
     } finally {
@@ -57,14 +57,14 @@ export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockVi
           : block.superseded
             ? <p role="note">{f.superseded}</p>
             : (
-              <div className="round-field free-reply">
-                <label htmlFor="free-reply">{f.reply}</label>
+              <div className="round-field free-response">
+                <label htmlFor="free-response">{f.response}</label>
                 <textarea
-                  id="free-reply" autoFocus rows={5} value={reply} aria-describedby={looksLikeCommand ? 'free-reply-hint' : undefined}
-                  onChange={event => { latest.current = event.target.value; setReply(event.target.value); saver(event.target.value); }}
+                  id="free-response" autoFocus rows={5} value={response} aria-describedby={looksLikeCommand ? 'free-response-hint' : undefined}
+                  onChange={event => { latest.current = event.target.value; setResponse(event.target.value); saver(event.target.value); }}
                   onKeyDown={event => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void send(); } }}
                 />
-                {looksLikeCommand && <small id="free-reply-hint">{f.asText}</small>}
+                {looksLikeCommand && <small id="free-response-hint">{f.asText}</small>}
                 <div className="round-steps"><button type="button" className="primary" disabled={!canSend} onClick={() => void send()}>{sending ? f.sending : f.send}</button></div>
               </div>
             )}

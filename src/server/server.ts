@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
 import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from '../core/round-answers';
-import { freeBlockMessage, replySchema } from '../core/round-phase';
+import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
 
@@ -69,10 +69,10 @@ const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TURN_BYTES = 4 * 1024 * 1024;
 const MAX_ANSWER_BYTES = 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
-const replyBodySchema = z.strictObject({ reply: replySchema });
+const responseBodySchema = z.strictObject({ response: responseSchema });
 const phaseSchema = z.strictObject({ cwd: cwdSchema });
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
-const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(reply|send)$/;
+const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
 const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
 const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free)-(\d{1,6})$/;
@@ -186,19 +186,19 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     const freePath = FREE_PATH.exec(path);
     if (freePath && sessionIdSchema.safeParse(freePath[1]).success) {
       const [, session, number, action] = freePath;
-      const body = replyBodySchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
-      if (req.method === 'PUT' && action === 'reply') {
+      const body = responseBodySchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
+      if (req.method === 'PUT' && action === 'response') {
         if (!body.success) return send(res, 400, { error: 'bad-request' });
-        const refused = await rounds.saveReply(session, Number(number), body.data.reply);
+        const refused = await rounds.saveResponse(session, Number(number), body.data.response);
         if (refused) return send(res, REFUSED[refused], { error: refused });
         return noContent(res);
       }
       if (req.method === 'POST' && action === 'send') {
         if (!body.success) return send(res, 400, { error: 'bad-request' });
-        const message = freeBlockMessage(body.data.reply);
-        // An empty reply would hand the agent an empty prompt.
+        const message = freeBlockMessage(body.data.response);
+        // An empty response would hand the agent an empty prompt.
         if (message === '') return send(res, 400, { error: 'bad-request' });
-        const refused = await rounds.sendReply(session, Number(number), body.data.reply, message);
+        const refused = await rounds.sendResponse(session, Number(number), body.data.response, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
         queued(session);
         return send(res, 200, { message });

@@ -73,10 +73,10 @@ export function serverClient(server: LocalServer) {
     startPhase: (session = SESSION, cwd = CWD) => call(`/api/sessions/${session}/phase`, { method: 'POST', body: { cwd } }),
     /** The page's "end the round phase". */
     endPhase: (session = SESSION) => call(`/api/sessions/${session}/phase`, { method: 'DELETE' }),
-    /** The page on every change to a free block's reply. */
-    saveReply: (number: number, reply: string, session = SESSION) => call(`/api/free/${session}/${number}/reply`, { method: 'PUT', body: { reply } }),
+    /** The page on every change to a free block's response. */
+    saveResponse: (number: number, response: string, session = SESSION) => call(`/api/free/${session}/${number}/response`, { method: 'PUT', body: { response } }),
     /** The page's Send under a free block. */
-    reply: (number: number, reply: string, session = SESSION) => call(`/api/free/${session}/${number}/send`, { method: 'POST', body: { reply } }),
+    respond: (number: number, response: string, session = SESSION) => call(`/api/free/${session}/${number}/send`, { method: 'POST', body: { response } }),
     /** The page on every change to an answer. */
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */

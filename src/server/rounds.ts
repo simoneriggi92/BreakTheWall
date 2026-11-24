@@ -5,10 +5,10 @@ import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import { draftSchema, emptyDraft, type Draft, type RoundView } from '../core/round-answers';
 import { roundSchema, type Round } from '../core/round';
-import { afterTurn, CLOSED_PHASE, OPEN_PHASE, replySchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
+import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
 
 /**
- * What the page shows of each session (#95, #99): its rounds with their drafts, its free blocks with their replies,
+ * What the page shows of each session (#95, #99): its rounds with their drafts, its free blocks with their responses,
  * the message each sent exactly as delivered, and whether the session is in the round phase. Kept on disk by project
  * (working directory) → session, one versioned file per round (`round-<n>.json`), per free block (`free-<n>.json`)
  * and for the phase (`phase.json`), rewritten whole and replaced atomically on every change, and checked with Zod when
@@ -34,7 +34,7 @@ const entryFields = {
   sent: sentSchema.nullable(),
 };
 const storedRoundSchema = z.strictObject({ ...entryFields, round: roundSchema, draft: draftSchema });
-const storedFreeSchema = z.strictObject({ ...entryFields, kind: z.literal('free'), text: z.string().max(1_000_000), reply: replySchema });
+const storedFreeSchema = z.strictObject({ ...entryFields, kind: z.literal('free'), text: z.string().max(1_000_000), response: responseSchema });
 const storedPhaseSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
@@ -86,7 +86,7 @@ export class RoundStore {
     const { phase, free } = afterTurn(before, false);
     if (before) await this.setPhase(session, cwd, phase);
     if (!free) return null;
-    const stored: StoredFree = { ...this.newEntry(session, cwd, 'free'), kind: 'free', text, reply: '' };
+    const stored: StoredFree = { ...this.newEntry(session, cwd, 'free'), kind: 'free', text, response: '' };
     await this.save(stored);
     return stored;
   }
@@ -117,7 +117,7 @@ export class RoundStore {
       const round: RoundView = { ...base, ...latest.round, draft: latest.draft };
       return { kind: 'round', round, phaseOpen };
     }
-    const block: FreeBlockView = { ...base, text: latest.text, reply: latest.reply };
+    const block: FreeBlockView = { ...base, text: latest.text, response: latest.response };
     return { kind: 'free', block, phaseOpen };
   }
 
@@ -134,10 +134,10 @@ export class RoundStore {
     return null;
   }
 
-  async saveReply(session: string, number: number, reply: string): Promise<RoundRefusal | null> {
+  async saveResponse(session: string, number: number, response: string): Promise<RoundRefusal | null> {
     const found = this.answerable(session, 'free', number);
     if (typeof found === 'string') return found;
-    await this.save({ ...found, reply });
+    await this.save({ ...found, response });
     return null;
   }
 
@@ -150,10 +150,10 @@ export class RoundStore {
   }
 
   /** Records the free block as answered with its message, which then waits in the session's queue. */
-  async sendReply(session: string, number: number, reply: string, message: string): Promise<RoundRefusal | null> {
+  async sendResponse(session: string, number: number, response: string, message: string): Promise<RoundRefusal | null> {
     const found = this.answerable(session, 'free', number);
     if (typeof found === 'string') return found;
-    await this.save({ ...found, reply, sent: sentNow(message) });
+    await this.save({ ...found, response, sent: sentNow(message) });
     return null;
   }
 

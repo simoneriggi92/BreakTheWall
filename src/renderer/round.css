@@ -88,7 +88,7 @@
 .round-phase { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .course-title + .round-phase { margin-left: auto; }
 .round-phase [role="alert"] { color: var(--bad); }
-/* A free block: the agent's turn and one reply, in one column at the prose measure. */
+/* A free block: the agent's turn and one response, in one column at the prose measure. */
 .free-layout { display: grid; gap: 16px; padding: 20px 24px 40px; max-width: 760px; margin: 0 auto; }
 .free-turn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; line-height: 1.6; }
 .free-layout [role="alert"] { margin: 0; color: var(--bad); }

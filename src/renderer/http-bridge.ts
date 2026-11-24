@@ -20,9 +20,9 @@ export interface PageBridge extends DesktopBridge {
   saveDraft(round: RoundKey, draft: Draft): Promise<void>;
   /** One Send for the whole round; resolves to the message exactly as the agent receives it. */
   sendRound(round: RoundKey, draft: Draft, language: MessageLanguage): Promise<string>;
-  saveReply(block: FreeBlockKey, reply: string): Promise<void>;
-  /** The free block's one reply; resolves to the message exactly as the agent receives it. */
-  sendReply(block: FreeBlockKey, reply: string): Promise<string>;
+  saveResponse(block: FreeBlockKey, response: string): Promise<void>;
+  /** The free block's one response; resolves to the message exactly as the agent receives it. */
+  sendResponse(block: FreeBlockKey, response: string): Promise<string>;
   /** The person ends the session's round phase: its next turns without a round stay in the terminal. */
   endPhase(session: string): Promise<void>;
 }
@@ -30,7 +30,7 @@ export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
 export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
 export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge;
-export type FreeBlockBridge = Pick<PageBridge, 'saveReply' | 'sendReply'> & PhaseBridge;
+export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
@@ -75,11 +75,11 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     async sendRound(round, draft, language) {
       return sentReplySchema.parse(await (await ok(await call(`${roundPath(round)}/send`, json('POST', { draft, language })))).json()).message;
     },
-    async saveReply(block, reply) {
-      await ok(await call(`${freePath(block)}/reply`, json('PUT', { reply })));
+    async saveResponse(block, response) {
+      await ok(await call(`${freePath(block)}/response`, json('PUT', { response })));
     },
-    async sendReply(block, reply) {
-      return sentReplySchema.parse(await (await ok(await call(`${freePath(block)}/send`, json('POST', { reply })))).json()).message;
+    async sendResponse(block, response) {
+      return sentReplySchema.parse(await (await ok(await call(`${freePath(block)}/send`, json('POST', { response })))).json()).message;
     },
     async endPhase(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}/phase`, { method: 'DELETE' }));
