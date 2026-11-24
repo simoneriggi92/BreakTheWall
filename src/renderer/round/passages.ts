@@ -5,10 +5,13 @@
  */
 import type { Remark } from '../../core/round-answers';
 
-/** Where a remark's words stand in one part of the question, as the remark keeps it. */
-export type Passage = Pick<Remark, 'start' | 'end' | 'passage'>;
+/**
+ * Where a remark's words stand in one part of the question, as the remark keeps it; `ask` marks a passage asked about
+ * in the side chat (#101), drawn in the side chat's colour apart from remarks.
+ */
+export type Passage = Pick<Remark, 'start' | 'end' | 'passage'> & { kind?: 'remark' | 'ask' };
 
-const MARK = 'round-remark-mark';
+const MARKS = { remark: 'round-remark-mark', ask: 'round-ask-mark' } as const;
 const skipped = (node: Node) => node.parentElement?.closest('.md-diagram') != null;
 
 function textNodes(host: HTMLElement): Text[] {
@@ -51,7 +54,7 @@ export function passageIn(host: HTMLElement, range: Range): Passage | null {
  * once: between two places it is left unmarked rather than guessed.
  */
 export function markPassages(host: HTMLElement, passages: readonly Passage[]) {
-  host.querySelectorAll(`mark.${MARK}`).forEach(mark => mark.replaceWith(...mark.childNodes));
+  host.querySelectorAll(`mark.${MARKS.remark}, mark.${MARKS.ask}`).forEach(mark => mark.replaceWith(...mark.childNodes));
   host.normalize();
   for (const passage of passages) {
     const text = textNodes(host).map(x => x.data).join('');
@@ -61,12 +64,12 @@ export function markPassages(host: HTMLElement, passages: readonly Passage[]) {
       if (start !== text.lastIndexOf(passage.passage)) continue;
     }
     if (start < 0) continue;
-    wrap(host, start, start + passage.passage.length);
+    wrap(host, start, start + passage.passage.length, MARKS[passage.kind ?? 'remark']);
   }
 }
 
 /** Wraps the characters from `start` to `end` in marks, one per text node they cross, blanks between blocks left out. */
-function wrap(host: HTMLElement, start: number, end: number) {
+function wrap(host: HTMLElement, start: number, end: number, className: string) {
   let at = 0;
   for (const node of textNodes(host)) {
     const from = Math.max(start, at), to = Math.min(end, at + node.length);
@@ -77,7 +80,7 @@ function wrap(host: HTMLElement, start: number, end: number) {
     if (to < at) target.splitText(to - from);
     if (target.data.trim() === '') continue;
     const mark = host.ownerDocument.createElement('mark');
-    mark.className = MARK;
+    mark.className = className;
     target.replaceWith(mark);
     mark.append(target);
     if (at >= end) break;
