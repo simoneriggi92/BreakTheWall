@@ -9,6 +9,7 @@ import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
+import { handleSessions } from './sessions';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -239,6 +240,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
+    if (await handleSessions(req, res, path, { rounds, leases: sessions, pageChanged })) return;
     return send(res, 404, { error: 'not-found' });
   }
 
@@ -324,7 +326,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
 }
 
 /** The request's JSON body, or undefined when it is too large or not JSON. */
-async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
+export async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Buffer>) {
@@ -349,12 +351,12 @@ async function takeLock(dataDir: string, own: ServerLock): Promise<boolean> {
   return false;
 }
 
-function send(res: ServerResponse, status: number, body: unknown) {
+export function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
   res.end(JSON.stringify(body));
 }
 
-function noContent(res: ServerResponse) {
+export function noContent(res: ServerResponse) {
   res.writeHead(204, { 'cache-control': 'no-store' }).end();
 }
 

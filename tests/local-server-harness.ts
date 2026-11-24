@@ -81,5 +81,17 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
+    /** The mod on `session.start`, on every renewal, and with the new id once `/clear` or `/resume` changed it (#102). */
+    register: (session = SESSION, cwd = CWD) => call('/api/sessions', { method: 'POST', body: { id: session, cwd } }),
+    /** The mod on `session.end`: the ending session's id and why it ends. */
+    end: (session = SESSION, reason = 'clear') => call(`/api/sessions/${session}/end`, { method: 'POST', body: { reason } }),
+    /** The page's history column: project → session → numbered rounds, and an update waiting for the other sessions. */
+    history: async () => (await call('/api/history')).json(),
+    /** The page opening a round from the history column. */
+    pastRound: (number: number, session = SESSION) => call(`/api/rounds/${session}/${number}`),
+    /** The page's "delete session". */
+    deleteSession: (session = SESSION) => call(`/api/sessions/${session}`, { method: 'DELETE' }),
+    /** A newer mod's launcher that found this server with other sessions still registered. */
+    updateWaits: (version: string) => call('/api/update', { method: 'POST', body: { version } }),
   };
 }
