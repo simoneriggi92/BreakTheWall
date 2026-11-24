@@ -268,9 +268,9 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   </>;
 
   return (
-    <div className="round-page">
-      {/* Progress sits in the sticky top bar, so it stays in view at every width, the outline folded or not. */}
-      <header className="topbar"><Brand tagline={false}/><div className="course-title"><strong>{r.title(round.number)}</strong></div><span className="round-progress">{r.progress(answered, round.questions.length)}</span>
+    <div className="round-page has-strip">
+      {/* The bar keeps the phase control; progress lives in the strip at the window's foot (#125). */}
+      <header className="topbar"><Brand tagline={false}/><div className="course-title"><strong>{r.title(round.number)}</strong></div>
         {band === 'drawer' && <button ref={drawerToggle} type="button" className="subtle" aria-expanded={drawerOpen} aria-controls={drawerOpen ? 'round-return' : undefined} onClick={() => setDrawerOpen(open => !open)}>{r.receives}</button>}
         {/* Below ~860 px the bar has no room for it: it goes into the drawer with the rest of the right column. */}
         {band !== 'drawer' && <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>}
@@ -423,7 +423,38 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             {returnBody}
           </section>)}
       </main>
+      <ProgressStrip
+        label={r.strip} count={r.progress(answered, round.questions.length)} current={question.number}
+        segments={round.questions.map(q => ({ number: q.number, answered: isAnswered(answerOf(draft, q)) }))}
+      />
     </div>
+  );
+}
+
+/**
+ * The round's progress at the window's foot (#125), at every width, drawn as a ruler that continues the rail's: one
+ * segment per question, filled once answered, the current one marked. The segments repeat for the eye what the count
+ * says, so assistive technology reads only the count, and they take no click: moving stays with the outline, the rail
+ * and the keys, with no third control doing the same (#115).
+ */
+function ProgressStrip({ label, count, current, segments }: {
+  label: string;
+  count: string;
+  current: number;
+  segments: readonly { number: number; answered: boolean }[];
+}) {
+  return (
+    <footer className="round-strip" aria-label={label}>
+      <ol aria-hidden="true">
+        {segments.map(x => (
+          <li key={x.number} className={`${x.answered ? 'is-answered' : 'is-open'}${x.number === current ? ' is-current' : ''}`}>
+            <span>{String(x.number).padStart(2, '0')}</span>
+          </li>
+        ))}
+      </ol>
+      {/* Polite: an answer is the person's own act, so the new count waits for whatever is being read. */}
+      <span className="round-strip-count" aria-live="polite">{count}</span>
+    </footer>
   );
 }
 

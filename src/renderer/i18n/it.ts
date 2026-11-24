@@ -27,6 +27,8 @@ export const it = {
       },
       outline: 'Domande',
       progress: (answered: number, total: number) => `${answered}/${total} con risposta`,
+      /** The strip at the window's foot (#125): the round's progress, one segment per question and the count. */
+      strip: 'Avanzamento del round',
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,

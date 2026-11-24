@@ -28,6 +28,7 @@ export const en: Messages = {
       },
       outline: 'Questions',
       progress: (answered: number, total: number) => `${answered}/${total} answered`,
+      strip: 'Round progress',
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,

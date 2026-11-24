@@ -27,6 +27,9 @@ const PAIRS: [string, string][] = [
   ...['a1', 'a2', 'a3', 'a4'].flatMap(x => [[x, `${x}-wash`], [x, 'surface'], ['ink', `${x}-wash`]] as [string, string][]),
   ['x-strip-ink', 'x-strip-seen'], ['x-strip-ink', 'x-strip-next'], ['x-strip-active-ink', 'x-strip-active'], ['x-prereq', 'x-prereq-soft'],
   ['x-lit-ink', 'x-lit'], ['muted', 'surface'],
+  // The progress strip (#125): an open question's number on the strip, an answered one's on its filled span, the
+  // current one's in accent on either, and the count.
+  ['muted', 'surface'], ['ink', 'accent-soft'], ['accent', 'surface'], ['accent', 'accent-soft'], ['ink', 'surface'],
 ];
 
 describe('paper and blueprint themes', () => {
@@ -151,5 +154,36 @@ describe('the round page as a drafting sheet (#123)', () => {
 
   it('uses tokens only: no literal colour', () => {
     expect(css.replace(/var\(--[a-z0-9-]+/g, 'var(').match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi)).toBeNull();
+  });
+});
+
+describe('the progress strip at the window\'s foot (#125)', () => {
+  // The #123 block's reader, kept apart so the tickets built beside this one merge without touching each other.
+  const css = readFileSync('src/renderer/round.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const declarations = (selector: string) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(m => m[1].split(/,(?![^(]*\))/).map(x => x.trim()).includes(selector))
+    .map(m => m[2]).join(';');
+
+  it('fixes a 42 px strip to the window\'s foot, its text on --surface', () => {
+    const strip = declarations('.round-strip');
+    expect(strip).toMatch(/position: fixed/);
+    expect(strip).toMatch(/bottom: 0/);
+    expect(strip).toMatch(/height: var\(--strip-h\)/);
+    expect(strip).toMatch(/background: var\(--surface\)/);
+    expect(declarations('.round-page.has-strip')).toMatch(/--strip-h: 42px/);
+  });
+
+  it('reserves the strip\'s height, so it covers no control or content', () => {
+    // The canvas ends above it; the panels already subtract --strip-h (#123).
+    expect(declarations('.round-page.has-strip')).toMatch(/padding-bottom: var\(--strip-h\)/);
+    // The History dock and its notices rise above it, and the overlays (the drawer, the side chat's, the history) end at it.
+    expect(declarations('.round-page.has-strip ~ .page-dock')).toMatch(/bottom: calc\(var\(--strip-h\) \+ 12px\)/);
+    for (const overlay of ['.round-layout.is-drawer .round-return', '.round-layout.is-drawer .round-side', '.round-page.has-strip ~ .page-history']) {
+      expect(declarations(overlay), overlay).toMatch(/bottom: var\(--strip-h\)/);
+    }
+    // The page's siblings do not inherit from it, so they are told the height too.
+    for (const sibling of ['.round-page.has-strip ~ .page-dock', '.round-page.has-strip ~ .page-history']) {
+      expect(declarations(sibling), sibling).toMatch(/--strip-h: 42px/);
+    }
   });
 });
