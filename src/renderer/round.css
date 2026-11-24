@@ -5,7 +5,7 @@
 /* The technical sheet (#123): a round and a free block sit on exploration's drafting grid, in the strong form the owner
    chose (#122, variant C): fine lines every 20 px, major ones every 100 px. No text is drawn on it: a major line under
    muted text drops it below AA, so every text sits on --surface, in the bar, a card or a panel. `--strip-h` is the
-   height a strip fixed at the window's foot takes from the panels; none yet. */
+   height a strip fixed at the window's foot takes from the panels: a round's progress strip sets it (#125). */
 .round-page {
   --strip-h: 0px;
   --major: color-mix(in srgb, var(--ink) 20%, transparent);
@@ -21,7 +21,6 @@
 .round-page > .topbar .brand > span { font-size: 15px; }
 .round-page > .topbar .brand-mark { width: 26px; height: 22px; }
 .round-page .course-title strong { font-family: var(--f-display); }
-.round-progress { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* The turn's text sits in the question's column, so both read on one left edge; outline and return span both rows and
    stay beside them from the top. The middle column takes what the panels leave, and the cards in it are capped and
    centred, so a wide window adds canvas around the round, not a gap between the panels and the window's edges. */
@@ -306,3 +305,37 @@
 .round-edge:hover::after, .round-edge:focus-visible::after, body.is-resizing .round-edge::after { background: var(--accent); }
 .round-edge:focus-visible { outline: none; }
 body.is-resizing { cursor: col-resize; user-select: none; }
+
+/* ---- The progress strip (#125) ----
+   The round's progress at the window's foot, at every width, as the owner chose in #122 (variant C): a ruler that
+   continues the rail's, with a baseline across the window, a major tick and number per question, four minor ticks
+   between. The page reserves its height, so it covers nothing and nothing covers it: the canvas ends above it, the
+   panels already subtract it (#123), the overlays end at it and the dock rises above it. The dock and the history are
+   the page's siblings, not its children, so they are told the height too. A free block has no questions, so no strip. */
+.round-page.has-strip, .round-page.has-strip ~ .page-dock, .round-page.has-strip ~ .page-history { --strip-h: 42px; }
+.round-page.has-strip { padding-bottom: var(--strip-h); }
+.round-page.has-strip ~ .page-dock { bottom: calc(var(--strip-h) + 12px); }
+.round-page.has-strip ~ .page-history { bottom: var(--strip-h); }
+.round-layout.is-drawer .round-return, .round-layout.is-drawer .round-side { bottom: var(--strip-h); }
+/* Above the bar's layer and the column edges, below the overlays and the dock, which end above it anyway. */
+.round-strip {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; height: var(--strip-h); box-sizing: border-box;
+  display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-top: 1px solid var(--line);
+  font-family: var(--f-mono);
+}
+.round-strip ol { list-style: none; flex: 1; min-width: 0; align-self: stretch; display: flex; margin: 6px 0 8px; padding: 0; border-bottom: 1px solid var(--muted); }
+/* The minor ticks: a line at the end of each fifth of a segment; the fifth one falls on the next question's major tick. */
+.round-strip li {
+  flex: 1; position: relative;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(20% - 1px), var(--muted) calc(20% - 1px) 20%) left bottom / 100% 5px no-repeat;
+}
+/* The major ticks: one where each question starts, and one closing the last. */
+.round-strip li::before, .round-strip li:last-child::after { content: ""; position: absolute; bottom: 0; width: 1px; height: 14px; background: var(--ink); }
+.round-strip li::before { left: 0; }
+.round-strip li:last-child::after { right: 0; }
+.round-strip li span { position: absolute; left: 5px; top: 0; font-size: 10.5px; line-height: 1; color: var(--muted); }
+.round-strip li.is-answered { background-color: var(--accent-soft); }
+.round-strip li.is-answered span { color: var(--ink); }
+.round-strip li.is-current span { color: var(--accent); font-weight: 700; }
+.round-strip li.is-current::before { width: 2px; height: 100%; background: var(--accent); }
+.round-strip-count { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }

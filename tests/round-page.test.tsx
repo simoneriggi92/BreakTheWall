@@ -82,6 +82,11 @@ afterEach(() => setLanguage('it-IT'));
 const outline = () => screen.getByRole('navigation', { name: 'Questions' });
 const receives = () => screen.getByRole('region', { name: 'What the agent receives' });
 const returnText = () => within(receives()).getByTestId('return-message').textContent;
+/** The round's progress at the window's foot (#125): the segments, and the count as the text that is read. */
+const strip = () => screen.getByRole('contentinfo', { name: 'Round progress' });
+/** Each segment as the eye reads it: its number, filled or not, and whether it marks the question in focus. */
+const segments = () => [...strip().querySelectorAll('li')]
+  .map(x => `${x.textContent} ${x.classList.contains('is-answered') ? 'answered' : 'open'}${x.classList.contains('is-current') ? ' current' : ''}`);
 
 describe('a round in the page (#95)', () => {
   it('shows the turn\'s text, an outline of the questions with their state, and the first question in focus', async () => {
@@ -89,7 +94,7 @@ describe('a round in the page (#95)', () => {
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Two decisions are open.');
     const items = within(outline()).getAllByRole('button');
     expect(items.map(x => x.textContent)).toEqual(['Q1 · Where do rounds live?no answer', 'Q2 · Who recognises a round?no answer']);
-    expect(within(screen.getByRole('banner')).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
     const question = screen.getByRole('article');
     expect(within(question).getByRole('heading', { level: 2 })).toHaveTextContent('Q1 · Where do rounds live?');
     expect(question).toHaveTextContent('The server keeps every round it receives.');
@@ -108,7 +113,7 @@ describe('a round in the page (#95)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
     expect(screen.getByRole('button', { name: 'Accept the recommendation' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('banner')).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
     expect(returnText()).toBe('**Q1 · Where do rounds live?** recommendation\n**Q2 · Who recognises a round?** no answer');
 
     await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
@@ -176,7 +181,7 @@ describe('a round in the page (#95)', () => {
     render(<LocalPage fetch={fakeServer({ ...ROUND, draft: { generalNote: 'Kept.', answers: { '2': { choice: 'none', note: '' } } } }).fetch}/>);
     await screen.findByRole('article');
     expect(screen.getByRole('textbox', { name: 'General note' })).toHaveValue('Kept.');
-    expect(within(screen.getByRole('banner')).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
     // The first question still waiting for an answer is the one in focus.
     expect(screen.getByRole('article')).toHaveTextContent('Where do rounds live?');
   });
@@ -276,15 +281,14 @@ describe('reading one question comfortably (#97)', () => {
     expect(question).toHaveTextContent('broken diagram');
   });
 
-  it('keeps "n/m answered" in the top bar, and collapses an answered question in the outline once focus moves on', async () => {
+  it('keeps "n/m answered" in view, and collapses an answered question in the outline once focus moves on', async () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
     await screen.findByRole('article');
-    const bar = screen.getByRole('banner');
-    expect(within(bar).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
 
     await user.click(within(screen.getByRole('group', { name: 'Options' })).getByRole('button', { name: /On disk/ }));
-    expect(within(bar).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
     // The question in focus stays whole in the outline, answered or not.
     const first = () => within(outline()).getAllByRole('button')[0];
     expect(first()).toHaveTextContent('Q1 · Where does the question live?option (b)');
@@ -641,7 +645,7 @@ describe('remarks on a question\'s passage (#98)', () => {
       '  - «server keeps every round» — Every one, forever?',
       '**Q2 · Who recognises a round?** no answer',
     ].join('\n'));
-    expect(within(screen.getByRole('banner')).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
     await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({
       generalNote: '',
       answers: { '1': { note: '', remarks: [{ part: 'body', start: 4, end: 28, passage: 'server keeps every round', text: 'Every one, forever?' }] } },
@@ -870,5 +874,58 @@ describe('the round page as a drafting sheet (#123)', () => {
     await user.click(foldQuestions);
     expect(screen.queryByRole('heading', { level: 2, name: 'Questions' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Unfold the questions' })).toBeInTheDocument();
+  });
+});
+
+describe('the progress strip at the window\'s foot (#125)', () => {
+  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+
+  it('shows one segment per question, fills the answered ones and marks the current one, with the count beside them', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(segments()).toEqual(['01 open current', '02 open']);
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
+    expect(segments()).toEqual(['01 answered current', '02 open']);
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
+
+    await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
+    expect(segments()).toEqual(['01 answered', '02 open current']);
+  });
+
+  it('takes the count out of the top bar, announces it politely, and gives the segments nothing to click', async () => {
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('banner')).queryByText(/answered/)).toBeNull();
+    // The phase control stays in the bar.
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: /End the round phase/ })).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toHaveAttribute('aria-live', 'polite');
+    const ruler = strip().querySelector('ol')!;
+    expect(ruler).toHaveAttribute('aria-hidden', 'true');
+    expect(ruler.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0);
+    // The page says it holds a strip, which is what reserves its height in the stylesheet (tests/theme.test.ts).
+    expect(strip().closest('.round-page')).toHaveClass('has-strip');
+  });
+
+  it('stays at the wide, rail and drawer widths, with the drawer open too, and is named in Italian', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    expect(segments()).toEqual(['01 open current', '02 open']);
+    browser.resize(1100);
+    expect(segments()).toEqual(['01 open current', '02 open']);
+    browser.resize(700);
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'What the agent receives' }));
+    expect(receives()).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
+    cleanup();
+
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('contentinfo', { name: 'Avanzamento del round' })).getByText('0/2 con risposta')).toBeInTheDocument();
   });
 });
