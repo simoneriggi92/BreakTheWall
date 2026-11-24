@@ -12,7 +12,9 @@
    around the round instead of a gap between the question and what the agent receives. */
 .round-layout {
   display: grid; gap: 20px 28px; padding: 20px 24px 40px; align-items: start; justify-content: center;
-  grid-template-columns: minmax(200px, 240px) minmax(0, 760px) minmax(280px, 360px);
+  /* Each column's width is a variable the bands and the folds set, so any mix of them composes without a rule each. */
+  --col-left: minmax(200px, 240px); --col-mid: 760px; --col-right: minmax(280px, 360px);
+  grid-template-columns: var(--col-left) minmax(0, var(--col-mid)) var(--col-right);
   grid-template-areas: "outline turn return" "outline question return";
   /* The side chat is as tall as the window; its extra height goes to the question's row, never between the turn's
      text and the question. */
@@ -41,7 +43,7 @@
 .round-outline-item.is-collapsed .round-outline-title { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-outline-item.is-collapsed.is-answered .round-outline-title { color: var(--good); }
 .round-question {
-  grid-area: question; max-width: 760px; background: var(--surface); border: 1px solid var(--line);
+  grid-area: question; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 20px 24px; line-height: 1.6;
 }
 .round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; max-width: 32em; }
@@ -121,13 +123,14 @@
 .round-markdown .md-diagram.drawn .md-diagram-svg { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
 
 /* Below ~1180 px: the outline is a rail of question numbers. */
-.round-layout.is-rail { grid-template-columns: 64px minmax(0, 760px) minmax(240px, 300px); }
-.round-layout.is-rail .round-outline-item, .round-layout.is-drawer .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
-.round-layout.is-rail .round-outline-title, .round-layout.is-drawer .round-outline-title { white-space: nowrap; }
+.round-layout.is-rail { --col-right: minmax(240px, 300px); }
+.round-layout.is-outline-folded { --col-left: 64px; }
+.round-layout.is-outline-folded .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
+.round-layout.is-outline-folded .round-outline-title { white-space: nowrap; }
 
 /* Below ~860 px: the rail and the question; the right column slides over as a drawer from the top bar. */
 .round-layout.is-drawer {
-  grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: "outline turn" "outline question"; justify-content: stretch; padding: 16px 16px 32px 8px; gap: 16px 12px;
+  grid-template-columns: var(--col-left) minmax(0, 1fr); grid-template-areas: "outline turn" "outline question"; justify-content: stretch; padding: 16px 16px 32px 8px; gap: 16px 12px;
 }
 .round-layout.is-drawer .round-question { padding: 16px 18px; }
 .round-layout.is-drawer .round-return {
@@ -183,8 +186,8 @@
 .round-side > .side-chat { flex: 0 1 auto; }
 /* A reply is read, not glanced at: while a side chat is open the right column widens, so its prose keeps a readable
    line and a table in a reply does not squeeze into one word a line. */
-.round-layout.is-wide:has(> .round-side) { grid-template-columns: minmax(200px, 240px) minmax(0, 760px) minmax(360px, 520px); }
-.round-layout.is-rail:has(> .round-side) { grid-template-columns: 64px minmax(0, 760px) minmax(320px, 420px); }
+.round-layout.is-wide:has(> .round-side) { --col-right: minmax(360px, 520px); }
+.round-layout.is-rail:has(> .round-side) { --col-right: minmax(320px, 420px); }
 .side-chat { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border: 1px solid var(--purple); border-radius: var(--radius); overflow: hidden; }
 .side-chat-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .side-chat-head h2 { flex: 1; margin: 0; font-size: 14px; color: var(--purple); }
@@ -223,3 +226,22 @@
   padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
   max-height: none;
 }
+
+/* Folding (the outline, the right column, the turn's text): each part keeps a button to fold or unfold it. A folded
+   right column is a narrow strip that still says how many questions are answered; the question takes the room it
+   leaves, while its prose keeps the measure. */
+.round-layout.is-drawer.is-outline-folded { --col-left: 56px; }
+.round-layout.is-side-folded { --col-right: 44px; --col-mid: 920px; }
+.round-fold { padding: 2px 9px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.round-outline > .round-fold { display: block; margin: 0 0 8px auto; }
+.round-layout.is-outline-folded .round-outline > .round-fold { margin: 0 auto 8px; }
+.round-side-fold { align-self: flex-end; justify-self: end; }
+.round-side-folded { grid-area: return; position: sticky; top: var(--round-stick); }
+.round-fold-strip {
+  writing-mode: vertical-rl; width: 44px; padding: 14px 0; font-size: 12.5px; font-weight: 700; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+}
+.round-fold-strip:hover { color: var(--ink); border-color: var(--accent); }
+.round-turn-fold { float: right; margin: 0 0 6px 12px; }
+.round-turn.is-folded { padding-top: 0; padding-bottom: 0; }
+.round-turn.is-folded .round-turn-fold { float: none; margin: 0; }

@@ -18,6 +18,12 @@ export const en: Messages = {
     round: {
       title: (n: number) => `Round ${n}`,
       turnText: 'The turn’s text',
+      /** The page's parts that fold and unfold: the outline, the right column, the turn's text. */
+      folds: {
+        foldOutline: 'Fold the questions', unfoldOutline: 'Unfold the questions',
+        foldSide: 'Fold the right column', unfoldSide: 'Unfold the right column',
+        hideTurn: 'Hide the agent’s text', showTurn: 'Show the agent’s text',
+      },
       outline: 'Questions',
       progress: (answered: number, total: number) => `${answered}/${total} answered`,
       question: (n: number, title: string) => `Q${n} · ${title}`,

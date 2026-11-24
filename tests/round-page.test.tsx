@@ -76,7 +76,7 @@ function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; 
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
-beforeEach(() => { sessionStorage.clear(); window.history.replaceState(null, '', `/#t=${SECRET}`); setLanguage('en-GB'); });
+beforeEach(() => { sessionStorage.clear(); localStorage.clear(); window.history.replaceState(null, '', `/#t=${SECRET}`); setLanguage('en-GB'); });
 afterEach(() => setLanguage('it-IT'));
 
 const outline = () => screen.getByRole('navigation', { name: 'Questions' });
@@ -397,6 +397,69 @@ function viewport(width: number) {
   }) as unknown as typeof window.matchMedia;
   return { resize: (next: number) => { width = next; act(() => lists.forEach(l => l.listeners.forEach(f => f()))); }, subscriptions: () => subscribed };
 }
+
+describe('folding the parts of a round', () => {
+  it('folds the outline to its numbers and unfolds it again', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(outline()).toHaveTextContent('Where do rounds live?');
+
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    expect(outline()).not.toHaveTextContent('Where do rounds live?');
+    expect(within(outline()).getByRole('button', { name: /^Q1 · Where do rounds live\?/ })).toHaveTextContent('Q1');
+
+    await user.click(screen.getByRole('button', { name: 'Unfold the questions' }));
+    expect(outline()).toHaveTextContent('Where do rounds live?');
+  });
+
+  it('folds the right column to a strip that still says how many are answered, and unfolds it', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Fold the right column' }));
+    expect(screen.queryByRole('region', { name: 'What the agent receives' })).toBeNull();
+
+    const unfold = screen.getByRole('button', { name: 'Unfold the right column' });
+    expect(unfold).toHaveTextContent('What the agent receives · 0/2 answered');
+    await user.click(unfold);
+    expect(receives()).toBeVisible();
+  });
+
+  it('folds the turn’s text to one line and shows it again', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    const turn = await screen.findByRole('region', { name: 'The turn’s text' });
+    await user.click(within(turn).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(turn).not.toHaveTextContent('Two decisions are open.');
+
+    await user.click(within(turn).getByRole('button', { name: 'Show the agent’s text' }));
+    expect(turn).toHaveTextContent('Two decisions are open.');
+  });
+
+  it('remembers what was folded when the page opens again', async () => {
+    const user = userEvent.setup();
+    const first = render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    await user.click(screen.getByRole('button', { name: 'Fold the right column' }));
+    first.unmount();
+
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(outline()).not.toHaveTextContent('Where do rounds live?');
+    expect(screen.getByRole('button', { name: 'Unfold the right column' })).toBeInTheDocument();
+  });
+
+  it('names the folds in Italian', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(screen.getByRole('button', { name: 'Comprimi le domande' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comprimi la colonna destra' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nascondi il testo dell’agente' })).toBeInTheDocument();
+  });
+});
 
 describe('the round beside a terminal (#97)', () => {
   afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });

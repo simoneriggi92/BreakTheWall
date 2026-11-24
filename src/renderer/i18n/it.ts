@@ -17,6 +17,12 @@ export const it = {
     round: {
       title: (n: number) => `Round ${n}`,
       turnText: 'Il testo del turno',
+      /** The page's parts that fold and unfold: the outline, the right column, the turn's text. */
+      folds: {
+        foldOutline: 'Comprimi le domande', unfoldOutline: 'Espandi le domande',
+        foldSide: 'Comprimi la colonna destra', unfoldSide: 'Espandi la colonna destra',
+        hideTurn: 'Nascondi il testo dell’agente', showTurn: 'Mostra il testo dell’agente',
+      },
       outline: 'Domande',
       progress: (answered: number, total: number) => `${answered}/${total} con risposta`,
       question: (n: number, title: string) => `Q${n} · ${title}`,

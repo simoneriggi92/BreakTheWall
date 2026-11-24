@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import { z } from 'zod';
 import { answerKind, answerOf, attachedOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { SideChatPassage } from '../../core/side-chat';
 import { answersWithRemarks, type SpecRemarksSection } from '../../core/spec-remarks';
@@ -129,6 +130,12 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const sideChats = useSideChats(bridge, round);
   const sideChatOf = (number: number) => sideChats.find(x => x.question === number);
   const [chatOpen, setChatOpen] = useState(false);
+  const [folds, fold] = useFolds();
+  const f = r.folds;
+  // The outline folds by itself below ~1180 px; the person's own choice, once made, wins at every width.
+  const outlineFolded = folds.outline ?? band !== 'wide';
+  // Below ~860 px the right column is already a drawer, closed until asked for: folding it means nothing there.
+  const sideFolded = band !== 'drawer' && folds.side === true;
   /** What the agent receives stays open above a side chat unless the person folds it: it is their answer. */
   const [returnOpen, setReturnOpen] = useState(true);
   /** What the person is typing in each question's side chat, kept while the focus moves. */
@@ -136,7 +143,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   /** The passage each question's next side-chat question quotes, chosen with "Ask here" (#101). */
   const [asking, setAsking] = useState<Record<number, SideChatPassage | undefined>>({});
   // In the narrowest layout the column is the drawer, so opening the chat opens it.
-  const openChat = () => { setChatOpen(true); setDrawerOpen(true); };
+  const openChat = () => { setChatOpen(true); setDrawerOpen(true); if (sideFolded) fold({ side: false }); };
   const askHere = () => {
     if (!selected) return;
     const { part, start, end, passage } = selected;
@@ -216,6 +223,9 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     }
   }
 
+  const sideFold = band !== 'drawer' && (
+    <button type="button" className="subtle round-fold round-side-fold" aria-expanded aria-label={f.foldSide} title={f.foldSide} onClick={() => fold({ side: true })}>»</button>
+  );
   const drawerBar = band === 'drawer' && <div className="round-drawer-bar">
     <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>
     <button type="button" className="subtle round-drawer-close" onClick={() => { setDrawerOpen(false); drawerToggle.current?.focus(); }}>{r.closeReceives}</button>
@@ -250,16 +260,24 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         {band !== 'drawer' && <PhaseControl session={round.session} open={phaseOpen} bridge={bridge}/>}
         <PreferencesMenu/>
       </header>
-      <main className={`round-layout is-${band}`}>
-        {round.turnText && <section className="round-turn" aria-label={r.turnText}><Markdown text={round.turnText}/></section>}
-        <nav className="round-outline" aria-label={r.outline}>
+      <main className={`round-layout is-${band}${outlineFolded ? ' is-outline-folded' : ''}${sideFolded ? ' is-side-folded' : ''}`}>
+        {round.turnText && <section className={`round-turn${folds.turn ? ' is-folded' : ''}`} aria-label={r.turnText}>
+          <button type="button" className="subtle round-fold round-turn-fold" aria-expanded={!folds.turn} onClick={() => fold({ turn: !folds.turn })}>{folds.turn ? f.showTurn : f.hideTurn}</button>
+          {!folds.turn && <Markdown text={round.turnText}/>}
+        </section>}
+        <div className="round-outline">
+        <button
+          type="button" className="subtle round-fold" aria-expanded={!outlineFolded} aria-label={outlineFolded ? f.unfoldOutline : f.foldOutline}
+          title={outlineFolded ? f.unfoldOutline : f.foldOutline} onClick={() => fold({ outline: !outlineFolded })}
+        >{outlineFolded ? '»' : '«'}</button>
+        <nav aria-label={r.outline}>
           <ol>
             {round.questions.map(q => {
               const a = answerOf(draft, q);
               const done = isAnswered(a);
               // An answered question out of focus folds to its number and answer: what is left to do stands out. In the
               // rail every question is its number, with a tick once answered; the title stays in its name and tooltip.
-              const rail = band !== 'wide';
+              const rail = outlineFolded;
               const collapsed = rail || (done && q.number !== question.number);
               const asked = sideChatOf(q.number)?.turns.length ?? 0;
               return (
@@ -278,6 +296,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             })}
           </ol>
         </nav>
+        </div>
         <article ref={article} className={`round-question${chatOpen ? ' is-chatting' : ''}`} aria-labelledby="round-question-title" onMouseUp={readSelection} onKeyUp={readSelection}>
           <div className="round-question-head">
             <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
@@ -351,9 +370,14 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             <div className="round-steps"><button type="button" className="primary" onClick={() => move(1)}>{r.next}</button></div>
           )}
         </article>
-        {showReturn && (chatOpen
+        {sideFolded && <aside className="round-side-folded">
+          <button type="button" className="round-fold-strip" aria-expanded={false} aria-label={f.unfoldSide} title={f.unfoldSide} onClick={() => fold({ side: false })}>
+            {r.receives} · {r.progress(answered, round.questions.length)}
+          </button>
+        </aside>}
+        {showReturn && !sideFolded && (chatOpen
           ? <div className="round-side">
-            {drawerBar}
+            {drawerBar}{sideFold}
             <details
               id="round-return" className="round-return-strip" aria-label={r.receives} open={returnOpen}
               onToggle={e => setReturnOpen(e.currentTarget.open)}
@@ -370,7 +394,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             />
           </div>
           : <section id="round-return" className="round-return" aria-label={r.receives}>
-            {drawerBar}
+            {drawerBar}{sideFold}
             {generalField}
             <h2>{r.receives}</h2>
             {returnBody}
@@ -381,6 +405,34 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
 }
 
 const NO_RIDING: readonly SpecRemarksSection[] = [];
+
+/** Which parts of a round the person folded. Unset means the page decides (the outline folds by itself when narrow). */
+const foldsSchema = z.object({ outline: z.boolean().optional(), side: z.boolean().optional(), turn: z.boolean().optional() });
+type Folds = z.infer<typeof foldsSchema>;
+const FOLDS_KEY = 'btw:round-folds';
+
+/**
+ * The folds, kept in this browser so every round opens the way the person left the last one. Storage may be refused
+ * (a private window, blocked site data): the page then folds as asked and forgets on reload.
+ */
+function useFolds(): [Folds, (change: Folds) => void] {
+  const [folds, setFolds] = useState<Folds>(readFolds);
+  const fold = (change: Folds) => setFolds(kept => {
+    const next = { ...kept, ...change };
+    try { localStorage.setItem(FOLDS_KEY, JSON.stringify(next)); } catch { /* storage refused: folded for this page only */ }
+    return next;
+  });
+  return [folds, fold];
+}
+
+function readFolds(): Folds {
+  try {
+    const parsed = foldsSchema.safeParse(JSON.parse(localStorage.getItem(FOLDS_KEY) ?? '{}'));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Where the "Remark" and "Ask here" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts
