@@ -6,7 +6,8 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import type { Question, Round } from '../core/round';
-import { sideChatAskSchema, sideChatTurnSchema, type SideChat, type SideChatTurn, type SideChatsView } from '../core/side-chat';
+import { quoted } from '../core/round-answers';
+import { sideChatAskSchema, sideChatPassageSchema, sideChatTurnSchema, type SideChat, type SideChatTurn, type SideChatsView } from '../core/side-chat';
 import { atomicWrite, entries, sessionFolder, type RoundStore } from './rounds';
 
 /**
@@ -35,8 +36,10 @@ export interface SideChatCommand {
   round: { number: number } & Round;
   question: Question;
   /** This question's earlier turns, finished. */
-  earlier: readonly Pick<SideChatTurn, 'ask' | 'reply'>[];
+  earlier: readonly Pick<SideChatTurn, 'ask' | 'reply' | 'passage'>[];
   ask: string;
+  /** The passage asked about with "Ask here" (#101). */
+  passage?: SideChatTurn['passage'];
 }
 
 /**
@@ -64,10 +67,14 @@ function sideChatPrompt(x: SideChatCommand): string {
     parts.push(`The round ${x.round.number}:\n\n${x.round.turnText ? `${x.round.turnText}\n\n` : ''}${others}`);
   }
   parts.push(`The question of this side chat:\n\n${questionText(x.question)}`);
-  if (x.earlier.length > 0) parts.push(`Earlier in this side chat:\n\n${x.earlier.map(t => `The person asked:\n${t.ask}\n\nYou replied:\n${t.reply}`).join('\n\n')}`);
-  parts.push(`The person asks:\n${x.ask}`);
+  if (x.earlier.length > 0) parts.push(`Earlier in this side chat:\n\n${x.earlier.map(t => `${asked('asked', t.passage)}\n${t.ask}\n\nYou replied:\n${t.reply}`).join('\n\n')}`);
+  parts.push(`${asked('asks', x.passage)}\n${x.ask}`);
   return parts.join('\n\n');
 }
+
+/** How a turn is introduced to the fork: about the question, or about a passage of it, quoted as the message quotes it. */
+const asked = (verb: 'asks' | 'asked', passage: SideChatTurn['passage']) =>
+  passage ? `The person ${verb} about this passage of the question: ${quoted(passage.passage)}` : `The person ${verb}:`;
 
 function questionText(q: Question): string {
   const options = q.options.length > 0 ? `\n\nOptions:\n${q.options.map(o => `- (${o.letter}) ${o.label}${o.consequence ? `: ${o.consequence}` : ''}`).join('\n')}` : '';
@@ -175,7 +182,7 @@ const storedThreadSchema = z.strictObject({
 });
 type StoredThread = z.infer<typeof storedThreadSchema>;
 const FILE = /^side-chat-(\d+)-(\d+)\.json$/;
-const askBodySchema = z.strictObject({ ask: sideChatAskSchema });
+const askBodySchema = z.strictObject({ ask: sideChatAskSchema, passage: sideChatPassageSchema.optional() });
 const ROUND_CHATS_PATH = /^\/api\/side-chats\/([^/]+)\/(\d{1,6})$/;
 const ASK_PATH = /^\/api\/side-chats\/([^/]+)\/(\d{1,6})\/(\d{1,3})$/;
 
@@ -308,14 +315,14 @@ export function sideChatRoutes(deps: SideChatDeps) {
       const thread = threads.get(key) ?? { version: 1 as const, session, cwd: found.cwd, round, question: number, turns: [] };
       // One reply at a time per question: the next question's prompt carries this one's reply.
       if (thread.turns.some(t => t.status === 'running')) return deps.io.send(res, 409, { error: 'busy' }), true;
-      const turn: SideChatTurn = { number: thread.turns.length + 1, ask: body.data.ask, reply: '', files: [], status: 'running', route: 'fork', at: new Date().toISOString() };
+      const turn: SideChatTurn = { number: thread.turns.length + 1, ask: body.data.ask, ...(body.data.passage ? { passage: body.data.passage } : {}), reply: '', files: [], status: 'running', route: 'fork', at: new Date().toISOString() };
       const next = { ...thread, turns: [...thread.turns, turn] };
       threads.set(key, next);
       changed(next);
       await save(next);
-      const earlier = thread.turns.filter(t => t.status === 'done').map(t => ({ ask: t.ask, reply: t.reply }));
+      const earlier = thread.turns.filter(t => t.status === 'done').map(t => ({ ask: t.ask, reply: t.reply, passage: t.passage }));
       const model = deps.modelOf(session);
-      void answer(key, turn.number, { session, round: { number: round, ...found.round }, question, earlier, ask: turn.ask, ...(model ? { model } : {}) }, found.cwd);
+      void answer(key, turn.number, { session, round: { number: round, ...found.round }, question, earlier, ask: turn.ask, passage: turn.passage, ...(model ? { model } : {}) }, found.cwd);
       deps.io.send(res, 202, { turn: turn.number });
       return true;
     }

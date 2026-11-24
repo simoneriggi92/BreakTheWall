@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { remarkPartSchema } from './round-answers';
 
 /**
  * Side chats (#100): one per question of a round, each a list of turns the person asked and the replies a read-only
@@ -8,9 +9,23 @@ import { z } from 'zod';
 /** What the person asks in one turn. */
 export const sideChatAskSchema = z.string().max(20_000).refine(x => x.trim() !== '', 'empty');
 
+/**
+ * The passage of the question a turn asks about, chosen with "Ask here" (#101): anchored like a remark, in the part of
+ * the question and by offsets into its rendered text, so the page marks it again; the fork reads only `passage`.
+ */
+export const sideChatPassageSchema = z.strictObject({
+  part: remarkPartSchema,
+  start: z.number().int().min(0).max(1_000_000),
+  end: z.number().int().min(1).max(1_000_000),
+  passage: z.string().max(5_000).refine(x => x.trim() !== ''),
+}).refine(x => x.end > x.start);
+export type SideChatPassage = z.infer<typeof sideChatPassageSchema>;
+
 export const sideChatTurnSchema = z.strictObject({
   number: z.number().int().min(1),
   ask: sideChatAskSchema,
+  /** Absent on a turn that asks about the whole question, and on every turn kept before #101. */
+  passage: sideChatPassageSchema.optional(),
   /** The reply as it streamed; once done, the fork's final answer. */
   reply: z.string().max(1_000_000),
   /** What the reply read, in order: a file (`src/a.ts`, `src/a.ts:10-40`) or a search (`grep "x" in src`, `glob "*.ts"`). */
