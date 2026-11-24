@@ -3,17 +3,29 @@
    come from RoundPage (`is-wide`, `is-rail`, `is-drawer`), not from media queries here, so what the page shows and
    how it is laid out never disagree. */
 .round-page { min-height: 100vh; background: var(--bg); color: var(--ink); }
+/* Where the side columns stick: below the sticky top bar (about 74 px) and the layout's 20 px of padding, so they
+   start where they stood before the page scrolled and never slide under the bar. */
+.round-layout { --round-stick: 94px; }
 .round-progress { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The turn's text sits in the question's column, so both read on one left edge; outline and return span both rows and
+   stay beside them from the top. The middle column is capped and the grid centred, so a wide window adds margin
+   around the round instead of a gap between the question and what the agent receives. */
 .round-layout {
-  display: grid; gap: 20px 28px; padding: 20px 24px 40px; align-items: start;
-  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(260px, 340px);
-  grid-template-areas: "turn turn turn" "outline question return";
+  display: grid; gap: 20px 28px; padding: 20px 24px 40px; align-items: start; justify-content: center;
+  grid-template-columns: minmax(200px, 240px) minmax(0, 760px) minmax(280px, 360px);
+  grid-template-areas: "outline turn return" "outline question return";
+  /* The side chat is as tall as the window; its extra height goes to the question's row, never between the turn's
+     text and the question. */
+  grid-template-rows: auto 1fr;
 }
 /* About 70 characters a line, where eyes tire least over hours of rounds. Measured in em, not ch: `ch` is the width
    of a zero, so 70ch held about 99 characters of the body font (6.7px a character at 15px, measured in the page).
    32em holds about 72. Prose keeps that measure; diagrams and options may use the question's full width. */
-.round-turn { grid-area: turn; max-width: 32em; color: var(--muted); border-left: 3px solid var(--line); padding-left: 14px; }
-.round-outline { grid-area: outline; position: sticky; top: 72px; }
+/* The turn's text is context, not the question: it takes the column's width rather than the prose measure, so a
+   long preamble stays short and lines up with the question below it. */
+.round-turn { grid-area: turn; color: var(--muted); border-left: 3px solid var(--line); padding: 2px 0 2px 16px; line-height: 1.6; }
+.round-turn .round-markdown > * { max-width: none; }
+.round-outline { grid-area: outline; position: sticky; top: var(--round-stick); }
 .round-outline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .round-outline-item {
   display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px;
@@ -76,7 +88,7 @@
 .round-remark-text { grid-column: 1 / -1; margin: 0; white-space: pre-wrap; }
 .round-keys { margin: 16px 0 0; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-steps { margin-top: 14px; display: flex; justify-content: flex-end; }
-.round-return { grid-area: return; position: sticky; top: 72px; display: grid; gap: 12px; }
+.round-return { grid-area: return; position: sticky; top: var(--round-stick); display: grid; gap: 12px; }
 .round-return h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .round-message {
   margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--f-mono); font-size: 13px; line-height: 1.55;
@@ -109,13 +121,13 @@
 .round-markdown .md-diagram.drawn .md-diagram-svg { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
 
 /* Below ~1180 px: the outline is a rail of question numbers. */
-.round-layout.is-rail { grid-template-columns: 64px minmax(0, 1fr) minmax(240px, 300px); }
+.round-layout.is-rail { grid-template-columns: 64px minmax(0, 760px) minmax(240px, 300px); }
 .round-layout.is-rail .round-outline-item, .round-layout.is-drawer .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
 .round-layout.is-rail .round-outline-title, .round-layout.is-drawer .round-outline-title { white-space: nowrap; }
 
 /* Below ~860 px: the rail and the question; the right column slides over as a drawer from the top bar. */
 .round-layout.is-drawer {
-  grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: "turn turn" "outline question"; padding: 16px 16px 32px 8px; gap: 16px 12px;
+  grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: "outline turn" "outline question"; justify-content: stretch; padding: 16px 16px 32px 8px; gap: 16px 12px;
 }
 .round-layout.is-drawer .round-question { padding: 16px 18px; }
 .round-layout.is-drawer .round-return {
@@ -162,9 +174,13 @@
 .round-question.is-chatting { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-soft); }
 .round-outline-chat { font-size: 11.5px; font-weight: 700; color: var(--purple); white-space: nowrap; }
 .round-side {
-  grid-area: return; position: sticky; top: 72px; display: grid; gap: 10px;
-  grid-template-rows: minmax(0, 1fr) auto; height: calc(100vh - 92px);
+  grid-area: return; position: sticky; top: var(--round-stick); display: grid; gap: 10px;
+  grid-template-rows: minmax(0, 1fr) auto; height: calc(100vh - var(--round-stick) - 20px);
 }
+/* A reply is read, not glanced at: while a side chat is open the right column widens, so its prose keeps a readable
+   line and a table in a reply does not squeeze into one word a line. */
+.round-layout.is-wide:has(> .round-side) { grid-template-columns: minmax(200px, 240px) minmax(0, 760px) minmax(360px, 520px); }
+.round-layout.is-rail:has(> .round-side) { grid-template-columns: 64px minmax(0, 760px) minmax(320px, 420px); }
 .side-chat { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border: 1px solid var(--purple); border-radius: var(--radius); overflow: hidden; }
 .side-chat-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .side-chat-head h2 { flex: 1; margin: 0; font-size: 14px; color: var(--purple); }
@@ -174,6 +190,10 @@
 .side-chat-turns > li { display: grid; gap: 8px; }
 .side-chat-ask { margin: 0; justify-self: end; max-width: 90%; background: var(--purple-soft); border-radius: 12px 12px 4px 12px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .side-chat-reply { font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+/* A wide table scrolls on its own instead of breaking every cell into a column of single words. */
+.side-chat-reply table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 13px; }
+.side-chat-reply :is(th, td) { padding: 4px 8px; border: 1px solid var(--line); vertical-align: top; overflow-wrap: normal; min-width: 8em; }
+.side-chat-reply .round-markdown > * + * { margin-top: .6em; }
 .side-chat-running, .side-chat-note { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
 .side-chat-read { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 .side-chat-read li { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
