@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { backingReportSchema, type BackingReport } from '../core/backing';
 import type { DesktopBridge } from '../core/bridge';
 import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
@@ -57,6 +58,8 @@ export interface PageBridge extends DesktopBridge {
    * `RidesError` when a round awaits answers: the remarks then go with that round's message.
    */
   sendSpecRemarks(id: string, draft: SpecRemarksDraft, language: MessageLanguage): Promise<string>;
+  /** What each statement of a version rests on (#106), checked by the server without a model. */
+  getSpecBacking(id: string): Promise<BackingReport>;
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
@@ -66,7 +69,7 @@ export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBri
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
 export type SpecRemarksBridge = Pick<PageBridge, 'getSpecRemarks' | 'saveSpecRemarks' | 'sendSpecRemarks'>;
-export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration'> & SpecRemarksBridge;
+export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration' | 'getSpecBacking'> & SpecRemarksBridge;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
@@ -169,6 +172,9 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
         if (rides.success) throw new RidesError(rides.data.round);
       }
       return sentReplySchema.parse(await (await ok(reply)).json()).message;
+    },
+    async getSpecBacking(id) {
+      return backingReportSchema.parse(await (await ok(await call(`/api/specs/${encodeURIComponent(id)}/backing`))).json());
     },
   };
 }

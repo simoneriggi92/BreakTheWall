@@ -64,6 +64,11 @@ export const xEn: typeof xIt = {
     order: 'Order', orderNone: 'No order to compare', orderFollows: 'The logic follows the chapters', orderPartly: 'The logic follows the chapters only in part', orderJumps: 'The logic jumps between chapters',
     orderBody: (pct: number, sections: number) => `In the main mechanism, in ${pct}% of cases the part another depends on comes first in the document; its parts are in ${sections} ${sections === 1 ? 'section' : 'sections'}.`,
     points: (pct: number) => ` The cards’ points rest on their own part’s lines in ${pct}% of cases.`,
+    backing: 'Backing', backingNone: 'This spec declares no backing',
+    backingNoneBody: 'No statement ends with a reference to an answer, an issue or lines of a file: none is flagged.',
+    backingHead: (statements: number, unbacked: number, broken: number) => `${statements} ${statements === 1 ? 'statement' : 'statements'}: ${unbacked} unbacked, ${broken} with a broken backing`,
+    backingBody: 'The flags are on the source’s lines; “Backing” shows what each statement rests on, with the cited answer beside it.',
+    backingFailed: 'The statements’ backing was not checked: the server did not answer.',
   },
   library: {
     title: 'Explorations', pill: 'HOW A SOURCE HOLDS TOGETHER', note: 'A source read for how it holds together: its parts, the links the source states and the questions it walks.',

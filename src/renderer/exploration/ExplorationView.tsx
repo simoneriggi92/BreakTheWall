@@ -10,7 +10,7 @@ import { originText, PreferencesMenu, usePreferences } from '../preferences';
 import { Graph, heightOf, type NodeState, type StripState } from './Graph';
 import { citing, crossing, guided, modelOf, sectionOf, shown, standIn, type Model, type Shaped } from './model';
 import { Card, IndexPanel, SourcePanel, type CardTarget } from './Panels';
-import { Report } from './Report';
+import { Report, type MoreReading } from './Report';
 import { initialState, reduce, type Action, type Link, type ViewState } from './state';
 
 /** The motion of the sub-level (X14), as the tokens set it; "reduce motion" stops it. */
@@ -21,13 +21,19 @@ const DURATION = 320, EASE = 'cubic-bezier(.2, .8, .2, 1)';
  * The exploration view (plan P-20261105-exploration X12–X17): one shared state read by three roles. The guide moves it,
  * the structure shows it, the source proves it; the index, the card and "how it was read" read the same state.
  */
-export function ExplorationView({ x, goHome }: { x: Exploration; goHome: () => void }) {
+/**
+ * What a host adds to the view of its source (#106): a mark on the source's lines, named by the lines a block spans,
+ * and readings after the view's own in "how it was read". A handed-over spec adds its backing this way.
+ */
+export interface SourceExtras { flagOf?: (from: number, to: number) => string | undefined; readings?: MoreReading[] }
+
+export function ExplorationView({ x, goHome, extras }: { x: Exploration; goHome: () => void; extras?: SourceExtras }) {
   const m = useMemo(() => modelOf(x), [x]);
   const [s, dispatch] = useReducer((state: ViewState, action: Action) => reduce(m, state, action), m, initialState);
-  return <ExplorationBody m={m} s={s} dispatch={dispatch} goHome={goHome}/>;
+  return <ExplorationBody m={m} s={s} dispatch={dispatch} goHome={goHome} extras={extras}/>;
 }
 
-export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewState; dispatch: (a: Action) => void; goHome: () => void }) {
+export function ExplorationBody({ m, s, dispatch, goHome, extras }: { m: Model; s: ViewState; dispatch: (a: Action) => void; goHome: () => void; extras?: SourceExtras }) {
   const { t } = usePreferences(), xt = t.x, x = m.x;
   const view = useMemo(() => shown(m, s.guide, s.all, new Set(s.visited)), [m, s.guide, s.all, s.visited]);
   const focus = s.explore ?? guided(m, s.guide, view) ?? null;
@@ -331,7 +337,7 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
     </header>
     <div className="xp-tabs" role="group" aria-label={xt.tabs}>{(['index', 'structure', 'source'] as const).map(k => <button key={k} aria-pressed={s.tab === k} onClick={() => dispatch({ type: 'tab', tab: k })}>{xt.panels[k]}</button>)}</div>
     <main id="main" ref={body} style={paneStyle} className={`xp-body xp-tab-${s.tab} ${s.folded.index ? 'xp-idx-closed' : ''} ${s.folded.source ? 'xp-src-closed' : ''} ${m.index.length ? 'xp-with-index' : ''}`}>
-      {s.report ? <Report m={m} onLine={pickLine} onLink={openLink}/> : <>
+      {s.report ? <Report m={m} onLine={pickLine} onLink={openLink} more={extras?.readings}/> : <>
         {m.index.length > 0 && <section className="xp-panel xp-index-panel">{panelHead(xt.panels.index, 'index')}
           {!s.folded.index && <><p className="xp-hint">{xt.panels.indexHint}</p><IndexPanel m={m} view={view} selected={selectedPart} section={s.section} now={now} onSection={pickSection}/></>}</section>}
         {m.index.length > 0 && <div className="xp-split xp-split-index">{!s.folded.index && splitter('xIndex')}</div>}
@@ -362,7 +368,7 @@ export function ExplorationBody({ m, s, dispatch, goHome }: { m: Model; s: ViewS
         </section>
         <div className="xp-split xp-split-source">{!s.folded.source && splitter('xSource')}</div>
         <section className="xp-panel xp-source-panel">{panelHead(xt.panels.source, 'source')}
-          {!s.folded.source && <SourcePanel m={m} cites={cites} view={s.sourceView} onLine={pickLine}/>}</section>
+          {!s.folded.source && <SourcePanel m={m} cites={cites} view={s.sourceView} onLine={pickLine} flagOf={extras?.flagOf}/>}</section>
       </>}
       <svg ref={wire} className="xp-wires" aria-hidden="true"/>
     </main>

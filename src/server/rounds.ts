@@ -3,8 +3,8 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promise
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
-import { draftSchema, emptyDraft, type Draft, type RoundView } from '../core/round-answers';
-import { roundSchema, type Round } from '../core/round';
+import { answerOf, draftSchema, emptyDraft, type Answer, type Draft, type RoundView } from '../core/round-answers';
+import { roundSchema, type Question, type Round } from '../core/round';
 import type { SpecRemarksSection } from '../core/spec-remarks';
 import type { HistoryRoundState } from '../core/session-history';
 import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
@@ -188,6 +188,17 @@ export class RoundStore {
   asked(session: string, number: number): { cwd: string; round: Round } | undefined {
     const found = this.entries.get(key(session, 'round', number));
     return found && 'round' in found ? { cwd: found.cwd, round: found.round } : undefined;
+  }
+
+  /**
+   * One question of a session's round as a spec's backing cites it (#106): what was asked, and the answer the person
+   * sent from the page, if they did. Undefined when the session has no such round or the round no such question.
+   */
+  cited(session: string, round: number, question: number): { question: Question; sent: boolean; answer: Answer | undefined } | undefined {
+    const found = this.entries.get(key(session, 'round', round));
+    const asked = found && 'round' in found ? found.round.questions.find(x => x.number === question) : undefined;
+    if (!found || !('round' in found) || !asked) return undefined;
+    return { question: asked, sent: found.sent !== null, answer: found.sent ? answerOf(found.draft, asked) : undefined };
   }
 
   async saveDraft(session: string, number: number, draft: Draft): Promise<RoundRefusal | null> {

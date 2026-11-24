@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { validateExploration, type Exploration } from '../../core/exploration';
 import type { SpecFailure, SpecView } from '../../core/spec';
 import { ExplorationView } from '../exploration/ExplorationView';
 import type { SpecBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { usePreferences } from '../preferences';
+import { backingExtras, BackingPanel, totals, useSpecBacking } from './Backing';
 import { anchorIn, SpecRemarksPanel, useSpecRemarks } from './SpecRemarks';
 
 /** The newest handover across every spec: the one the page opens. */
@@ -14,7 +15,9 @@ export const newestSpec = (specs: SpecView[]) => specs.reduce<SpecView | undefin
  * A handed-over spec in the page (#104): its version explored with the app's own view, or the structure being written.
  * The person keeps reading the version they opened when a new one arrives; a superseded version says so and opens
  * the new one on request. A passage selected in the source takes a remark, or says something is missing there (#105);
- * the remarks panel beside the exploration returns them with one Send. Only ids cross to the server.
+ * the remarks panel beside the exploration returns them with one Send. What each statement rests on is flagged on
+ * the source's lines and listed in the backing panel, where a flag turns into a remark (#106). Only ids cross to the
+ * server.
  */
 export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge: SpecBridge; onClose: () => void }) {
   const { t } = usePreferences(), s = t.page.spec;
@@ -26,6 +29,10 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
   // One draft per spec, named by its newest version; read again on every poll, which hands over a new list.
   const remarks = useSpecRemarks(spec?.latest ?? '', specs, bridge);
   const [remarksOpen, setRemarksOpen] = useState(false);
+  // Checked again on every poll: an answer sent meanwhile shows beside the statement that cites it.
+  const backing = useSpecBacking(spec?.id, specs, bridge);
+  const extras = useMemo(() => backingExtras(backing, t.x.report), [backing, t]);
+  const [backingOpen, setBackingOpen] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const [offer, setOffer] = useState<{ anchor: { from: number; to: number; passage: string }; top: number; left: number } | null>(null);
   const readSelection = () => {
@@ -65,6 +72,8 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     document.getSelection()?.removeAllRanges();
   };
   const count = remarks.draft?.remarks.length ?? 0;
+  const report = backing !== null && backing !== 'failed' && backing.declared ? backing : null;
+  const flagged = report && totals(report);
 
   return <div className="spec-page">
     <div className="spec-bar">
@@ -72,12 +81,13 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
       {spec.superseded && <p className="spec-superseded" role="status">
         {s.superseded} · <button type="button" className="spec-link" onClick={() => setOpenId(spec.latest)}>{s.openNew}</button>
       </p>}
+      {flagged && <button type="button" className="subtle spec-backing-toggle" aria-expanded={backingOpen} onClick={() => setBackingOpen(x => !x)}>{t.page.backing.toggle(flagged.unbacked, flagged.broken)}</button>}
       <button type="button" className="subtle spec-remarks-toggle" aria-expanded={remarksOpen} onClick={() => setRemarksOpen(x => !x)}>{t.page.specRemarks.toggle(count)}</button>
     </div>
     <div className="spec-main">
     {exploration
       ? <div ref={body} className="spec-body" onMouseUp={readSelection} onKeyUp={readSelection}>
-        <ExplorationView key={key} x={exploration} goHome={onClose}/>
+        <ExplorationView key={key} x={exploration} goHome={onClose} extras={extras}/>
         {offer && <div className="round-selection-offer spec-selection-offer" style={{ top: offer.top, left: offer.left }} onMouseDown={event => event.preventDefault()}>
           <button type="button" className="round-remark-offer" onClick={() => remark(false)}>{t.page.specRemarks.remark}</button>
           <button type="button" className="round-remark-offer" onClick={() => remark(true)}>{t.page.specRemarks.missingHere}</button>
@@ -90,6 +100,9 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
           : <Writing spec={spec} t={t} onExplore={() => act(id => bridge.exploreSpec(id))} onCancel={() => act(id => bridge.cancelSpec(id))}/>}
         {refused && <p role="alert">{s.actionFailed}</p>}
       </main>}
+    {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)}
+      // A superseded version takes no new remarks: its flags stay marks.
+      onRemark={spec.superseded ? undefined : anchor => { remarks.add(spec.number, anchor); setRemarksOpen(true); }}/>}
     {remarksOpen && <SpecRemarksPanel spec={spec} versions={versions} remarks={remarks} onClose={() => setRemarksOpen(false)}/>}
     </div>
   </div>;

@@ -191,6 +191,18 @@ describe('the to-spec skill is asked for the closing `Spec: <location>` line (#1
     expect(both).toContain('- **(a)** label: consequence');
   });
 
+  it('asks each statement to end with its backing: an answer [R2·Q3], a link to an issue or comment, or path:a-b (#106)', () => {
+    const data = dataFolder();
+    for (const context of [hook(typed('to-spec'), data), hook(called('to-spec'), data), hook(started('compact'), data)]) {
+      expect(context).toContain('[R2·Q3]');
+      expect(context).toMatch(/issue or comment/);
+      expect(context).toContain('path:a-b');
+      expect(context).toMatch(/every list item, table row and paragraph/);
+    }
+    // The round skills are asked nothing about backing.
+    expect(hook(typed('grilling'), dataFolder())).not.toContain('[R2·Q3]');
+  });
+
   it('leaves a session that only had rounds without the spec request after a compaction', () => {
     const data = dataFolder();
     hook(typed('grilling'), data);

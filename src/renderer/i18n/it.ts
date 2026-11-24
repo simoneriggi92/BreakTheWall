@@ -182,6 +182,28 @@ export const it = {
       sentAlone: 'Inviate da sole',
       sentWith: (n: number) => `Inviate con le risposte al round ${n}`,
     },
+    /** The backing of a handed-over spec (#106): what each statement declares it rests on, checked without a model. */
+    backing: {
+      title: 'Fondamento della specifica',
+      toggle: (unbacked: number, broken: number) => `Fondamento · ${unbacked} senza · ${broken} non ${broken === 1 ? 'trovato' : 'trovati'}`,
+      close: 'Chiudi',
+      /** A section's heading: its title, then what is flagged in it. */
+      section: (title: string, unbacked: number, broken: number) => [title, ...unbacked ? [`${unbacked} senza fondamento`] : [], ...broken ? [`${broken} ${broken === 1 ? 'rotto' : 'rotti'}`] : [], ...!unbacked && !broken ? ['con fondamento'] : []].join(' · '),
+      opening: 'Titolo e apertura',
+      states: { backed: 'Con fondamento', unbacked: 'Senza fondamento', broken: 'Fondamento non trovato' },
+      notFound: 'non trovato',
+      cited: (written: string) => `Risposta citata ${written}`,
+      question: (round: number, question: number) => `Round ${round} · Q${question}`,
+      choice: {
+        recommendation: (text: string) => `raccomandazione: ${text}`,
+        option: (letter: string, label: string) => `(${letter}) ${label}`,
+        none: 'nessuna scelta',
+      },
+      notSent: 'nessuna risposta inviata dalla pagina',
+      remarkOn: (lines: string) => `Osservazione su ${lines}`,
+      remark: 'Osservazione',
+      failed: 'Il fondamento non è stato controllato. Riapri la specifica per riprovare.',
+    },
   },
   assistants: {
     label: 'Usa con Claude', title: 'Usa Break the Wall da Claude',
