@@ -1,12 +1,14 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CurrentView } from '../src/core/round-phase';
+import type { History } from '../src/core/session-history';
 import { LocalPage } from '../src/renderer/LocalPage';
 
 const SECRET = 'a'.repeat(43);
 interface Call { url: string; secret: string | null }
 
-/** The local server as the page sees it: it knows one secret and refuses every other. */
-function fakeServer(known = SECRET) {
+/** The local server as the page sees it: it knows one secret and refuses every other; it may show a round or a free block. */
+function fakeServer(known = SECRET, shows: { current?: CurrentView; history?: History } = {}) {
   const calls: Call[] = [];
   const held = new Set<(error: Error) => void>();
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -15,6 +17,8 @@ function fakeServer(known = SECRET) {
     calls.push({ url, secret });
     if (secret !== known) return new Response(JSON.stringify({ error: 'secret' }), { status: 401 });
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
+    if (url === '/api/current' && shows.current) return Response.json({ current: shows.current });
+    if (url === '/api/history' && shows.history) return Response.json(shows.history);
     if (url === '/api/page/poll') return new Promise<Response>((_, fail) => {
       held.add(fail);
       init?.signal?.addEventListener('abort', () => fail(new DOMException('aborted', 'AbortError')));
@@ -98,5 +102,47 @@ describe('a tab opened from Claude Code (#94)', () => {
     openAt('');
     render(<LocalPage fetch={fakeServer().fetch}/>);
     expect(await screen.findByText('CLAUDE CODE · LOCALE')).toBeInTheDocument();
+  });
+});
+
+const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
+const SHOWN = { project: 'BreakTheWall', turnFolded: false, session: SESSION, number: 1, receivedAt: '2026-11-24T10:00:00.000Z', sent: null, superseded: false };
+const A_ROUND: CurrentView = {
+  kind: 'round', phaseOpen: true, queued: false, transcriptGone: false, riding: [],
+  round: {
+    ...SHOWN, turnText: '', draft: { generalNote: '', answers: {} },
+    questions: [{ number: 1, title: 'Where do rounds live?', body: 'Beside the session.', options: [], recommended: null, recommendation: 'In the data folder.' }],
+  },
+};
+const A_FREE_BLOCK: CurrentView = { kind: 'free', phaseOpen: true, queued: false, transcriptGone: false, riding: [], block: { ...SHOWN, text: 'Which folder?', response: '' } };
+const HISTORY: History = {
+  projects: [{ cwd: '/work/BreakTheWall', sessions: [{ session: SESSION, startedAt: '2026-11-24T10:00:00.000Z', live: true, skill: null, ticket: null, transcriptGone: false, rounds: [{ number: 1, receivedAt: '2026-11-24T10:00:00.000Z', state: 'open' }] }] }],
+  update: null,
+};
+
+describe('the progress strip and the history dock (#125)', () => {
+  // jsdom lays nothing out: what it can show is the structure the stylesheet raises the dock by
+  // (`.round-page.has-strip ~ .page-dock`, checked in tests/theme.test.ts) and the strip itself.
+  it('puts the strip on a round, and the dock after the page that holds it, so the dock rises above it', async () => {
+    openAt(`#t=${SECRET}`);
+    render(<LocalPage fetch={fakeServer(SECRET, { current: A_ROUND, history: HISTORY }).fetch}/>);
+    const strip = await screen.findByRole('contentinfo', { name: 'Avanzamento del round' });
+    expect(within(strip).getByText('0/1 con risposta')).toBeInTheDocument();
+    const page = strip.closest('.round-page')!;
+    expect(page).toHaveClass('has-strip');
+    const toggle = await screen.findByRole('button', { name: 'Cronologia' });
+    const dock = toggle.closest('.page-dock')!;
+    expect(dock).not.toBeNull();
+    // A later sibling of the page, as the `~` combinator needs; inside the page it would never be raised.
+    expect(dock.parentElement).toBe(page.parentElement);
+    expect(page.compareDocumentPosition(dock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows no strip under a free block, so the dock stays at the window\'s foot', async () => {
+    openAt(`#t=${SECRET}`);
+    render(<LocalPage fetch={fakeServer(SECRET, { current: A_FREE_BLOCK, history: HISTORY }).fetch}/>);
+    await screen.findByRole('button', { name: 'Cronologia' });
+    expect(screen.queryByRole('contentinfo')).toBeNull();
+    expect(document.querySelector('.round-page')).not.toHaveClass('has-strip');
   });
 });

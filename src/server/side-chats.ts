@@ -4,7 +4,7 @@ import { isAbsolute, join, relative } from 'node:path';
 import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { sessionIdSchema } from '../core/local-server';
+import { cwdSchema, sessionIdSchema } from '../core/local-server';
 import type { Question, Round } from '../core/round';
 import { quoted } from '../core/round-answers';
 import { sideChatAskSchema, sideChatPassageSchema, sideChatTurnSchema, type SideChat, type SideChatTurn, type SideChatsView } from '../core/side-chat';
@@ -177,7 +177,7 @@ export function spawnSideChat(command = 'claude', leading: string[] = []): SideC
 const storedSideChatSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   round: z.number().int().min(1),
   question: z.number().int().min(1),
   turns: z.array(sideChatTurnSchema),

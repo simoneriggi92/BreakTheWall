@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
-import { sessionIdSchema } from '../core/local-server';
+import { cwdSchema, sessionIdSchema } from '../core/local-server';
 import type { History, HistoryProject } from '../core/session-history';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -113,7 +113,7 @@ function history({ rounds, labels, transcripts, live, update }: SessionsContext)
 const storedLabelSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   skill: z.string().min(1).max(200),
   ticket: z.number().int().min(1).nullable(),
 });
@@ -168,7 +168,7 @@ export class SessionLabels {
 const storedTranscriptSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   path: z.string().min(1).max(4096).refine(isAbsolute),
 });
 type StoredTranscript = z.infer<typeof storedTranscriptSchema>;
@@ -233,7 +233,7 @@ export class SessionTranscripts {
 const storedModelsSchema = z.strictObject({
   version: z.literal(1),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   model: modelSchema.optional(),
   sideChatModel: modelSchema.optional(),
 });

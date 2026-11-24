@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
 import { idSchema } from '../core/lesson';
-import { sessionIdSchema } from '../core/local-server';
+import { cwdSchema, sessionIdSchema } from '../core/local-server';
 import { detectLanguage } from '../core/generation';
 import { failure, ProviderError, type ProviderFailure } from '../core/provider';
 import { importSource, normalizeText, SOURCE_LIMITS } from '../core/source';
@@ -40,7 +40,7 @@ const storedSpecSchema = z.strictObject({
   number: z.number().int().min(1),
   handedOverAt: z.iso.datetime(),
   session: sessionIdSchema,
-  cwd: z.string().min(1).max(4096),
+  cwd: cwdSchema,
   title: z.string().min(1).max(200),
   text: z.string().max(SOURCE_LIMITS.maxFileBytes),
   exploration: z.strictObject({ id: idSchema, revision: idSchema }).nullable(),

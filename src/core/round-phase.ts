@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { sessionIdSchema } from './local-server';
-import { asText, roundViewSchema, turnFoldedField } from './round-answers';
+import { asText, roundViewSchema, turnHeadFields } from './round-answers';
 import { specRemarksSectionSchema } from './spec-remarks';
 
 /**
@@ -36,8 +36,6 @@ export const responseSchema = z.string().max(50_000);
 /** A free block as the page reads it. */
 export const freeBlockViewSchema = z.strictObject({
   session: sessionIdSchema,
-  /** The working directory the session ran in, as on a round (#126). */
-  cwd: z.string().min(1).max(4096),
   number: z.number().int().min(1),
   receivedAt: z.iso.datetime(),
   /** The agent's turn, whole: nothing in it is parsed. */
@@ -47,7 +45,7 @@ export const freeBlockViewSchema = z.strictObject({
   sent: z.strictObject({ message: z.string(), at: z.iso.datetime() }).nullable(),
   /** A later turn of the same session arrived on the page: this one no longer takes a response. */
   superseded: z.boolean(),
-  ...turnFoldedField,
+  ...turnHeadFields,
 });
 export type FreeBlockView = z.infer<typeof freeBlockViewSchema>;
 
@@ -73,6 +71,16 @@ export const currentViewSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('free'), block: freeBlockViewSchema, phaseOpen: z.boolean(), ...standingFields }),
 ]);
 export type CurrentView = z.infer<typeof currentViewSchema>;
+
+/** A round or a free block, by the kind the page's view gives it and its number in the session. */
+export type TurnKey = Pick<FreeBlockView, 'session' | 'number'> & { kind: CurrentView['kind'] };
+/**
+ * Where each kind lives in the page's API (`/api/rounds/…`, `/api/free/…`): written once, for the page that builds a
+ * path and the server that reads one back.
+ */
+export const TURN_ROUTES = { round: 'rounds', free: 'free' } as const satisfies Record<TurnKey['kind'], string>;
+export const kindOfRoute = (route: string): TurnKey['kind'] | undefined =>
+  (Object.keys(TURN_ROUTES) as TurnKey['kind'][]).find(kind => TURN_ROUTES[kind] === route);
 
 /** The response as the agent receives it: the person's own words, never a command. */
 export const freeBlockMessage = (response: string) => asText(response.trim());

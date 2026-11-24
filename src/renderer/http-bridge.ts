@@ -3,7 +3,7 @@ import { backingReportSchema, type BackingReport } from '../core/backing';
 import type { DesktopBridge } from '../core/bridge';
 import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
-import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
+import { currentViewSchema, TURN_ROUTES, type CurrentView, type FreeBlockView, type TurnKey } from '../core/round-phase';
 import { historySchema, type History } from '../core/session-history';
 import { sideChatsViewSchema, type SideChatPassage, type SideChatsView } from '../core/side-chat';
 import { specListSchema, type SpecList } from '../core/spec';
@@ -66,8 +66,6 @@ export interface PageBridge extends DesktopBridge {
 }
 export type RoundKey = Pick<RoundView, 'session' | 'number'>;
 export type FreeBlockKey = Pick<FreeBlockView, 'session' | 'number'>;
-/** A round or a free block, as the agent's text at its head names it (#126). */
-export type TurnKey = { kind: 'round' | 'free'; session: string; number: number };
 export type PhaseBridge = Pick<PageBridge, 'endPhase'>;
 export type FoldBridge = Pick<PageBridge, 'foldTurn'>;
 export type SideChatBridge = Pick<PageBridge, 'getSideChats' | 'askSideChat'>;
@@ -132,8 +130,8 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     async sendResponse(block, response) {
       return sentReplySchema.parse(await (await ok(await call(`${freePath(block)}/send`, json('POST', { response })))).json()).message;
     },
-    async foldTurn({ kind, ...entry }, folded) {
-      await ok(await call(`${kind === 'round' ? roundPath(entry) : freePath(entry)}/fold`, json('PUT', { folded })));
+    async foldTurn({ kind, session, number }, folded) {
+      await ok(await call(`/api/${TURN_ROUTES[kind]}/${encodeURIComponent(session)}/${number}/fold`, json('PUT', { folded })));
     },
     async endPhase(session) {
       await ok(await call(`/api/sessions/${encodeURIComponent(session)}/phase`, { method: 'DELETE' }));

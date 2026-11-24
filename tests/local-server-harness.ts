@@ -92,6 +92,8 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
+    /** The page folding or unfolding the agent's text of a round or a free block (#126). */
+    fold: (kind: 'rounds' | 'free', number: number, folded: unknown, session = SESSION) => call(`/api/${kind}/${session}/${number}/fold`, { method: 'PUT', body: { folded } }),
     /**
      * The mod on `session.start`, on every renewal, and with the new id once `/clear` or `/resume` changed it (#102); with
      * the session's model and the plugin's side-chat model (#100), and where Claude Code keeps its transcript (#103).

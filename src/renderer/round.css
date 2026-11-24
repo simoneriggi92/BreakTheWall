@@ -8,6 +8,8 @@
    height a strip fixed at the window's foot takes from the panels: a round's progress strip sets it (#125). */
 .round-page {
   --strip-h: 0px;
+  /* The room the history dock takes at the foot of the window, above the strip: its toggle and the gap under it. */
+  --dock-room: 64px;
   --major: color-mix(in srgb, var(--ink) 20%, transparent);
   min-height: 100vh; color: var(--ink); background-color: var(--bg);
   background-image:
@@ -17,7 +19,10 @@
 }
 /* The docked frame (#123, after the owner's Plannotator reference): a 48 px bar, a tool's and not a welcome, so the
    brand goes without its tagline; the panels against the window's edges below it, the round in cards between them. */
-.round-page > .topbar { min-height: 48px; padding: 6px 16px; gap: 14px; background: var(--surface); }
+/* Exactly 48 px, never more: the panels stick at --round-stick and end above the strip, so a taller bar (a full-size
+   button in it, or a second row) would slide them under the strip. Its buttons are compact to fit. */
+.round-page > .topbar { height: 48px; min-height: 48px; box-sizing: border-box; flex-wrap: nowrap; padding: 6px 16px; gap: 14px; background: var(--surface); }
+.round-page > .topbar .subtle { padding-block: 5px; }
 .round-page > .topbar .brand > span { font-size: 15px; }
 .round-page > .topbar .brand-mark { width: 26px; height: 22px; }
 .round-page .course-title strong { font-family: var(--f-display); }
@@ -58,7 +63,6 @@
   height: calc(100vh - var(--round-stick) - var(--strip-h)); overflow: auto; border-left: 1px solid var(--line);
 }
 .round-layout:not(.is-drawer) .round-return, .round-layout:not(.is-drawer) .round-side { padding: 0 16px 16px; }
-.round-layout:not(.is-drawer) .round-side { padding-top: 12px; }
 .round-layout:not(.is-drawer) .round-side-folded .round-fold-strip { border: 0; border-radius: 0; width: 100%; height: 100%; }
 /* A panel's head row: its name as a label, and its fold. The fold is a control, so it keeps the body face. */
 .round-panel-head {
@@ -231,6 +235,9 @@
    space left, then scrolls inside, so an empty side chat is not a tall blank box. */
 .round-side > * { flex: none; }
 .round-side > .side-chat { flex: 0 1 auto; }
+/* Never below its head, its note and its composer: on a short window, with what the agent receives open above it, the
+   chat would shrink to a clipped composer. The column scrolls the rest instead. */
+.round-side > .side-chat { min-height: 320px; }
 /* A reply is read, not glanced at: while a side chat is open the right column widens, so its prose keeps a readable
    line and a table in a reply does not squeeze into one word a line. */
 .round-layout.is-wide:has(> .round-side) { --col-right: minmax(360px, 520px); }
@@ -271,7 +278,7 @@
 .round-layout.is-drawer .round-side {
   position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); height: auto;
   padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
-  max-height: none;
+  max-height: none; overflow: auto;
 }
 
 /* Folding (the outline, the right column, the turn's text): each part keeps a button to fold or unfold it. A folded
@@ -329,6 +336,7 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .agent-text.is-folded { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 8px 12px 8px 16px; }
 .agent-text.is-folded .turn-chip { overflow-wrap: normal; white-space: nowrap; }
 .turn-line { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 14px; }
+.agent-text [role="alert"] { grid-column: 1 / -1; margin: 8px 0 0; color: var(--bad); font-size: 14px; }
 
 /* ---- The progress strip (#125) ----
    The round's progress at the window's foot, at every width, as the owner chose in #122 (variant C): a ruler that
@@ -347,7 +355,10 @@ body.is-resizing { cursor: col-resize; user-select: none; }
   display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-top: 1px solid var(--line);
   font-family: var(--f-mono);
 }
-.round-strip ol { list-style: none; flex: 1; min-width: 0; align-self: stretch; display: flex; margin: 6px 0 8px; padding: 0; border-bottom: 1px solid var(--muted); }
+.round-strip ol { list-style: none; flex: 1; min-width: 0; align-self: stretch; display: flex; margin: 6px 0 9px; padding: 0; }
+/* The baseline runs the window's whole width, under the count too, right below the ticks: the strip is a ruler that
+   continues past the last question, not a bar that stops where the count starts. */
+.round-strip::after { content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 1px; background: var(--muted); }
 /* The minor ticks: a line at the end of each fifth of a segment; the fifth one falls on the next question's major tick. */
 .round-strip li {
   flex: 1; position: relative;
@@ -358,7 +369,9 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .round-strip li::before { left: 0; }
 .round-strip li:last-child::after { right: 0; }
 .round-strip li span { position: absolute; left: 5px; top: 0; font-size: 10.5px; line-height: 1; color: var(--muted); }
-.round-strip li.is-answered { background-color: var(--accent-soft); }
+/* The fill is the owner's (#122); alone it stands about 1.2:1 off the strip, under the 3:1 a graphic needs, so an
+   accent line along the baseline says "answered" too. */
+.round-strip li.is-answered { background-color: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
 .round-strip li.is-answered span { color: var(--ink); }
 .round-strip li.is-current span { color: var(--accent); font-weight: 700; }
 .round-strip li.is-current::before { width: 2px; height: 100%; background: var(--accent); }
@@ -370,7 +383,8 @@ body.is-resizing { cursor: col-resize; user-select: none; }
    a longer ink tick and a filled square, current the longest accent tick on accent-soft. No scroll pointer: the page
    shows one question at a time, so there is no scroll position to point at. A tick, its number and its square need
    46 px: the rail keeps 64 px in the drawer too, with a narrower inset, so the ruler never scrolls sideways. */
-.round-layout.is-outline-folded .round-outline { padding-inline: 4px; }
+.round-layout.is-outline-folded .round-outline { display: flex; flex-direction: column; padding-inline: 4px; padding-bottom: var(--dock-room); }
+.round-layout.is-outline-folded .round-outline > :not(.round-rail-title) { flex: none; }
 .round-layout.is-outline-folded .round-outline > .round-panel-head { margin-inline: -4px; }
 .round-layout.is-outline-folded .round-outline nav ol { gap: 0; margin-left: 8px; padding: 6px 0; border-left: 1px solid var(--muted); }
 .round-layout.is-outline-folded .round-outline li { position: relative; }
@@ -392,9 +406,10 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .round-layout.is-outline-folded .round-outline-item.is-answered::after { background: var(--ink); border-color: var(--ink); }
 /* A side chat's count would not fit beside a tick; the question's side chat still opens from the question. */
 .round-layout.is-outline-folded .round-outline-chat { display: none; }
-/* The current title runs bottom to top under the ticks, cut rather than wrapped, at a length that keeps it clear of
-   the history dock at the window's foot. */
+/* The current title runs bottom to top under the ticks, cut rather than wrapped, at most 32vh and never into the room
+   the history dock takes at the rail's foot: on a short window it shrinks into what the ticks leave, down to nothing. */
 .round-rail-title {
+  flex: 0 1 auto; min-height: 0; align-self: flex-start;
   writing-mode: vertical-rl; transform: rotate(180deg); margin: 18px 0 0 18px; max-height: 32vh;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font: 600 11.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent);

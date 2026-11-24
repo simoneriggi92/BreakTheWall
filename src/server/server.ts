@@ -3,11 +3,11 @@ import { readFile, realpath } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { z } from 'zod';
-import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
+import { cwdSchema, SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
 import { draftSchema, fitsQuestions, messageLanguageSchema } from '../core/round-answers';
 import { answersWithRemarks } from '../core/spec-remarks';
-import { freeBlockMessage, responseSchema } from '../core/round-phase';
+import { freeBlockMessage, kindOfRoute, responseSchema } from '../core/round-phase';
 import type { GhRunner } from './gh';
 import { noContent, readJson, send, TRANSCRIPT_GONE } from './http';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
@@ -64,7 +64,6 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 
-const cwdSchema = z.string().min(1).max(4096);
 /**
  * A session as the mod registers it: its id, its folder, the model it runs on, the side-chat model set in the
  * plugin, if any (#100), and where Claude Code keeps its transcript (#103). A model name `--model` could not take, or a
@@ -257,11 +256,11 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     }
     // Before the answers' paths: a round whose transcript is gone, or that was sent, still folds, as reading does.
     const foldPath = FOLD_PATH.exec(path);
-    if (req.method === 'PUT' && foldPath && sessionIdSchema.safeParse(foldPath[2]).success) {
-      const [, kind, session, number] = foldPath;
+    const foldKind = foldPath && kindOfRoute(foldPath[1]);
+    if (req.method === 'PUT' && foldPath && foldKind && sessionIdSchema.safeParse(foldPath[2]).success) {
       const body = foldSchema.safeParse(await readJson(req));
       if (!body.success) return send(res, 400, { error: 'bad-request' });
-      if (!await rounds.foldTurn(session, kind === 'rounds' ? 'round' : 'free', Number(number), body.data.folded)) return send(res, 404, { error: 'unknown' });
+      if (!await rounds.foldTurn({ session: foldPath[2], kind: foldKind, number: Number(foldPath[3]) }, body.data.folded)) return send(res, 404, { error: 'unknown' });
       return noContent(res);
     }
     const freePath = FREE_PATH.exec(path);

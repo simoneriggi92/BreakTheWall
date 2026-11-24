@@ -240,7 +240,7 @@ describe('remarks on a superseded version (#105)', () => {
 });
 
 const ROUND: RoundView = {
-  session: SESSION, cwd: '/work/BreakTheWall', number: 3, receivedAt: '2026-11-24T12:00:00.000Z', turnText: '',
+  session: SESSION, project: 'BreakTheWall', turnFolded: false, number: 3, receivedAt: '2026-11-24T12:00:00.000Z', turnText: '',
   questions: [{ number: 1, title: 'Where does the opening time live?', body: 'In the spec or the till.', options: [], recommended: null, recommendation: 'In the spec.' }],
   draft: { generalNote: '', answers: {} }, sent: null, superseded: false,
 };

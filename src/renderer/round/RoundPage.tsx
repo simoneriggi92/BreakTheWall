@@ -278,8 +278,8 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
       </header>
       <main className={`round-layout is-${band}${outlineFolded ? ' is-outline-folded' : ''}${sideFolded ? ' is-side-folded' : ''}`} style={columnWidths}>
         {round.turnText && <AgentText
-          entry={{ kind: 'round', session: round.session, number: round.number }} cwd={round.cwd} text={round.turnText}
-          round={r.title(round.number)} folded={round.turnFolded ?? false} label={r.turnText} className="round-turn" bridge={bridge}
+          entry={{ kind: 'round', session: round.session, number: round.number }} project={round.project} text={round.turnText}
+          number={r.title(round.number)} folded={round.turnFolded} label={r.turnText} className="round-turn" bridge={bridge}
         />}
         <div className="round-outline">
         {/* The panel's head row names it and holds its fold; folded to a rail, the numbers need no name above them. */}
@@ -302,7 +302,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
               const rail = outlineFolded;
               const collapsed = rail || (done && q.number !== question.number);
               const asked = sideChatOf(q.number)?.turns.length ?? 0;
-              const name = rail ? r.tickName(q.number, q.title, answerState(a)) : r.collapsed(q.number, q.title, answerState(a));
+              const name = rail ? r.tickName(r.tick(q.number), q.title, answerState(a)) : r.collapsed(q.number, q.title, answerState(a));
               return (
                 <li key={q.number}>
                   <button
@@ -407,7 +407,10 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
         </aside>}
         {showReturn && !sideFolded && (chatOpen
           ? <div className="round-side">
-            {drawerBar}{sideFold}{sideEdge}
+            {drawerBar}
+            {/* Named in its head row with its fold, as without a side chat (#123): it holds the answer and the chat. */}
+            <div className="round-panel-head"><h2>{r.withSideChat}</h2>{sideFold}</div>
+            {sideEdge}
             <details
               id="round-return" className="round-return-strip" aria-label={r.receives} open={returnOpen}
               onToggle={e => setReturnOpen(e.currentTarget.open)}
@@ -434,7 +437,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
       </main>
       <ProgressStrip
         label={r.strip} count={r.progress(answered, round.questions.length)} current={question.number}
-        segments={round.questions.map(q => ({ number: q.number, answered: isAnswered(answerOf(draft, q)) }))}
+        segments={round.questions.map(q => ({ number: q.number, tick: r.tick(q.number), answered: isAnswered(answerOf(draft, q)) }))}
       />
     </div>
   );
@@ -450,14 +453,14 @@ function ProgressStrip({ label, count, current, segments }: {
   label: string;
   count: string;
   current: number;
-  segments: readonly { number: number; answered: boolean }[];
+  segments: readonly { number: number; tick: string; answered: boolean }[];
 }) {
   return (
     <footer className="round-strip" aria-label={label}>
       <ol aria-hidden="true">
         {segments.map(x => (
           <li key={x.number} className={`${x.answered ? 'is-answered' : 'is-open'}${x.number === current ? ' is-current' : ''}`}>
-            <span>{String(x.number).padStart(2, '0')}</span>
+            <span>{x.tick}</span>
           </li>
         ))}
       </ol>
