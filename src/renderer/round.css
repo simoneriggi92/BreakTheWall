@@ -62,7 +62,11 @@
 /* Remarks (#98): amber, apart from the accent the answer uses, so a remarked passage never reads as a choice. */
 .round-question { position: relative; }
 .round-remark-mark { background: var(--amber-soft); color: inherit; border-bottom: 2px solid var(--amber); border-radius: 2px; }
-.round-remark-offer { position: absolute; z-index: 2; font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--amber); border: 0; border-radius: 999px; padding: 4px 12px; box-shadow: 0 2px 8px var(--shadow); cursor: pointer; }
+.round-selection-offer { position: absolute; z-index: 2; display: flex; gap: 6px; }
+.round-remark-offer, .round-ask-offer { font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--amber); border: 0; border-radius: 999px; padding: 4px 12px; box-shadow: 0 2px 8px var(--shadow); cursor: pointer; }
+/* "Ask here" (#101) and the passages asked about take the side chat's violet, apart from the amber of remarks. */
+.round-ask-offer { background: var(--purple); }
+.round-ask-mark { background: var(--purple-soft); color: inherit; border-bottom: 2px solid var(--purple); border-radius: 2px; }
 .round-remarks { margin-top: 16px; }
 .round-remarks h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); }
 .round-remarks ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -175,6 +179,13 @@
 .side-chat-read li { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
 .side-chat [role="alert"] { margin: 6px 12px; color: var(--bad); }
 .side-chat-reply [role="alert"] { margin: 6px 0 0; }
+.side-chat-passage { display: block; margin-bottom: 4px; font-style: italic; color: var(--purple); quotes: none; }
+.side-chat-asking { display: flex; align-items: start; gap: 8px; margin: 0; padding: 8px 12px 0; border-top: 1px solid var(--line); }
+.side-chat-asking .side-chat-passage { flex: 1; margin: 0; overflow-wrap: anywhere; }
+.side-chat-asking + .side-chat-composer { border-top: 0; }
+.side-chat-attach { margin-top: 8px; font-size: 12.5px; }
+.side-chat-attach[aria-pressed="true"] { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
+.round-unattached { margin: 0; font-size: 13px; color: var(--purple); }
 .side-chat-composer { display: flex; align-items: end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
 .side-chat-composer textarea { flex: 1; font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; resize: vertical; }
 .round-return-strip { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }

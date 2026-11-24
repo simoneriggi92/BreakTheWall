@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
-import { answerKind, answerOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, returnMessage, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
+import { answerKind, answerOf, attachedOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, returnMessage, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
+import type { SideChatPassage } from '../../core/side-chat';
 import type { RoundBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
@@ -58,6 +59,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     const merged: Answer = { ...(latest.current.answers[key] ?? { note: '' }), ...patch };
     if (merged.choice === undefined) delete merged.choice;
     if (!merged.remarks?.length) delete merged.remarks;
+    if (!merged.attached?.length) delete merged.attached;
     change({ ...latest.current, answers: { ...latest.current.answers, [key]: merged } });
   };
   // Choosing the same thing again takes the choice back; the note stays.
@@ -77,7 +79,8 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const openNote = () => { if (note.current) note.current.focus(); else setNoteOpen(question.number); };
 
   // Remarks (#98): a passage selected in the question's body or recommendation offers "Remark"; the remark's field
-  // opens focused, and the passage stays marked while the remark exists.
+  // opens focused, and the passage stays marked while the remark exists. Beside it, "Ask here" (#101) asks about the
+  // passage in the side chat, which reads and so works on a sent or superseded round too.
   const remarks = remarksOf(answer);
   const article = useRef<HTMLElement>(null);
   const hosts: Record<RemarkPart, RefObject<HTMLDivElement | null>> = { body: useRef(null), recommendation: useRef(null) };
@@ -86,7 +89,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const [focusRemark, setFocusRemark] = useState<string | null>(null);
   const readSelection = () => {
     const selection = document.getSelection();
-    const range = !readOnly && selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
     for (const part of REMARK_PARTS) {
       const host = hosts[part].current;
       const passage = range && host ? passageIn(host, range) : null;
@@ -100,6 +103,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     document.addEventListener('selectionchange', cleared);
     return () => document.removeEventListener('selectionchange', cleared);
   }, []);
+  const takeSelection = () => { setSelected(null); document.getSelection()?.removeAllRanges(); };
   const changeRemarks = (next: Remark[]) => changeAnswer({ remarks: sortRemarks(next) });
   const addRemark = () => {
     if (!selected) return;
@@ -109,8 +113,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     const key = remarkKey(selected);
     if (!kept.some(x => remarkKey(x) === key)) changeRemarks([...kept, { part, start, end, passage, text: '' }]);
     setFocusRemark(key);
-    setSelected(null);
-    document.getSelection()?.removeAllRanges();
+    takeSelection();
   };
   const editRemark = (target: Remark, patch: Partial<Remark> | null) => changeRemarks(remarksOf(answerOf(latest.current, question)).flatMap(x =>
     remarkKey(x) !== remarkKey(target) ? [x] : patch ? [{ ...x, ...patch }] : []));
@@ -125,12 +128,42 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
   const [chatOpen, setChatOpen] = useState(false);
   /** What the person is typing in each question's side chat, kept while the focus moves. */
   const [asks, setAsks] = useState<Record<number, string>>({});
+  /** The passage each question's next side-chat question quotes, chosen with "Ask here" (#101). */
+  const [asking, setAsking] = useState<Record<number, SideChatPassage | undefined>>({});
   // In the narrowest layout the column is the drawer, so opening the chat opens it.
   const openChat = () => { setChatOpen(true); setDrawerOpen(true); };
-  const askSideChat = async (number: number, text: string) => {
-    await bridge.askSideChat(round, number, text);
-    setAsks(kept => ({ ...kept, [number]: '' }));
+  const askHere = () => {
+    if (!selected) return;
+    const { part, start, end, passage } = selected;
+    setAsking(kept => ({ ...kept, [question.number]: { part, start, end, passage } }));
+    openChat();
+    takeSelection();
   };
+  const askSideChat = async (number: number, text: string) => {
+    await bridge.askSideChat(round, number, text, asking[number]);
+    setAsks(kept => ({ ...kept, [number]: '' }));
+    setAsking(kept => ({ ...kept, [number]: undefined }));
+  };
+  // The passages asked about are marked in the question in the side chat's colour, apart from remarks.
+  const askedPassages = [...threadOf(question.number)?.turns.map(x => x.passage) ?? [], asking[question.number]]
+    .filter((x): x is SideChatPassage => x !== undefined);
+  const marksIn = (part: RemarkPart) => [
+    ...remarks.filter(x => x.part === part),
+    ...askedPassages.filter(x => x.part === part).map(x => ({ ...x, kind: 'ask' as const })),
+  ];
+  /** 📎 (#101): attaches a finished reply to the question's answer, copied whole, or takes it back. */
+  const toggleAttached = (number: number) => {
+    const turn = threadOf(question.number)?.turns.find(x => x.number === number);
+    if (!turn || turn.status !== 'done') return;
+    const kept = attachedOf(answerOf(latest.current, question));
+    changeAnswer({
+      attached: kept.some(x => x.turn === number)
+        ? kept.filter(x => x.turn !== number)
+        : attachedOf({ note: '', attached: [...kept, { turn: number, ask: turn.ask, ...(turn.passage ? { passage: turn.passage.passage } : {}), reply: turn.reply }] }),
+    });
+  };
+  // The review before Send counts the side chats with a reply to attach and none attached.
+  const unattached = sideChats.filter(x => x.turns.some(t => t.status === 'done') && attachedOf(answerOf(draft, { number: x.question })).length === 0).length;
 
   const goTo = (number: number) => { setFocus(number); setNoteOpen(null); setSelected(null); setFocusRemark(null); };
   const move = (step: number) => goTo(round.questions[Math.min(round.questions.length - 1, Math.max(0, index + step))].number);
@@ -193,6 +226,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
     : <button type="button" className="round-write" onClick={() => setGeneralOpen(true)}>{r.writeGeneralNote}</button>);
   const returnBody = <>
     <pre className="round-message" data-testid="return-message">{message}</pre>
+    {!readOnly && unattached > 0 && <p className="round-unattached">{s.unattached(unattached)}</p>}
     {delivered !== null
       ? queued ? <QueuedNotice session={round.session}/> : <p role="status">{r.sent}</p>
       : !round.superseded && !transcriptGone && <button type="button" className="primary" disabled={sending} onClick={() => void send()}>{sending ? r.sending : r.send}</button>}
@@ -244,7 +278,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
             <button type="button" className="subtle round-chat-open" aria-label={s.open} title={s.open} aria-pressed={chatOpen} aria-keyshortcuts="c" onClick={() => chatOpen ? setChatOpen(false) : openChat()}>{s.openShort}</button>
           </div>
-          <Markdown text={question.body} host={hosts.body} marks={remarks.filter(x => x.part === 'body')}/>
+          <Markdown text={question.body} host={hosts.body} marks={marksIn('body')}/>
           {question.options.length > 0 && (
             <div className="round-options" role="group" aria-label={r.options}>
               {question.options.map(option => (
@@ -264,7 +298,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
           )}
           <section className="round-recommendation" aria-label={r.recommendation}>
             <h3>{r.recommendation}</h3>
-            {question.recommendation ? <Markdown text={question.recommendation} host={hosts.recommendation} marks={remarks.filter(x => x.part === 'recommendation')}/> : <p>{r.noRecommendation}</p>}
+            {question.recommendation ? <Markdown text={question.recommendation} host={hosts.recommendation} marks={marksIn('recommendation')}/> : <p>{r.noRecommendation}</p>}
           </section>
           {!readOnly && (
             <div className="round-answer">
@@ -277,9 +311,13 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
                 : <button type="button" className="round-write" onClick={openNote}>{r.writeNote}</button>}
             </div>
           )}
-          {selected && (
-            // Pressing it must not empty the selection it acts on.
-            <button type="button" className="round-remark-offer" style={{ top: selected.top, left: selected.left }} onMouseDown={event => event.preventDefault()} onClick={addRemark}>{r.remark}</button>
+          {/* Without the session's transcript there is nothing to ask (#103), and a read-only round takes no remark. */}
+          {selected && !transcriptGone && (
+            // Pressing either must not empty the selection it acts on.
+            <div className="round-selection-offer" style={{ top: selected.top, left: selected.left }} onMouseDown={event => event.preventDefault()}>
+              {!readOnly && <button type="button" className="round-remark-offer" onClick={addRemark}>{r.remark}</button>}
+              <button type="button" className="round-ask-offer" onClick={askHere}>{r.askHere}</button>
+            </div>
           )}
           {remarks.length > 0 && (
             <section className="round-remarks" aria-label={r.remarks}>
@@ -314,6 +352,8 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
             <SideChat
               question={question} thread={threadOf(question.number)} readOnly={transcriptGone}
               ask={asks[question.number] ?? ''} onAskChange={text => setAsks(kept => ({ ...kept, [question.number]: text }))}
+              passage={asking[question.number]} onDropPassage={() => setAsking(kept => ({ ...kept, [question.number]: undefined }))}
+              attached={attachedOf(answer).map(x => x.turn)} onAttach={readOnly ? undefined : toggleAttached}
               onAsk={text => askSideChat(question.number, text)} onClose={() => setChatOpen(false)}
             />
             <details id="round-return" className="round-return-strip" aria-label={r.receives}>
@@ -333,7 +373,7 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
 }
 
 /**
- * Where the "Remark" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts
+ * Where the "Remark" and "Ask here" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts
  * on; measured against the question, which positions it, so scrolling the page never leaves it behind.
  */
 function below(range: Range, frame: HTMLElement | null): { top: number; left: number } {

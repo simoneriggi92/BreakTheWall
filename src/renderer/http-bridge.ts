@@ -4,7 +4,7 @@ import { SECRET_HEADER, serverStatusSchema } from '../core/local-server';
 import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
 import { historySchema, type History } from '../core/session-history';
-import { sideChatsViewSchema, type SideChatsView } from '../core/side-chat';
+import { sideChatsViewSchema, type SideChatPassage, type SideChatsView } from '../core/side-chat';
 import { specListSchema, type SpecView } from '../core/spec';
 import { browserBridge } from './storage';
 
@@ -39,8 +39,8 @@ export interface PageBridge extends DesktopBridge {
    * they change past it: a reply streams in this way.
    */
   getSideChats(round: RoundKey, after: number | null, signal: AbortSignal): Promise<SideChatsView>;
-  /** Asks in the side chat of one question; the reply arrives through `getSideChats`. */
-  askSideChat(round: RoundKey, question: number, ask: string): Promise<void>;
+  /** Asks in the side chat of one question, about a passage of it if given (#101); the reply arrives through `getSideChats`. */
+  askSideChat(round: RoundKey, question: number, ask: string, passage?: SideChatPassage): Promise<void>;
   /** Every version of every spec handed over (#104), newest first. */
   listSpecs(): Promise<SpecView[]>;
   /** Writes a version's structure again, after a failure or a cancel; the page follows it through its poll. */
@@ -124,8 +124,8 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
       const path = `/api/side-chats/${encodeURIComponent(round.session)}/${round.number}${after === null ? '' : `?after=${after}`}`;
       return sideChatsViewSchema.parse(await (await ok(await call(path, { signal }))).json());
     },
-    async askSideChat(round, question, ask) {
-      await ok(await call(`/api/side-chats/${encodeURIComponent(round.session)}/${round.number}/${question}`, json('POST', { ask })));
+    async askSideChat(round, question, ask, passage) {
+      await ok(await call(`/api/side-chats/${encodeURIComponent(round.session)}/${round.number}/${question}`, json('POST', { ask, ...(passage ? { passage } : {}) })));
     },
     async listSpecs() {
       return specListSchema.parse(await (await ok(await call('/api/specs'))).json()).specs;

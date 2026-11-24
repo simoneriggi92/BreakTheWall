@@ -34,6 +34,8 @@ export const it = {
       writeNote: 'Scrivi una nota',
       writeGeneralNote: 'Aggiungi una nota generale',
       remark: 'Osservazione',
+      /** Beside "Remark" on a selected passage (#101): asks about it in the side chat. */
+      askHere: 'Chiedi qui',
       remarks: 'Osservazioni',
       remarkOn: (quote: string) => `Osservazione su ${quote}`,
       removeRemark: 'Togli',
@@ -124,6 +126,12 @@ export const it = {
       failed: 'Nessuna risposta. Chiedi di nuovo.',
       askFailed: 'La domanda non è partita. Riprova.',
       count: (n: number) => `${n} nella chat laterale`,
+      /** The passage the next question quotes (#101). */
+      askingAbout: 'Chiedi su',
+      wholeQuestion: 'Chiedi sull’intera domanda',
+      attach: '📎 Allega alla risposta',
+      /** Before Send: threads none of whose replies the person attached. */
+      unattached: (n: number) => n === 1 ? '1 chat laterale senza una risposta allegata' : `${n} chat laterali senza una risposta allegata`,
       key: 'c chat laterale',
     },
     /** A spec the agent handed over (#104), opened as a source. */

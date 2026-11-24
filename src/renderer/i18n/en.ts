@@ -35,6 +35,8 @@ export const en: Messages = {
       writeNote: 'Write a note',
       writeGeneralNote: 'Add a general note',
       remark: 'Remark',
+      /** Beside "Remark" on a selected passage (#101): asks about it in the side chat. */
+      askHere: 'Ask here',
       remarks: 'Remarks',
       remarkOn: (quote: string) => `Remark on ${quote}`,
       removeRemark: 'Remove',
@@ -117,6 +119,12 @@ export const en: Messages = {
       failed: 'No reply. Ask again.',
       askFailed: 'The question was not sent. Try again.',
       count: (n: number) => `${n} in the side chat`,
+      /** The passage the next question quotes (#101). */
+      askingAbout: 'Asking about',
+      wholeQuestion: 'Ask about the whole question',
+      attach: '📎 Attach to answer',
+      /** Before Send: threads none of whose replies the person attached. */
+      unattached: (n: number) => n === 1 ? '1 side chat with no reply attached' : `${n} side chats with no reply attached`,
       key: 'c side chat',
     },
     spec: {

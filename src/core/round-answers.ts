@@ -23,6 +23,20 @@ export const remarkSchema = z.strictObject({
 export type Remark = z.infer<typeof remarkSchema>;
 
 /**
+ * One exchange of a question's side chat the person attached to their answer (#101): what they asked, the passage
+ * they asked about if any, and the reply, copied whole from the thread when attached. Kept in the draft, so the page's
+ * preview and the message the server sends come from the same text through the same function. `turn` names the
+ * exchange in its thread: one turn is attached once.
+ */
+export const attachedSchema = z.strictObject({
+  turn: z.number().int().min(1),
+  ask: z.string().max(20_000),
+  passage: z.string().max(5_000).optional(),
+  reply: z.string().max(200_000),
+});
+export type Attached = z.infer<typeof attachedSchema>;
+
+/**
  * A question takes the recommendation, one of its options by letter (#96), no choice, or only a note. Remarks ride
  * with the answer but are not one: a question with remarks alone is still unanswered.
  */
@@ -31,6 +45,8 @@ export const answerSchema = z.strictObject({
   note: z.string().max(50_000),
   /** Absent rather than empty, so a draft kept before remarks existed reads the same. */
   remarks: z.array(remarkSchema).max(200).optional(),
+  /** Side-chat exchanges attached with 📎 (#101); absent rather than empty, like remarks. */
+  attached: z.array(attachedSchema).max(100).refine(x => new Set(x.map(a => a.turn)).size === x.length).optional(),
 });
 export const draftSchema = z.strictObject({
   /** One per round; it returns at the top of the message. */
@@ -71,13 +87,14 @@ export function answerKind(answer: Answer | undefined): AnswerKind {
 }
 
 /**
- * Every option letter in the draft is one its question offers, and every remark sits on a question the round has: the
+ * Every option letter in the draft is one its question offers, and every remark and attached exchange sits on a
+ * question the round has: the
  * page offers no other, so another is a bad request.
  */
 export function fitsQuestions(questions: readonly Question[], draft: Draft): boolean {
   return Object.entries(draft.answers).every(([number, answer]) => {
     const question = questions.find(q => String(q.number) === number);
-    if (answer.remarks?.length && !question) return false;
+    if ((answer.remarks?.length || answer.attached?.length) && !question) return false;
     if (answerKind(answer) !== 'option') return true;
     return question?.options.some(x => x.letter === answer.choice) ?? false;
   });
@@ -94,6 +111,8 @@ export const sortRemarks = (remarks: readonly Remark[]): Remark[] =>
 export const remarksOf = (answer: Answer | undefined): Remark[] => sortRemarks(answer?.remarks ?? []);
 /** A remark is known by where it stands: one passage takes one remark. */
 export const remarkKey = (x: Pick<Remark, 'part' | 'start' | 'end'>) => `${x.part}:${x.start}:${x.end}`;
+/** Attached exchanges in the order they were asked in their thread. */
+export const attachedOf = (answer: Answer | undefined): Attached[] => [...answer?.attached ?? []].sort((a, b) => a.turn - b.turn);
 export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
 
 /** The words on a question's title line, in the page's interface language; a note alone puts none there. */
@@ -102,10 +121,17 @@ const TITLE_WORDS: Record<MessageLanguage, Record<Exclude<AnswerKind, 'option'>,
   en: { recommendation: 'recommendation', none: 'no choice', unanswered: 'no answer', note: '' },
 };
 
+/** How an attached exchange is introduced, in the page's interface language. */
+const SIDE_CHAT_WORDS: Record<MessageLanguage, { question: string; reply: string }> = {
+  it: { question: 'Chat laterale — domanda:', reply: 'risposta:' },
+  en: { question: 'Side chat — question:', reply: 'reply:' },
+};
+
 /**
  * Plain Markdown that reads as the person's own words: the general note first, then every question by number and
  * title, so it still reads after compaction, the choice on the title line ("recommendation", the option's letter, "no
- * choice" or "no answer"), the note indented below, then its remarks that have words, as `- «passage» — text`.
+ * choice" or "no answer"), the note indented below, then its remarks that have words, as `- «passage» — text`, then
+ * the side-chat exchanges attached to it, the reply whole and verbatim, only indented to stay under its question.
  */
 export function returnMessage(questions: readonly Question[], draft: Draft, language: MessageLanguage): string {
   const lines: string[] = [];
@@ -124,6 +150,16 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
     for (const remark of remarksOf(answer).filter(x => x.text.trim() !== '')) {
       const [first, ...rest] = remark.text.trim().split(/\r?\n/);
       lines.push(`  - ${quoted(remark.passage)} — ${first}`, ...rest.flatMap(line => indented(line, '    ')));
+    }
+    const words = SIDE_CHAT_WORDS[language];
+    for (const x of attachedOf(answer)) {
+      const [ask, ...askRest] = x.ask.trim().split(/\r?\n/);
+      const about = x.passage ? `${quoted(x.passage)} — ` : '';
+      const [reply, ...replyRest] = x.reply.trim().split(/\r?\n/);
+      lines.push(
+        `  - ${words.question} ${about}${ask}`, ...askRest.flatMap(line => indented(line, '    ')),
+        `    ${words.reply} ${reply}`, ...replyRest.flatMap(line => indented(line, '    ')),
+      );
     }
   }
   return asText(lines.join('\n'));
