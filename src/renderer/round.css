@@ -8,6 +8,8 @@
    height a strip fixed at the window's foot takes from the panels: a round's progress strip sets it (#125). */
 .round-page {
   --strip-h: 0px;
+  /* The room the history dock takes at the foot of the window, above the strip: its toggle and the gap under it. */
+  --dock-room: 64px;
   --major: color-mix(in srgb, var(--ink) 20%, transparent);
   min-height: 100vh; color: var(--ink); background-color: var(--bg);
   background-image:
@@ -17,7 +19,10 @@
 }
 /* The docked frame (#123, after the owner's Plannotator reference): a 48 px bar, a tool's and not a welcome, so the
    brand goes without its tagline; the panels against the window's edges below it, the round in cards between them. */
-.round-page > .topbar { min-height: 48px; padding: 6px 16px; gap: 14px; background: var(--surface); }
+/* Exactly 48 px, never more: the panels stick at --round-stick and end above the strip, so a taller bar (a full-size
+   button in it, or a second row) would slide them under the strip. Its buttons are compact to fit. */
+.round-page > .topbar { height: 48px; min-height: 48px; box-sizing: border-box; flex-wrap: nowrap; padding: 6px 16px; gap: 14px; background: var(--surface); }
+.round-page > .topbar .subtle { padding-block: 5px; }
 .round-page > .topbar .brand > span { font-size: 15px; }
 .round-page > .topbar .brand-mark { width: 26px; height: 22px; }
 .round-page .course-title strong { font-family: var(--f-display); }
@@ -230,6 +235,9 @@
    space left, then scrolls inside, so an empty side chat is not a tall blank box. */
 .round-side > * { flex: none; }
 .round-side > .side-chat { flex: 0 1 auto; }
+/* Never below its head, its note and its composer: on a short window, with what the agent receives open above it, the
+   chat would shrink to a clipped composer. The column scrolls the rest instead. */
+.round-side > .side-chat { min-height: 320px; }
 /* A reply is read, not glanced at: while a side chat is open the right column widens, so its prose keeps a readable
    line and a table in a reply does not squeeze into one word a line. */
 .round-layout.is-wide:has(> .round-side) { --col-right: minmax(360px, 520px); }
@@ -270,7 +278,7 @@
 .round-layout.is-drawer .round-side {
   position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); height: auto;
   padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
-  max-height: none;
+  max-height: none; overflow: auto;
 }
 
 /* Folding (the outline, the right column, the turn's text): each part keeps a button to fold or unfold it. A folded
@@ -375,7 +383,8 @@ body.is-resizing { cursor: col-resize; user-select: none; }
    a longer ink tick and a filled square, current the longest accent tick on accent-soft. No scroll pointer: the page
    shows one question at a time, so there is no scroll position to point at. A tick, its number and its square need
    46 px: the rail keeps 64 px in the drawer too, with a narrower inset, so the ruler never scrolls sideways. */
-.round-layout.is-outline-folded .round-outline { padding-inline: 4px; }
+.round-layout.is-outline-folded .round-outline { display: flex; flex-direction: column; padding-inline: 4px; padding-bottom: var(--dock-room); }
+.round-layout.is-outline-folded .round-outline > :not(.round-rail-title) { flex: none; }
 .round-layout.is-outline-folded .round-outline > .round-panel-head { margin-inline: -4px; }
 .round-layout.is-outline-folded .round-outline nav ol { gap: 0; margin-left: 8px; padding: 6px 0; border-left: 1px solid var(--muted); }
 .round-layout.is-outline-folded .round-outline li { position: relative; }
@@ -397,9 +406,10 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .round-layout.is-outline-folded .round-outline-item.is-answered::after { background: var(--ink); border-color: var(--ink); }
 /* A side chat's count would not fit beside a tick; the question's side chat still opens from the question. */
 .round-layout.is-outline-folded .round-outline-chat { display: none; }
-/* The current title runs bottom to top under the ticks, cut rather than wrapped, at a length that keeps it clear of
-   the history dock at the window's foot. */
+/* The current title runs bottom to top under the ticks, cut rather than wrapped, at most 32vh and never into the room
+   the history dock takes at the rail's foot: on a short window it shrinks into what the ticks leave, down to nothing. */
 .round-rail-title {
+  flex: 0 1 auto; min-height: 0; align-self: flex-start;
   writing-mode: vertical-rl; transform: rotate(180deg); margin: 18px 0 0 18px; max-height: 32vh;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font: 600 11.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent);

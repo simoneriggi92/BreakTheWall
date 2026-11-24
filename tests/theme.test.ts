@@ -127,7 +127,10 @@ describe('the round page as a drafting sheet (#123)', () => {
   });
 
   it('docks the frame: a 48 px bar, the panels below it, the round in cards centred on the canvas', () => {
-    expect(declarations('.round-page > .topbar')).toMatch(/min-height: 48px/);
+    // Exactly 48 px, which is where the panels stick: a taller bar (a 41 px button in it) slid them 6 px under the strip.
+    expect(declarations('.round-page > .topbar')).toMatch(/(?:^|[;\s])height: 48px/);
+    expect(declarations('.round-page > .topbar')).toMatch(/box-sizing: border-box/);
+    expect(declarations('.round-page > .topbar')).toMatch(/flex-wrap: nowrap/);
     expect(declarations('.round-layout')).toMatch(/--round-stick: 48px/);
     const cards = declarations('.round-question');
     expect(cards).toMatch(/width: min\(100% - 128px, 800px\)/);
@@ -137,6 +140,13 @@ describe('the round page as a drafting sheet (#123)', () => {
     expect(declarations('.round-layout.is-drawer .round-question')).toMatch(/width: calc\(100% - 24px\)/);
     // The drawer keeps its overlay.
     expect(declarations('.round-layout.is-drawer .round-return')).toMatch(/position: fixed/);
+  });
+
+  it('keeps a side chat\'s head and composer on a short window: it never shrinks below them, and the column scrolls', () => {
+    // At 640 px tall, with what the agent receives open above it, the chat shrank to a clipped composer.
+    expect(Number(/min-height: (\d+)px/.exec(declarations('.round-side > .side-chat'))?.[1])).toBeGreaterThanOrEqual(300);
+    expect(declarations('.round-layout:not(.is-drawer) .round-side')).toMatch(/overflow: auto/);
+    expect(declarations('.round-layout.is-drawer .round-side')).toMatch(/overflow: auto/);
   });
 
   it('gives each face one job: mono for labels and metadata, display for headings', () => {
@@ -285,6 +295,18 @@ describe('the rail as a ruler and the question\'s numeral (#124)', () => {
     const stroke = over(t.ink, share, t.surface);
     expect(contrast(stroke, t.surface)).toBeLessThan(2);
     expect(contrast(t.ink, stroke)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps the rail\'s title clear of the history dock on a short window: it shrinks into the room the dock leaves', () => {
+    // At 1100×640 with seven questions, 32vh of title ran under the dock, which the strip raises (#125).
+    const rail = declarations('.round-layout.is-outline-folded .round-outline');
+    expect(rail).toMatch(/display: flex/);
+    expect(rail).toMatch(/flex-direction: column/);
+    expect(rail).toMatch(/padding-bottom: var\(--dock-room\)/);
+    expect(declarations('.round-page')).toMatch(/--dock-room: \d+px/);
+    const title = declarations('.round-rail-title');
+    expect(title).toMatch(/flex: 0 1 auto/);
+    expect(title).toMatch(/min-height: 0/);
   });
 
   it('runs the rail\'s title bottom to top on one line, cut with an ellipsis, never wrapped', () => {
