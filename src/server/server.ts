@@ -9,6 +9,7 @@ import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
+import { handleSessions, SessionLabels } from './sessions';
 import { openSpecs, type GhRunner } from './specs';
 import type { ClaudeRunner } from '../desktop/claude/completer';
 
@@ -74,7 +75,8 @@ const MAX_TURN_BYTES = 4 * 1024 * 1024;
 const MAX_ANSWER_BYTES = 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
 const responseBodySchema = z.strictObject({ response: responseSchema });
-const phaseSchema = z.strictObject({ cwd: cwdSchema });
+/** The injection marker (#99), with the round skill that started and its arguments, which name the session (#102). */
+const phaseSchema = z.strictObject({ cwd: cwdSchema, skill: z.string().min(1).max(200).optional(), args: z.string().max(4000).optional() });
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
 const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
 const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
@@ -91,8 +93,18 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const local = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const staticRoot = await realpath(options.staticDir);
   const own: ServerLock = { port, pid: process.pid, version: options.version, secret };
+  // Requests are taken from the moment the lock can name this server and answered once its stores are open: a rival
+  // asking for the status meanwhile waits a moment rather than time out and take the lock for an orphan's.
+  let opened!: () => void;
+  const ready = new Promise<void>(done => { opened = done; });
+  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
+    void ready.then(() => handle(req, res)).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
+  });
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
   const rounds = await RoundStore.open(options.dataDir);
+  const labels = await SessionLabels.open(options.dataDir);
+  /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
+  const update: { version: string | null } = { version: null };
   const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send });
 
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
@@ -128,9 +140,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     else if (Date.now() - lastBusy >= idleMs) void stop();
   }, checkEveryMs);
 
-  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
-    void handle(req, res).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
-  });
+  opened();
 
   async function handle(req: IncomingMessage, res: ServerResponse) {
     // A rebinding DNS name points another site at 127.0.0.1; its requests still carry its own Host.
@@ -144,7 +154,8 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && path === '/api/status') {
       // A launcher that just found this server is about to use it: the idle clock starts over.
       lastBusy = Date.now();
-      const status: ServerStatus = { app: 'break-the-wall', version: options.version, platform: process.platform, pageConnected: pageConnected() };
+      busy();
+      const status: ServerStatus = { app: 'break-the-wall', version: options.version, platform: process.platform, pageConnected: pageConnected(), sessions: [...sessions.keys()] };
       return send(res, 200, status);
     }
     if (req.method === 'POST' && path === '/api/sessions') {
@@ -187,6 +198,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         const body = phaseSchema.safeParse(await readJson(req));
         if (!body.success) return send(res, 400, { error: 'bad-request' });
         await rounds.startPhase(phasePath[1], body.data.cwd);
+        if (body.data.skill) await labels.mark(phasePath[1], body.data.cwd, body.data.skill, body.data.args);
         pageChanged();
         return noContent(res);
       }
@@ -252,6 +264,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
+    if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, update, pageChanged })) return;
     if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
   }
@@ -338,7 +351,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
 }
 
 /** The request's JSON body, or undefined when it is too large or not JSON. */
-async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
+export async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Buffer>) {
@@ -363,12 +376,12 @@ async function takeLock(dataDir: string, own: ServerLock): Promise<boolean> {
   return false;
 }
 
-function send(res: ServerResponse, status: number, body: unknown) {
+export function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
   res.end(JSON.stringify(body));
 }
 
-function noContent(res: ServerResponse) {
+export function noContent(res: ServerResponse) {
   res.writeHead(204, { 'cache-control': 'no-store' }).end();
 }
 

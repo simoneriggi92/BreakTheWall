@@ -76,8 +76,8 @@ export function serverClient(server: LocalServer) {
     round: async () => { const { current } = await (await call('/api/current')).json(); return current?.kind === 'round' ? current.round : null; },
     /** The free block the page shows, or null when it shows a round or nothing. */
     free: async () => { const { current } = await (await call('/api/current')).json(); return current?.kind === 'free' ? current.block : null; },
-    /** The plugin's injection hook, through the launcher: the session was asked for rounds (#99). */
-    startPhase: (session = SESSION, cwd = CWD) => call(`/api/sessions/${session}/phase`, { method: 'POST', body: { cwd } }),
+    /** The plugin's injection hook, through the launcher: the session was asked for rounds (#99), by a skill started with its arguments (#102). */
+    startPhase: (session = SESSION, cwd = CWD, marker: { skill?: string; args?: string } = {}) => call(`/api/sessions/${session}/phase`, { method: 'POST', body: { cwd, ...marker } }),
     /** The page's "end the round phase". */
     endPhase: (session = SESSION) => call(`/api/sessions/${session}/phase`, { method: 'DELETE' }),
     /** The page on every change to a free block's response. */
@@ -88,6 +88,18 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
+    /** The mod on `session.start`, on every renewal, and with the new id once `/clear` or `/resume` changed it (#102). */
+    register: (session = SESSION, cwd = CWD) => call('/api/sessions', { method: 'POST', body: { id: session, cwd } }),
+    /** The mod on `session.end`: the ending session's id and why it ends. */
+    end: (session = SESSION, reason = 'clear') => call(`/api/sessions/${session}/end`, { method: 'POST', body: { reason } }),
+    /** The page's history column: project → session → numbered rounds, and an update waiting for the other sessions. */
+    history: async () => (await call('/api/history')).json(),
+    /** The page opening a round from the history column. */
+    pastRound: (number: number, session = SESSION) => call(`/api/rounds/${session}/${number}`),
+    /** The page's "delete session". */
+    deleteSession: (session = SESSION) => call(`/api/sessions/${session}`, { method: 'DELETE' }),
+    /** A newer mod's launcher that found this server with other sessions still registered. */
+    updateWaits: (version: string) => call('/api/update', { method: 'POST', body: { version } }),
     /** The page's specs (#104): every version handed over, newest first. */
     specs: async () => specListSchema.parse(await (await call('/api/specs')).json()).specs,
     /** One version, with its text as handed over. */

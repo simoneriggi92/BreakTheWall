@@ -123,13 +123,27 @@ function asks(event) {
   return [kind];
 }
 
-/** `node launcher.cjs phase <session> <cwd>`, left running on its own; a failure only leaves the phase to the first round. */
+/**
+ * The skill that started and its arguments, as Claude Code reports them: the server names the session after them
+ * in the history column (#102).
+ * @param {Record<string, unknown>} event @returns {[string, string]}
+ */
+function skillOf(event) {
+  if (event.hook_event_name === 'UserPromptExpansion') return [String(event.command_name ?? ''), typeof event.command_args === 'string' ? event.command_args : ''];
+  const input = /** @type {{ skill?: unknown, args?: unknown }} */ (event.tool_input ?? {});
+  return [String(input.skill ?? ''), typeof input.args === 'string' ? input.args : ''];
+}
+
+/**
+ * `node launcher.cjs phase <session> <cwd> <skill> <args>`, left running on its own; a failure only leaves the phase
+ * to the first round.
+ */
 function markPhase(/** @type {Record<string, unknown>} */ event) {
   const { session_id: session, cwd } = event;
   if (typeof session !== 'string' || !SESSION_ID.test(session) || typeof cwd !== 'string' || cwd === '') return;
   try {
     const launcher = join(dirname(dirname(fileURLToPath(import.meta.url))), 'server', 'launcher.cjs');
-    const child = spawn(process.execPath, [launcher, 'phase', session, cwd], { detached: true, stdio: 'ignore', windowsHide: true });
+    const child = spawn(process.execPath, [launcher, 'phase', session, cwd, ...skillOf(event)], { detached: true, stdio: 'ignore', windowsHide: true });
     child.on('error', () => {});
     child.unref();
   } catch { /* No launcher to run: the phase opens at the first round. */ }

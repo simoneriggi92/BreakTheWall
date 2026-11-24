@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import { draftSchema, emptyDraft, type Draft, type RoundView } from '../core/round-answers';
 import { roundSchema, type Round } from '../core/round';
+import type { HistoryRoundState } from '../core/session-history';
 import { afterTurn, CLOSED_PHASE, OPEN_PHASE, responseSchema, type CurrentView, type FreeBlockView, type Phase } from '../core/round-phase';
 
 /**
@@ -50,12 +51,22 @@ type StoredPhase = z.infer<typeof storedPhaseSchema>;
 export type Kind = 'round' | 'free';
 type EntryOf<K extends Kind> = K extends 'round' ? StoredRound : StoredFree;
 
+export interface SessionSummary {
+  session: string;
+  cwd: string;
+  startedAt: string;
+  latestAt: string;
+  rounds: { number: number; receivedAt: string; state: HistoryRoundState }[];
+}
+
 /** Why a change to a round or a free block was refused; the server answers each with its own status. */
 export type RoundRefusal = 'unknown' | 'sent' | 'superseded';
 
 const kindOf = (x: Stored): Kind => 'round' in x ? 'round' : 'free';
 const orderOf = (x: Stored) => x.order ?? x.number;
 /** How the mod names what it confirms: `round-2`, `free-1`. */
+/** Where the sessions' folders live, by project, inside the server's data folder. */
+export const projectsDir = (dataDir: string) => join(dataDir, 'projects');
 export const deliveryId = (kind: Kind, number: number) => `${kind}-${number}`;
 
 export class RoundStore {
@@ -68,7 +79,7 @@ export class RoundStore {
   private constructor(private dir: string) {}
 
   static async open(dataDir: string): Promise<RoundStore> {
-    const store = new RoundStore(join(dataDir, 'projects'));
+    const store = new RoundStore(projectsDir(dataDir));
     await store.load();
     return store;
   }
@@ -108,16 +119,25 @@ export class RoundStore {
   current(): CurrentView | null {
     let latest: Stored | undefined;
     for (const x of this.entries.values()) if (!latest || x.receivedAt > latest.receivedAt || (x.receivedAt === latest.receivedAt && orderOf(x) > orderOf(latest))) latest = x;
-    if (!latest) return null;
-    const phaseOpen = this.phaseOf(latest.session)?.open ?? false;
-    const superseded = this.ofSession(latest.session).some(y => orderOf(y) > orderOf(latest));
-    const sent = latest.sent ? { message: latest.sent.message, at: latest.sent.at } : null;
-    const base = { session: latest.session, number: latest.number, receivedAt: latest.receivedAt, sent, superseded };
-    if ('round' in latest) {
-      const round: RoundView = { ...base, ...latest.round, draft: latest.draft };
+    return latest ? this.viewOf(latest) : null;
+  }
+
+  /** One round of a session as the page shows it, for the history column (#102); undefined when there is none. */
+  round(session: string, number: number): CurrentView | undefined {
+    const found = this.entries.get(key(session, 'round', number));
+    return found && this.viewOf(found);
+  }
+
+  private viewOf(x: Stored): CurrentView {
+    const phaseOpen = this.phaseOf(x.session)?.open ?? false;
+    const superseded = this.ofSession(x.session).some(y => orderOf(y) > orderOf(x));
+    const sent = x.sent ? { message: x.sent.message, at: x.sent.at } : null;
+    const base = { session: x.session, number: x.number, receivedAt: x.receivedAt, sent, superseded };
+    if ('round' in x) {
+      const round: RoundView = { ...base, ...x.round, draft: x.draft };
       return { kind: 'round', round, phaseOpen };
     }
-    const block: FreeBlockView = { ...base, text: latest.text, response: latest.response };
+    const block: FreeBlockView = { ...base, text: x.text, response: x.response };
     return { kind: 'free', block, phaseOpen };
   }
 
@@ -181,6 +201,39 @@ export class RoundStore {
     return true;
   }
 
+  /**
+   * Every session the page showed something of (#102): its working directory, when its first and latest round or
+   * free block arrived, and its rounds in number order with their state.
+   */
+  summaries(): SessionSummary[] {
+    const bySession = new Map<string, Stored[]>();
+    for (const x of this.entries.values()) bySession.set(x.session, [...bySession.get(x.session) ?? [], x]);
+    return [...bySession].map(([session, all]) => {
+      const last = Math.max(...all.map(orderOf));
+      const times = all.map(x => x.receivedAt).sort();
+      const rounds = all.filter((x): x is StoredRound => 'round' in x).sort((a, b) => a.number - b.number).map(x => ({
+        number: x.number, receivedAt: x.receivedAt,
+        state: x.sent ? 'sent' as const : orderOf(x) < last ? 'superseded' as const : 'open' as const,
+      }));
+      return { session, cwd: all[0].cwd, startedAt: times[0], latestAt: times.at(-1) ?? times[0], rounds };
+    });
+  }
+
+  /**
+   * The person deleted the session from the page (#102): its rounds, free blocks, drafts, waiting messages and phase
+   * go, on disk with every other file of its folder. False for a session the page never showed.
+   */
+  async deleteSession(session: string): Promise<boolean> {
+    const kept = [...this.ofSession(session), ...this.phases.has(session) ? [this.phases.get(session)!] : []];
+    if (kept.length === 0) return false;
+    for (const x of this.ofSession(session)) { this.entries.delete(entryKey(x)); this.leases.delete(entryKey(x)); }
+    this.phases.delete(session);
+    // A write still on its way would put a file back into the folder after it is gone.
+    await Promise.all([...this.writes].filter(([id]) => id.startsWith(`${session}/`)).map(([, write]) => write.catch(() => {})));
+    await Promise.all([...new Set(kept.map(x => this.sessionDir(x)))].map(dir => rm(dir, { recursive: true, force: true })));
+    return true;
+  }
+
   private newEntry(session: string, cwd: string, kind: Kind) {
     const ofSession = this.ofSession(session);
     const number = ofSession.filter(x => kindOf(x) === kind).reduce((most, x) => Math.max(most, x.number), 0) + 1;
@@ -215,9 +268,7 @@ export class RoundStore {
   }
 
   private sessionDir(x: { cwd: string; session: string }) {
-    // The working directory names the project; hashed, so any path makes a safe folder name.
-    const project = createHash('sha256').update(x.cwd).digest('hex').slice(0, 16);
-    return join(this.dir, project, x.session);
+    return sessionFolder(this.dir, x);
   }
 
   private save(x: Stored): Promise<void> {
@@ -252,15 +303,20 @@ export class RoundStore {
   }
 }
 
+/** `<projects>/<project>/<session>`: the working directory names the project, hashed, so any path makes a safe folder name. */
+export function sessionFolder(projectsDir: string, x: { cwd: string; session: string }) {
+  return join(projectsDir, createHash('sha256').update(x.cwd).digest('hex').slice(0, 16), x.session);
+}
+
 const key = (session: string, kind: Kind, number: number) => `${session}/${deliveryId(kind, number)}`;
 const entryKey = (x: Stored) => key(x.session, kindOf(x), x.number);
 const sentNow = (message: string) => ({ message, at: new Date().toISOString(), deliveredAt: null });
 
-async function entries(dir: string): Promise<string[]> {
+export async function entries(dir: string): Promise<string[]> {
   try { return await readdir(dir); } catch { return []; }
 }
 
-async function atomicWrite(file: string, data: string) {
+export async function atomicWrite(file: string, data: string) {
   await mkdir(dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${randomBytes(6).toString('hex')}.pending`;
   try {

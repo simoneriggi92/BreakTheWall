@@ -70,6 +70,29 @@ export const it = {
       endedHint: 'I prossimi turni dell’agente senza un round restano nel terminale.',
       endFailed: 'La fase non si è chiusa. Riprova.',
     },
+    /** The history column (#102): project → session → numbered rounds. */
+    history: {
+      open: 'Cronologia',
+      title: 'Cronologia',
+      close: 'Chiudi',
+      live: 'attiva',
+      ended: 'conclusa',
+      round: (n: number) => `Round ${n}`,
+      states: { open: 'aperto', sent: 'inviato', superseded: 'superato' },
+      delete: 'Elimina la sessione',
+      confirmDelete: 'Eliminala per sempre',
+      keep: 'Tienila',
+      deleteFailed: 'La sessione non è stata eliminata. Riprova.',
+      openFailed: 'Il round non si è aperto. Riprova.',
+    },
+    /** What arrives while the person writes or reads history (#102), and an update that waits. */
+    notice: {
+      /** Followed by the project's name, emphasised. */
+      newRound: 'Nuovo round in',
+      newTurn: 'Nuovo turno dell’agente in',
+      open: 'Apri',
+      update: (version: string) => `Break the Wall ${version} è pronto: l’aggiornamento arriva quando le altre sessioni finiscono.`,
+    },
     /** A spec the agent handed over (#104), opened as a source. */
     spec: {
       /** The version's number and its location as the agent wrote it. */
