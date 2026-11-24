@@ -7,10 +7,30 @@ import { optionLetterSchema, questionSchema, type Question } from './round';
  * function the server sends with, so "what the agent receives" is exactly what it receives.
  */
 
-/** A question takes the recommendation, one of its options by letter (#96), no choice, or only a note. */
+/**
+ * A passage of a question the person points at, with their words on it (#98). `part` and the offsets anchor it in the
+ * question's text as the page renders it, so the page can mark it again; the message quotes only `passage`.
+ */
+export const remarkPartSchema = z.enum(['body', 'recommendation']);
+export type RemarkPart = z.infer<typeof remarkPartSchema>;
+export const remarkSchema = z.strictObject({
+  part: remarkPartSchema,
+  start: z.number().int().min(0).max(1_000_000),
+  end: z.number().int().min(1).max(1_000_000),
+  passage: z.string().max(5_000).refine(x => x.trim() !== ''),
+  text: z.string().max(50_000),
+}).refine(x => x.end > x.start);
+export type Remark = z.infer<typeof remarkSchema>;
+
+/**
+ * A question takes the recommendation, one of its options by letter (#96), no choice, or only a note. Remarks ride
+ * with the answer but are not one: a question with remarks alone is still unanswered.
+ */
 export const answerSchema = z.strictObject({
   choice: z.union([z.enum(['recommendation', 'none']), optionLetterSchema]).optional(),
   note: z.string().max(50_000),
+  /** Absent rather than empty, so a draft kept before remarks existed reads the same. */
+  remarks: z.array(remarkSchema).max(200).optional(),
 });
 export const draftSchema = z.strictObject({
   /** One per round; it returns at the top of the message. */
@@ -50,13 +70,30 @@ export function answerKind(answer: Answer | undefined): AnswerKind {
   return answer && answer.note.trim() !== '' ? 'note' : 'unanswered';
 }
 
-/** Every option letter in the draft is one its question offers: the page offers no other, so another is a bad request. */
+/**
+ * Every option letter in the draft is one its question offers, and every remark sits on a question the round has: the
+ * page offers no other, so another is a bad request.
+ */
 export function fitsQuestions(questions: readonly Question[], draft: Draft): boolean {
   return Object.entries(draft.answers).every(([number, answer]) => {
+    const question = questions.find(q => String(q.number) === number);
+    if (answer.remarks?.length && !question) return false;
     if (answerKind(answer) !== 'option') return true;
-    return questions.find(q => String(q.number) === number)?.options.some(x => x.letter === answer.choice) ?? false;
+    return question?.options.some(x => x.letter === answer.choice) ?? false;
   });
 }
+
+/** A passage as the message and the page quote it: on one line, as it reads, however many lines it crossed. */
+export const quoted = (passage: string) => `«${passage.replace(/\s+/g, ' ').trim()}»`;
+
+/** The parts of a question a remark can sit in, in the order they stand. */
+export const REMARK_PARTS: readonly RemarkPart[] = remarkPartSchema.options;
+/** Remarks in the order their passages stand: the body's first, then the recommendation's. */
+export const sortRemarks = (remarks: readonly Remark[]): Remark[] =>
+  [...remarks].sort((a, b) => REMARK_PARTS.indexOf(a.part) - REMARK_PARTS.indexOf(b.part) || a.start - b.start || a.end - b.end);
+export const remarksOf = (answer: Answer | undefined): Remark[] => sortRemarks(answer?.remarks ?? []);
+/** A remark is known by where it stands: one passage takes one remark. */
+export const remarkKey = (x: Pick<Remark, 'part' | 'start' | 'end'>) => `${x.part}:${x.start}:${x.end}`;
 export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
 
 /** The words on a question's title line, in the page's interface language; a note alone puts none there. */
@@ -68,7 +105,7 @@ const TITLE_WORDS: Record<MessageLanguage, Record<Exclude<AnswerKind, 'option'>,
 /**
  * Plain Markdown that reads as the person's own words: the general note first, then every question by number and
  * title, so it still reads after compaction, the choice on the title line ("recommendation", the option's letter, "no
- * choice" or "no answer") and the note indented below.
+ * choice" or "no answer"), the note indented below, then its remarks that have words, as `- «passage» — text`.
  */
 export function returnMessage(questions: readonly Question[], draft: Draft, language: MessageLanguage): string {
   const lines: string[] = [];
@@ -82,7 +119,14 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
     const title = `**Q${question.number} · ${question.title}**`;
     lines.push(word ? `${title} ${word}` : title);
     const note = answer?.note.trim();
-    if (note) lines.push(...note.split(/\r?\n/).map(line => line.trim() ? `  ${line}` : ''));
+    if (note) lines.push(...indented(note, '  '));
+    // A remark with no words yet is only a mark on the page: a bare quote would ask the agent to guess why.
+    for (const remark of remarksOf(answer).filter(x => x.text.trim() !== '')) {
+      const [first, ...rest] = remark.text.trim().split(/\r?\n/);
+      lines.push(`  - ${quoted(remark.passage)} — ${first}`, ...rest.flatMap(line => indented(line, '    ')));
+    }
   }
   return lines.join('\n');
 }
+
+const indented = (text: string, by: string) => text.split(/\r?\n/).map(line => line.trim() ? `${by}${line}` : '');

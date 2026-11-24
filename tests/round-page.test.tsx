@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RoundView } from '../src/core/round-answers';
@@ -434,5 +434,142 @@ describe('the round beside a terminal (#97)', () => {
     expect(server.requests.some(x => x.method === 'POST')).toBe(true);
     expect(await within(receives()).findByText('as delivered by the server (en)')).toBeInTheDocument();
     expect(within(receives()).getByRole('status')).toHaveTextContent('Sent.');
+  });
+});
+
+/** Selects `text` where it first stands inside `host`, as a drag of the mouse would, and lets go of the button there. */
+function selectText(host: HTMLElement, text: string) {
+  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const at = (node as Text).data.indexOf(text);
+    if (at < 0) continue;
+    const range = document.createRange();
+    range.setStart(node, at);
+    range.setEnd(node, at + text.length);
+    const selection = document.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent.mouseUp(node.parentElement!);
+    return;
+  }
+  throw new Error(`"${text}" is not in the element`);
+}
+const marks = () => Array.from(screen.getByRole('article').querySelectorAll('mark')).map(x => x.textContent);
+const recommendation = () => screen.getByRole('region', { name: 'Recommendation' });
+
+describe('remarks on a question\'s passage (#98)', () => {
+  afterEach(() => document.getSelection()?.removeAllRanges());
+
+  it('offers "Remark" on a passage selected in the question, highlights it, and returns it live under its question', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    const question = await screen.findByRole('article');
+    expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
+
+    selectText(question, 'server keeps every round');
+    await user.click(screen.getByRole('button', { name: 'Remark' }));
+    expect(marks()).toEqual(['server keeps every round']);
+    expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
+    const field = screen.getByRole('textbox', { name: 'Remark on «server keeps every round»' });
+    expect(field).toHaveFocus();
+    // Until it has words, the remark is only a mark: nothing of it reaches the agent.
+    expect(returnText()).toBe('**Q1 · Where do rounds live?** no answer\n**Q2 · Who recognises a round?** no answer');
+    await user.type(field, 'Every one, forever?');
+
+    // A remark is not an answer: the question still reads "no answer".
+    expect(returnText()).toBe([
+      '**Q1 · Where do rounds live?** no answer',
+      '  - «server keeps every round» — Every one, forever?',
+      '**Q2 · Who recognises a round?** no answer',
+    ].join('\n'));
+    expect(within(screen.getByRole('banner')).getByText('0/2 answered')).toBeInTheDocument();
+    await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({
+      generalNote: '',
+      answers: { '1': { note: '', remarks: [{ part: 'body', start: 4, end: 28, passage: 'server keeps every round', text: 'Every one, forever?' }] } },
+    }));
+  });
+
+  it('takes several remarks per question, in the order their passages stand, each edited or removed before Send', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    const question = await screen.findByRole('article');
+    selectText(recommendation(), 'per-user data folder');
+    await user.click(screen.getByRole('button', { name: 'Remark' }));
+    await user.type(screen.getByRole('textbox', { name: 'Remark on «per-user data folder»' }), 'Which one on Linux?');
+    selectText(question, 'every round');
+    await user.click(screen.getByRole('button', { name: 'Remark' }));
+    await user.type(screen.getByRole('textbox', { name: 'Remark on «every round»' }), 'Forever?');
+    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
+    expect(marks()).toEqual(['every round', 'per-user data folder']);
+    expect(returnText()).toBe([
+      '**Q1 · Where do rounds live?** recommendation',
+      '  - «every round» — Forever?',
+      '  - «per-user data folder» — Which one on Linux?',
+      '**Q2 · Who recognises a round?** no answer',
+    ].join('\n'));
+
+    await user.clear(screen.getByRole('textbox', { name: 'Remark on «every round»' }));
+    await user.type(screen.getByRole('textbox', { name: 'Remark on «every round»' }), 'Superseded ones too?');
+    await user.click(screen.getByRole('button', { name: 'Remove the remark on «per-user data folder»' }));
+    expect(marks()).toEqual(['every round']);
+    expect(returnText()).toBe([
+      '**Q1 · Where do rounds live?** recommendation',
+      '  - «every round» — Superseded ones too?',
+      '**Q2 · Who recognises a round?** no answer',
+    ].join('\n'));
+    await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({
+      generalNote: '',
+      answers: { '1': { choice: 'recommendation', note: '', remarks: [{ part: 'body', start: 17, end: 28, passage: 'every round', text: 'Superseded ones too?' }] } },
+    }));
+
+    // The remarks stay with their question when focus moves away and back.
+    await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
+    expect(marks()).toEqual([]);
+    await user.click(within(outline()).getByRole('button', { name: /Q1/ }));
+    expect(marks()).toEqual(['every round']);
+    expect(screen.getByRole('textbox', { name: 'Remark on «every round»' })).toHaveValue('Superseded ones too?');
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(server.requests.find(x => x.method === 'POST')?.body).toMatchObject({ draft: { answers: { '1': { remarks: [{ passage: 'every round', text: 'Superseded ones too?' }] } } } });
+  });
+
+  it('offers no remark on text outside the question\'s passages', async () => {
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    selectText(screen.getByRole('region', { name: 'The turn’s text' }), 'Two decisions');
+    expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
+  });
+
+  it('shows the remarks the server kept, highlighted, and read-only once the round is sent', async () => {
+    const kept = { part: 'body' as const, start: 4, end: 10, passage: 'server', text: 'Which server?' };
+    render(<LocalPage fetch={fakeServer({ ...ROUND, draft: { generalNote: '', answers: { '1': { note: '', remarks: [kept] } } }, sent: { message: 'the delivered words', at: '2026-11-23T10:05:00.000Z' } }).fetch}/>);
+    const question = await screen.findByRole('article');
+    expect(marks()).toEqual(['server']);
+    expect(within(question).getByRole('region', { name: 'Remarks' })).toHaveTextContent('«server»Which server?');
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remove the remark/ })).toBeNull();
+    selectText(question, 'every round');
+    expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
+  });
+
+  it('marks a kept passage whose place moved by its words only when they stand once, never guessing between two', async () => {
+    // Offsets that no longer hold their words, in "In the per-user data folder.": "data" stands once, "er" three times.
+    const moved = { part: 'recommendation' as const, start: 0, end: 4, passage: 'data', text: '' };
+    const twice = { part: 'recommendation' as const, start: 0, end: 2, passage: 'er', text: '' };
+    render(<LocalPage fetch={fakeServer({ ...ROUND, draft: { generalNote: '', answers: { '1': { note: '', remarks: [moved, twice] } } } }).fetch}/>);
+    await screen.findByRole('article');
+    expect(marks()).toEqual(['data']);
+  });
+
+  it('words remarks in Italian when the page is in Italian', async () => {
+    setLanguage('it-IT');
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    selectText(await screen.findByRole('article'), 'server');
+    await user.click(screen.getByRole('button', { name: 'Osservazione' }));
+    expect(screen.getByRole('textbox', { name: 'Osservazione su «server»' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Togli l’osservazione su «server»' })).toBeInTheDocument();
   });
 });

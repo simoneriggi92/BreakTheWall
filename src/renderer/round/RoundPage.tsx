@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { answerKind, answerOf, isAnswered, returnMessage, type Answer, type Draft, type RoundView } from '../../core/round-answers';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import { answerKind, answerOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, returnMessage, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { RoundBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
 import { renderInlineMarkdown, renderMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
 import { useDiagrams } from '../use-diagrams';
+import { markPassages, passageIn, type Passage } from './passages';
 
 /**
  * A round in the page (#95): the turn's text above, the outline of its questions on the left, one question in focus
@@ -44,6 +45,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
     const key = String(question.number);
     const merged: Answer = { ...(latest.current.answers[key] ?? { note: '' }), ...patch };
     if (merged.choice === undefined) delete merged.choice;
+    if (!merged.remarks?.length) delete merged.remarks;
     change({ ...latest.current, answers: { ...latest.current.answers, [key]: merged } });
   };
   // Choosing the same thing again takes the choice back; the note stays.
@@ -62,11 +64,50 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
   const showGeneral = generalOpen || draft.generalNote !== '';
   const openNote = () => { if (note.current) note.current.focus(); else setNoteOpen(question.number); };
 
+  // Remarks (#98): a passage selected in the question's body or recommendation offers "Remark"; the remark's field
+  // opens focused, and the passage stays marked while the remark exists.
+  const remarks = remarksOf(answer);
+  const article = useRef<HTMLElement>(null);
+  const hosts: Record<RemarkPart, RefObject<HTMLDivElement | null>> = { body: useRef(null), recommendation: useRef(null) };
+  const [selected, setSelected] = useState<Passage & { part: RemarkPart; top: number; left: number } | null>(null);
+  /** The remark whose field opens focused: the one just made, or the one its passage already had. */
+  const [focusRemark, setFocusRemark] = useState<string | null>(null);
+  const readSelection = () => {
+    const selection = document.getSelection();
+    const range = !readOnly && selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    for (const part of REMARK_PARTS) {
+      const host = hosts[part].current;
+      const passage = range && host ? passageIn(host, range) : null;
+      if (passage) return setSelected({ part, ...passage, ...below(range!, article.current) });
+    }
+    setSelected(null);
+  };
+  useEffect(() => {
+    // A click elsewhere empties the selection, and the offer goes with it.
+    const cleared = () => { if (document.getSelection()?.isCollapsed !== false) setSelected(null); };
+    document.addEventListener('selectionchange', cleared);
+    return () => document.removeEventListener('selectionchange', cleared);
+  }, []);
+  const changeRemarks = (next: Remark[]) => changeAnswer({ remarks: sortRemarks(next) });
+  const addRemark = () => {
+    if (!selected) return;
+    const { part, start, end, passage } = selected;
+    const kept = remarksOf(answerOf(latest.current, question));
+    // The same passage twice is one remark: selecting it again only opens its field.
+    const key = remarkKey(selected);
+    if (!kept.some(x => remarkKey(x) === key)) changeRemarks([...kept, { part, start, end, passage, text: '' }]);
+    setFocusRemark(key);
+    setSelected(null);
+    document.getSelection()?.removeAllRanges();
+  };
+  const editRemark = (target: Remark, patch: Partial<Remark> | null) => changeRemarks(remarksOf(answerOf(latest.current, question)).flatMap(x =>
+    remarkKey(x) !== remarkKey(target) ? [x] : patch ? [{ ...x, ...patch }] : []));
+
   const band = useWidthBand();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const showReturn = band !== 'drawer' || drawerOpen;
 
-  const goTo = (number: number) => { setFocus(number); setNoteOpen(null); };
+  const goTo = (number: number) => { setFocus(number); setNoteOpen(null); setSelected(null); setFocusRemark(null); };
   const move = (step: number) => goTo(round.questions[Math.min(round.questions.length - 1, Math.max(0, index + step))].number);
   const canSend = !readOnly && !sending;
   const drawerToggle = useRef<HTMLButtonElement>(null);
@@ -142,9 +183,9 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
             })}
           </ol>
         </nav>
-        <article className="round-question" aria-labelledby="round-question-title">
+        <article ref={article} className="round-question" aria-labelledby="round-question-title" onMouseUp={readSelection} onKeyUp={readSelection}>
           <h2 id="round-question-title">{r.question(question.number, question.title)}</h2>
-          <Markdown text={question.body}/>
+          <Markdown text={question.body} host={hosts.body} marks={remarks.filter(x => x.part === 'body')}/>
           {question.options.length > 0 && (
             <div className="round-options" role="group" aria-label={r.options}>
               {question.options.map(option => (
@@ -164,7 +205,7 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
           )}
           <section className="round-recommendation" aria-label={r.recommendation}>
             <h3>{r.recommendation}</h3>
-            {question.recommendation ? <Markdown text={question.recommendation}/> : <p>{r.noRecommendation}</p>}
+            {question.recommendation ? <Markdown text={question.recommendation} host={hosts.recommendation} marks={remarks.filter(x => x.part === 'recommendation')}/> : <p>{r.noRecommendation}</p>}
           </section>
           {!readOnly && (
             <div className="round-answer">
@@ -176,6 +217,31 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
                 ? <label className="round-field">{r.note}<textarea ref={note} autoFocus={noteOpen === question.number} value={answer?.note ?? ''} rows={4} onChange={event => { setNoteOpen(question.number); changeAnswer({ note: event.target.value }); }}/></label>
                 : <button type="button" className="round-write" onClick={openNote}>{r.writeNote}</button>}
             </div>
+          )}
+          {selected && (
+            // Pressing it must not empty the selection it acts on.
+            <button type="button" className="round-remark-offer" style={{ top: selected.top, left: selected.left }} onMouseDown={event => event.preventDefault()} onClick={addRemark}>{r.remark}</button>
+          )}
+          {remarks.length > 0 && (
+            <section className="round-remarks" aria-label={r.remarks}>
+              <h3>{r.remarks}</h3>
+              <ol>
+                {remarks.map(remark => {
+                  const quote = quoted(remark.passage);
+                  return (
+                    <li key={remarkKey(remark)}>
+                      <q className="round-remark-passage">{quote}</q>
+                      {readOnly
+                        ? <p className="round-remark-text">{remark.text}</p>
+                        : <>
+                          <textarea aria-label={r.remarkOn(quote)} autoFocus={focusRemark === remarkKey(remark)} value={remark.text} rows={2} onChange={event => editRemark(remark, { text: event.target.value })}/>
+                          <button type="button" className="subtle" aria-label={r.removeRemarkOn(quote)} onClick={() => editRemark(remark, null)}>{r.removeRemark}</button>
+                        </>}
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
           )}
           <p className="round-keys">{keyHint(r.keys, question.options.length, Boolean(question.recommendation), readOnly)}</p>
           {/* Moving is the outline's job and j/k's; the step forward shows up here once the question is answered. */}
@@ -204,6 +270,19 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
       </main>
     </div>
   );
+}
+
+const NO_MARKS: readonly Passage[] = [];
+
+/**
+ * Where the "Remark" offer goes. Under the selection's end, so it covers neither the passage nor the line it starts
+ * on; measured against the question, which positions it, so scrolling the page never leaves it behind.
+ */
+function below(range: Range, frame: HTMLElement | null): { top: number; left: number } {
+  // jsdom lays nothing out and has no rectangle for a range.
+  if (!frame || typeof range.getBoundingClientRect !== 'function') return { top: 0, left: 0 };
+  const rect = range.getBoundingClientRect(), box = frame.getBoundingClientRect();
+  return { top: rect.bottom - box.top + 4, left: Math.max(0, rect.right - box.left - 40) };
 }
 
 /** The keys that work on the question in focus, and only those: no pick without options, no accept without a recommendation. */
@@ -292,10 +371,14 @@ function Inline({ text, className }: { text: string; className: string }) {
  * The agent's Markdown, rendered with raw HTML off: markup in a round shows as text and never runs. Mermaid fences
  * are drawn in place, so an architecture question is judged from its diagram.
  */
-function Markdown({ text }: { text: string }) {
+function Markdown({ text, host: given, marks = NO_MARKS }: { text: string; host?: RefObject<HTMLDivElement | null>; marks?: readonly Passage[] }) {
   const { t, theme } = usePreferences();
   const rendered = useMemo(() => renderMarkdown(text), [text]);
-  const host = useRef<HTMLDivElement>(null);
+  const own = useRef<HTMLDivElement>(null);
+  const host = given ?? own;
   useDiagrams(host, rendered, theme, t.d.diagramFailed);
+  // React sets the HTML only when it changes, so the marks are drawn into it after every render that could move them.
+  const marksKey = marks.map(x => `${x.start}:${x.end}:${x.passage}`).join('\n');
+  useLayoutEffect(() => { if (host.current) markPassages(host.current, marks); }, [host, rendered, marksKey]);
   return <div ref={host} className="round-markdown" dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }
