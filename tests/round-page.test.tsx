@@ -1,8 +1,15 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RoundView } from '../src/core/round-answers';
 import { LocalPage } from '../src/renderer/LocalPage';
+
+// jsdom cannot lay out a Mermaid diagram: the renderer is replaced, and a diagram whose code says "broken" fails.
+const renderDiagram = vi.hoisted(() => vi.fn(async (code: string, _theme: string, _box: HTMLElement) => {
+  if (code.includes('broken')) throw new Error('Parse error');
+  return `<svg role="img" aria-label="drawn: ${code.split('\n')[0]}"><text>diagram</text></svg>`;
+}));
+vi.mock('../src/renderer/diagrams', () => ({ renderDiagram }));
 
 const SECRET = 'a'.repeat(43);
 const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
@@ -67,7 +74,7 @@ describe('a round in the page (#95)', () => {
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Two decisions are open.');
     const items = within(outline()).getAllByRole('button');
     expect(items.map(x => x.textContent)).toEqual(['Q1 · Where do rounds live?no answer', 'Q2 · Who recognises a round?no answer']);
-    expect(within(outline()).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByText('0/2 answered')).toBeInTheDocument();
     const question = screen.getByRole('article');
     expect(within(question).getByRole('heading', { level: 2 })).toHaveTextContent('Q1 · Where do rounds live?');
     expect(question).toHaveTextContent('The server keeps every round it receives.');
@@ -86,13 +93,15 @@ describe('a round in the page (#95)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
     expect(screen.getByRole('button', { name: 'Accept the recommendation' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(outline()).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByText('1/2 answered')).toBeInTheDocument();
     expect(returnText()).toBe('**Q1 · Where do rounds live?** recommendation\n**Q2 · Who recognises a round?** no answer');
 
     await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
     expect(screen.getByRole('article')).toHaveTextContent('The mod or the server.');
     await user.click(screen.getByRole('button', { name: 'No choice' }));
+    await user.click(screen.getByRole('button', { name: 'Write a note' }));
     await user.type(screen.getByRole('textbox', { name: 'Note' }), 'Keep the mod thin.');
+    await user.click(screen.getByRole('button', { name: 'Add a general note' }));
     await user.type(screen.getByRole('textbox', { name: 'General note' }), 'Small first version.');
     expect(returnText()).toBe([
       'Small first version.',
@@ -111,17 +120,18 @@ describe('a round in the page (#95)', () => {
     });
   });
 
-  it('keeps the note when the choice is taken back, and moves between questions with next and previous', async () => {
+  it('keeps the note when the choice is taken back, and when focus moves away and back', async () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer().fetch}/>);
     await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Write a note' }));
     await user.type(screen.getByRole('textbox', { name: 'Note' }), 'Outside the plugin folder.');
     await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
     await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
     expect(returnText()).toContain('**Q1 · Where do rounds live?**\n  Outside the plugin folder.');
-    await user.click(screen.getByRole('button', { name: 'Next question' }));
+    await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
     expect(screen.getByRole('article')).toHaveTextContent('Who recognises a round?');
-    await user.click(screen.getByRole('button', { name: 'Previous question' }));
+    await user.click(within(outline()).getByRole('button', { name: /Q1/ }));
     expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('Outside the plugin folder.');
   });
 
@@ -151,7 +161,7 @@ describe('a round in the page (#95)', () => {
     render(<LocalPage fetch={fakeServer({ ...ROUND, draft: { generalNote: 'Kept.', answers: { '2': { choice: 'none', note: '' } } } }).fetch}/>);
     await screen.findByRole('article');
     expect(screen.getByRole('textbox', { name: 'General note' })).toHaveValue('Kept.');
-    expect(within(outline()).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByText('1/2 answered')).toBeInTheDocument();
     // The first question still waiting for an answer is the one in focus.
     expect(screen.getByRole('article')).toHaveTextContent('Where do rounds live?');
   });
@@ -227,5 +237,202 @@ describe('a question\'s options side by side (#96)', () => {
     await user.click(within(options).getByRole('button', { name: /On disk/ }));
     await user.click(within(options).getByRole('button', { name: /On disk/ }));
     expect(returnText()).toContain('**Q1 · Where does the question live?** no answer');
+  });
+});
+
+const WITH_DIAGRAM: RoundView = {
+  ...ROUND,
+  questions: [
+    { ...ROUND.questions[0], body: ['The server keeps every round it receives.', '', '```mermaid', 'flowchart LR', '  Mod --> Server', '```', '', '```mermaid', 'broken diagram', '```'].join('\n') },
+    ROUND.questions[1],
+  ],
+};
+
+describe('reading one question comfortably (#97)', () => {
+  it('draws a Mermaid diagram inside the question, and keeps the code of one that does not draw', async () => {
+    render(<LocalPage fetch={fakeServer(WITH_DIAGRAM).fetch}/>);
+    const question = await screen.findByRole('article');
+    await waitFor(() => expect(within(question).getByRole('img', { name: 'drawn: flowchart LR' })).toBeInTheDocument());
+    expect(renderDiagram).toHaveBeenCalledWith('flowchart LR\n  Mod --> Server\n', expect.stringMatching(/^(paper|blueprint)$/), expect.any(HTMLElement));
+    // Measured where it is shown (#114), inside the question.
+    const call = renderDiagram.mock.calls.find(([code]) => code.startsWith('flowchart'))!;
+    expect(call[2]).toBe(within(question).getByRole('img', { name: 'drawn: flowchart LR' }).parentElement);
+    expect(await within(question).findByText('This diagram does not draw: its code is shown instead.')).toBeInTheDocument();
+    expect(question).toHaveTextContent('broken diagram');
+  });
+
+  it('keeps "n/m answered" in the top bar, and collapses an answered question in the outline once focus moves on', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
+    await screen.findByRole('article');
+    const bar = screen.getByRole('banner');
+    expect(within(bar).getByText('0/2 answered')).toBeInTheDocument();
+
+    await user.click(within(screen.getByRole('group', { name: 'Options' })).getByRole('button', { name: /On disk/ }));
+    expect(within(bar).getByText('1/2 answered')).toBeInTheDocument();
+    // The question in focus stays whole in the outline, answered or not.
+    const first = () => within(outline()).getAllByRole('button')[0];
+    expect(first()).toHaveTextContent('Q1 · Where does the question live?option (b)');
+
+    await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
+    // Collapsed: one line with its number and answer; the title stays in its name and its tooltip.
+    expect(first()).toHaveTextContent(/^Q1option \(b\)$/);
+    expect(first()).toHaveAccessibleName('Q1 · Where does the question live? · option (b)');
+    expect(first()).toHaveAttribute('title', 'Where does the question live?');
+    // A question still waiting for its answer never collapses.
+    expect(within(outline()).getAllByRole('button')[1]).toHaveTextContent('Q2 · Who recognises a round?no answer');
+  });
+
+  it('answers a round from the keyboard: move, pick an option, accept the recommendation, write a note, send', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(WITH_OPTIONS);
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    const heading = () => within(screen.getByRole('article')).getByRole('heading', { level: 2 });
+
+    // Digits pick options in their order, so no option letter ever collides with a key below.
+    await user.keyboard('3');
+    expect(returnText()).toBe('**Q1 · Where does the question live?** (c)\n**Q2 · Who recognises a round?** no answer');
+    await user.keyboard('j');
+    expect(heading()).toHaveTextContent('Q2 · Who recognises a round?');
+    // "y" accepts, and pressing it again keeps the answer: it never takes it back.
+    await user.keyboard('yy');
+    await user.keyboard('k');
+    expect(heading()).toHaveTextContent('Q1 · Where does the question live?');
+    await user.keyboard('k');
+    expect(heading()).toHaveTextContent('Q1 · Where does the question live?');
+
+    // "n" opens the note; inside it, keys are text, and Escape hands them back to the round.
+    await user.keyboard('n');
+    expect(screen.getByRole('textbox', { name: 'Note' })).toHaveFocus();
+    await user.keyboard('jky');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('textbox', { name: 'Note' })).not.toHaveFocus();
+    await user.keyboard('j');
+    expect(heading()).toHaveTextContent('Q2 · Who recognises a round?');
+    expect(returnText()).toBe('**Q1 · Where does the question live?** (c)\n  jky\n**Q2 · Who recognises a round?** recommendation');
+
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    expect(server.requests.find(x => x.method === 'POST')?.body).toMatchObject({ draft: { answers: { '1': { choice: 'c', note: 'jky' }, '2': { choice: 'recommendation' } } } });
+    expect(await within(receives()).findByText('as delivered by the server (en)')).toBeInTheDocument();
+  });
+
+  it('shows few commands at first, and the rest on the question in focus as they are needed', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
+    const question = await screen.findByRole('article');
+    // At first: the options, the recommendation, no choice, two small "write" buttons, and Send. No text fields.
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Previous question|Next question/ })).toBeNull();
+    expect(within(question).getAllByRole('button').map(x => x.textContent)).toEqual([
+      expect.stringContaining('(a)'), expect.stringContaining('(b)'), expect.stringContaining('(c)'),
+      'Accept the recommendation', 'No choice', 'Write a note',
+    ]);
+
+    await user.click(within(question).getByRole('button', { name: 'Write a note' }));
+    expect(within(question).getByRole('textbox', { name: 'Note' })).toHaveFocus();
+    expect(within(question).queryByRole('button', { name: 'Write a note' })).toBeNull();
+
+    // Once the question is answered, the step to the next one appears on it.
+    await user.click(within(question).getByRole('button', { name: 'Accept the recommendation' }));
+    await user.click(within(question).getByRole('button', { name: 'Next question' }));
+    expect(screen.getByRole('article')).toHaveTextContent('Who recognises a round?');
+    // The note field belongs to the question it was opened on.
+    expect(screen.queryByRole('textbox', { name: 'Note' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Add a general note' }));
+    expect(screen.getByRole('textbox', { name: 'General note' })).toHaveFocus();
+  });
+
+  it('shows the keys on the question in focus, in both languages', async () => {
+    render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
+    expect(within(await screen.findByRole('article')).getByText('j/k move · 1–3 pick · y accept · n note · Ctrl+Enter send')).toBeInTheDocument();
+    cleanup();
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
+    expect(within(await screen.findByRole('article')).getByText('j/k sposta · 1–3 scegli · y accetta · n nota · Ctrl+Invio invia')).toBeInTheDocument();
+  });
+});
+
+/** A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. */
+function viewport(width: number) {
+  const lists = new Set<{ query: string; listeners: Set<() => void> }>();
+  let subscribed = 0;
+  const matches = (query: string) => { const max = /max-width:\s*(\d+)px/.exec(query); return max ? width <= Number(max[1]) : false; };
+  window.matchMedia = ((query: string) => {
+    const list = { query, listeners: new Set<() => void>() };
+    lists.add(list);
+    return {
+      get matches() { return matches(query); }, media: query,
+      addEventListener: (_: string, f: () => void) => { subscribed++; list.listeners.add(f); }, removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
+    };
+  }) as unknown as typeof window.matchMedia;
+  return { resize: (next: number) => { width = next; act(() => lists.forEach(l => l.listeners.forEach(f => f()))); }, subscriptions: () => subscribed };
+}
+
+describe('the round beside a terminal (#97)', () => {
+  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+
+  it('folds the outline into a rail below ~1180 px, keeping every question reachable by name', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(within(outline()).getAllByRole('button')[1]).toHaveTextContent('Q2 · Who recognises a round?no answer');
+
+    browser.resize(1100);
+    const rail = within(outline()).getAllByRole('button');
+    expect(rail.map(x => x.textContent)).toEqual(['Q1', 'Q2']);
+    expect(rail[1]).toHaveAccessibleName('Q2 · Who recognises a round? · no answer');
+    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
+    expect(within(outline()).getAllByRole('button')[0]).toHaveTextContent('Q1 ✓');
+    await user.click(within(outline()).getByRole('button', { name: /Who recognises a round/ }));
+    expect(screen.getByRole('article')).toHaveTextContent('The mod or the server.');
+    // The right column is still a column at this width.
+    expect(receives()).toBeInTheDocument();
+  });
+
+  it('listens to the window\'s width once, not again on every answer', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    const before = browser.subscriptions();
+    await user.keyboard('yjy');
+    expect(browser.subscriptions()).toBe(before);
+  });
+
+  it('turns the right column into a drawer below ~860 px, opened from the top bar and closed with Escape', async () => {
+    const user = userEvent.setup();
+    viewport(700);
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    expect(screen.queryByRole('region', { name: 'What the agent receives' })).toBeNull();
+
+    await user.keyboard('y');
+    const toggle = within(screen.getByRole('banner')).getByRole('button', { name: 'What the agent receives' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(returnText()).toBe('**Q1 · Where do rounds live?** recommendation\n**Q2 · Who recognises a round?** no answer');
+    expect(within(receives()).getByRole('button', { name: 'Send' })).toBeInTheDocument();
+
+    // Escape closes it from inside, and the focus goes back to the button that opened it.
+    await user.click(within(receives()).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('region', { name: 'What the agent receives' })).toBeNull();
+    expect(toggle).toHaveFocus();
+    await user.click(toggle);
+    within(receives()).getByRole('button', { name: 'Send' }).focus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('region', { name: 'What the agent receives' })).toBeNull();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+
+    // Sending from the keyboard with the drawer closed opens it, so what was delivered is seen.
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    expect(server.requests.some(x => x.method === 'POST')).toBe(true);
+    expect(await within(receives()).findByText('as delivered by the server (en)')).toBeInTheDocument();
+    expect(within(receives()).getByRole('status')).toHaveTextContent('Sent.');
   });
 });

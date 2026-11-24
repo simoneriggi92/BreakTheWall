@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { List, X } from 'lucide-react';
 import type { Cite, Disassembly } from '../../core/disassembly';
-import { renderDiagram } from '../diagrams';
 import { renderMarkdown } from '../markdown';
-import { mountSvg } from '../svg-mount';
 import { usePreferences } from '../preferences';
+import { useDiagrams } from '../use-diagrams';
 
 type Source = Disassembly['sources'][number];
 
@@ -17,28 +16,7 @@ export function SourceDocument({ source, focus, cited, className = '', active = 
   const rendered = useMemo(() => renderMarkdown(source.text), [source.text]);
   const host = useRef<HTMLDivElement>(null);
 
-  // Diagrams are drawn after the text, each in its own figure; one that does not parse keeps its code, with a note.
-  useEffect(() => {
-    const el = host.current;
-    if (!el || !rendered.diagrams || !active) return;
-    let live = true;
-    const unmount: (() => void)[] = [];
-    el.querySelectorAll<HTMLElement>('.md-diagram').forEach(figure => {
-      const code = figure.querySelector('.md-diagram-source')?.textContent ?? '';
-      void renderDiagram(code, theme).then(svg => {
-        if (!live) return;
-        let box = figure.querySelector<HTMLElement>('.md-diagram-svg');
-        if (!box) { box = document.createElement('div'); box.className = 'md-diagram-svg'; figure.prepend(box); }
-        unmount.push(mountSvg(box, svg));
-        figure.classList.add('drawn'); figure.classList.remove('failed');
-      }).catch(() => {
-        if (!active || figure.classList.contains('failed')) return;
-        const note = document.createElement('figcaption'); note.className = 'md-diagram-note micro plain'; note.textContent = t.d.diagramFailed;
-        figure.append(note); figure.classList.add('failed');
-      });
-    });
-    return () => { live = false; unmount.forEach(f => f()); };
-  }, [rendered, theme, t, active]);
+  useDiagrams(host, rendered, theme, t.d.diagramFailed, active);
 
   useEffect(() => {
     const el = host.current;

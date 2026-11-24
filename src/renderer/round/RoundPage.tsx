@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { answerKind, answerOf, isAnswered, returnMessage, type Answer, type Draft, type RoundView } from '../../core/round-answers';
 import type { RoundBridge } from '../http-bridge';
+import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
 import { renderInlineMarkdown, renderMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
+import { useDiagrams } from '../use-diagrams';
 
 /**
  * A round in the page (#95): the turn's text above, the outline of its questions on the left, one question in focus
@@ -51,7 +53,51 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
     return kind === 'option' ? r.optionState(a?.choice ?? '') : r.states[kind];
   };
 
+  // Fields stay folded behind a small button until used, so a question opens with its answers and little else. A
+  // field with text is always open; one opened by hand stays open while emptied, so typing never makes it vanish.
+  const note = useRef<HTMLTextAreaElement>(null);
+  const [noteOpen, setNoteOpen] = useState<number | null>(null);
+  const showNote = noteOpen === question.number || Boolean(answer?.note);
+  const [generalOpen, setGeneralOpen] = useState(false);
+  const showGeneral = generalOpen || draft.generalNote !== '';
+  const openNote = () => { if (note.current) note.current.focus(); else setNoteOpen(question.number); };
+
+  const band = useWidthBand();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const showReturn = band !== 'drawer' || drawerOpen;
+
+  const goTo = (number: number) => { setFocus(number); setNoteOpen(null); };
+  const move = (step: number) => goTo(round.questions[Math.min(round.questions.length - 1, Math.max(0, index + step))].number);
+  const canSend = !readOnly && !sending;
+  const drawerToggle = useRef<HTMLButtonElement>(null);
+
+  useRoundKeys(event => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) return canSend ? (void send(), true) : false;
+    if (inField(event.target)) {
+      // Escape hands the keys back to the round without losing what was typed.
+      if (event.key !== 'Escape') return false;
+      (event.target as HTMLElement).blur();
+      return true;
+    }
+    // A focused button inside a closing drawer would vanish with it and drop the focus on the page.
+    if (event.key === 'Escape' && band === 'drawer' && drawerOpen) return setDrawerOpen(false), drawerToggle.current?.focus(), true;
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (event.key === 'j') return move(1), true;
+    if (event.key === 'k') return move(-1), true;
+    if (readOnly) return false;
+    // "y" only accepts: pressed twice it keeps the answer, unlike the button, which toggles.
+    if (event.key === 'y' && question.recommendation) return changeAnswer({ choice: 'recommendation' }), true;
+    if (event.key === 'n') return openNote(), true;
+    // Digits pick options in their order, as in the owner's prototype (#78): an option may carry any letter a–z, so
+    // letter keys would collide with j, k, n and y.
+    const option = /^[1-9]$/.test(event.key) ? question.options[Number(event.key) - 1] : undefined;
+    if (option) return toggle(option.letter), true;
+    return false;
+  });
+
   async function send() {
+    // In the narrowest layout the result shows in the drawer, so sending opens it.
+    setDrawerOpen(true);
     setSending(true);
     setFailure(undefined);
     try {
@@ -65,20 +111,35 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
 
   return (
     <div className="round-page">
-      <header className="topbar"><Brand/><div className="course-title"><strong>{r.title(round.number)}</strong></div><PreferencesMenu/></header>
-      <main className="round-layout">
+      {/* Progress sits in the sticky top bar, so it stays in view at every width, the outline folded or not. */}
+      <header className="topbar"><Brand/><div className="course-title"><strong>{r.title(round.number)}</strong></div><span className="round-progress">{r.progress(answered, round.questions.length)}</span>
+        {band === 'drawer' && <button ref={drawerToggle} type="button" className="subtle" aria-expanded={drawerOpen} aria-controls={drawerOpen ? 'round-return' : undefined} onClick={() => setDrawerOpen(open => !open)}>{r.receives}</button>}
+        <PreferencesMenu/>
+      </header>
+      <main className={`round-layout is-${band}`}>
         {round.turnText && <section className="round-turn" aria-label={r.turnText}><Markdown text={round.turnText}/></section>}
         <nav className="round-outline" aria-label={r.outline}>
-          <p className="round-progress">{r.progress(answered, round.questions.length)}</p>
           <ol>
-            {round.questions.map(q => (
-              <li key={q.number}>
-                <button type="button" className={`round-outline-item${isAnswered(answerOf(draft, q)) ? ' is-answered' : ''}`} aria-current={q.number === question.number ? 'true' : undefined} onClick={() => setFocus(q.number)}>
-                  <span className="round-outline-title">{r.question(q.number, q.title)}</span>
-                  <span className="round-outline-state">{answerState(answerOf(draft, q))}</span>
-                </button>
-              </li>
-            ))}
+            {round.questions.map(q => {
+              const a = answerOf(draft, q);
+              const done = isAnswered(a);
+              // An answered question out of focus folds to its number and answer: what is left to do stands out. In the
+              // rail every question is its number, with a tick once answered; the title stays in its name and tooltip.
+              const rail = band !== 'wide';
+              const collapsed = rail || (done && q.number !== question.number);
+              return (
+                <li key={q.number}>
+                  <button
+                    type="button" className={`round-outline-item${done ? ' is-answered' : ''}${collapsed ? ' is-collapsed' : ''}`}
+                    aria-current={q.number === question.number ? 'true' : undefined} onClick={() => goTo(q.number)}
+                    {...(collapsed ? { title: q.title, 'aria-label': r.collapsed(q.number, q.title, answerState(a)) } : {})}
+                  >
+                    <span className="round-outline-title">{rail ? `${r.number(q.number)}${done ? ' ✓' : ''}` : collapsed ? r.number(q.number) : r.question(q.number, q.title)}</span>
+                    {!rail && <span className="round-outline-state">{answerState(a)}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         </nav>
         <article className="round-question" aria-labelledby="round-question-title">
@@ -111,32 +172,84 @@ export function RoundPage({ round, bridge }: { round: RoundView; bridge: RoundBr
                 {question.recommendation && <button type="button" className="subtle" aria-pressed={answer?.choice === 'recommendation'} onClick={() => toggle('recommendation')}>{r.accept}</button>}
                 <button type="button" className="subtle" aria-pressed={answer?.choice === 'none'} onClick={() => toggle('none')}>{r.none}</button>
               </div>
-              <label className="round-field">{r.note}<textarea value={answer?.note ?? ''} rows={4} onChange={event => changeAnswer({ note: event.target.value })}/></label>
+              {showNote
+                ? <label className="round-field">{r.note}<textarea ref={note} autoFocus={noteOpen === question.number} value={answer?.note ?? ''} rows={4} onChange={event => { setNoteOpen(question.number); changeAnswer({ note: event.target.value }); }}/></label>
+                : <button type="button" className="round-write" onClick={openNote}>{r.writeNote}</button>}
             </div>
           )}
-          <div className="round-steps">
-            <button type="button" className="subtle" disabled={index === 0} onClick={() => setFocus(round.questions[index - 1].number)}>{r.previous}</button>
-            <button type="button" className="subtle" disabled={index === round.questions.length - 1} onClick={() => setFocus(round.questions[index + 1].number)}>{r.next}</button>
-          </div>
+          <p className="round-keys">{keyHint(r.keys, question.options.length, Boolean(question.recommendation), readOnly)}</p>
+          {/* Moving is the outline's job and j/k's; the step forward shows up here once the question is answered. */}
+          {!readOnly && isAnswered(answer) && index < round.questions.length - 1 && (
+            <div className="round-steps"><button type="button" className="primary" onClick={() => move(1)}>{r.next}</button></div>
+          )}
         </article>
-        <section className="round-return" aria-label={r.receives}>
-          {!readOnly && (
-            <div className="round-field">
-              <label htmlFor="round-general-note">{r.generalNote}</label>
-              <textarea id="round-general-note" aria-describedby="round-general-hint" value={draft.generalNote} rows={3} onChange={event => change({ ...latest.current, generalNote: event.target.value })}/>
-              <small id="round-general-hint">{r.generalNoteHint}</small>
-            </div>
-          )}
+        {showReturn && <section id="round-return" className="round-return" aria-label={r.receives}>
+          {band === 'drawer' && <button type="button" className="subtle round-drawer-close" onClick={() => { setDrawerOpen(false); drawerToggle.current?.focus(); }}>{r.closeReceives}</button>}
+          {!readOnly && (showGeneral
+            ? (
+              <div className="round-field">
+                <label htmlFor="round-general-note">{r.generalNote}</label>
+                <textarea id="round-general-note" autoFocus={generalOpen} aria-describedby="round-general-hint" value={draft.generalNote} rows={3} onChange={event => { setGeneralOpen(true); change({ ...latest.current, generalNote: event.target.value }); }}/>
+                <small id="round-general-hint">{r.generalNoteHint}</small>
+              </div>
+            )
+            : <button type="button" className="round-write" onClick={() => setGeneralOpen(true)}>{r.writeGeneralNote}</button>)}
           <h2>{r.receives}</h2>
           <pre className="round-message" data-testid="return-message">{message}</pre>
           {delivered !== null
             ? <p role="status">{r.sent}</p>
             : !round.superseded && <button type="button" className="primary" disabled={sending} onClick={() => void send()}>{sending ? r.sending : r.send}</button>}
           {failure && delivered === null && <p role="alert">{failure === 'send' ? r.sendFailed : r.saveFailed}</p>}
-        </section>
+        </section>}
       </main>
     </div>
   );
+}
+
+/** The keys that work on the question in focus, and only those: no pick without options, no accept without a recommendation. */
+function keyHint(keys: Messages['page']['round']['keys'], options: number, accept: boolean, readOnly: boolean): string {
+  if (readOnly) return keys.move;
+  const pick = options > 1 ? keys.pick(`1–${options}`) : options === 1 ? keys.pick('1') : null;
+  return [keys.move, pick, accept ? keys.accept : null, keys.note, keys.send].filter(Boolean).join(' · ');
+}
+
+type WidthBand = 'wide' | 'rail' | 'drawer';
+const RAIL = '(max-width: 1180px)', DRAWER = '(max-width: 860px)';
+/**
+ * How wide the window is, in the page's two steps: below ~1180 px the outline folds into a rail, below ~860 px the
+ * right column becomes a drawer. Read from `matchMedia` so the layout and what is on the page change together;
+ * without it (a test environment) the page is wide.
+ */
+function useWidthBand(): WidthBand {
+  return useSyncExternalStore(subscribeToWidth, widthBand);
+}
+// At module level: React subscribes again whenever it is handed a new subscribe function, so an inline one would
+// re-register both listeners on every render.
+function subscribeToWidth(changed: () => void) {
+  if (typeof window.matchMedia !== 'function') return () => {};
+  const lists = [window.matchMedia(RAIL), window.matchMedia(DRAWER)];
+  lists.forEach(list => list.addEventListener('change', changed));
+  return () => lists.forEach(list => list.removeEventListener('change', changed));
+}
+function widthBand(): WidthBand {
+  if (typeof window.matchMedia !== 'function') return 'wide';
+  return window.matchMedia(DRAWER).matches ? 'drawer' : window.matchMedia(RAIL).matches ? 'rail' : 'wide';
+}
+
+const inField = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
+/**
+ * The round's keys, listened to on the whole document so they work wherever the focus rests. The handler is read
+ * from a ref on every key, so it always sees the current question and draft; it returns true for a key it used.
+ */
+function useRoundKeys(handle: (event: KeyboardEvent) => boolean) {
+  const current = useRef(handle);
+  current.current = handle;
+  useEffect(() => {
+    const listen = (event: KeyboardEvent) => { if (!event.defaultPrevented && current.current(event)) event.preventDefault(); };
+    document.addEventListener('keydown', listen);
+    return () => document.removeEventListener('keydown', listen);
+  }, []);
 }
 
 /**
@@ -175,8 +288,14 @@ function Inline({ text, className }: { text: string; className: string }) {
   return <span className={className} dangerouslySetInnerHTML={{ __html: html }}/>;
 }
 
-/** The agent's Markdown, rendered with raw HTML off: markup in a round shows as text and never runs. */
+/**
+ * The agent's Markdown, rendered with raw HTML off: markup in a round shows as text and never runs. Mermaid fences
+ * are drawn in place, so an architecture question is judged from its diagram.
+ */
 function Markdown({ text }: { text: string }) {
-  const html = useMemo(() => renderMarkdown(text).html, [text]);
-  return <div className="round-markdown" dangerouslySetInnerHTML={{ __html: html }}/>;
+  const { t, theme } = usePreferences();
+  const rendered = useMemo(() => renderMarkdown(text), [text]);
+  const host = useRef<HTMLDivElement>(null);
+  useDiagrams(host, rendered, theme, t.d.diagramFailed);
+  return <div ref={host} className="round-markdown" dangerouslySetInnerHTML={{ __html: rendered.html }}/>;
 }

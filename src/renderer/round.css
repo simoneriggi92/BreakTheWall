@@ -1,16 +1,20 @@
-/* A round in the local page (#95): the turn's text above, outline on the left, one question in the middle, what the
-   agent receives on the right. Theme tokens only, so both themes hold their checked contrast. Narrow windows stack
-   the columns; the rail and the drawer come with the reading work (#97). */
+/* A round in the local page (#95, #97): the turn's text above, outline on the left, one question in the middle, what
+   the agent receives on the right. Theme tokens only, so both themes hold their checked contrast. The width steps
+   come from RoundPage (`is-wide`, `is-rail`, `is-drawer`), not from media queries here, so what the page shows and
+   how it is laid out never disagree. */
 .round-page { min-height: 100vh; background: var(--bg); color: var(--ink); }
+.round-progress { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .round-layout {
   display: grid; gap: 20px 28px; padding: 20px 24px 40px; align-items: start;
   grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(260px, 340px);
   grid-template-areas: "turn turn turn" "outline question return";
 }
-.round-turn { grid-area: turn; max-width: 70ch; color: var(--muted); border-left: 3px solid var(--line); padding-left: 14px; }
+/* About 70 characters a line, where eyes tire least over hours of rounds. Measured in em, not ch: `ch` is the width
+   of a zero, so 70ch held about 99 characters of the body font (6.7px a character at 15px, measured in the page).
+   32em holds about 72. Prose keeps that measure; diagrams and options may use the question's full width. */
+.round-turn { grid-area: turn; max-width: 32em; color: var(--muted); border-left: 3px solid var(--line); padding-left: 14px; }
 .round-outline { grid-area: outline; position: sticky; top: 72px; }
 .round-outline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.round-progress { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--muted); }
 .round-outline-item {
   display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px;
   background: transparent; border: 1px solid transparent; color: var(--ink); font: inherit;
@@ -20,11 +24,16 @@
 .round-outline-title { font-size: 14px; font-weight: 600; }
 .round-outline-state { font-size: 12px; color: var(--muted); }
 .round-outline-item.is-answered .round-outline-state { color: var(--good); }
+/* Folded: one line, number then answer, so the questions still open stand out. */
+.round-outline-item.is-collapsed { display: flex; align-items: baseline; gap: 10px; padding: 5px 10px; }
+.round-outline-item.is-collapsed .round-outline-title { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.round-outline-item.is-collapsed.is-answered .round-outline-title { color: var(--good); }
 .round-question {
-  grid-area: question; max-width: 70ch; background: var(--surface); border: 1px solid var(--line);
+  grid-area: question; max-width: 760px; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 20px 24px; line-height: 1.6;
 }
-.round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; }
+.round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; max-width: 32em; }
+.round-markdown > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { max-width: 32em; }
 .round-recommendation { margin-top: 16px; padding: 12px 14px; border-radius: 9px; background: var(--accent-soft); }
 .round-recommendation h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
 .round-recommendation p { margin: 0; }
@@ -40,13 +49,18 @@
 .round-option-letter { color: var(--accent); }
 .round-option-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 1px 7px; }
 .round-option-consequence { font-size: 14px; color: var(--muted); }
-.round-answer { margin-top: 18px; display: grid; gap: 12px; }
+.round-answer { margin-top: 18px; display: grid; gap: 12px; justify-items: start; }
+.round-answer .round-field { justify-self: stretch; }
 .round-choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .round-choices [aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* The small "write" buttons that stand in for a field until it is needed. */
+.round-write { justify-self: start; background: none; border: 0; padding: 2px 0; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.round-write::before { content: "+ "; }
 .round-field { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
 .round-field textarea { font: inherit; font-weight: 400; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; resize: vertical; }
 .round-field small { font-weight: 400; color: var(--muted); }
-.round-steps { margin-top: 18px; display: flex; justify-content: space-between; gap: 8px; }
+.round-keys { margin: 16px 0 0; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.round-steps { margin-top: 14px; display: flex; justify-content: flex-end; }
 .round-return { grid-area: return; position: sticky; top: 72px; display: grid; gap: 12px; }
 .round-return h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .round-message {
@@ -55,14 +69,23 @@
 }
 .round-return [role="alert"] { margin: 0; color: var(--bad); }
 .round-return [role="status"] { margin: 0; color: var(--good); }
+.round-drawer-close { justify-self: end; }
 .round-markdown > :first-child { margin-top: 0; }
 .round-markdown > :last-child { margin-bottom: 0; }
 .round-markdown pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 10px 12px; font-size: 13px; }
-@media (max-width: 1180px) {
-  .round-layout { grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); grid-template-areas: "turn turn" "outline question" "outline return"; }
-  .round-return { position: static; }
+.round-markdown .md-diagram.drawn .md-diagram-svg { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
+
+/* Below ~1180 px: the outline is a rail of question numbers. */
+.round-layout.is-rail { grid-template-columns: 64px minmax(0, 1fr) minmax(240px, 300px); }
+.round-layout.is-rail .round-outline-item, .round-layout.is-drawer .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
+.round-layout.is-rail .round-outline-title, .round-layout.is-drawer .round-outline-title { white-space: nowrap; }
+
+/* Below ~860 px: the rail and the question; the right column slides over as a drawer from the top bar. */
+.round-layout.is-drawer {
+  grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: "turn turn" "outline question"; padding: 16px 16px 32px 8px; gap: 16px 12px;
 }
-@media (max-width: 860px) {
-  .round-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "turn" "outline" "question" "return"; padding: 16px; }
-  .round-outline { position: static; }
+.round-layout.is-drawer .round-question { padding: 16px 18px; }
+.round-layout.is-drawer .round-return {
+  position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(360px, 92vw); overflow: auto; align-content: start;
+  padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
 }

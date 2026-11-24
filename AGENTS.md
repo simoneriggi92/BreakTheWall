@@ -55,7 +55,7 @@ Work in this repository follows the `mattpocock/skills` set (owner, 2026-11-16),
 
 ### Issue tracker
 
-GitHub Issues on `simoneriggi92/BreakTheWall`, through the `gh` CLI. See `docs/agents/issue-tracker.md`.
+GitHub Issues on `simoneriggi92/BreakTheWall`, through `gh`. Read `docs/agents/issue-tracker.md` before the session's first `gh issue` call: a spec runs to tens of kilobytes and is read from a file, not the terminal.
 
 ### Triage labels
 
