@@ -9,7 +9,7 @@ import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from
 import { freeBlockMessage, responseSchema } from '../core/round-phase';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
 import { RoundStore, type Kind, type RoundRefusal } from './rounds';
-import { handleSessions, SessionLabels } from './sessions';
+import { handleSessions, SessionLabels, SessionTranscripts, transcriptPathSchema } from './sessions';
 import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
 import { openSpecs, type GhRunner } from './specs';
 import type { ClaudeRunner } from '../desktop/claude/completer';
@@ -62,11 +62,15 @@ const TYPES: Record<string, string> = {
 
 const cwdSchema = z.string().min(1).max(4096);
 /**
- * A session as the mod registers it: its id, its folder, the model it runs on, and the side-chat model set in the
- * plugin, if any (#100). A model name `--model` could not take is dropped, never the session with it.
+ * A session as the mod registers it: its id, its folder, the model it runs on, the side-chat model set in the
+ * plugin, if any (#100), and where Claude Code keeps its transcript (#103). A model name `--model` could not take, or a
+ * transcript path that is not one, is dropped, never the session with it.
  */
 const registeredModelSchema = modelSchema.optional().catch(undefined);
-const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema, model: registeredModelSchema, sideChatModel: registeredModelSchema });
+const registrationSchema = z.strictObject({
+  id: sessionIdSchema, cwd: cwdSchema, model: registeredModelSchema, sideChatModel: registeredModelSchema,
+  transcript: transcriptPathSchema.optional().catch(undefined),
+});
 /**
  * Every turn as the mod posts it on `turn.complete`, with how it ended and, for a subagent's run, its agent: the server
  * decides whether it holds a round, so the mod decides nothing.
@@ -92,6 +96,8 @@ const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
 const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free)-(\d{1,6})$/;
 const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
+/** Claude Code no longer keeps the session's transcript (#103): its rounds and side chats take nothing more. */
+const TRANSCRIPT_GONE = { error: 'transcript-gone' };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<LocalServer | null> {
   const { idleMs = 10 * 60_000, checkEveryMs = 15_000, sessionTtlMs = 2 * 60_000, pollHoldMs = 25_000, pageGraceMs = 10_000, deliveryHoldMs = 20_000, deliveryLeaseMs = 10 * 60_000 } = options;
@@ -110,8 +116,12 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     void ready.then(() => handle(req, res)).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
   });
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
-  const rounds = await RoundStore.open(options.dataDir);
+  // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
+  const sessions = new Map<string, { cwd: string; until: number }>();
+  const live = (session: string) => (sessions.get(session)?.until ?? 0) > Date.now();
+  const rounds = await RoundStore.open(options.dataDir, { live, transcriptGone: session => transcripts.gone(session) });
   const labels = await SessionLabels.open(options.dataDir);
+  const transcripts = await SessionTranscripts.open(options.dataDir, rounds);
   /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
   const update: { version: string | null } = { version: null };
   /** The models each session registered with, kept past its lease, so a side chat on an ended session still runs on its model. */
@@ -119,12 +129,11 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const sideChats = sideChatRoutes({
     dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
     modelOf: session => { const x = models.get(session); return x?.sideChatModel ?? x?.model; },
+    readOnly: session => transcripts.gone(session),
     io: { readJson, send },
   });
   const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: () => pageChanged(), send });
 
-  // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
-  const sessions = new Map<string, { cwd: string; until: number }>();
   /** Open page polls, answered early when what the page shows has changed. */
   const pagePolls = new Set<() => void>();
   /** Mod polls waiting for a message, by session, so a Send wakes only the session it answers. */
@@ -178,9 +187,13 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'POST' && path === '/api/sessions') {
       const registration = registrationSchema.safeParse(await readJson(req));
       if (!registration.success) return send(res, 400, { error: 'bad-request' });
-      const { id, cwd, model, sideChatModel } = registration.data;
+      const { id, cwd, model, sideChatModel, transcript } = registration.data;
+      const resumed = !live(id);
       sessions.set(id, { cwd, until: Date.now() + sessionTtlMs });
       models.set(id, { model, sideChatModel });
+      if (transcript !== undefined) await transcripts.remember(id, transcript);
+      // A session coming back with `claude --resume`: what it had queued is no longer shown as waiting.
+      if (resumed) pageChanged();
       lastBusy = Date.now();
       return noContent(res);
     }
@@ -201,12 +214,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       const round = parseRound(text);
       if (round) {
         const stored = await rounds.add(session, cwd, round);
+        await transcripts.keep(session);
         pageChanged();
         return send(res, 200, { round: stored.number });
       }
       // A turn with nothing to read asks the person nothing.
       const free = text.trim() === '' ? null : await rounds.addTurn(session, cwd, text);
       if (!free) return send(res, 200, { round: null });
+      await transcripts.keep(session);
       pageChanged();
       return send(res, 200, { round: null, free: free.number });
     }
@@ -230,6 +245,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     const freePath = FREE_PATH.exec(path);
     if (freePath && sessionIdSchema.safeParse(freePath[1]).success) {
       const [, session, number, action] = freePath;
+      if (transcripts.gone(session)) return send(res, 409, TRANSCRIPT_GONE);
       const body = responseBodySchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
       if (req.method === 'PUT' && action === 'response') {
         if (!body.success) return send(res, 400, { error: 'bad-request' });
@@ -251,6 +267,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     const roundPath = ROUND_PATH.exec(path);
     if (roundPath && sessionIdSchema.safeParse(roundPath[1]).success) {
       const [, session, number, action] = roundPath;
+      if (transcripts.gone(session)) return send(res, 409, TRANSCRIPT_GONE);
       if (req.method === 'PUT' && action === 'draft') {
         const draft = draftSchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
         if (!draft.success) return send(res, 400, { error: 'bad-request' });
@@ -283,7 +300,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
-    if (await handleSessions(req, res, path, { rounds, labels, leases: sessions, update, pageChanged })) return;
+    if (await handleSessions(req, res, path, { rounds, labels, transcripts, sideChats, leases: sessions, live, update, pageChanged })) return;
     if (await sideChats.handle(req, res, path)) return;
     if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });

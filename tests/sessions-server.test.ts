@@ -23,8 +23,8 @@ describe('one page serves every session of every project (#102)', () => {
     expect(await api.round()).toMatchObject({ session: OTHER, number: 1 });
     const { projects } = await api.history();
     expect(projects).toEqual([
-      { cwd: OTHER_CWD, sessions: [{ session: OTHER, startedAt: expect.any(String), live: true, skill: null, ticket: null, rounds: [{ number: 1, receivedAt: expect.any(String), state: 'open' }] }] },
-      { cwd: CWD, sessions: [{ session: SESSION, startedAt: expect.any(String), live: true, skill: null, ticket: null, rounds: [
+      { cwd: OTHER_CWD, sessions: [{ session: OTHER, startedAt: expect.any(String), live: true, skill: null, ticket: null, transcriptGone: false, rounds: [{ number: 1, receivedAt: expect.any(String), state: 'open' }] }] },
+      { cwd: CWD, sessions: [{ session: SESSION, startedAt: expect.any(String), live: true, skill: null, ticket: null, transcriptGone: false, rounds: [
         { number: 1, receivedAt: expect.any(String), state: 'superseded' },
         { number: 2, receivedAt: expect.any(String), state: 'open' },
       ] }] },

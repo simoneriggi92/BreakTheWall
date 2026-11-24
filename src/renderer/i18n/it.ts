@@ -78,12 +78,24 @@ export const it = {
       live: 'attiva',
       ended: 'conclusa',
       round: (n: number) => `Round ${n}`,
-      states: { open: 'aperto', sent: 'inviato', superseded: 'superato' },
+      states: { open: 'aperto', sent: 'inviato', superseded: 'superato', queued: 'in coda' },
+      transcriptGone: 'sola lettura',
       delete: 'Elimina la sessione',
       confirmDelete: 'Eliminala per sempre',
       keep: 'Tienila',
       deleteFailed: 'La sessione non è stata eliminata. Riprova.',
       openFailed: 'Il round non si è aperto. Riprova.',
+    },
+    /** A round of an ended session (#103): what waits for `claude --resume <id>`, and what is read-only once the transcript is gone. */
+    session: {
+      /** Followed by the command, shown as code. */
+      queued: 'In coda: arriva all’agente quando riprendi la sessione con',
+      copyCommand: 'Copia il comando',
+      copyMarkdown: 'Copia come Markdown',
+      copied: 'Copiato.',
+      copyFailed: 'Copia non riuscita: seleziona il testo e copialo a mano.',
+      transcriptGone: 'Claude Code non conserva più la conversazione di questa sessione: i suoi round e le chat laterali restano in sola lettura.',
+      sideChatGone: 'Claude Code non conserva più questa sessione: la chat laterale si può leggere, non continuare.',
     },
     /** What arrives while the person writes or reads history (#102), and an update that waits. */
     notice: {

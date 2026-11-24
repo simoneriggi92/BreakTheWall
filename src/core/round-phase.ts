@@ -47,10 +47,21 @@ export const freeBlockViewSchema = z.strictObject({
 });
 export type FreeBlockView = z.infer<typeof freeBlockViewSchema>;
 
-/** What the page shows: the latest round or free block across sessions, and whether its session is in the phase. */
+/**
+ * Where the shown round or free block stands with its session (#103). Absent in a view kept from before, which then
+ * reads as answerable and not queued.
+ */
+const standingFields = {
+  /** Its message waits for an ended session, delivered when the person resumes it with `claude --resume <id>`. */
+  queued: z.boolean().default(false),
+  /** Claude Code no longer keeps the session's transcript: nothing can resume or fork it, so the round is read-only. */
+  transcriptGone: z.boolean().default(false),
+};
+
+/** What the page shows: the latest round or free block across sessions, whether its session is in the phase, and where it stands. */
 export const currentViewSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('round'), round: roundViewSchema, phaseOpen: z.boolean() }),
-  z.strictObject({ kind: z.literal('free'), block: freeBlockViewSchema, phaseOpen: z.boolean() }),
+  z.strictObject({ kind: z.literal('round'), round: roundViewSchema, phaseOpen: z.boolean(), ...standingFields }),
+  z.strictObject({ kind: z.literal('free'), block: freeBlockViewSchema, phaseOpen: z.boolean(), ...standingFields }),
 ]);
 export type CurrentView = z.infer<typeof currentViewSchema>;
 

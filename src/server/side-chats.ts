@@ -185,6 +185,8 @@ export interface SideChatDeps {
   runner: SideChatRunner;
   /** The model a side chat of this session runs on: the plugin's setting, else the session's; none when unknown. */
   modelOf: (session: string) => string | undefined;
+  /** Claude Code no longer keeps the session's transcript (#103): its side chats are read, never asked. */
+  readOnly: (session: string) => boolean;
   /** How long a read of the side chats that names the version it has is held. */
   holdMs: number;
   io: {
@@ -202,7 +204,8 @@ export function sideChatRoutes(deps: SideChatDeps) {
   const projects = join(deps.dataDir, 'projects');
   const threads = new Map<string, StoredThread>();
   const writes = new Map<string, Promise<void>>();
-  const running = new Set<AbortController>();
+  /** The replies still running, with the session each belongs to. */
+  const running = new Map<AbortController, string>();
   /** Grows on every change, from the start time, so a version read before a restart is never ahead of one after it. */
   let clock = Date.now();
   const started = clock;
@@ -255,7 +258,7 @@ export function sideChatRoutes(deps: SideChatDeps) {
 
   async function answer(key: string, number: number, command: Omit<SideChatCommand, 'route'>, cwd: string) {
     const stop = new AbortController();
-    running.add(stop);
+    running.set(stop, command.session);
     try {
       for (const route of ['fork', 'fresh'] as const) {
         update(key, number, { route, reply: '', files: [] }, false);
@@ -304,6 +307,7 @@ export function sideChatRoutes(deps: SideChatDeps) {
       const found = deps.rounds.asked(session, round);
       const question = found?.round.questions.find(q => q.number === number);
       if (!found || !question) return deps.io.send(res, 404, { error: 'unknown' }), true;
+      if (deps.readOnly(session)) return deps.io.send(res, 409, { error: 'transcript-gone' }), true;
       const key = threadKey(session, round, number);
       const thread = threads.get(key) ?? { version: 1 as const, session, cwd: found.cwd, round, question: number, turns: [] };
       // One reply at a time per question: the next question's prompt carries this one's reply.
@@ -347,7 +351,19 @@ export function sideChatRoutes(deps: SideChatDeps) {
   return {
     handle,
     /** The server stops: every reply still running stops with it. */
-    stop() { for (const x of running) x.abort(); },
+    stop() { for (const x of running.keys()) x.abort(); },
+    /**
+     * The session was deleted: its replies still running stop, and its threads are forgotten once their last writes
+     * have landed, so nothing is written back into its folder and a round of the same number starts with none.
+     */
+    async forget(session: string) {
+      await loaded;
+      for (const [x, of] of running) if (of === session) x.abort();
+      const gone = [...threads.values()].filter(x => x.session === session);
+      for (const x of gone) threads.delete(threadKey(x.session, x.round, x.question));
+      await Promise.all(gone.map(x => writes.get(threadKey(x.session, x.round, x.question))?.catch(() => {})));
+      for (const x of gone) { writes.delete(threadKey(x.session, x.round, x.question)); changed(x); }
+    },
   };
 }
 

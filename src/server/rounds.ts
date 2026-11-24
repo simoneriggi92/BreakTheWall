@@ -59,6 +59,16 @@ export interface SessionSummary {
   rounds: { number: number; receivedAt: string; state: HistoryRoundState }[];
 }
 
+/**
+ * Where a session stands, as the server knows it (#103): live while its lease runs, and whether Claude Code's
+ * transcript of it is gone. The store reads it whenever it shows a round.
+ */
+export interface Standing {
+  live(session: string): boolean;
+  transcriptGone(session: string): boolean;
+}
+const NO_STANDING: Standing = { live: () => false, transcriptGone: () => false };
+
 /** Why a change to a round or a free block was refused; the server answers each with its own status. */
 export type RoundRefusal = 'unknown' | 'sent' | 'superseded';
 
@@ -76,10 +86,10 @@ export class RoundStore {
   /** Messages handed to a poll and not yet confirmed, until when; kept in memory, so a restart offers them again. */
   private leases = new Map<string, number>();
 
-  private constructor(private dir: string) {}
+  private constructor(private dir: string, private standing: Standing) {}
 
-  static async open(dataDir: string): Promise<RoundStore> {
-    const store = new RoundStore(projectsDir(dataDir));
+  static async open(dataDir: string, standing: Standing = NO_STANDING): Promise<RoundStore> {
+    const store = new RoundStore(projectsDir(dataDir), standing);
     await store.load();
     return store;
   }
@@ -133,12 +143,18 @@ export class RoundStore {
     const superseded = this.ofSession(x.session).some(y => orderOf(y) > orderOf(x));
     const sent = x.sent ? { message: x.sent.message, at: x.sent.at } : null;
     const base = { session: x.session, number: x.number, receivedAt: x.receivedAt, sent, superseded };
+    const standing = { phaseOpen, queued: this.queued(x), transcriptGone: this.standing.transcriptGone(x.session) };
     if ('round' in x) {
       const round: RoundView = { ...base, ...x.round, draft: x.draft };
-      return { kind: 'round', round, phaseOpen };
+      return { kind: 'round', round, ...standing };
     }
     const block: FreeBlockView = { ...base, text: x.text, response: x.response };
-    return { kind: 'free', block, phaseOpen };
+    return { kind: 'free', block, ...standing };
+  }
+
+  /** Sent, not yet delivered, and its session ended: it waits for `claude --resume <id>`. */
+  private queued(x: Stored): boolean {
+    return Boolean(x.sent && !x.sent.deliveredAt && !this.standing.live(x.session));
   }
 
   /** The questions of one round, to word its message. */
@@ -197,6 +213,19 @@ export class RoundStore {
     return { id: deliveryId(kindOf(waiting), waiting.number), message: waiting.sent.message };
   }
 
+  /**
+   * The session ended (#103): what its mod took and never confirmed will not be submitted now, so it is offered again
+   * as soon as the session is resumed, not once its lease runs out.
+   */
+  release(session: string): void {
+    for (const x of this.ofSession(session)) this.leases.delete(entryKey(x));
+  }
+
+  /** The working directory a session's rounds were kept under; undefined for a session the page never showed. */
+  cwdOf(session: string): string | undefined {
+    return this.ofSession(session)[0]?.cwd;
+  }
+
   /** The mod submitted the message: it is delivered and never offered again. False when the entry sent nothing. */
   async confirm(session: string, kind: Kind, number: number): Promise<boolean> {
     const found = this.entries.get(key(session, kind, number));
@@ -218,7 +247,7 @@ export class RoundStore {
       const times = all.map(x => x.receivedAt).sort();
       const rounds = all.filter((x): x is StoredRound => 'round' in x).sort((a, b) => a.number - b.number).map(x => ({
         number: x.number, receivedAt: x.receivedAt,
-        state: x.sent ? 'sent' as const : orderOf(x) < last ? 'superseded' as const : 'open' as const,
+        state: this.queued(x) ? 'queued' as const : x.sent ? 'sent' as const : orderOf(x) < last ? 'superseded' as const : 'open' as const,
       }));
       return { session, cwd: all[0].cwd, startedAt: times[0], latestAt: times.at(-1) ?? times[0], rounds };
     });
