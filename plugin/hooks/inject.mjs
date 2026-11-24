@@ -19,8 +19,12 @@ import { fileURLToPath } from 'node:url';
  * A round skill starting is also the injection marker that opens the session's round phase on the local server (#99), so a
  * clarifying turn before the first round already shows in the page. The launcher, beside the server in this plugin,
  * finds the server; it runs detached, so the skill's start never waits on it.
+ *
+ * The spec skill (`to-spec`) is asked for a closing `Spec: <location>` line (#104), which the server reads to open the
+ * spec in the page. It opens no round phase: the handover ends it.
  */
 const ROUND_SKILLS = new Set(['grilling', 'grill-me', 'grill-with-docs']);
+const SPEC_SKILLS = new Set(['to-spec']);
 /** A marker not refreshed for this long belongs to a session nobody resumes. */
 const FORGET_MS = 30 * 24 * 3600 * 1000;
 /** A session id names a file: only a plain one does. */
@@ -37,25 +41,49 @@ const OPTIONS_REQUEST = [
   'Letters in order from (a); the label a few words; the consequence what choosing it leads to. In the ➡️ recommendation, name the option you recommend by its letter, as in "➡️ **(b)**, because …". A question with no real alternatives needs no list.',
 ].join('\n');
 
-/** Typed or called, bare or under its plugin (`mattpocock-skills:grilling`). */
-const isRoundSkill = (/** @type {unknown} */ name) =>
-  typeof name === 'string' && ROUND_SKILLS.has(name.trim().replace(/^\//, '').split(':').at(-1) ?? '');
+/** Written for the model, so in English whatever the interface language. */
+const SPEC_REQUEST = [
+  'Break the Wall opens the spec you hand over in a page beside the terminal, where the person reads it as a source. Keep the skill\'s steps and the spec\'s format as they are, with one addition: when you hand over the spec, end that message with one line, alone and last:',
+  '',
+  'Spec: <location>',
+  '',
+  'where <location> is the GitHub issue\'s URL (or `#<number>` for an issue of this repository), the file\'s path relative to the working directory, or `pasted` when the spec is the text of that same message, above the line. Hand over a revised spec the same way, with the same location: it opens as a new version.',
+].join('\n');
 
-const markerDir = () => join(process.env.CLAUDE_PLUGIN_DATA || join(tmpdir(), 'break-the-wall'), 'options-sessions');
+/**
+ * What each request asks, of which skills, and where the sessions asked are marked, so a compaction asks them again.
+ * @typedef {'options' | 'spec'} Request
+ * @type {Record<Request, { skills: Set<string>; folder: string; text: string }>}
+ */
+const REQUESTS = {
+  options: { skills: ROUND_SKILLS, folder: 'options-sessions', text: OPTIONS_REQUEST },
+  spec: { skills: SPEC_SKILLS, folder: 'spec-sessions', text: SPEC_REQUEST },
+};
+/** @type {Request[]} */
+const KINDS = ['options', 'spec'];
+
+/** The request a skill takes, typed or called, bare or under its plugin (`mattpocock-skills:grilling`). */
+function requestOf(/** @type {unknown} */ name) {
+  if (typeof name !== 'string') return undefined;
+  const skill = name.trim().replace(/^\//, '').split(':').at(-1) ?? '';
+  return KINDS.find(kind => REQUESTS[kind].skills.has(skill));
+}
+
+const markerDir = (/** @type {Request} */ kind) => join(process.env.CLAUDE_PLUGIN_DATA || join(tmpdir(), 'break-the-wall'), REQUESTS[kind].folder);
 
 /** The session's marker file, or undefined for an id that could name anything but one file in the folder. */
-const markerOf = (/** @type {unknown} */ session) =>
-  typeof session === 'string' && SESSION_ID.test(session) ? join(markerDir(), session) : undefined;
+const markerOf = (/** @type {Request} */ kind, /** @type {unknown} */ session) =>
+  typeof session === 'string' && SESSION_ID.test(session) ? join(markerDir(kind), session) : undefined;
 
 /**
  * One empty file per session asked, its time refreshed at each use (a compaction too, so a long session stays
  * marked); markers past FORGET_MS go as one is written.
  */
-function mark(/** @type {unknown} */ session) {
-  const marker = markerOf(session);
+function mark(/** @type {Request} */ kind, /** @type {unknown} */ session) {
+  const marker = markerOf(kind, session);
   if (!marker) return;
   try {
-    const dir = markerDir();
+    const dir = markerDir(kind);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     writeFileSync(marker, '');
     const now = Date.now();
@@ -65,31 +93,34 @@ function mark(/** @type {unknown} */ session) {
   } catch { /* Without a marker the request still went out; only a later compaction will not repeat it. */ }
 }
 
-function isMarked(/** @type {unknown} */ session) {
-  const marker = markerOf(session);
+function isMarked(/** @type {Request} */ kind, /** @type {unknown} */ session) {
+  const marker = markerOf(kind, session);
   try { return marker !== undefined && statSync(marker).isFile(); } catch { return false; }
 }
 
-/** @param {Record<string, unknown>} event @returns {boolean} whether the request goes with this event */
+/** @param {Record<string, unknown>} event @returns {Request[]} the requests that go with this event */
 function asks(event) {
+  /** @type {Request | undefined} */
+  let kind;
   switch (event.hook_event_name) {
     case 'UserPromptExpansion':
-      if (!isRoundSkill(event.command_name)) return false;
-      mark(event.session_id);
-      return true;
+      kind = requestOf(event.command_name);
+      break;
     case 'PreToolUse': {
       const input = event.tool_input;
-      if (event.tool_name !== 'Skill' || typeof input !== 'object' || input === null || !isRoundSkill(/** @type {{ skill?: unknown }} */ (input).skill)) return false;
-      mark(event.session_id);
-      return true;
+      if (event.tool_name === 'Skill' && typeof input === 'object' && input !== null) kind = requestOf(/** @type {{ skill?: unknown }} */ (input).skill);
+      break;
     }
-    case 'SessionStart':
-      if (event.source !== 'compact' || !isMarked(event.session_id)) return false;
-      mark(event.session_id);
-      return true;
-    default:
-      return false;
+    case 'SessionStart': {
+      if (event.source !== 'compact') return [];
+      const marked = KINDS.filter(x => isMarked(x, event.session_id));
+      for (const x of marked) mark(x, event.session_id);
+      return marked;
+    }
   }
+  if (!kind) return [];
+  mark(kind, event.session_id);
+  return [kind];
 }
 
 /** `node launcher.cjs phase <session> <cwd>`, left running on its own; a failure only leaves the phase to the first round. */
@@ -110,10 +141,13 @@ process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
   try {
     const event = JSON.parse(input);
-    if (typeof event !== 'object' || event === null || !asks(event)) return;
+    if (typeof event !== 'object' || event === null) return;
+    const requests = asks(event);
+    if (requests.length === 0) return;
     // A compaction only re-sends the request the summary dropped: the server kept the phase, and one the person ended
     // must stay ended. Only a round skill starting opens it.
-    if (event.hook_event_name !== 'SessionStart') markPhase(event);
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext: OPTIONS_REQUEST } }));
+    if (event.hook_event_name !== 'SessionStart' && requests.includes('options')) markPhase(event);
+    const additionalContext = requests.map(kind => REQUESTS[kind].text).join('\n\n');
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event.hook_event_name, additionalContext } }));
   } catch { /* Not an event: nothing to add. */ }
 });
