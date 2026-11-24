@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
  * The plugin's classic hooks (#96): they ask the skills that write rounds for each question's options as a list the
  * server reads, so the page can show them side by side, without editing the pinned skills. Typed (UserPromptExpansion),
  * called by Claude (PreToolUse on Skill), and again after a compaction (SessionStart on compact) in a session asked
- * before, since a compaction summarises injected context instead of keeping it.
+ * before, since a compaction summarises injected context instead of keeping it. The same request asks for the context
+ * before the first question as a short list (#127), since the page renders structure but cannot invent it.
  *
  * Classic command hooks, not the mod's `classic.*` events: on Claude Code 2.1.330 a built-in plugin hooked on those
  * events runs first and passes them on past every other plugin, so a mod's hook there never runs (witnessed, #96).
@@ -40,6 +41,10 @@ const OPTIONS_REQUEST = [
   '- **(b)** label: consequence',
   '',
   'Letters in order from (a); the label a few words; the consequence what choosing it leads to. In the ➡️ recommendation, name the option you recommend by its letter, as in "➡️ **(b)**, because …". A question with no real alternatives needs no list.',
+  '',
+  // The page renders the agent's text with its headings, lists and code (#121), but it cannot invent structure that
+  // prose never had: the shape is the one the owner chose in the prototype (#122, variant C).
+  'Write the context before the first question as a short Markdown list, not prose: a short heading, then 3 to 6 bullets, each opening with a bold label, such as **Read:**, **Found:**, **Carried over:**, **Open:** or **Lands in:**. Use code only where it names the place the answers land.',
 ].join('\n');
 
 /** Written for the model, so in English whatever the interface language. */
