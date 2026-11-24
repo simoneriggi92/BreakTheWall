@@ -193,8 +193,12 @@ export interface SideChatDeps {
   };
 }
 
-/** The side chats' routes, for the server's guarded `handle`: true when the request was theirs. */
-export async function sideChatRoutes(deps: SideChatDeps) {
+/**
+ * The side chats' routes, for the server's guarded `handle`: true when the request was theirs. Created at once, the
+ * kept threads read in the background: the server's start never waits on them, as a rival probing it for the lock
+ * would otherwise find it holding the lock and not answering.
+ */
+export function sideChatRoutes(deps: SideChatDeps) {
   const projects = join(deps.dataDir, 'projects');
   const threads = new Map<string, StoredThread>();
   const writes = new Map<string, Promise<void>>();
@@ -205,18 +209,20 @@ export async function sideChatRoutes(deps: SideChatDeps) {
   const versions = new Map<string, number>();
   const waiting = new Map<string, Set<() => void>>();
 
-  for (const project of await entries(projects)) {
-    for (const session of await entries(join(projects, project))) {
-      for (const name of await entries(join(projects, project, session))) {
-        if (!FILE.test(name)) continue;
-        try {
-          const x = storedThreadSchema.parse(JSON.parse(await readFile(join(projects, project, session, name), 'utf8')));
-          // A reply the last server was still streaming when it stopped will never finish.
-          threads.set(threadKey(x.session, x.round, x.question), { ...x, turns: x.turns.map(t => t.status === 'running' ? { ...t, status: 'failed' } : t) });
-        } catch { /* A file that does not parse is left on disk untouched. */ }
+  const loaded = (async () => {
+    for (const project of await entries(projects)) {
+      for (const session of await entries(join(projects, project))) {
+        for (const name of await entries(join(projects, project, session))) {
+          if (!FILE.test(name)) continue;
+          try {
+            const x = storedThreadSchema.parse(JSON.parse(await readFile(join(projects, project, session, name), 'utf8')));
+            // A reply the last server was still streaming when it stopped will never finish.
+            threads.set(threadKey(x.session, x.round, x.question), { ...x, turns: x.turns.map(t => t.status === 'running' ? { ...t, status: 'failed' } : t) });
+          } catch { /* A file that does not parse is left on disk untouched. */ }
+        }
       }
     }
-  }
+  })();
 
   const roundKey = (session: string, round: number) => `${session}/${round}`;
   const view = (session: string, round: number): SideChatsView => ({
@@ -279,6 +285,8 @@ export async function sideChatRoutes(deps: SideChatDeps) {
   }
 
   async function handle(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean> {
+    if (!path.startsWith('/api/side-chats/')) return false;
+    await loaded;
     const chats = ROUND_CHATS_PATH.exec(path);
     if (req.method === 'GET' && chats && sessionIdSchema.safeParse(chats[1]).success) {
       const session = chats[1], round = Number(chats[2]);

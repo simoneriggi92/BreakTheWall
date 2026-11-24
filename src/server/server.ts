@@ -99,7 +99,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const rounds = await RoundStore.open(options.dataDir);
   /** The models each session registered with, kept past its lease, so a side chat on an ended session still runs on its model. */
   const models = new Map<string, { model?: string; sideChatModel?: string }>();
-  const sideChats = await sideChatRoutes({
+  const sideChats = sideChatRoutes({
     dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
     modelOf: session => { const x = models.get(session); return x?.sideChatModel ?? x?.model; },
     io: { readJson, send },
