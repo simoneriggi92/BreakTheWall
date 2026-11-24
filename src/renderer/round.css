@@ -73,7 +73,7 @@
 .round-markdown > :first-child { margin-top: 0; }
 .round-markdown > :last-child { margin-bottom: 0; }
 .round-markdown pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 10px 12px; font-size: 13px; }
-.round-markdown .md-diagram-svg { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
+.round-markdown .md-diagram.drawn .md-diagram-svg { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
 
 /* Below ~1180 px: the outline is a rail of question numbers. */
 .round-layout.is-rail { grid-template-columns: 64px minmax(0, 1fr) minmax(240px, 300px); }

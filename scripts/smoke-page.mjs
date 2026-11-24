@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -68,7 +69,33 @@ try {
   const line = await settle(stray.read, 'document.querySelector("main.secretless")?.textContent');
   if (!line?.includes('/break-the-wall')) fail('a tab without the secret does not say to open it from Claude Code');
 
-  if (!process.exitCode) console.log(`smoke:page: the page opens with the secret (${label}), and a tab without it says: ${line}`);
+  // A round with diagrams (#114): Mermaid measures labels while the production policy refuses its styles, so a label
+  // measured in one font and shown in another is clipped. Only a real browser under that policy shows it. Every HTML
+  // label counts: edge labels in a flowchart, bold titles in a class diagram.
+  const turn = await fetch(`${base}/api/turns`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-btw-secret': server.secret },
+    body: JSON.stringify({ session: randomUUID(), cwd: process.cwd(), text: readFileSync('scripts/fixtures/preview-round.md', 'utf8'), reason: 'answer' }),
+  });
+  if (!turn.ok) throw new Error(`the server refused the preview round (${turn.status})`);
+  // Q1 holds a flowchart and Q3 a class diagram; only the question in focus is drawn.
+  const drawnLabels = () => settle(opened.read, `(() => {
+    const labels = [...document.querySelectorAll('.md-diagram.drawn foreignObject')].filter(fo => fo.textContent.trim());
+    if (!labels.length) return null;
+    return labels.map(fo => {
+      // Rectangles on both sides, so a diagram scaled down to fit compares like with like.
+      const box = fo.getBoundingClientRect(), text = (fo.querySelector('span, p') ?? fo.firstElementChild)?.getBoundingClientRect();
+      return { label: fo.textContent.trim(), clipped: !text || text.width > box.width + 0.5 || text.height > box.height + 0.5 };
+    });
+  })()`);
+  const flowchart = await drawnLabels();
+  const openedQ3 = await opened.read(`(() => { const q3 = [...document.querySelectorAll('nav button')].find(b => /^Q3\\b/.test(b.textContent)); q3?.click(); return !!q3; })()`);
+  // The class diagram's labels, once Q3 is drawn: one of its class names proves it is the diagram read.
+  const classDiagram = openedQ3 && await settle(opened.read, `[...document.querySelectorAll('.md-diagram.drawn foreignObject')].some(fo => fo.textContent.trim() === 'Session')`) && await drawnLabels();
+  const labels = flowchart && classDiagram && [...flowchart, ...classDiagram];
+  if (!labels) fail('the round\'s diagrams did not draw (Q1\'s flowchart, then Q3\'s class diagram)');
+  else if (labels.some(l => l.clipped)) fail(`diagram labels are clipped: ${labels.filter(l => l.clipped).map(l => l.label).join(', ')}`);
+
+  if (!process.exitCode) console.log(`smoke:page: the page opens with the secret (${label}), a tab without it says: ${line}, and a round's diagrams draw ${labels.length} labels whole`);
   opened.close(); stray.close();
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));

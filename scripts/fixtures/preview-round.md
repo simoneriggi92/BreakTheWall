@@ -28,6 +28,15 @@ flowchart LR
 
 ❓ **Q3** - **What does a deleted session leave behind?**: Deleting from the page removes the session's rounds, drafts and side chats. A queued delivery for that session may still be waiting for `claude --resume`.
 
+```mermaid
+classDiagram
+  class Session { +id +cwd +delete() }
+  class Round { +number +draft +sent }
+  class Delivery { +message +queuedAt }
+  Session "1" --> "*" Round : keeps
+  Session "1" --> "0..1" Delivery : waits with
+```
+
 ➡️ Remove the queued delivery too, and say so in the confirmation.
 
 ❓ **Q4** - **How does the history column order sessions?**: By the latest round received, or by the project, then the date.

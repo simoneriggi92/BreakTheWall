@@ -10,7 +10,7 @@ import { PreferencesProvider } from '../src/renderer/preferences';
 import { atlas } from './disassemblies';
 
 // jsdom cannot lay out a Mermaid diagram: the renderer is replaced, and a diagram whose code says "broken" fails.
-const renderDiagram = vi.hoisted(() => vi.fn(async (code: string) => {
+const renderDiagram = vi.hoisted(() => vi.fn(async (code: string, _theme: string, _box: HTMLElement) => {
   if (code.includes('broken')) throw new Error('Parse error');
   return '<svg class="drawn-diagram"><text>diagram</text></svg>';
 }));
@@ -84,8 +84,13 @@ describe('rendered view of a markdown source (D18)', () => {
     expect(document.querySelector('.md-diagram.drawn .drawn-diagram')).not.toBeNull();
     await waitFor(() => expect(document.querySelector('.md-diagram.failed')).not.toBeNull());
     expect(document.querySelector('.md-diagram.failed .md-diagram-source')!.textContent).toBe('broken diagram\n');
+    // A diagram that does not draw leaves no empty box behind, only its code and the note.
+    expect(document.querySelector('.md-diagram.failed .md-diagram-svg')).toBeNull();
     expect(screen.getByText('Questo diagramma non si disegna: resta il suo codice.')).toBeInTheDocument();
-    expect(renderDiagram).toHaveBeenCalledWith('flowchart LR\n  A --> B\n', 'paper');
+    expect(renderDiagram).toHaveBeenCalledWith('flowchart LR\n  A --> B\n', 'paper', expect.any(HTMLElement));
+    // Measured where it is shown (#114): the element handed to the renderer is the one that holds the drawing.
+    const call = renderDiagram.mock.calls.find(([code]) => code.startsWith('flowchart'))!;
+    expect(call[2]).toBe(document.querySelector('.md-diagram.drawn .md-diagram-svg'));
   });
 });
 
