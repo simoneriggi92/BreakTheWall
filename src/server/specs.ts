@@ -14,6 +14,7 @@ import { claudeCompleter, spawnClaude, type ClaudeRunner } from '../desktop/clau
 import type { Completer } from '../desktop/completion';
 import { ExplorationStore } from '../desktop/exploration-store';
 import { Generator } from '../desktop/generator';
+import { backingChecker } from './backing';
 import { specRemarkRoutes, type RemarkedSpec, type Riding, type SpecRemarksContext } from './spec-remarks';
 
 /**
@@ -72,6 +73,7 @@ export interface SpecRoutes {
 
 const SPEC_PATH = /^\/api\/specs\/([^/]+)$/;
 const EXPLORE_PATH = /^\/api\/specs\/([^/]+)\/exploration$/;
+const BACKING_PATH = /^\/api\/specs\/([^/]+)\/backing$/;
 const EXPLORATION_PATH = /^\/api\/explorations\/([^/]+)\/([^/]+)$/;
 
 export async function openSpecs(options: {
@@ -93,6 +95,7 @@ export async function openSpecs(options: {
   /** Structures being written, or why the last one stopped; in memory, so a restart offers to write it again. */
   const runs = new Map<string, { run: NonNullable<SpecRun>; generator?: Generator }>();
   const writes = new Map<string, Promise<void>>();
+  const backing = backingChecker({ rounds: options.remarks.rounds, gh });
 
   const idOf = (x: Pick<StoredSpec, 'key' | 'number'>) => `spec-${hash(x.key)}-${x.number}`;
   const versionsOf = (key: string) => [...specs.values()].filter(x => x.key === key);
@@ -195,6 +198,15 @@ export async function openSpecs(options: {
       const spec = specIdSchema.safeParse(specPath[1]).success ? specs.get(specPath[1]) : undefined;
       if (!spec) send(res, 404, { error: 'unknown' });
       else send(res, 200, { spec: view(spec), text: spec.text });
+      return true;
+    }
+    const backingPath = BACKING_PATH.exec(path);
+    if (req.method === 'GET' && backingPath) {
+      const spec = specIdSchema.safeParse(backingPath[1]).success ? specs.get(backingPath[1]) : undefined;
+      if (!spec) { send(res, 404, { error: 'unknown' }); return true; }
+      // `[R2·Q3]` names a round of the session that handed this version over, else of a session that handed over another.
+      const others = versionsOf(spec.key).filter(x => x !== spec).sort((a, b) => b.number - a.number).map(x => x.session);
+      send(res, 200, await backing.check({ text: spec.text, sessions: [...new Set([spec.session, ...others])], cwd: spec.cwd }));
       return true;
     }
     const explorePath = EXPLORE_PATH.exec(path);
