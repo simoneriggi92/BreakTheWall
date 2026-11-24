@@ -106,6 +106,17 @@ export const it = {
       newTurn: 'Nuovo turno dell’agente in',
       /** A spec handed over while the person writes or reads history (#104). */
       newSpec: 'Nuova specifica in',
+      /** A handover the server could not read (#104): the location as the agent wrote it, and why. */
+      unreadable: (location: string, why: string) => `La specifica in ${location} non si è potuta leggere: ${why}. Nessuna specifica è stata consegnata; la fase dei round non finisce.`,
+      unreadableWhy: {
+        'gh-failed': 'gh non l’ha trovata o non ha risposto',
+        missing: 'nella cartella della sessione non c’è questo file',
+        outside: 'il file è fuori dalla cartella della sessione',
+        'not-a-file': 'è una cartella, non un file',
+        'too-large': 'il file è troppo grande',
+        'not-text': 'il file non è testo UTF-8',
+        empty: 'la specifica è vuota',
+      },
       open: 'Apri',
       update: (version: string) => `Break the Wall ${version} è pronto: l’aggiornamento arriva quando le altre sessioni finiscono.`,
     },

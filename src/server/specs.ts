@@ -8,7 +8,7 @@ import { sessionIdSchema } from '../core/local-server';
 import { detectLanguage } from '../core/generation';
 import { failure, ProviderError, type ProviderFailure } from '../core/provider';
 import { importSource, normalizeText, SOURCE_LIMITS } from '../core/source';
-import { parseSpecHandover, specIdSchema, type SpecLocation, type SpecRun, type SpecView } from '../core/spec';
+import { parseSpecHandover, specIdSchema, type SpecLocation, type SpecRun, type SpecView, type UnreadableHandover, type UnreadableWhy } from '../core/spec';
 import { claudeCompleter, spawnClaude, type ClaudeRunner } from '../desktop/claude/completer';
 import type { Completer } from '../desktop/completion';
 import { ExplorationStore } from '../desktop/exploration-store';
@@ -48,6 +48,7 @@ const storedSpecSchema = z.strictObject({
 type StoredSpec = z.infer<typeof storedSpecSchema>;
 
 interface Read { key: string; title: string; text: string }
+type ReadOrWhy = { read: Read } | { why: UnreadableWhy };
 
 export interface SpecRoutes {
   /**
@@ -88,6 +89,8 @@ export async function openSpecs(options: {
   /** Structures being written, or why the last one stopped; in memory, so a restart offers to write it again. */
   const runs = new Map<string, { run: NonNullable<SpecRun>; generator?: Generator }>();
   const writes = new WriteQueue();
+  /** The latest handover of each session that could not be read; in memory, as the page only needs to say it now. */
+  const unreadable = new Map<string, UnreadableHandover>();
   const backing = backingChecker({ rounds: options.rounds, gh });
 
   const idOf = (x: Pick<StoredSpec, 'key' | 'number'>) => `spec-${hash(x.key)}-${x.number}`;
@@ -104,9 +107,14 @@ export async function openSpecs(options: {
   async function handover(turn: { session: string; cwd: string; text: string }): Promise<string | null> {
     const found = parseSpecHandover(turn.text);
     if (!found) return null;
-    let read: Read | null;
-    try { read = await readSpec(found.location, found.above, turn); } catch { read = null; }
-    if (!read) return null;
+    const result = await readSpec(found.location, found.above, turn).catch((): ReadOrWhy => ({ why: found.location.kind === 'github' ? 'gh-failed' : 'missing' }));
+    if ('why' in result) {
+      unreadable.set(turn.session, { location: found.written, session: turn.session, at: now().toISOString(), why: result.why });
+      changed();
+      return null;
+    }
+    unreadable.delete(turn.session);
+    const { read } = result;
     const number = versionsOf(read.key).reduce((most, x) => Math.max(most, x.number), 0) + 1;
     const stored: StoredSpec = {
       version: 1, key: read.key, location: found.written, number, handedOverAt: now().toISOString(),
@@ -118,21 +126,24 @@ export async function openSpecs(options: {
     return id;
   }
 
-  async function readSpec(location: SpecLocation, above: string, turn: { session: string; cwd: string }): Promise<Read | null> {
-    if (location.kind === 'pasted') return above === '' ? null : { key: `pasted:${turn.session}`, title: titleOf(above, 'Spec'), text: normalizeText(above) };
+  async function readSpec(location: SpecLocation, above: string, turn: { session: string; cwd: string }): Promise<ReadOrWhy> {
+    if (location.kind === 'pasted') {
+      const text = normalizeText(above);
+      return text === '' ? { why: 'empty' } : { read: { key: `pasted:${turn.session}`, title: titleOf(above, 'Spec'), text } };
+    }
     if (location.kind === 'github') {
       const exit = await gh({ args: ['issue', 'view', location.issue, '--json', 'title,body,url'], cwd: turn.cwd, signal: AbortSignal.timeout(GH_TIMEOUT_MS) });
-      if (exit.code !== 0) return null;
-      const issue = ghIssueSchema.parse(JSON.parse(exit.stdout));
-      const text = normalizeText(issue.body ?? '');
-      return text === '' ? null : { key: issue.url, title: issue.title.trim().slice(0, 200) || 'Spec', text };
+      const issue = exit.code === 0 ? ghIssueSchema.safeParse(parseJson(exit.stdout)) : null;
+      if (!issue?.success) return { why: 'gh-failed' };
+      const text = normalizeText(issue.data.body ?? '');
+      return text === '' ? { why: 'empty' } : { read: { key: issue.data.url, title: issue.data.title.trim().slice(0, 200) || 'Spec', text } };
     }
     // Only a file inside the session's folder: the location comes from the agent's turn, never from the page.
     const found = await fileInside(turn.cwd, location.path, SOURCE_LIMITS.maxFileBytes);
-    if (!('file' in found)) return null;
-    const { file } = found;
-    const text = normalizeText(new TextDecoder('utf-8', { fatal: true }).decode(await readFile(file)));
-    return text === '' ? null : { key: file, title: titleOf(text, basename(file)), text };
+    if ('refused' in found) return { why: found.refused };
+    let text: string;
+    try { text = normalizeText(new TextDecoder('utf-8', { fatal: true }).decode(await readFile(found.file))); } catch { return { why: 'not-text' }; }
+    return text === '' ? { why: 'empty' } : { read: { key: found.file, title: titleOf(text, basename(found.file)), text } };
   }
 
   /** Writes the version's structure in the background; the page follows it through its poll. */
@@ -169,7 +180,10 @@ export async function openSpecs(options: {
 
   async function handle(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean> {
     if (req.method === 'GET' && path === '/api/specs') {
-      send(res, 200, { specs: [...specs.values()].sort((a, b) => b.handedOverAt.localeCompare(a.handedOverAt) || b.number - a.number).map(view) });
+      send(res, 200, {
+        specs: [...specs.values()].sort((a, b) => b.handedOverAt.localeCompare(a.handedOverAt) || b.number - a.number).map(view),
+        unreadable: [...unreadable.values()].sort((a, b) => b.at.localeCompare(a.at)),
+      });
       return true;
     }
     if (req.method === 'GET' && path === '/api/explorations') {
@@ -257,6 +271,10 @@ export async function openSpecs(options: {
 function titleOf(text: string, fallback: string): string {
   const heading = /^#{1,6}\s+(.+?)\s*#*\s*$/m.exec(text)?.[1];
   return (heading || fallback).slice(0, 200);
+}
+
+function parseJson(text: string): unknown {
+  try { return JSON.parse(text); } catch { return undefined; }
 }
 
 const hash = (key: string) => createHash('sha256').update(key).digest('hex').slice(0, 16);

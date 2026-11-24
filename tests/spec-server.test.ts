@@ -119,6 +119,24 @@ describe('a spec handed over from a GitHub issue or pasted (#104)', () => {
     expect(await client.specs()).toEqual([]);
   });
 
+  it('says why a handover could not be read, the latest of each session, and keeps the round phase open', async () => {
+    const outside = project({ 'secret.md': '# Not the spec' });
+    const cwd = project({ 'docs/notes.md': 'A folder, not a spec.' });
+    writeFileSync(join(cwd, 'scan.md'), Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a]));
+    const client = serverClient(await start({ runners: { gh: fakeGh({}).runner } }));
+    const cases = [['#7', 'gh-failed'], ['missing.md', 'missing'], [join(outside, 'secret.md'), 'outside'], ['docs', 'not-a-file'], ['scan.md', 'not-text'], ['pasted', 'empty']];
+    for (const [location, why] of cases) {
+      await client.startPhase(SESSION, cwd);
+      await client.turn(location === 'pasted' ? 'Spec: pasted' : handover(location), SESSION, cwd);
+      expect(await client.unreadable()).toEqual([{ location, session: SESSION, at: expect.any(String), why }]);
+      expect((await client.current()).phaseOpen).toBe(true);
+    }
+    // A spec that is read replaces what the session could not hand over.
+    writeFileSync(join(cwd, 'spec.md'), BAKERY);
+    await client.turn(handover('spec.md'), SESSION, cwd);
+    expect(await client.unreadable()).toEqual([]);
+  });
+
   it('reads only the last line: a Spec line inside the turn is no handover', async () => {
     const cwd = project({ 'spec.md': BAKERY });
     const server = await start();

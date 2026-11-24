@@ -6,7 +6,7 @@ import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, type CurrentView, type FreeBlockView } from '../core/round-phase';
 import { historySchema, type History } from '../core/session-history';
 import { sideChatsViewSchema, type SideChatPassage, type SideChatsView } from '../core/side-chat';
-import { specListSchema, type SpecView } from '../core/spec';
+import { specListSchema, type SpecList } from '../core/spec';
 import { specRemarksViewSchema, type SpecRemarksDraft, type SpecRemarksView } from '../core/spec-remarks';
 import { browserBridge } from './storage';
 
@@ -44,7 +44,8 @@ export interface PageBridge extends DesktopBridge {
   /** Asks in the side chat of one question, about a passage of it if given (#101); the reply arrives through `getSideChats`. */
   askSideChat(round: RoundKey, question: number, ask: string, passage?: SideChatPassage): Promise<void>;
   /** Every version of every spec handed over (#104), newest first. */
-  listSpecs(): Promise<SpecView[]>;
+  /** Every version handed over, and the handovers that could not be read. */
+  listSpecs(): Promise<SpecList>;
   /** Writes a version's structure again, after a failure or a cancel; the page follows it through its poll. */
   exploreSpec(id: string): Promise<void>;
   cancelSpec(id: string): Promise<void>;
@@ -146,7 +147,7 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
       await ok(await call(`/api/side-chats/${encodeURIComponent(round.session)}/${round.number}/${question}`, json('POST', { ask, ...(passage ? { passage } : {}) })));
     },
     async listSpecs() {
-      return specListSchema.parse(await (await ok(await call('/api/specs'))).json()).specs;
+      return specListSchema.parse(await (await ok(await call('/api/specs'))).json());
     },
     async exploreSpec(id) {
       await ok(await call(`/api/specs/${encodeURIComponent(id)}/exploration`, { method: 'POST' }));

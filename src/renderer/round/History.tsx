@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { projectName, type History, type HistorySession } from '../../core/session-history';
+import type { UnreadableHandover } from '../../core/spec';
 import type { HistoryBridge, RoundKey } from '../http-bridge';
 import { usePreferences } from '../preferences';
 
@@ -109,4 +110,22 @@ function Arrived({ words, project, onOpen }: { words: string; project: string | 
     <span>{words} {project && <em>{project}</em>}</span>
     <button type="button" className="primary" onClick={onOpen}>{t.page.notice.open}</button>
   </p>;
+}
+
+/**
+ * Handovers the server could not read (#104): the location as the agent wrote it and why, so a spec that never
+ * opened is not mistaken for one still being read. The person closes each; the next read handover clears it anyway.
+ */
+export function UnreadableNotices({ unreadable, onClose }: { unreadable: readonly UnreadableHandover[]; onClose(x: UnreadableHandover): void }) {
+  const { t } = usePreferences();
+  const n = t.page.notice;
+  if (unreadable.length === 0) return null;
+  return (
+    <div className="page-notices">
+      {unreadable.map(x => <p key={`${x.session}/${x.at}`} role="alert" className="page-notice">
+        <span>{n.unreadable(x.location, n.unreadableWhy[x.why])}</span>
+        <button type="button" className="subtle" onClick={() => onClose(x)}>{t.common.closeNotice}</button>
+      </p>)}
+    </div>
+  );
 }

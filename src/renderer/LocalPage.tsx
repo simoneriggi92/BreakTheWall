@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CurrentView } from '../core/round-phase';
 import { projectName, type History } from '../core/session-history';
-import type { SpecView } from '../core/spec';
+import type { SpecList, SpecView, UnreadableHandover } from '../core/spec';
 import { App } from './App';
 import { httpBridge, RefusedError, type RoundKey } from './http-bridge';
 import { PreferencesProvider, usePreferences } from './preferences';
 import { FreeBlockPage } from './round/FreeBlockPage';
-import { PageNotices, SessionHistory } from './round/History';
+import { PageNotices, SessionHistory, UnreadableNotices } from './round/History';
 import { RoundPage } from './round/RoundPage';
 import { newestSpec, SpecPage } from './spec/SpecPage';
 import { browserBridge } from './storage';
@@ -86,7 +86,12 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   /** The spec, not a round, is in front: a new version there is the spec page's own business. */
   const specInFront = useRef(false);
   const holdSpec = (spec: SpecView | null) => { heldSpec.current = spec; setArrivedSpec(spec); };
-  const followSpecs = (next: SpecView[]) => {
+  /** Handovers that could not be read (#104), less those the person closed. */
+  const [unreadable, setUnreadable] = useState<UnreadableHandover[]>([]);
+  const [closedUnreadable, setClosedUnreadable] = useState<string[]>([]);
+  const unreadableKey = (x: UnreadableHandover) => `${x.session}/${x.at}`;
+  const followSpecs = ({ specs: next, unreadable: failed }: SpecList) => {
+    setUnreadable(failed);
     setSpecs(next);
     const newest = newestSpec(next);
     if (!newest) { takenSpec.current ??= null; return; }
@@ -147,9 +152,14 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
     const spec = newestSpec(specs);
     const shownAt = current?.kind === 'round' ? current.round.receivedAt : current?.block.receivedAt;
     specInFront.current = Boolean(spec && (specOpened || (spec.id === takenSpec.current && spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt))));
+    const notReadNotices = <UnreadableNotices unreadable={unreadable.filter(x => !closedUnreadable.includes(unreadableKey(x)))}
+      onClose={x => setClosedUnreadable(kept => [...kept, unreadableKey(x)])}/>;
     if (spec && specInFront.current) {
       const close = () => { setSpecOpened(false); setClosedSpec(spec.id); };
-      return <PreferencesProvider bridge={bridge}><SpecPage specs={specs} bridge={bridge} onClose={close}/></PreferencesProvider>;
+      return <PreferencesProvider bridge={bridge}>
+        <SpecPage specs={specs} bridge={bridge} onClose={close}/>
+        <div className="page-dock">{notReadNotices}</div>
+      </PreferencesProvider>;
     }
     if (!current) return <App bridge={bridge}/>;
     const openArrived = () => followNow(held.current);
@@ -190,6 +200,7 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
         <PageNotices
           arrived={arrived?.kind ?? null} project={projectOf(sessionOf(arrived))} onOpen={openArrived}
           spec={arrivedSpec && { project: projectOf(arrivedSpec.session), onOpen: openSpec }} update={history?.update ?? null}/>
+        {notReadNotices}
       </div>
     </PreferencesProvider>;
   }
