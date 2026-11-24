@@ -6,7 +6,8 @@ import { sessionIdSchema } from './local-server';
  * live or ended, the round skill and ticket they began with) and their numbered rounds with their state. Sessions
  * with no round or free block are left out: every Claude Code session registers, few ask anything.
  */
-export const historyRoundStateSchema = z.enum(['open', 'sent', 'superseded']);
+/** `queued`: sent to a session that has ended, waiting for `claude --resume <id>` (#103). */
+export const historyRoundStateSchema = z.enum(['open', 'sent', 'superseded', 'queued']);
 export type HistoryRoundState = z.infer<typeof historyRoundStateSchema>;
 
 export const historySessionSchema = z.strictObject({
@@ -19,6 +20,8 @@ export const historySessionSchema = z.strictObject({
   skill: z.string().nullable(),
   /** The issue that skill was started on (`/grill-with-docs #70`), when its arguments name one. */
   ticket: z.number().int().min(1).nullable(),
+  /** Claude Code no longer keeps its transcript: its rounds and side chats are read-only, its history still readable (#103). */
+  transcriptGone: z.boolean().default(false),
   rounds: z.array(z.strictObject({ number: z.number().int().min(1), receivedAt: z.iso.datetime(), state: historyRoundStateSchema })),
 });
 export type HistorySession = z.infer<typeof historySessionSchema>;

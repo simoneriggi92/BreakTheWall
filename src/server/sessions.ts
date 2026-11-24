@@ -2,8 +2,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { sessionIdSchema } from '../core/local-server';
 import type { History, HistoryProject } from '../core/session-history';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { atomicWrite, entries, projectsDir, sessionFolder, type RoundStore } from './rounds';
 import { noContent, readJson, send } from './server';
 
@@ -14,8 +15,12 @@ import { noContent, readJson, send } from './server';
 export interface SessionsContext {
   rounds: RoundStore;
   labels: SessionLabels;
+  transcripts: SessionTranscripts;
+  /** The side chats, whose replies still running stop when their session is deleted (#103). */
+  sideChats: { forget(session: string): Promise<void> };
   /** The registrations the mod renews, by session id: a session is live while its lease runs. */
   leases: Map<string, { cwd: string; until: number }>;
+  live(session: string): boolean;
   /** A newer version a launcher found this server too old for, while other sessions still used it. */
   update: { version: string | null };
   pageChanged(): void;
@@ -32,7 +37,7 @@ const SESSION_PATH = /^\/api\/sessions\/([^/]+)$/;
 const PAST_ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})$/;
 
 export async function handleSessions(req: IncomingMessage, res: ServerResponse, path: string, context: SessionsContext): Promise<boolean> {
-  const { rounds, labels, leases, update, pageChanged } = context;
+  const { rounds, labels, transcripts, sideChats, leases, update, pageChanged } = context;
   if (req.method === 'GET' && path === '/api/history') {
     send(res, 200, history(context));
     return true;
@@ -56,6 +61,8 @@ export async function handleSessions(req: IncomingMessage, res: ServerResponse, 
       // `/clear` and `/resume` go on under another id, which the mod registers next: this one moves to history at
       // once rather than when its lease runs out. A `claude --resume` of it registers it again.
       leases.delete(endPath[1]);
+      // What its mod took and had not submitted yet waits for the session's resume, not for its lease.
+      rounds.release(endPath[1]);
       pageChanged();
       noContent(res);
     }
@@ -63,7 +70,9 @@ export async function handleSessions(req: IncomingMessage, res: ServerResponse, 
   }
   const sessionPath = SESSION_PATH.exec(path);
   if (req.method === 'DELETE' && sessionPath) {
-    if (sessionIdSchema.safeParse(sessionPath[1]).success && (await labels.forget(sessionPath[1]), await rounds.deleteSession(sessionPath[1]))) {
+    const session = sessionPath[1];
+    // A reply still streaming, or a label or transcript still being written, would put a file back into the folder.
+    if (sessionIdSchema.safeParse(session).success && (await Promise.all([labels.forget(session), transcripts.forget(session), sideChats.forget(session)]), await rounds.deleteSession(session))) {
       pageChanged();
       noContent(res);
     } else send(res, 404, { error: 'unknown' });
@@ -79,15 +88,13 @@ export async function handleSessions(req: IncomingMessage, res: ServerResponse, 
   return false;
 }
 
-function history({ rounds, labels, leases, update }: SessionsContext): History {
-  const now = Date.now();
+function history({ rounds, labels, transcripts, live, update }: SessionsContext): History {
   const projects = new Map<string, HistoryProject & { latestAt: string }>();
   const summaries = rounds.summaries().sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   for (const x of summaries) {
     const project = projects.get(x.cwd) ?? { cwd: x.cwd, sessions: [], latestAt: x.latestAt };
     if (x.latestAt > project.latestAt) project.latestAt = x.latestAt;
-    const live = (leases.get(x.session)?.until ?? 0) > now;
-    project.sessions.push({ session: x.session, startedAt: x.startedAt, live, ...labels.of(x.session), rounds: x.rounds });
+    project.sessions.push({ session: x.session, startedAt: x.startedAt, live: live(x.session), ...labels.of(x.session), transcriptGone: transcripts.gone(x.session), rounds: x.rounds });
     projects.set(x.cwd, project);
   }
   return {
@@ -153,5 +160,76 @@ export class SessionLabels {
     await this.writes.get(session)?.catch(() => {});
     this.writes.delete(session);
     this.labels.delete(session);
+  }
+}
+
+const storedTranscriptSchema = z.strictObject({
+  version: z.literal(1),
+  session: sessionIdSchema,
+  cwd: z.string().min(1).max(4096),
+  path: z.string().min(1).max(4096).refine(isAbsolute),
+});
+type StoredTranscript = z.infer<typeof storedTranscriptSchema>;
+/** Where Claude Code keeps a session's transcript, as the mod registers it (`$.session.info().transcriptPath`). */
+export const transcriptPathSchema = z.string().max(4096).refine(x => x === '' || isAbsolute(x));
+
+/**
+ * Where Claude Code keeps each session's transcript (#103), as its mod registered it: once the transcript is gone,
+ * nothing can resume or fork the session, so its rounds and side chats turn read-only. Kept as `transcript.json` beside
+ * the rounds of a session the page shows, so it outlives a restart; a session that asked nothing gets no folder for it.
+ * The server only checks whether the file exists, never reads it.
+ */
+export class SessionTranscripts {
+  private paths = new Map<string, string>();
+  private kept = new Map<string, string>();
+  private writes = new Map<string, Promise<void>>();
+
+  private constructor(private dir: string, private rounds: RoundStore) {}
+
+  static async open(dataDir: string, rounds: RoundStore): Promise<SessionTranscripts> {
+    const store = new SessionTranscripts(projectsDir(dataDir), rounds);
+    for (const project of await entries(store.dir)) {
+      for (const session of await entries(join(store.dir, project))) {
+        try {
+          const x = storedTranscriptSchema.parse(JSON.parse(await readFile(join(store.dir, project, session, 'transcript.json'), 'utf8')));
+          store.paths.set(x.session, x.path);
+          store.kept.set(x.session, x.path);
+        } catch { /* None, or one that does not parse: the session stays answerable. */ }
+      }
+    }
+    return store;
+  }
+
+  /** The mod registered the session; an empty path says Claude Code keeps no transcript of it here, which tells nothing. */
+  async remember(session: string, path: string): Promise<void> {
+    if (path === '') return;
+    this.paths.set(session, path);
+    await this.keep(session);
+  }
+
+  /** Kept on disk once the session has a folder: after its first round or free block, or at once when it has one. */
+  async keep(session: string): Promise<void> {
+    const path = this.paths.get(session);
+    const cwd = this.rounds.cwdOf(session);
+    if (path === undefined || cwd === undefined || this.kept.get(session) === path) return;
+    this.kept.set(session, path);
+    const stored: StoredTranscript = { version: 1, session, cwd, path };
+    const write = (this.writes.get(session) ?? Promise.resolve()).catch(() => {})
+      .then(() => atomicWrite(join(sessionFolder(this.dir, stored), 'transcript.json'), JSON.stringify(stored, null, 2)));
+    this.writes.set(session, write);
+    await write;
+  }
+
+  /** Only a transcript the mod named and that is no longer there: a session never told of stays answerable. */
+  gone(session: string): boolean {
+    const path = this.paths.get(session);
+    return path !== undefined && !existsSync(path);
+  }
+
+  async forget(session: string): Promise<void> {
+    await this.writes.get(session)?.catch(() => {});
+    this.writes.delete(session);
+    this.paths.delete(session);
+    this.kept.delete(session);
   }
 }

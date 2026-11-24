@@ -90,12 +90,28 @@ export const register: Register = (on, options) => {
 
 /**
  * Re-reads the session id each time: `/clear` and `/resume` change it without a new `session.start`. The session's
- * model, and the plugin's side-chat model when set, go with it: the server picks which one a side chat runs on.
+ * model, and the plugin's side-chat model when set, go with it: the server picks which one a side chat runs on. So does
+ * where Claude Code keeps the session's transcript (#103): once that file is gone the server turns the session's rounds
+ * read-only, as nothing can resume or fork it. A session that keeps none here names none.
  */
 async function registerSession($: EngineInterface) {
   if (!server) return
-  const body = { id: await $.session.id(), cwd: await $.session.cwd(), model: await $.session.model(), ...(sideChatModel ? { sideChatModel } : {}) }
+  const transcript = await transcriptOf($)
+  const body = {
+    id: await $.session.id(), cwd: await $.session.cwd(), model: await $.session.model(),
+    ...(transcript ? { transcript } : {}), ...(sideChatModel ? { sideChatModel } : {}),
+  }
   await post($, '/api/sessions', JSON.stringify(body))
+}
+
+/** The transcript's path, or empty when the engine gives none: a registration never fails over it. */
+async function transcriptOf($: EngineInterface): Promise<string> {
+  try {
+    const { transcriptPath } = await $.session.info()
+    return typeof transcriptPath === 'string' ? transcriptPath : ''
+  } catch {
+    return ''
+  }
 }
 
 /** The session that went on after `ended`; none when the process is leaving and the id is still the ending one. */

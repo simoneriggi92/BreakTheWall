@@ -7,19 +7,28 @@ import { Brand } from '../icons';
 import { renderInlineMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
 import { passageIn, type Passage } from './passages';
-import { Markdown, PhaseControl, useLatestSaver } from './shared';
+import { CopyButton, Markdown, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
 import { SideChat, useSideChats } from './SideChat';
 
 /**
  * A round in the page (#95): the turn's text above, the outline of its questions on the left, one question in focus
  * in the middle, and on the right "what the agent receives", worded live by the same function the server sends with.
  * Every change is saved at once; after Send the round is read-only and shows the message as delivered. A side chat on
- * the focused question (#100) takes the right column, follows the focus, and folds the return to a strip.
+ * the focused question (#100) takes the right column, follows the focus, and folds the return to a strip. A round
+ * of an ended session still takes answers, which wait queued for `claude --resume <id>`; once Claude Code no longer
+ * keeps the session's transcript it is read-only, its side chats too (#103). Every round copies as Markdown.
  */
-export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phaseOpen: boolean; bridge: RoundBridge }) {
+export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = false, bridge }: {
+  round: RoundView;
+  phaseOpen: boolean;
+  queued?: boolean;
+  transcriptGone?: boolean;
+  bridge: RoundBridge;
+}) {
   const { t, language } = usePreferences();
   const r = t.page.round;
   const s = t.page.sideChat;
+  const x = t.page.session;
   const [draft, setDraft] = useState<Draft>(round.draft);
   // Changes read the latest draft from here, so two quick edits never build on the same stale copy.
   const latest = useRef(round.draft);
@@ -32,7 +41,7 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
   // A round sent from another tab arrives through the page's poll.
   useEffect(() => { if (round.sent) setDelivered(round.sent.message); }, [round.sent]);
 
-  const readOnly = delivered !== null || round.superseded;
+  const readOnly = delivered !== null || round.superseded || transcriptGone;
   const message = delivered ?? returnMessage(round.questions, draft, language);
   const index = Math.max(0, round.questions.findIndex(q => q.number === focus));
   const question = round.questions[index];
@@ -219,8 +228,11 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
     <pre className="round-message" data-testid="return-message">{message}</pre>
     {!readOnly && unattached > 0 && <p className="round-unattached">{s.unattached(unattached)}</p>}
     {delivered !== null
-      ? <p role="status">{r.sent}</p>
-      : !round.superseded && <button type="button" className="primary" disabled={sending} onClick={() => void send()}>{sending ? r.sending : r.send}</button>}
+      ? queued ? <QueuedNotice session={round.session}/> : <p role="status">{r.sent}</p>
+      : !round.superseded && !transcriptGone && <button type="button" className="primary" disabled={sending} onClick={() => void send()}>{sending ? r.sending : r.send}</button>}
+    {transcriptGone && <p role="note">{x.transcriptGone}</p>}
+    {/* The way out by hand, whatever happens to the delivery: what the agent receives, or received, as Markdown. */}
+    <CopyButton text={message} label={x.copyMarkdown}/>
     {failure && delivered === null && <p role="alert">{failure === 'send' ? r.sendFailed : r.saveFailed}</p>}
   </>;
 
@@ -299,7 +311,8 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
                 : <button type="button" className="round-write" onClick={openNote}>{r.writeNote}</button>}
             </div>
           )}
-          {selected && (
+          {/* Without the session's transcript there is nothing to ask (#103), and a read-only round takes no remark. */}
+          {selected && !transcriptGone && (
             // Pressing either must not empty the selection it acts on.
             <div className="round-selection-offer" style={{ top: selected.top, left: selected.left }} onMouseDown={event => event.preventDefault()}>
               {!readOnly && <button type="button" className="round-remark-offer" onClick={addRemark}>{r.remark}</button>}
@@ -337,7 +350,7 @@ export function RoundPage({ round, phaseOpen, bridge }: { round: RoundView; phas
           ? <div className="round-side">
             {drawerBar}
             <SideChat
-              question={question} thread={threadOf(question.number)}
+              question={question} thread={threadOf(question.number)} readOnly={transcriptGone}
               ask={asks[question.number] ?? ''} onAskChange={text => setAsks(kept => ({ ...kept, [question.number]: text }))}
               passage={asking[question.number]} onDropPassage={() => setAsking(kept => ({ ...kept, [question.number]: undefined }))}
               attached={attachedOf(answer).map(x => x.turn)} onAttach={readOnly ? undefined : toggleAttached}

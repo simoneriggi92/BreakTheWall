@@ -92,8 +92,11 @@ export function serverClient(server: LocalServer) {
     saveDraft: (number: number, draft: unknown, session = SESSION) => call(`/api/rounds/${session}/${number}/draft`, { method: 'PUT', body: draft }),
     /** The page's one Send. */
     send: (number: number, draft: unknown, language = 'en', session = SESSION) => call(`/api/rounds/${session}/${number}/send`, { method: 'POST', body: { draft, language } }),
-    /** The mod on `session.start`, on every renewal, and with the new id once `/clear` or `/resume` changed it (#102); with the session's model and the plugin's side-chat model (#100). */
-    register: (session = SESSION, cwd = CWD, more: { model?: string; sideChatModel?: string } = {}) => call('/api/sessions', { method: 'POST', body: { id: session, cwd, ...more } }),
+    /**
+     * The mod on `session.start`, on every renewal, and with the new id once `/clear` or `/resume` changed it (#102); with
+     * the session's model and the plugin's side-chat model (#100), and where Claude Code keeps its transcript (#103).
+     */
+    register: (session = SESSION, cwd = CWD, more: { model?: string; sideChatModel?: string; transcript?: string } = {}) => call('/api/sessions', { method: 'POST', body: { id: session, cwd, ...more } }),
     /** The mod on `session.end`: the ending session's id and why it ends. */
     end: (session = SESSION, reason = 'clear') => call(`/api/sessions/${session}/end`, { method: 'POST', body: { reason } }),
     /** The page's history column: project → session → numbered rounds, and an update waiting for the other sessions. */

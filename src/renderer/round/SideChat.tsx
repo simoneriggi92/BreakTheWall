@@ -41,9 +41,11 @@ export function useSideChats(bridge: SideChatBridge, round: RoundKey): Thread[] 
  * copy of the session, each with what it read. Nothing here reaches the agent unless the person attaches a reply to
  * their answer with 📎 (#101).
  */
-export function SideChat({ question, thread, ask, passage, attached, onAsk, onAskChange, onDropPassage, onAttach, onClose }: {
+export function SideChat({ question, thread, readOnly = false, ask, passage, attached, onAsk, onAskChange, onDropPassage, onAttach, onClose }: {
   question: Question;
   thread: Thread | undefined;
+  /** Claude Code no longer keeps the session (#103): the thread is read, never continued. */
+  readOnly?: boolean;
   /** What the person is typing for this question, kept while the focus moves. */
   ask: string;
   /** The passage chosen with "Ask here", which the next question quotes (#101). */
@@ -108,6 +110,7 @@ export function SideChat({ question, thread, ask, passage, attached, onAsk, onAs
             </li>
           ))}
         </ol>}
+      {readOnly ? <p role="note" className="side-chat-note">{t.page.session.sideChatGone}</p> : <>
       {passage && (
         <figure className="side-chat-asking" aria-label={s.askingAbout}>
           <q className="side-chat-passage">{quoted(passage.passage)}</q>
@@ -127,6 +130,7 @@ export function SideChat({ question, thread, ask, passage, attached, onAsk, onAs
         />
         <button type="submit" className="primary" disabled={busy}>{s.send}</button>
       </form>
+      </>}
       {failed && <p role="alert">{s.askFailed}</p>}
     </section>
   );

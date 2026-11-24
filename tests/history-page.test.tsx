@@ -17,9 +17,9 @@ const roundOf = (session: string, number: number, title: string, more: Partial<R
   questions: [{ number: 1, title, body: `About ${title.toLowerCase()}`, options: [], recommended: null, recommendation: 'The simple one.' }],
   draft: { generalNote: '', answers: {} }, sent: null, superseded: false, ...more,
 });
-const asView = (round: RoundView): CurrentView => ({ kind: 'round', round, phaseOpen: true });
+const asView = (round: RoundView): CurrentView => ({ kind: 'round', round, phaseOpen: true, queued: false, transcriptGone: false });
 const sessionOf = (session: string, rounds: HistorySession['rounds'], more: Partial<HistorySession> = {}): HistorySession =>
-  ({ session, startedAt: '2026-11-23T10:00:00.000Z', live: true, skill: null, ticket: null, rounds, ...more });
+  ({ session, startedAt: '2026-11-23T10:00:00.000Z', live: true, skill: null, ticket: null, transcriptGone: false, rounds, ...more });
 
 /**
  * The local server as the page sees it (seam ② of #92): the latest round, the history column, past rounds by

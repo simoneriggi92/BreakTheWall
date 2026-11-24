@@ -55,7 +55,7 @@ function SessionEntry({ session, shown, bridge, onOpen, onDeleted }: { session: 
     <div className="page-history-session">
       <p className="page-history-meta">
         <time dateTime={session.startedAt}>{started}</time>
-        {' · '}<span className={session.live ? 'is-live' : undefined}>{[session.live ? h.live : h.ended, ...began].join(' · ')}</span>
+        {' · '}<span className={session.live ? 'is-live' : undefined}>{[session.live ? h.live : h.ended, session.transcriptGone ? h.transcriptGone : null, ...began].filter(Boolean).join(' · ')}</span>
       </p>
       <ol className="page-history-rounds">
         {session.rounds.map(round => (
