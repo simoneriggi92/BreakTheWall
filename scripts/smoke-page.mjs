@@ -82,16 +82,17 @@ try {
     const labels = [...document.querySelectorAll('.md-diagram.drawn foreignObject')].filter(fo => fo.textContent.trim());
     if (!labels.length) return null;
     return labels.map(fo => {
-      const box = fo.getBoundingClientRect(), inner = fo.querySelector('span, p') ?? fo.firstElementChild, text = inner?.getBoundingClientRect();
-      return { label: fo.textContent.trim(), clipped: !text || Math.max(text.width, inner.scrollWidth) > box.width + 0.5 || text.height > box.height + 0.5 };
+      // Rectangles on both sides, so a diagram scaled down to fit compares like with like.
+      const box = fo.getBoundingClientRect(), text = (fo.querySelector('span, p') ?? fo.firstElementChild)?.getBoundingClientRect();
+      return { label: fo.textContent.trim(), clipped: !text || text.width > box.width + 0.5 || text.height > box.height + 0.5 };
     });
   })()`);
-  const first = await drawnLabels();
-  await opened.read(`document.querySelectorAll('nav .round-outline-item')[2]?.click()`);
-  await wait(200);
-  const third = first && await drawnLabels();
-  const labels = first && third && [...first, ...third];
-  if (!labels) fail('the round\'s diagrams did not draw');
+  const flowchart = await drawnLabels();
+  const openedQ3 = await opened.read(`(() => { const q3 = [...document.querySelectorAll('nav button')].find(b => /^Q3\\b/.test(b.textContent)); q3?.click(); return !!q3; })()`);
+  // The class diagram's labels, once Q3 is drawn: one of its class names proves it is the diagram read.
+  const classDiagram = openedQ3 && await settle(opened.read, `[...document.querySelectorAll('.md-diagram.drawn foreignObject')].some(fo => fo.textContent.trim() === 'Session')`) && await drawnLabels();
+  const labels = flowchart && classDiagram && [...flowchart, ...classDiagram];
+  if (!labels) fail('the round\'s diagrams did not draw (Q1\'s flowchart, then Q3\'s class diagram)');
   else if (labels.some(l => l.clipped)) fail(`diagram labels are clipped: ${labels.filter(l => l.clipped).map(l => l.label).join(', ')}`);
 
   if (!process.exitCode) console.log(`smoke:page: the page opens with the secret (${label}), a tab without it says: ${line}, and a round's diagrams draw ${labels.length} labels whole`);

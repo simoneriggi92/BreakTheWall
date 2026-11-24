@@ -335,7 +335,8 @@
 .md-diagram.drawn .md-diagram-source { display: none; }
 .md-diagram-svg { overflow-x: auto; position: relative; }
 /* Where Mermaid measures a diagram (#114): laid out, at the box's width and font, but never seen. */
-.md-diagram-scratch { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; pointer-events: none; }
+/* Zero height and clipped, so the half-drawn diagram never adds scroll to its box. */
+.md-diagram-scratch { position: absolute; top: 0; left: 0; width: 100%; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
 .md-diagram-svg svg { max-width: 100%; height: auto; }
 
 /* The full-window reader: a separate reading surface, with an outline that can be opened even at narrow widths. */

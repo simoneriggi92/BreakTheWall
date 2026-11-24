@@ -19,14 +19,20 @@ export function useDiagrams(host: RefObject<HTMLElement | null>, rendered: { dia
       const code = figure.querySelector('.md-diagram-source')?.textContent ?? '';
       // The box exists before the drawing, since the diagram is measured where it will be shown; it is framed only
       // once drawn (CSS), and a diagram that does not draw takes it away again.
-      const box = figure.querySelector<HTMLElement>('.md-diagram-svg') ?? figure.insertBefore(Object.assign(document.createElement('div'), { className: 'md-diagram-svg' }), figure.firstChild);
-      void renderDiagram(code, theme, box).then(svg => {
+      let box = figure.querySelector<HTMLElement>('.md-diagram-svg');
+      if (!box) {
+        box = document.createElement('div');
+        box.className = 'md-diagram-svg';
+        figure.prepend(box);
+      }
+      const shownIn = box;
+      void renderDiagram(code, theme, shownIn).then(svg => {
         if (!live) return;
-        unmount.push(mountSvg(box, svg));
+        unmount.push(mountSvg(shownIn, svg));
         figure.classList.add('drawn'); figure.classList.remove('failed');
       }).catch(() => {
         if (!active || figure.classList.contains('failed')) return;
-        if (!box.firstChild) box.remove();
+        if (!shownIn.firstChild) shownIn.remove();
         const note = document.createElement('figcaption'); note.className = 'md-diagram-note micro plain'; note.textContent = failedNote;
         figure.append(note); figure.classList.add('failed');
       });
