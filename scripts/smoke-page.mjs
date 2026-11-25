@@ -88,7 +88,8 @@ try {
     });
   })()`);
   const flowchart = await drawnLabels();
-  const openedQ3 = await opened.read(`(() => { const q3 = [...document.querySelectorAll('nav button')].find(b => /^Q3\\b/.test(b.textContent)); q3?.click(); return !!q3; })()`);
+  // The wide outline names Q3 "Q3 · …"; the rail form, at headless Chrome's default width, shows the ruler's "03" (#124).
+  const openedQ3 = await opened.read(`(() => { const q3 = [...document.querySelectorAll('nav button')].find(b => /^(Q3|03)\\b/.test(b.textContent)); q3?.click(); return !!q3; })()`);
   // The class diagram's labels, once Q3 is drawn: one of its class names proves it is the diagram read.
   const classDiagram = openedQ3 && await settle(opened.read, `[...document.querySelectorAll('.md-diagram.drawn foreignObject')].some(fo => fo.textContent.trim() === 'Session')`) && await drawnLabels();
   const labels = flowchart && classDiagram && [...flowchart, ...classDiagram];
