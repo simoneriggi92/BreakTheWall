@@ -283,8 +283,6 @@ export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: {
         : s.all ? <p className="xp-step-text">{xt.step.allText}</p>
         : <>
           {question && <p className="xp-step-text">{question.steps[s.guide.at].text}</p>}
-          {!question && step && 'premise' in step && <span className="xp-chips"><span className="xp-hint">{xt.step.premiseIs}</span>
-            <button className="xp-chip" aria-pressed={focus === m.premise!.id} onClick={() => dispatch({ type: 'explore', id: m.premise!.id })}>{m.premise!.name}</button></span>}
           {banner && <p className="xp-banner" role="status">{banner}</p>}
           {!question && step && !('premise' in step) && entering.length > 0 && <span className="xp-chips"><span className="xp-hint">{s.guide.at === (m.premise ? 1 : 0) ? xt.step.startFrom : xt.step.entering}</span>
             {entering.map(p => <button key={p!.id} className="xp-chip" aria-pressed={focus === p!.id} onClick={() => dispatch({ type: 'explore', id: p!.id })}>{p!.name}</button>)}</span>}
@@ -357,7 +355,7 @@ export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: {
           </div>
           {stepStrip}
           {splitter('xCard')}
-          <Card m={m} target={card} tone={cardTone} pick={s.pick} sub={s.sub}
+          <Card m={m} target={card} tone={cardTone} pick={s.pick} sub={s.sub} offDrawing={card?.kind === 'part' && aside.some(p => p.id === card.id)}
             onPoint={i => dispatch({ type: 'pick', pick: i === null ? null : { point: i } })} onUnpick={() => dispatch({ type: 'pick', pick: null })}
             onNote={id => sub ? dispatch({ type: 'sub-select', id }) : dispatch({ type: 'explore', id })}
             onBackToRole={() => dispatch({ type: 'member', part: card?.kind === 'member' ? card.part : '', id: null })}

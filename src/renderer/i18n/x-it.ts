@@ -11,7 +11,7 @@ export const xIt = {
     premise: 'Il punto di partenza della fonte', premiseCount: 'prima di tutto',
     layer: (k: number, n: number) => `livello ${k} di ${n}`, nucleus: (k: number, n: number) => `aspetto ${k} di ${n}`,
     question: (k: number, n: number) => `passo ${k} di ${n}`,
-    premiseIs: 'la premessa:', startFrom: 'si parte da:', entering: 'entrano ora:',
+    startFrom: 'si parte da:', entering: 'entrano ora:',
     banner: (name: string, main: string) => `Cambi aspetto del documento. «${name}» non è collegato da legami a «${main}»: è un altro tema della stessa fonte.`,
     bannerTouch: (links: string) => ` L’unico contatto è un riferimento: ${links}.`, bannerNone: ' Non lo tocca in nessun punto.',
     otherNucleus: 'Passa a un altro aspetto →', toWhole: 'Ora tutta la fonte →', otherQuestions: 'Altre domande della fonte',
