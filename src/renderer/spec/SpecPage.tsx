@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { validateExploration, type Exploration } from '../../core/exploration';
 import type { SpecFailure, SpecView } from '../../core/spec';
 import { ExplorationView } from '../exploration/ExplorationView';
+import { SourceLines } from '../exploration/Panels';
 import type { SpecBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { usePreferences } from '../preferences';
@@ -16,8 +17,9 @@ export const newestSpec = (specs: SpecView[]) => specs.reduce<SpecView | undefin
  * The person keeps reading the version they opened when a new one arrives; a superseded version says so and opens
  * the new one on request. A passage selected in the source takes a remark, or says something is missing there (#105);
  * the remarks panel beside the exploration returns them with one Send. What each statement rests on is flagged on
- * the source's lines and listed in the backing panel, where a flag turns into a remark (#106). Only ids cross to the
- * server.
+ * the source's lines and listed in the backing panel, where a flag turns into a remark (#106). Until the structure
+ * is there, and when it could not be written, the spec reads as its numbered lines and takes remarks the same way
+ * (#128): a remark anchors to lines of the spec, never to the structure. Only ids cross to the server.
  */
 export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge: SpecBridge; onClose: () => void }) {
   const { t } = usePreferences(), s = t.page.spec;
@@ -59,9 +61,23 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     // The key names the exploration; the view object changes on every poll.
   }, [bridge, key]);
 
+  // The exploration read for this version: undefined until it arrives, null when the server's copy cannot be shown.
+  const exploration = loaded?.key === key ? loaded?.x : undefined;
+  // The text is needed only while no exploration can be shown: not written yet, being written, failed, or unreadable.
+  const textNeeded = !!spec && (!spec.exploration || exploration === null);
+  const [specText, setSpecText] = useState<{ id: string; text: string }>();
+  useEffect(() => {
+    if (!spec || !textNeeded) return;
+    let active = true;
+    const id = spec.id;
+    // Without the text the page still says where the structure stands; nothing else depends on it.
+    bridge.getSpecText(id).then(text => { if (active) setSpecText({ id, text }); }, () => undefined);
+    return () => { active = false; };
+    // The id names the version; the view object changes on every poll.
+  }, [bridge, spec?.id, textNeeded]);
+
   if (!spec) return null;
   const act = (call: (id: string) => Promise<void>) => { setRefused(false); call(spec.id).catch(() => setRefused(true)); };
-  const exploration = loaded?.key === key ? loaded?.x : undefined;
   const versions = specs.filter(x => x.latest === spec.latest);
   const remark = (missing: boolean) => {
     if (!offer) return;
@@ -74,6 +90,10 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
   const count = remarks.draft?.remarks.length ?? 0;
   const report = backing !== null && backing !== 'failed' && backing.declared ? backing : null;
   const flagged = report && totals(report);
+  const offerButtons = offer && <div className="round-selection-offer spec-selection-offer" style={{ top: offer.top, left: offer.left }} onMouseDown={event => event.preventDefault()}>
+    <button type="button" className="round-remark-offer" onClick={() => remark(false)}>{t.page.specRemarks.remark}</button>
+    <button type="button" className="round-remark-offer" onClick={() => remark(true)}>{t.page.specRemarks.missingHere}</button>
+  </div>;
 
   return <div className="spec-page">
     <div className="spec-bar">
@@ -88,17 +108,18 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     {exploration
       ? <div ref={body} className="spec-body" onMouseUp={readSelection} onKeyUp={readSelection}>
         <ExplorationView key={key} x={exploration} goHome={onClose} backLabel={s.close} extras={extras}/>
-        {offer && <div className="round-selection-offer spec-selection-offer" style={{ top: offer.top, left: offer.left }} onMouseDown={event => event.preventDefault()}>
-          <button type="button" className="round-remark-offer" onClick={() => remark(false)}>{t.page.specRemarks.remark}</button>
-          <button type="button" className="round-remark-offer" onClick={() => remark(true)}>{t.page.specRemarks.missingHere}</button>
-        </div>}
+        {offerButtons}
       </div>
       : <main id="main" className="spec-waiting">
         <h1>{spec.title}</h1>
         {spec.exploration
-          ? loaded?.key === key && <p role="alert">{s.unreadable}</p>
+          ? exploration === null && <p role="alert">{s.unreadable}</p>
           : <Writing spec={spec} t={t} onExplore={() => act(id => bridge.exploreSpec(id))} onCancel={() => act(id => bridge.cancelSpec(id))}/>}
         {refused && <p role="alert">{s.actionFailed}</p>}
+        {specText?.id === spec.id && <div ref={body} className="spec-body spec-text" onMouseUp={readSelection} onKeyUp={readSelection}>
+          <div className="xp-source"><SourceLines text={specText.text} title={spec.title} code={false} cites={NO_CITES}/></div>
+          {offerButtons}
+        </div>}
       </main>}
     {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)}
       // A superseded version takes no new remarks: its flags stay marks.
@@ -107,6 +128,9 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     </div>
   </div>;
 }
+
+/** The plain text cites nothing: no part has read it yet. */
+const NO_CITES: [] = [];
 
 /** Where the offer goes: under the selection's end, in the window, so it covers neither the passage nor its line. */
 function below(range: Range): { top: number; left: number } {

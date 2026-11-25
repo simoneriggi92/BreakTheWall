@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { acceptExploration } from '../src/core/exploration-generation';
@@ -34,6 +34,7 @@ type Request = { method: string; url: string; body?: unknown };
 /** The local server as the page sees it: the specs, their explorations and remarks, the latest round, and a poll. */
 function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; round?: RoundView; riding?: SpecRemarksSection[]; explorations: Exploration[]; sendReply?: () => Response; holdSaves?: boolean }) {
   let remarks = initial.remarks ?? noRemarks();
+  let specs = initial.specs;
   const requests: Request[] = [];
   /** Saves held as a slow network would hold them, until the test lets them land. */
   const heldSaves: (() => void)[] = [];
@@ -45,7 +46,9 @@ function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; rou
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
     if (url === '/api/current') return Response.json({ current: initial.round ? { kind: 'round', round: initial.round, phaseOpen: false, riding: initial.riding ?? [] } : null });
     if (url === '/api/history') return Response.json({ projects: [], update: null });
-    if (url === '/api/specs') return Response.json({ specs: initial.specs });
+    if (url === '/api/specs') return Response.json({ specs });
+    const one = /^\/api\/specs\/([^/]+)$/.exec(url);
+    if (one) return Response.json({ spec: specs.find(x => x.id === one[1]), text: BAKERY });
     const found = /^\/api\/explorations\/([^/]+)\/([^/]+)$/.exec(url);
     if (found) {
       const x = initial.explorations.find(y => y.id === found[1] && y.revision === found[2]);
@@ -70,7 +73,8 @@ function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; rou
     return new Response('{}', { status: 404 });
   });
   const landSaves = () => { for (const land of heldSaves.splice(0)) land(); };
-  return { fetch: fetch as unknown as typeof window.fetch, requests, landSaves, saved: () => requests.filter(x => x.method === 'PUT').at(-1)?.body };
+  const changeSpecs = (next: SpecView[]) => act(() => { specs = next; for (const done of polls) done(Response.json({ changed: true })); polls.clear(); });
+  return { fetch: fetch as unknown as typeof window.fetch, requests, landSaves, changeSpecs, saved: () => requests.filter(x => x.method === 'PUT').at(-1)?.body };
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
@@ -147,6 +151,59 @@ describe('remarks anchor to quoted passages of the spec (#105)', () => {
     const aside = screen.getByRole('complementary', { name: 'Osservazioni sulla specifica' });
     await user.type(within(aside).getByRole('textbox', { name: 'Osservazione su riga 4 (manca qui)' }), 'Il sale?');
     expect(within(aside).getByTestId('spec-remarks-message')).toHaveTextContent(/^Osservazioni sulla specifica «The night bakery».*- riga 4 \(manca qui\) — Il sale\?$/);
+  });
+});
+
+describe('remarks on the spec while its structure is written (#128)', () => {
+  const writing = (fields: Partial<SpecView> = {}) => version({ exploration: null, run: { state: 'running', repairing: false }, ...fields });
+  /** The spec's numbered lines, shown until the structure is there. */
+  const text = async () => (await screen.findByRole('list', { name: 'Lines of The night bakery' })).closest<HTMLElement>('.xp-source')!;
+
+  it('anchors a remark on the plain text by its lines, as the exploration would', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [writing()], explorations: [] });
+    render(<LocalPage fetch={server.fetch}/>);
+    selectText(await text(), 'loses water');
+    await user.click(screen.getByRole('button', { name: 'Remark' }));
+    await user.type(within(panel()).getByRole('textbox', { name: 'Remark on line 4 «loses water»' }), 'Why?');
+    await vi.waitFor(() => expect(server.saved()).toEqual({ generalNote: '', remarks: [{ version: 1, from: 4, to: 4, passage: 'loses water', text: 'Why?' }] }));
+    expect(receives()).toContain('- line 4 «loses water» — Why?');
+  });
+
+  it('keeps a remark written on the plain text once the exploration opens', async () => {
+    const draft = { generalNote: '', remarks: [{ version: 1, from: 4, to: 4, passage: 'loses water', text: 'Why?' }] };
+    const server = fakeServer({ specs: [writing()], remarks: { ...noRemarks(), draft }, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await text();
+    expect(screen.getByRole('button', { name: 'Remarks · 1' })).toBeInTheDocument();
+    await server.changeSpecs([version()]);
+    await source();
+    expect(screen.getByRole('button', { name: 'Remarks · 1' })).toBeInTheDocument();
+    expect(server.requests.filter(x => x.method === 'PUT')).toEqual([]);
+  });
+
+  it('anchors "(missing here)" on the lines of a selection across lines', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [writing()], explorations: [] });
+    render(<LocalPage fetch={server.fetch}/>);
+    const host = await text();
+    const lineText = (n: number) => host.querySelector(`[data-from="${n}"] .line-text`)!.firstChild!;
+    const range = document.createRange();
+    range.setStart(lineText(11), 0);
+    range.setEnd(lineText(12), 3);
+    document.getSelection()!.removeAllRanges();
+    document.getSelection()!.addRange(range);
+    fireEvent.mouseUp(host);
+    await user.click(screen.getByRole('button', { name: 'Missing here' }));
+    await user.type(within(panel()).getByRole('textbox', { name: 'Remark on lines 11–12 (missing here)' }), 'Who checks it?');
+    await vi.waitFor(() => expect(server.saved()).toEqual({ generalNote: '', remarks: [{ version: 1, from: 11, to: 12, missing: true, text: 'Who checks it?' }] }));
+  });
+
+  it('offers nothing on the plain text of a superseded version', async () => {
+    const server = fakeServer({ specs: [version({ id: V2, number: 2, latest: V2 }), writing({ superseded: true, latest: V2, handedOverAt: '2026-11-24T12:00:00.000Z' })], explorations: [] });
+    render(<LocalPage fetch={server.fetch}/>);
+    selectText(await text(), 'loses water');
+    expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
   });
 });
 

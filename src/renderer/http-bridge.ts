@@ -6,6 +6,7 @@ import type { Draft, MessageLanguage, RoundView } from '../core/round-answers';
 import { currentViewSchema, TURN_ROUTES, type CurrentView, type FreeBlockView, type TurnKey } from '../core/round-phase';
 import { historySchema, type History } from '../core/session-history';
 import { sideChatsViewSchema, type SideChatPassage, type SideChatsView } from '../core/side-chat';
+import { SOURCE_LIMITS } from '../core/source';
 import { specListSchema, type SpecList } from '../core/spec';
 import { specRemarksViewSchema, type SpecRemarksDraft, type SpecRemarksView } from '../core/spec-remarks';
 import { browserBridge } from './storage';
@@ -51,6 +52,8 @@ export interface PageBridge extends DesktopBridge {
   /** Writes a version's structure again, after a failure or a cancel; the page follows it through its poll. */
   exploreSpec(id: string): Promise<void>;
   cancelSpec(id: string): Promise<void>;
+  /** A version's text as it was handed over (#128): what the page shows while its structure is being written, or failed. */
+  getSpecText(id: string): Promise<string>;
   /** A saved exploration, unchecked: the page validates it before showing it. Null when the server has none. */
   findExploration(key: { id: string; revision: string }): Promise<unknown | null>;
   /** The remarks on a spec (#105), named by any of its versions: the draft, what was sent, the round they ride with. */
@@ -73,11 +76,12 @@ export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBri
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge & FoldBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
 export type SpecRemarksBridge = Pick<PageBridge, 'getSpecRemarks' | 'saveSpecRemarks' | 'sendSpecRemarks'>;
-export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'findExploration' | 'getSpecBacking'> & SpecRemarksBridge;
+export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'getSpecText' | 'findExploration' | 'getSpecBacking'> & SpecRemarksBridge;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
 const sentReplySchema = z.object({ message: z.string() });
 const explorationReplySchema = z.object({ exploration: z.unknown() });
+const specTextReplySchema = z.object({ text: z.string().max(SOURCE_LIMITS.maxFileBytes) });
 
 export class RefusedError extends Error {}
 /** The remarks were not sent alone: a round awaits answers, and they ride in its message. */
@@ -160,6 +164,9 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
     },
     async cancelSpec(id) {
       await ok(await call(`/api/specs/${encodeURIComponent(id)}/exploration`, { method: 'DELETE' }));
+    },
+    async getSpecText(id) {
+      return specTextReplySchema.parse(await (await ok(await call(`/api/specs/${encodeURIComponent(id)}`))).json()).text;
     },
     async findExploration({ id, revision }) {
       const reply = await call(`/api/explorations/${encodeURIComponent(id)}/${encodeURIComponent(revision)}`);

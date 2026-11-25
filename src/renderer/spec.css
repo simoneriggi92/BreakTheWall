@@ -12,6 +12,10 @@
 .spec-waiting { max-width: 44rem; margin: 18vh auto 0; padding: 0 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
 .spec-waiting h1 { font: 500 24px/1.25 var(--f-display); }
 .spec-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* The spec's lines until its structure is written (#128): the column starts at the top and scrolls as one page. */
+.spec-main > .spec-waiting:has(.spec-text) { margin-top: 0; padding-top: 32px; padding-bottom: 32px; min-height: 0; overflow-y: auto; }
+.spec-text { align-self: stretch; flex: none; }
+.spec-text .source-text { overflow: visible; padding: 0; }
 
 /* Remarks on the spec (#105): the offer under a selection in the source, and the panel beside the exploration. */
 .spec-selection-offer { position: fixed; z-index: 20; }
