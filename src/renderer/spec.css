@@ -1,0 +1,54 @@
+/* A handed-over spec in the page (#104): a thin bar naming the version over the exploration view, which keeps the rest of the window. */
+.spec-page { height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); }
+.spec-main { flex: 1; min-height: 0; display: flex; }
+.spec-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.spec-body > .xp { height: auto; flex: 1; min-height: 0; }
+.spec-main > .spec-waiting { flex: 1; }
+.spec-remarks-toggle { margin-left: auto; }
+.spec-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 6px 20px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.spec-version { color: var(--muted); font-family: var(--f-mono); overflow-wrap: anywhere; }
+.spec-superseded { margin: 0; padding: 2px 10px; border: 1px solid var(--amber); background: var(--amber-soft); border-radius: 999px; }
+.spec-link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
+.spec-waiting { max-width: 44rem; margin: 18vh auto 0; padding: 0 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.spec-waiting h1 { font: 500 24px/1.25 var(--f-display); }
+.spec-run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* Remarks on the spec (#105): the offer under a selection in the source, and the panel beside the exploration. */
+.spec-selection-offer { position: fixed; z-index: 20; }
+.spec-remarks { width: min(26rem, 40vw); flex: none; overflow-y: auto; padding: 14px 18px 24px; border-left: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; gap: 12px; font-size: 14px; }
+.spec-remarks h2 { font: 600 16px/1.3 var(--f-display); margin: 0; }
+.spec-remarks h3 { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0; }
+.spec-remarks p { margin: 0; }
+.spec-remarks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.spec-remarks ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.spec-remarks li { display: grid; gap: 4px; }
+.spec-remarks-group { display: grid; gap: 8px; }
+.spec-remarks li textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; resize: vertical; }
+.spec-remarks li > button { justify-self: start; }
+.spec-remark-anchor { font-family: var(--f-mono); font-size: 12px; color: var(--muted); border-left: 3px solid var(--amber); padding-left: 8px; overflow-wrap: anywhere; }
+.spec-remarks .round-message { max-height: 30vh; }
+.spec-remarks > .primary { align-self: flex-start; }
+.spec-remarks-sent { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.spec-remarks-batch { display: grid; gap: 6px; }
+@media (max-width: 860px) {
+  .spec-remarks { position: fixed; inset: auto 0 0 0; width: auto; max-height: 70vh; border-left: 0; border-top: 1px solid var(--line); box-shadow: 0 -6px 20px var(--shadow); z-index: 15; }
+}
+
+/* The backing of the spec (#106): a flag on the source's lines (unbacked dashed amber, broken solid red, so the two read
+   apart without colour too), and the panel that lists each section's statements. */
+.spec-body .xp-source [data-backing] { box-shadow: inset 3px 0 var(--flag); }
+.spec-body .xp-source [data-backing="unbacked"] { --flag: var(--amber); outline: 1px dashed var(--amber); outline-offset: -1px; }
+.spec-body .xp-source [data-backing="broken"] { --flag: var(--bad); background: var(--bad-soft); }
+.spec-backing-toggle { margin-left: auto; }
+.spec-backing-toggle + .spec-remarks-toggle { margin-left: 0; }
+.spec-backing-statement { border-left: 3px solid transparent; padding-left: 8px; }
+.spec-backing-statement[data-state="unbacked"] { border-left: 3px dashed var(--amber); }
+.spec-backing-statement[data-state="broken"] { border-left-color: var(--bad); }
+.spec-backing-statement .spec-remark-anchor { border-left: 0; padding-left: 0; }
+.spec-backing-state { font-size: 12px; font-weight: 700; color: var(--muted); }
+.spec-backing-statement[data-state="broken"] .spec-backing-state { color: var(--bad); }
+.spec-backing .spec-backing-references { gap: 4px; font-size: 13px; }
+.spec-backing-references code { font-family: var(--f-mono); font-size: 12px; }
+.spec-backing-answer { background: var(--sunk); border-radius: 8px; padding: 6px 8px; }
+.spec-backing-question { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.spec-backing-statement > button { justify-self: start; }

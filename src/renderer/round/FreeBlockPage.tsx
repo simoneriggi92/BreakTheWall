@@ -4,14 +4,21 @@ import type { FreeBlockView } from '../../core/round-phase';
 import type { FreeBlockBridge } from '../http-bridge';
 import { Brand } from '../icons';
 import { PreferencesMenu, usePreferences } from '../preferences';
-import { Markdown, PhaseControl, useLatestSaver } from './shared';
+import { AgentText, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
 
 /**
  * A turn without a round, during the round phase (#99): the agent's text, read-only, and one response field, returned as
  * one message. Nothing in the text is parsed, and the response is the person's own words: what Claude Code would take
- * for a command, the server sends as text.
+ * for a command, the server sends as text. A response to an ended session waits queued for `claude --resume <id>`; once
+ * Claude Code no longer keeps the session's transcript, the block is read-only (#103).
  */
-export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockView; phaseOpen: boolean; bridge: FreeBlockBridge }) {
+export function FreeBlockPage({ block, phaseOpen, queued = false, transcriptGone = false, bridge }: {
+  block: FreeBlockView;
+  phaseOpen: boolean;
+  queued?: boolean;
+  transcriptGone?: boolean;
+  bridge: FreeBlockBridge;
+}) {
   const { t } = usePreferences();
   const f = t.page.free;
   const [response, setResponse] = useState(block.response);
@@ -24,7 +31,7 @@ export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockVi
   // A response sent from another tab arrives through the page's poll.
   useEffect(() => { if (block.sent) setDelivered(block.sent.message); }, [block.sent]);
 
-  const readOnly = delivered !== null || block.superseded;
+  const readOnly = delivered !== null || block.superseded || transcriptGone;
   const canSend = !readOnly && !sending && response.trim() !== '';
   const looksLikeCommand = startsAsCommand(response);
 
@@ -43,19 +50,24 @@ export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockVi
 
   return (
     <div className="round-page">
-      <header className="topbar"><Brand/><div className="course-title"><strong>{f.title}</strong></div>
+      <header className="topbar"><Brand tagline={false}/><div className="course-title"><strong>{f.title}</strong></div>
         <PhaseControl session={block.session} open={phaseOpen} bridge={bridge}/>
         <PreferencesMenu/>
       </header>
       <main className="free-layout">
-        <section className="free-turn" aria-label={f.title}><Markdown text={block.text}/></section>
+        <AgentText
+          entry={{ kind: 'free', session: block.session, number: block.number }} project={block.project} text={block.text}
+          number={f.number(block.number)} folded={block.turnFolded} label={f.title} className="free-turn" bridge={bridge}
+        />
+        {/* A card of its own, so what follows the turn is read on the surface and never on the grid (#123). */}
+        <div className="free-reply">
         {delivered !== null
           ? <>
             <pre className="round-message" data-testid="free-message">{delivered}</pre>
-            <p role="status">{f.sent}</p>
+            {queued ? <QueuedNotice session={block.session}/> : <p role="status">{f.sent}</p>}
           </>
-          : block.superseded
-            ? <p role="note">{f.superseded}</p>
+          : block.superseded || transcriptGone
+            ? <p role="note">{transcriptGone ? t.page.session.transcriptGone : f.superseded}</p>
             : (
               <div className="round-field free-response">
                 <label htmlFor="free-response">{f.response}</label>
@@ -69,6 +81,7 @@ export function FreeBlockPage({ block, phaseOpen, bridge }: { block: FreeBlockVi
               </div>
             )}
         {failure && delivered === null && <p role="alert">{failure === 'send' ? f.sendFailed : f.saveFailed}</p>}
+        </div>
       </main>
     </div>
   );

@@ -62,6 +62,12 @@ export const xIt = {
     order: 'Ordine', orderNone: 'Nessun ordine da confrontare', orderFollows: 'La logica segue i capitoli', orderPartly: 'La logica segue i capitoli solo in parte', orderJumps: 'La logica salta tra i capitoli',
     orderBody: (pct: number, sections: number) => `Nel meccanismo principale, nel ${pct}% dei casi la parte da cui un’altra dipende viene prima nel documento; le sue parti stanno in ${sections} ${sections === 1 ? 'sezione' : 'sezioni'}.`,
     points: (pct: number) => ` I punti delle schede poggiano sulle righe della loro parte nel ${pct}% dei casi.`,
+    /** A handed-over spec's backing (#106): what its statements declare they rest on. */
+    backing: 'Fondamento', backingNone: 'Questa specifica non dichiara alcun fondamento',
+    backingNoneBody: 'Nessuna affermazione finisce con un riferimento a una risposta, a una issue o a righe di un file: nessuna è segnalata.',
+    backingHead: (statements: number, unbacked: number, broken: number) => `${statements} ${statements === 1 ? 'affermazione' : 'affermazioni'}: ${unbacked} senza fondamento, ${broken} con un fondamento non trovato`,
+    backingBody: 'Le segnalazioni sono sulle righe della fonte; «Fondamento» mostra su cosa poggia ciascuna, con la risposta citata accanto.',
+    backingFailed: 'Il fondamento delle affermazioni non è stato controllato: il server non ha risposto.',
   },
   library: {
     title: 'Esplorazioni', pill: 'LA STRUTTURA DI UNA FONTE', note: 'Una fonte letta per come si regge: le sue parti, i legami che la fonte dichiara e le domande che percorre.',

@@ -48,7 +48,6 @@ describe('the options request rides the round skills (#96)', () => {
 
   it('leaves every other command, skill and tool alone', () => {
     const data = dataFolder();
-    expect(hook(typed('to-spec'), data)).toBeUndefined();
     expect(hook(typed('grilling-notes'), data)).toBeUndefined();
     expect(hook(called('tdd'), data)).toBeUndefined();
     expect(hook(called('grilling', 'Read'), data)).toBeUndefined();
@@ -61,6 +60,28 @@ describe('the options request rides the round skills (#96)', () => {
     expect(hook({ hook_event_name: 'UserPromptExpansion', session_id: SESSION }, data)).toBeUndefined();
     expect(hook({ ...typed('grilling'), session_id: '../escape' }, data)).toContain('- **(a)** label: consequence');
     expect(readdirSync(data, { recursive: true })).not.toContain('escape');
+  });
+});
+
+describe('the round skills are asked to write the turn\'s context as a short list (#127)', () => {
+  /** The shape settled by #122, variant C: a short heading, then 3–6 bullets each opening with a bold label. */
+  const LABELS = ['**Read:**', '**Found:**', '**Carried over:**', '**Open:**', '**Lands in:**'];
+
+  it('asks a round skill, typed, called or after a compaction, for the context before the first question as a short Markdown list', () => {
+    const data = dataFolder();
+    for (const context of [hook(typed('grilling'), data), hook(called('mattpocock-skills:grill-me'), data), hook(started('compact'), data)]) {
+      expect(context).toMatch(/context before the first question/);
+      expect(context).toMatch(/short heading/);
+      expect(context).toMatch(/3 to 6 bullets/);
+      for (const label of LABELS) expect(context).toContain(label);
+      // The skill's own round format and the options list stay as they were.
+      expect(context).toContain('Keep the skill\'s round format and questions as they are');
+      expect(context).toContain('- **(a)** label: consequence');
+    }
+  });
+
+  it('asks the spec skill nothing about the context', () => {
+    expect(hook(typed('to-spec'), dataFolder())).not.toContain('**Carried over:**');
   });
 });
 
@@ -134,18 +155,23 @@ describe('the injection marks the session\'s round phase on the server (#99)', (
   }
   const CWD = '/work/project';
 
-  it('runs the launcher\'s phase command with the session and its working directory when a round skill starts', async () => {
+  it('runs the launcher\'s phase command with the session, its working directory, and the skill with its arguments when a round skill starts', async () => {
     const { run, launched } = plugin();
-    expect(run({ ...typed('grilling'), cwd: CWD })).toContain('label: consequence');
-    run({ ...called('grill-me'), cwd: CWD });
-    expect(await launched(2)).toEqual([['phase', SESSION, CWD], ['phase', SESSION, CWD]]);
+    expect(run({ ...typed('grilling'), command_args: 'the history, #102', cwd: CWD })).toContain('label: consequence');
+    run({ ...called('mattpocock-skills:grill-me'), tool_input: { skill: 'mattpocock-skills:grill-me', args: '#7' }, cwd: CWD });
+    run({ ...called('grill-with-docs'), cwd: CWD });
+    expect(await launched(3)).toEqual([
+      ['phase', SESSION, CWD, 'grilling', 'the history, #102'],
+      ['phase', SESSION, CWD, 'mattpocock-skills:grill-me', '#7'],
+      ['phase', SESSION, CWD, 'grill-with-docs', ''],
+    ]);
   });
 
   it('runs nothing on a compaction: the server keeps the phase, and one the person ended stays ended', async () => {
     const { run, launched } = plugin();
     run({ ...typed('grilling'), cwd: CWD });
     expect(run({ ...started('compact'), cwd: CWD })).toContain('label: consequence');
-    expect(await launched(2)).toEqual([['phase', SESSION, CWD]]);
+    expect(await launched(2)).toEqual([['phase', SESSION, CWD, 'grilling', '']]);
   });
 
   it('runs nothing for another skill, a session id that is not plain, or a turn with no working directory', async () => {
@@ -154,5 +180,54 @@ describe('the injection marks the session\'s round phase on the server (#99)', (
     run({ ...typed('grilling', '../escape'), cwd: CWD });
     run(typed('grilling'));
     expect(await launched(1)).toEqual([]);
+  });
+
+  it('runs nothing when to-spec starts: the spec\'s handover ends the phase, it does not open one', async () => {
+    const { run, launched } = plugin();
+    run({ ...typed('to-spec'), cwd: CWD });
+    run({ ...called('mattpocock-skills:to-spec'), cwd: CWD });
+    expect(await launched(1)).toEqual([]);
+  });
+});
+
+describe('the to-spec skill is asked for the closing `Spec: <location>` line (#104)', () => {
+  it('asks to-spec, typed or called, bare or under its plugin, to end with the line, and not for options', () => {
+    const data = dataFolder();
+    for (const context of [hook(typed('to-spec'), data), hook(called('mattpocock-skills:to-spec'), data)]) {
+      expect(context).toContain('Spec: <location>');
+      expect(context).toMatch(/GitHub issue/);
+      expect(context).toMatch(/`pasted`/);
+      expect(context).not.toContain('- **(a)** label: consequence');
+    }
+  });
+
+  it('asks again after a compaction of a session asked, alongside the options request when both were asked', () => {
+    const data = dataFolder();
+    hook(typed('to-spec'), data);
+    const spec = hook(started('compact'), data);
+    expect(spec).toContain('Spec: <location>');
+    expect(spec).not.toContain('- **(a)** label: consequence');
+    hook(typed('grilling'), data);
+    const both = hook(started('compact'), data);
+    expect(both).toContain('Spec: <location>');
+    expect(both).toContain('- **(a)** label: consequence');
+  });
+
+  it('asks each statement to end with its backing: an answer [R2·Q3], a link to an issue or comment, or path:a-b (#106)', () => {
+    const data = dataFolder();
+    for (const context of [hook(typed('to-spec'), data), hook(called('to-spec'), data), hook(started('compact'), data)]) {
+      expect(context).toContain('[R2·Q3]');
+      expect(context).toMatch(/issue or comment/);
+      expect(context).toContain('path:a-b');
+      expect(context).toMatch(/every list item, table row and paragraph/);
+    }
+    // The round skills are asked nothing about backing.
+    expect(hook(typed('grilling'), dataFolder())).not.toContain('[R2·Q3]');
+  });
+
+  it('leaves a session that only had rounds without the spec request after a compaction', () => {
+    const data = dataFolder();
+    hook(typed('grilling'), data);
+    expect(hook(started('compact'), data)).not.toContain('Spec: <location>');
   });
 });

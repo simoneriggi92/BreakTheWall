@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { build } from 'esbuild';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { browserCommand, openPage, pageUrl } from '../src/server/launch';
+import { browserCommand, compareVersions, openPage, pageUrl } from '../src/server/launch';
 import { readLock } from '../src/server/lock';
 import { startLocalServer, type LocalServer } from '../src/server/server';
 import { CWD, serverClient, SESSION } from './local-server-harness';
@@ -35,10 +35,11 @@ afterEach(async () => {
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const dataFolder = () => mkdtempSync(join(root, 'data-'));
-async function launch(command: string, dataDir: string) {
-  const { stdout } = await run(process.execPath, [join(root, 'plugin', 'server', 'launcher.cjs'), command], { env: { ...process.env, BTW_USER_DATA_DIR: dataDir }, timeout: 20_000 });
+async function launch(command: string, dataDir: string, ...args: string[]) {
+  const { stdout } = await run(process.execPath, [join(root, 'plugin', 'server', 'launcher.cjs'), command, ...args], { env: { ...process.env, BTW_USER_DATA_DIR: dataDir }, timeout: 20_000 });
   const reply = JSON.parse(stdout) as { port: number; secret: string; pid: number };
-  started.push(reply.pid);
+  // A server this test runs in process is stopped after the test, not killed with the test's own process.
+  if (reply.pid !== process.pid) started.push(reply.pid);
   return reply;
 }
 const status = (port: number, secret: string) => fetch(`http://127.0.0.1:${port}/api/status`, { headers: { 'x-btw-secret': secret } });
@@ -87,6 +88,56 @@ describe('the launcher starts one server, detached from the session (#94)', () =
   });
 });
 
+describe('a newer mod replaces an older server only when no other session uses it (#102)', () => {
+  /** A server of an earlier version on the launcher's data folder, checking its lock often so a replacement shows. */
+  async function older(userData: string, version = '0.5.0') {
+    const server = (await startLocalServer({ dataDir: join(userData, 'rounds'), staticDir: join(root, 'plugin', 'page'), version, checkEveryMs: 50 }))!;
+    servers.push(server);
+    return server;
+  }
+
+  it('replaces an older server no session is registered with, which then stops', async () => {
+    const userData = dataFolder();
+    const old = await older(userData);
+    const reply = await launch('start', userData);
+    expect(reply.port).not.toBe(old.port);
+    expect(readLock(join(userData, 'rounds'))).toMatchObject({ port: reply.port, version: '0.6.0-test' });
+    await old.stopped;
+  });
+
+  it('replaces an older server only the launching session is registered with', async () => {
+    const userData = dataFolder();
+    const old = await older(userData);
+    await serverClient(old).register(SESSION, CWD);
+    expect((await launch('start', userData, SESSION)).port).not.toBe(old.port);
+  });
+
+  it('keeps an older server another session uses, and tells its page the update comes once the other sessions end', async () => {
+    const userData = dataFolder();
+    const old = await older(userData);
+    await serverClient(old).register('c0ffee00-0000-4000-8000-000000000002', '/work/other');
+    const reply = await launch('start', userData, SESSION);
+    expect(reply).toMatchObject({ port: old.port, secret: old.secret });
+    expect((await serverClient(old).history()).update).toBe('0.6.0-test');
+  });
+
+  it('orders versions as releases do: a pre-release before its release, numbers as numbers', () => {
+    const ordered = ['0.5.0-alpha', '0.5.0-alpha.2', '0.5.0-alpha.10', '0.5.0', '0.5.1', '0.10.0', '1.0.0-beta', '1.0.0'];
+    for (let i = 1; i < ordered.length; i++) {
+      expect(compareVersions(ordered[i - 1], ordered[i])).toBeLessThan(0);
+      expect(compareVersions(ordered[i], ordered[i - 1])).toBeGreaterThan(0);
+    }
+    expect(compareVersions('0.6.0-test', '0.6.0-test')).toBe(0);
+  });
+
+  it('keeps a server of the same or a newer version', async () => {
+    const userData = dataFolder();
+    const newer = await older(userData, '0.6.1');
+    expect((await launch('start', userData)).port).toBe(newer.port);
+    expect((await serverClient(newer).history()).update).toBeNull();
+  });
+});
+
 describe('/break-the-wall opens a tab only when no page is connected (#94)', () => {
   async function running() {
     const dataDir = mkdtempSync(join(root, 'data-'));
@@ -126,8 +177,10 @@ describe('the injection marker reaches the server through the launcher (#99)', (
     const userData = dataFolder();
     const server = (await startLocalServer({ dataDir: join(userData, 'rounds'), staticDir: join(root, 'plugin', 'page'), version: '0.6.0-test' }))!;
     servers.push(server);
-    expect(await phase(userData, SESSION, CWD)).toEqual({ marked: true });
+    expect(await phase(userData, SESSION, CWD, 'mattpocock-skills:grilling', 'the history column, #102')).toEqual({ marked: true });
     expect(await (await serverClient(server).turn('Which page do you mean?')).json()).toEqual({ round: null, free: 1 });
+    // The skill and its arguments name the session in the history column.
+    expect((await serverClient(server).history()).projects[0].sessions[0]).toMatchObject({ session: SESSION, skill: 'grilling', ticket: 102 });
   });
 
   it('starts no server when none runs: the phase then opens at the first round', async () => {

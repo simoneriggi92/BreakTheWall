@@ -2,18 +2,77 @@
    the agent receives on the right. Theme tokens only, so both themes hold their checked contrast. The width steps
    come from RoundPage (`is-wide`, `is-rail`, `is-drawer`), not from media queries here, so what the page shows and
    how it is laid out never disagree. */
-.round-page { min-height: 100vh; background: var(--bg); color: var(--ink); }
-.round-progress { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The technical sheet (#123): a round and a free block sit on exploration's drafting grid, in the strong form the owner
+   chose (#122, variant C): fine lines every 20 px, major ones every 100 px. No text is drawn on it: a major line under
+   muted text drops it below AA, so every text sits on --surface, in the bar, a card or a panel. `--strip-h` is the
+   height a strip fixed at the window's foot takes from the panels: a round's progress strip sets it (#125). */
+.round-page {
+  --strip-h: 0px;
+  /* The room the history dock takes at the foot of the window, above the strip: its toggle and the gap under it. */
+  --dock-room: 64px;
+  --major: color-mix(in srgb, var(--ink) 20%, transparent);
+  min-height: 100vh; color: var(--ink); background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--major) 1px, transparent 1px), linear-gradient(90deg, var(--major) 1px, transparent 1px),
+    linear-gradient(var(--grid-major) 1px, transparent 1px), linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+}
+/* The docked frame (#123, after the owner's Plannotator reference): a 48 px bar, a tool's and not a welcome, so the
+   brand goes without its tagline; the panels against the window's edges below it, the round in cards between them. */
+/* Exactly 48 px, never more: the panels stick at --round-stick and end above the strip, so a taller bar (a full-size
+   button in it, or a second row) would slide them under the strip. Its buttons are compact to fit. */
+.round-page > .topbar { height: 48px; min-height: 48px; box-sizing: border-box; flex-wrap: nowrap; padding: 6px 16px; gap: 14px; background: var(--surface); }
+.round-page > .topbar .subtle { padding-block: 5px; }
+.round-page > .topbar .brand > span { font-size: 15px; }
+.round-page > .topbar .brand-mark { width: 26px; height: 22px; }
+.round-page .course-title strong { font-family: var(--f-display); }
+/* The turn's text sits in the question's column, so both read on one left edge; outline and return span both rows and
+   stay beside them from the top. The middle column takes what the panels leave, and the cards in it are capped and
+   centred, so a wide window adds canvas around the round, not a gap between the panels and the window's edges. */
 .round-layout {
-  display: grid; gap: 20px 28px; padding: 20px 24px 40px; align-items: start;
-  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr) minmax(260px, 340px);
-  grid-template-areas: "turn turn turn" "outline question return";
+  /* Where the panels stick: right below the 48 px bar, so they never slide under it. */
+  --round-stick: 48px;
+  display: grid; gap: 0; padding: 0; align-items: start; justify-content: stretch;
+  /* Each column's width is a variable the bands and the folds set, so any mix of them composes without a rule each. */
+  --col-left: minmax(200px, 240px); --col-mid: 1fr; --col-right: minmax(280px, 360px);
+  grid-template-columns: var(--col-left) minmax(0, var(--col-mid)) var(--col-right);
+  grid-template-areas: "outline turn return" "outline question return";
+  /* The side chat is as tall as the window; its extra height goes to the question's row, never between the turn's
+     text and the question. */
+  grid-template-rows: auto 1fr;
 }
 /* About 70 characters a line, where eyes tire least over hours of rounds. Measured in em, not ch: `ch` is the width
    of a zero, so 70ch held about 99 characters of the body font (6.7px a character at 15px, measured in the page).
    32em holds about 72. Prose keeps that measure; diagrams and options may use the question's full width. */
-.round-turn { grid-area: turn; max-width: 32em; color: var(--muted); border-left: 3px solid var(--line); padding-left: 14px; }
-.round-outline { grid-area: outline; position: sticky; top: 72px; }
+/* The turn's text sits in a card as wide as the question's, so both read on one left edge; how its text reads is the
+   round head's (#126), below. */
+.round-turn, .round-question { justify-self: center; width: min(100% - 128px, 800px); }
+.round-turn {
+  grid-area: turn; margin-top: 32px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 24px;
+}
+/* The panels: full height between the bar and the window's foot, scrolling inside, divided from the canvas by a
+   hairline. The outline is one at every width; the right column only where it is not the drawer's overlay. */
+.round-outline {
+  grid-area: outline; position: sticky; top: var(--round-stick); height: calc(100vh - var(--round-stick) - var(--strip-h));
+  overflow: auto; background: var(--surface); border-right: 1px solid var(--line); padding: 0 8px 12px;
+}
+.round-layout:not(.is-drawer) .round-return,
+.round-layout:not(.is-drawer) .round-side,
+.round-layout:not(.is-drawer) .round-side-folded {
+  height: calc(100vh - var(--round-stick) - var(--strip-h)); overflow: auto; border-left: 1px solid var(--line);
+}
+.round-layout:not(.is-drawer) .round-return, .round-layout:not(.is-drawer) .round-side { padding: 0 16px 16px; }
+.round-layout:not(.is-drawer) .round-side-folded .round-fold-strip { border: 0; border-radius: 0; width: 100%; height: 100%; }
+/* A panel's head row: its name as a label, and its fold. The fold is a control, so it keeps the body face. */
+.round-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 -16px 4px; padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--line); font: 600 11.5px/17px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.round-panel-head h2 { margin: 0; font: inherit; letter-spacing: inherit; color: inherit; }
+.round-panel-head .round-fold { flex: none; margin: 0; font-family: var(--f-body); letter-spacing: 0; text-transform: none; }
+.round-outline > .round-panel-head { margin: 0 -8px 8px; }
+.round-layout.is-outline-folded .round-outline > .round-panel-head { justify-content: center; padding: 8px 0; }
 .round-outline ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .round-outline-item {
   display: grid; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px;
@@ -22,20 +81,26 @@
 .round-outline-item:hover { border-color: var(--line); }
 .round-outline-item[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .round-outline-title { font-size: 14px; font-weight: 600; }
-.round-outline-state { font-size: 12px; color: var(--muted); }
+.round-outline-state { font-size: 11.5px; color: var(--muted); }
+/* One job per face (#123): mono for labels and metadata (states, letters, badges, section labels, counts), display for
+   headings (the global h1–h3 and the bar's title), body for text; controls keep the body face. Only the three system
+   faces, so the content policy needs no font request. */
+.round-outline-state, .round-option-letter, .round-option-badge, .round-recommendation h3, .round-remarks h3,
+.round-return-strip summary, .round-fold-strip, .round-outline-chat, .round-unattached { font-family: var(--f-mono); }
 .round-outline-item.is-answered .round-outline-state { color: var(--good); }
 /* Folded: one line, number then answer, so the questions still open stand out. */
 .round-outline-item.is-collapsed { display: flex; align-items: baseline; gap: 10px; padding: 5px 10px; }
 .round-outline-item.is-collapsed .round-outline-title { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-outline-item.is-collapsed.is-answered .round-outline-title { color: var(--good); }
 .round-question {
-  grid-area: question; max-width: 760px; background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: 20px 24px; line-height: 1.6;
+  grid-area: question; margin: 16px 0 48px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 32px 44px; line-height: 1.6;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 70%, transparent), 0 10px 30px color-mix(in srgb, var(--shadow) 45%, transparent);
 }
 .round-question h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.3; max-width: 32em; }
 .round-markdown > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { max-width: 32em; }
 .round-recommendation { margin-top: 16px; padding: 12px 14px; border-radius: 9px; background: var(--accent-soft); }
-.round-recommendation h3 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+.round-recommendation h3 { margin: 0 0 4px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
 .round-recommendation p { margin: 0; }
 .round-options { margin-top: 16px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .round-option {
@@ -47,7 +112,7 @@
 .round-option[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .round-option-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-weight: 700; }
 .round-option-letter { color: var(--accent); }
-.round-option-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 1px 7px; }
+.round-option-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 1px 7px; }
 .round-option-consequence { font-size: 14px; color: var(--muted); }
 .round-answer { margin-top: 18px; display: grid; gap: 12px; justify-items: start; }
 .round-answer .round-field { justify-self: stretch; }
@@ -62,9 +127,13 @@
 /* Remarks (#98): amber, apart from the accent the answer uses, so a remarked passage never reads as a choice. */
 .round-question { position: relative; }
 .round-remark-mark { background: var(--amber-soft); color: inherit; border-bottom: 2px solid var(--amber); border-radius: 2px; }
-.round-remark-offer { position: absolute; z-index: 2; font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--amber); border: 0; border-radius: 999px; padding: 4px 12px; box-shadow: 0 2px 8px var(--shadow); cursor: pointer; }
+.round-selection-offer { position: absolute; z-index: 2; display: flex; gap: 6px; }
+.round-remark-offer, .round-ask-offer { font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--amber); border: 0; border-radius: 999px; padding: 4px 12px; box-shadow: 0 2px 8px var(--shadow); cursor: pointer; }
+/* "Ask here" (#101) and the passages asked about take the side chat's violet, apart from the amber of remarks. */
+.round-ask-offer { background: var(--purple); }
+.round-ask-mark { background: var(--purple-soft); color: inherit; border-bottom: 2px solid var(--purple); border-radius: 2px; }
 .round-remarks { margin-top: 16px; }
-.round-remarks h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); }
+.round-remarks h3 { margin: 0 0 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); }
 .round-remarks ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .round-remarks li { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; padding-left: 10px; border-left: 3px solid var(--amber); }
 .round-remark-passage { grid-column: 1 / -1; color: var(--muted); font-style: italic; quotes: none; }
@@ -72,14 +141,18 @@
 .round-remark-text { grid-column: 1 / -1; margin: 0; white-space: pre-wrap; }
 .round-keys { margin: 16px 0 0; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
 .round-steps { margin-top: 14px; display: flex; justify-content: flex-end; }
-.round-return { grid-area: return; position: sticky; top: 72px; display: grid; gap: 12px; }
-.round-return h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.round-return { grid-area: return; position: sticky; top: var(--round-stick); display: grid; gap: 12px; background: var(--surface); }
 .round-message {
   margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--f-mono); font-size: 13px; line-height: 1.55;
   background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 12px 14px; max-height: 50vh; overflow: auto;
 }
 .round-return [role="alert"] { margin: 0; color: var(--bad); }
 .round-return [role="status"] { margin: 0; color: var(--good); }
+/* An ended session (#103): what waits for `claude --resume`, in the ink of a note, and the copy buttons beside it. */
+.round-return .round-queued, .free-layout .round-queued { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.round-queued code { font-family: var(--f-mono); font-size: 12.5px; background: var(--code-bg); color: var(--code-ink); border-radius: 5px; padding: 1px 6px; }
+.round-return [role="note"] { margin: 0; color: var(--muted); }
+.round-copy { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .round-drawer-close { justify-self: end; }
 .round-drawer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .round-drawer-bar .round-drawer-close { margin-left: auto; }
@@ -88,9 +161,11 @@
 .round-phase { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .course-title + .round-phase { margin-left: auto; }
 .round-phase [role="alert"] { color: var(--bad); }
-/* A free block: the agent's turn and one response, in one column at the prose measure. */
-.free-layout { display: grid; gap: 16px; padding: 20px 24px 40px; max-width: 760px; margin: 0 auto; }
-.free-turn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; line-height: 1.6; }
+/* A free block: the agent's turn and one response, in one column at the prose measure, on the grid. Both are cards,
+   the response with what follows its Send, so no text sits on the canvas. */
+.free-layout { display: grid; gap: 16px; padding: 32px 24px 48px; max-width: 760px; margin: 0 auto; }
+.free-turn, .free-reply { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; line-height: 1.6; }
+.free-reply { display: grid; gap: 12px; }
 .free-layout [role="alert"] { margin: 0; color: var(--bad); }
 .free-layout [role="status"] { margin: 0; color: var(--good); }
 .free-layout [role="note"] { margin: 0; color: var(--muted); }
@@ -100,16 +175,251 @@
 .round-markdown .md-diagram.drawn .md-diagram-svg { background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
 
 /* Below ~1180 px: the outline is a rail of question numbers. */
-.round-layout.is-rail { grid-template-columns: 64px minmax(0, 1fr) minmax(240px, 300px); }
-.round-layout.is-rail .round-outline-item, .round-layout.is-drawer .round-outline-item { justify-content: center; padding: 6px 4px; text-align: center; }
-.round-layout.is-rail .round-outline-title, .round-layout.is-drawer .round-outline-title { white-space: nowrap; }
+.round-layout.is-rail { --col-right: minmax(240px, 300px); }
+.round-layout.is-rail .round-turn, .round-layout.is-rail .round-question { width: min(100% - 48px, 800px); }
+.round-layout.is-rail .round-question { padding: 24px 28px; }
+.round-layout.is-outline-folded { --col-left: 64px; }
 
 /* Below ~860 px: the rail and the question; the right column slides over as a drawer from the top bar. */
 .round-layout.is-drawer {
-  grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: "turn turn" "outline question"; padding: 16px 16px 32px 8px; gap: 16px 12px;
+  grid-template-columns: var(--col-left) minmax(0, 1fr); grid-template-areas: "outline turn" "outline question"; justify-content: stretch;
 }
-.round-layout.is-drawer .round-question { padding: 16px 18px; }
+.round-layout.is-drawer .round-turn, .round-layout.is-drawer .round-question { width: calc(100% - 24px); }
+.round-layout.is-drawer .round-turn { margin-top: 16px; }
+.round-layout.is-drawer .round-question { padding: 18px; margin-bottom: 24px; }
 .round-layout.is-drawer .round-return {
   position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(360px, 92vw); overflow: auto; align-content: start;
   padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
 }
+
+/* Sessions across projects (#102): the history column over the page's left edge, and the dock below it that opens it
+   and says what arrived while the person was writing or reading history. Both float over the round, so its own
+   layout and width steps stay as they are. */
+.page-history {
+  position: fixed; inset: 0 auto 0 0; z-index: 30; width: min(320px, 88vw); overflow-y: auto;
+  background: var(--surface); border-right: 1px solid var(--line); box-shadow: 0 0 24px var(--shadow); padding: 12px 16px 72px;
+}
+.page-history-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.page-history-bar h2 { font-size: 17px; margin: 0; }
+.page-history-project + .page-history-project { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 4px; }
+.page-history-project h3 { font-size: 15px; margin: 8px 0; overflow-wrap: anywhere; }
+.page-history-project > ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.page-history-meta { margin: 0 0 6px; color: var(--muted); font-size: 13.5px; }
+.page-history-meta .is-live { color: var(--good); font-weight: 600; }
+.page-history-rounds { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 2px; }
+.page-history-round { width: 100%; text-align: left; padding: 5px 8px; border-radius: 7px; border: 1px solid transparent; background: none; color: inherit; font-size: 14px; }
+.page-history-round:hover { border-color: var(--line); }
+.page-history-round[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.page-history-round.is-superseded, .page-history-round.is-sent { color: var(--muted); }
+.page-history-session .subtle { padding: 4px 10px; font-size: 13px; }
+.page-history-confirm { display: flex; flex-wrap: wrap; gap: 6px; }
+.page-history-delete { color: var(--bad); border-color: var(--bad); }
+.page-dock { position: fixed; left: 16px; bottom: 16px; z-index: 31; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(560px, calc(100vw - 32px)); }
+.page-history-toggle { box-shadow: 0 2px 10px var(--shadow); }
+.page-notice {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius); box-shadow: 0 2px 10px var(--shadow);
+}
+.page-notice .primary { padding: 5px 12px; font-size: 14px; }
+
+/* A side chat on the focused question (#100): violet, apart from the accent of answers and the amber of remarks. It
+   takes the right column; the question's border says a chat is open beside it, and the return folds to a strip. */
+.round-question-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.round-question-head h2 { flex: 1; }
+.round-chat-open { flex: none; }
+.round-chat-open[aria-pressed="true"] { border-color: var(--purple); color: var(--purple); }
+.round-question.is-chatting { border-color: var(--purple); box-shadow: 0 0 0 2px var(--purple-soft); }
+.round-outline-chat { font-size: 11.5px; font-weight: 700; color: var(--purple); white-space: nowrap; }
+.round-side { grid-area: return; position: sticky; top: var(--round-stick); display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+/* What the agent receives comes first and keeps its height; the side chat below grows with its replies up to the
+   space left, then scrolls inside, so an empty side chat is not a tall blank box. */
+.round-side > * { flex: none; }
+.round-side > .side-chat { flex: 0 1 auto; }
+/* Never below its head, its note and its composer: on a short window, with what the agent receives open above it, the
+   chat would shrink to a clipped composer. The column scrolls the rest instead. */
+.round-side > .side-chat { min-height: 320px; }
+/* A reply is read, not glanced at: while a side chat is open the right column widens, so its prose keeps a readable
+   line and a table in a reply does not squeeze into one word a line. */
+.round-layout.is-wide:has(> .round-side) { --col-right: minmax(360px, 520px); }
+.round-layout.is-rail:has(> .round-side) { --col-right: minmax(320px, 420px); }
+.side-chat { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border: 1px solid var(--purple); border-radius: var(--radius); overflow: hidden; }
+.side-chat-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.side-chat-head h2 { flex: 1; margin: 0; font-size: 14px; color: var(--purple); }
+.side-chat-fork { margin: 0; padding: 6px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.side-chat-empty { margin: 0; padding: 12px; font-size: 14px; color: var(--muted); }
+.side-chat-turns { list-style: none; margin: 0; padding: 12px; display: grid; gap: 16px; align-content: start; overflow: auto; min-height: 0; flex: 1; }
+.side-chat-turns > li { display: grid; gap: 8px; }
+.side-chat-ask { margin: 0; justify-self: end; max-width: 90%; background: var(--purple-soft); border-radius: 12px 12px 4px 12px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.side-chat-reply { font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+/* A wide table scrolls on its own instead of breaking every cell into a column of single words. */
+.side-chat-reply table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 13px; }
+.side-chat-reply :is(th, td) { padding: 4px 8px; border: 1px solid var(--line); vertical-align: top; overflow-wrap: normal; min-width: 8em; }
+.side-chat-reply .round-markdown > * + * { margin-top: .6em; }
+.side-chat-running, .side-chat-note { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+.side-chat-read { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.side-chat-read li { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+.side-chat [role="alert"] { margin: 6px 12px; color: var(--bad); }
+.side-chat-reply [role="alert"] { margin: 6px 0 0; }
+.side-chat-passage { display: block; margin-bottom: 4px; font-style: italic; color: var(--purple); quotes: none; }
+.side-chat-asking { display: flex; align-items: start; gap: 8px; margin: 0; padding: 8px 12px 0; border-top: 1px solid var(--line); }
+.side-chat-asking .side-chat-passage { flex: 1; margin: 0; overflow-wrap: anywhere; }
+.side-chat-asking + .side-chat-composer { border-top: 0; }
+.side-chat-attach { margin-top: 8px; font-size: 12.5px; }
+.side-chat-attach[aria-pressed="true"] { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
+.round-unattached { margin: 0; font-size: 13px; color: var(--purple); }
+.side-chat-composer { display: flex; align-items: end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.side-chat-composer textarea { flex: 1; font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; resize: vertical; }
+.round-return-strip { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.round-return-strip summary { cursor: pointer; padding: 8px 12px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.round-return-body { display: grid; gap: 12px; padding: 0 12px 12px; }
+.round-return-body .round-message { max-height: 34vh; }
+.round-return-body [role="alert"] { margin: 0; color: var(--bad); }
+.round-return-body [role="status"] { margin: 0; color: var(--good); }
+.round-layout.is-drawer .round-side {
+  position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; width: min(380px, 92vw); height: auto;
+  padding: 16px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -12px 0 30px var(--shadow);
+  max-height: none; overflow: auto;
+}
+
+/* Folding (the outline, the right column, the turn's text): each part keeps a button to fold or unfold it. A folded
+   right column is a narrow strip that still says how many questions are answered; the question takes the room it
+   leaves, while its prose keeps the measure. */
+.round-layout.is-side-folded { --col-right: 44px; }
+.round-fold { padding: 2px 9px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.round-side-fold { align-self: flex-end; justify-self: end; }
+.round-side-folded { grid-area: return; position: sticky; top: var(--round-stick); background: var(--surface); }
+.round-fold-strip {
+  writing-mode: vertical-rl; width: 44px; padding: 14px 0; font-size: 12.5px; font-weight: 700; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+}
+.round-fold-strip:hover { color: var(--ink); border-color: var(--accent); }
+
+/* The edges between columns (dragged, or moved with ← → once focused): a thin line that shows on hover, focus and
+   while dragging. With no gap between the panels and the canvas, each sits on its panel's hairline, inside the
+   panel, which scrolls; the panels run the window's height, so the edge can be taken anywhere along it. */
+.round-return { align-content: start; }
+.round-edge { position: absolute; top: 0; bottom: 0; width: 12px; z-index: 2; cursor: col-resize; touch-action: none; }
+.round-edge.grows-right { right: 0; }
+.round-edge.grows-left { left: 0; }
+.round-edge::after { content: ""; position: absolute; top: 0; bottom: 0; left: 5px; width: 2px; border-radius: 2px; background: transparent; transition: background .15s; }
+.round-edge:hover::after, .round-edge:focus-visible::after, body.is-resizing .round-edge::after { background: var(--accent); }
+.round-edge:focus-visible { outline: none; }
+body.is-resizing { cursor: col-resize; user-select: none; }
+
+/* ---- #126 The round head: a chip says where the turn came from, and the agent's text reads like a page ----
+   One rendering for a round's turn and a free block's (`.agent-text` on `.round-turn` and `.free-turn`), as the owner
+   chose in #122 (variant C). The chip and the fold share a head row, so a long project name never runs under the
+   control; the text spans the card below them. */
+.agent-text {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: start;
+  color: var(--ink); font-size: 15px; line-height: 1.6;
+}
+.agent-text > .round-markdown { grid-column: 1 / -1; margin-top: 12px; }
+/* About 64 characters a line: 29em of the body face. `ch` is a zero's width, so 64ch would hold about 90. */
+.agent-text .round-markdown > * { max-width: 29em; margin-bottom: 0; }
+.agent-text .round-markdown > * + * { margin-top: .75em; }
+/* The measure is for prose; a diagram keeps the card's width. */
+.agent-text .round-markdown > .md-diagram { max-width: none; }
+.agent-text .round-markdown :is(h1, h2, h3, h4, h5, h6) { font-family: var(--f-display); font-size: 16px; line-height: 1.35; }
+.agent-text ul, .agent-text ol { padding-left: 1.2em; }
+.agent-text li + li { margin-top: 4px; }
+.agent-text li::marker { color: var(--accent); }
+.agent-text strong { font-weight: 650; }
+.agent-text :not(pre) > code { font-size: .88em; background: var(--sunk); border-radius: 4px; padding: 1px 5px; }
+/* Static on purpose: metadata to glance at, never a terminal's typing or cursor. */
+.turn-chip {
+  justify-self: start; margin: 0; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--sunk); color: var(--muted); font: 500 11.5px/1.5 var(--f-mono); overflow-wrap: anywhere;
+}
+.turn-fold { margin: 0; }
+/* Folded: one line, the chip, then the text's first line cut with an ellipsis, then the control. */
+.agent-text.is-folded { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; padding: 8px 12px 8px 16px; }
+.agent-text.is-folded .turn-chip { overflow-wrap: normal; white-space: nowrap; }
+.turn-line { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 14px; }
+.agent-text [role="alert"] { grid-column: 1 / -1; margin: 8px 0 0; color: var(--bad); font-size: 14px; }
+
+/* ---- The progress strip (#125) ----
+   The round's progress at the window's foot, at every width, as the owner chose in #122 (variant C): a ruler that
+   continues the rail's, with a baseline across the window, a major tick and number per question, four minor ticks
+   between. The page reserves its height, so it covers nothing and nothing covers it: the canvas ends above it, the
+   panels already subtract it (#123), the overlays end at it and the dock rises above it. The dock and the history are
+   the page's siblings, not its children, so they are told the height too. A free block has no questions, so no strip. */
+.round-page.has-strip, .round-page.has-strip ~ .page-dock, .round-page.has-strip ~ .page-history { --strip-h: 42px; }
+.round-page.has-strip { padding-bottom: var(--strip-h); }
+.round-page.has-strip ~ .page-dock { bottom: calc(var(--strip-h) + 12px); }
+.round-page.has-strip ~ .page-history { bottom: var(--strip-h); }
+.round-layout.is-drawer .round-return, .round-layout.is-drawer .round-side { bottom: var(--strip-h); }
+/* Above the bar's layer and the column edges, below the overlays and the dock, which end above it anyway. */
+.round-strip {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; height: var(--strip-h); box-sizing: border-box;
+  display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-top: 1px solid var(--line);
+  font-family: var(--f-mono);
+}
+.round-strip ol { list-style: none; flex: 1; min-width: 0; align-self: stretch; display: flex; margin: 6px 0 9px; padding: 0; }
+/* The baseline runs the window's whole width, under the count too, right below the ticks: the strip is a ruler that
+   continues past the last question, not a bar that stops where the count starts. */
+.round-strip::after { content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 1px; background: var(--muted); }
+/* The minor ticks: a line at the end of each fifth of a segment; the fifth one falls on the next question's major tick. */
+.round-strip li {
+  flex: 1; position: relative;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(20% - 1px), var(--muted) calc(20% - 1px) 20%) left bottom / 100% 5px no-repeat;
+}
+/* The major ticks: one where each question starts, and one closing the last. */
+.round-strip li::before, .round-strip li:last-child::after { content: ""; position: absolute; bottom: 0; width: 1px; height: 14px; background: var(--ink); }
+.round-strip li::before { left: 0; }
+.round-strip li:last-child::after { right: 0; }
+.round-strip li span { position: absolute; left: 5px; top: 0; font-size: 10.5px; line-height: 1; color: var(--muted); }
+/* The fill is the owner's (#122); alone it stands about 1.2:1 off the strip, under the 3:1 a graphic needs, so an
+   accent line along the baseline says "answered" too. */
+.round-strip li.is-answered { background-color: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+.round-strip li.is-answered span { color: var(--ink); }
+.round-strip li.is-current span { color: var(--accent); font-weight: 700; }
+.round-strip li.is-current::before { width: 2px; height: 100%; background: var(--accent); }
+.round-strip-count { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---- The rail as a ruler and the question's numeral (#124, settled by #122: variant C) ----
+   The rail (the outline folded, by the width or by hand) is a ruler: a line down its left with one tick per question
+   and a minor tick between two. Tick and square say the state: open is a short muted tick and an open square, answered
+   a longer ink tick and a filled square, current the longest accent tick on accent-soft. No scroll pointer: the page
+   shows one question at a time, so there is no scroll position to point at. A tick, its number and its square need
+   46 px: the rail keeps 64 px in the drawer too, with a narrower inset, so the ruler never scrolls sideways. */
+.round-layout.is-outline-folded .round-outline { display: flex; flex-direction: column; padding-inline: 4px; padding-bottom: var(--dock-room); }
+.round-layout.is-outline-folded .round-outline > :not(.round-rail-title) { flex: none; }
+.round-layout.is-outline-folded .round-outline > .round-panel-head { margin-inline: -4px; }
+.round-layout.is-outline-folded .round-outline nav ol { gap: 0; margin-left: 8px; padding: 6px 0; border-left: 1px solid var(--muted); }
+.round-layout.is-outline-folded .round-outline li { position: relative; }
+.round-layout.is-outline-folded .round-outline li + li::before { content: ""; position: absolute; left: 0; top: -1px; width: 4px; height: 1px; background: var(--muted); }
+.round-layout.is-outline-folded .round-outline-item {
+  position: relative; display: flex; justify-content: flex-start; align-items: center; gap: 5px; padding: 8px 4px 8px 16px;
+  border: 0; border-radius: 0 6px 6px 0; text-align: left;
+}
+.round-layout.is-outline-folded .round-outline-item:hover:not([aria-current="true"]) { background: var(--sunk); }
+.round-layout.is-outline-folded .round-outline-item::before { content: ""; position: absolute; left: 0; top: 50%; width: 8px; height: 1px; background: var(--muted); }
+.round-layout.is-outline-folded .round-outline-item.is-answered::before { width: 10px; height: 2px; margin-top: -1px; background: var(--ink); }
+.round-layout.is-outline-folded .round-outline-item[aria-current="true"] { background: var(--accent-soft); }
+.round-layout.is-outline-folded .round-outline-item[aria-current="true"]::before { width: 13px; height: 3px; margin-top: -1px; background: var(--accent); }
+.round-layout.is-outline-folded .round-outline-title { white-space: nowrap; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.round-layout.is-outline-folded .round-outline-item.is-answered .round-outline-title { color: var(--ink); }
+.round-layout.is-outline-folded .round-outline-item[aria-current="true"] .round-outline-title { color: var(--accent); font-weight: 700; }
+/* The state said twice for the eye, as the owner chose: an open square for open, a filled one for answered. */
+.round-layout.is-outline-folded .round-outline-item::after { content: ""; flex: none; width: 5px; height: 5px; border: 1px solid var(--muted); }
+.round-layout.is-outline-folded .round-outline-item.is-answered::after { background: var(--ink); border-color: var(--ink); }
+/* A side chat's count would not fit beside a tick; the question's side chat still opens from the question. */
+.round-layout.is-outline-folded .round-outline-chat { display: none; }
+/* The current title runs bottom to top under the ticks, cut rather than wrapped, at most 32vh and never into the room
+   the history dock takes at the rail's foot: on a short window it shrinks into what the ticks leave, down to nothing. */
+.round-rail-title {
+  flex: 0 1 auto; min-height: 0; align-self: flex-start;
+  writing-mode: vertical-rl; transform: rotate(180deg); margin: 18px 0 0 18px; max-height: 32vh;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 11.5px/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent);
+}
+/* The numeral, on the wide layout only (RoundPage draws it there): huge and outlined only, top right of the card,
+   behind the heading and the start of the body, which sit above it. Faint by design: it is presence, not text, and the
+   ink drawn over its stroke keeps AA (tests/theme.test.ts). */
+.round-numeral {
+  position: absolute; top: 6px; right: 12px; z-index: 0; pointer-events: none; user-select: none;
+  font-family: var(--f-display); font-weight: 800; font-size: 250px; line-height: .8; letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+  color: transparent; -webkit-text-stroke: 1.25px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.round-question > :not(.round-numeral):not(.round-selection-offer) { position: relative; z-index: 1; }

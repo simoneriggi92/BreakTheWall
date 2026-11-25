@@ -6,12 +6,15 @@ import { modMessages, nodeIsSupported } from './messages'
  * Break the Wall's mod (#94, #95): a thin adapter between a Claude Code session and the local server. It checks
  * Node, has the launcher find or start the server, keeps this session registered, serves `/break-the-wall` without a
  * model turn, posts each main-loop turn's final text, and submits the answers the server hands back as the person's
- * own words. Every decision (which server, whether to open a tab, whether a turn holds a round, the message's words)
- * is the server's, where it is tested; what the mod still owns, the order of its calls, `register.test.ts` holds.
+ * own words, and reports a session's end so the page follows `/clear` and `/resume` (#102). Every decision (which
+ * server, whether to open a tab, whether a turn holds a round, the message's words) is the server's, where it is
+ * tested; what the mod still owns, the order of its calls, `register.test.ts` holds.
  */
 const COMMAND = 'break-the-wall'
 /** Well inside the server's two-minute registration, so a live session never lapses. */
 const RENEW_MS = 30_000
+/** After `session.end`, once the engine has gone on under the new id of a `/clear` or `/resume`. */
+const REREGISTER_MS = 1_000
 /** After a failed delivery poll; a held poll that simply ran out is followed at once. */
 const DELIVERY_RETRY_MS = 5_000
 
@@ -26,8 +29,11 @@ let server: Server | undefined
 let renewal: ReturnType<EngineInterface['clock']['every']> | undefined
 /** Whether this module load already long-polls for deliveries: one chain of polls, never two. */
 let delivering = false
+/** The plugin's side-chat model (`userConfig.sideChatModel`), handed to the server as set; empty when the person set none. */
+let sideChatModel = ''
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  sideChatModel = typeof options.sideChatModel === 'string' ? options.sideChatModel.trim() : ''
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({ name: COMMAND, description: t.description })
@@ -57,6 +63,16 @@ export const register: Register = on => {
     return result
   })
 
+  // `/clear` and an in-process `/resume` end this session and go on under another id, with no session.start: the
+  // ending one leaves the live sessions at once (#102), and the one that follows registers. Within the end's short
+  // bound, so one fetch and nothing that could launch a server.
+  on('session.end', async ($, e, next) => {
+    if (server) await postTo($, server, `/api/sessions/${encodeURIComponent(e.sessionId)}/end`, JSON.stringify({ reason: e.reason })).catch(() => undefined)
+    const ended = await next(e)
+    if (server) $.clock.after(REREGISTER_MS, () => { void registerNext($, e.sessionId).catch(() => {}) })
+    return ended
+  })
+
   on('command.run', { command: COMMAND }, async $ => {
     if (node !== 'ok') node = await checkNode($)
     if (node !== 'ok') return { text: t.nodeMissing, isTextDisplayOnly: true }
@@ -72,10 +88,36 @@ export const register: Register = on => {
   })
 }
 
-/** Re-reads the session id each time: `/clear` and `/resume` change it without a new `session.start`. */
+/**
+ * Re-reads the session id each time: `/clear` and `/resume` change it without a new `session.start`. The session's
+ * model, and the plugin's side-chat model when set, go with it: the server picks which one a side chat runs on. So does
+ * where Claude Code keeps the session's transcript (#103): once that file is gone the server turns the session's rounds
+ * read-only, as nothing can resume or fork it. A session that keeps none here names none.
+ */
 async function registerSession($: EngineInterface) {
   if (!server) return
-  await post($, '/api/sessions', JSON.stringify({ id: await $.session.id(), cwd: await $.session.cwd() }))
+  const transcript = await transcriptOf($)
+  const body = {
+    id: await $.session.id(), cwd: await $.session.cwd(), model: await $.session.model(),
+    ...(transcript ? { transcript } : {}), ...(sideChatModel ? { sideChatModel } : {}),
+  }
+  await post($, '/api/sessions', JSON.stringify(body))
+}
+
+/** The transcript's path, or empty when the engine gives none: a registration never fails over it. */
+async function transcriptOf($: EngineInterface): Promise<string> {
+  try {
+    const { transcriptPath } = await $.session.info()
+    return typeof transcriptPath === 'string' ? transcriptPath : ''
+  } catch {
+    return ''
+  }
+}
+
+/** The session that went on after `ended`; none when the process is leaving and the id is still the ending one. */
+async function registerNext($: EngineInterface, ended: string) {
+  if (await $.session.id() === ended) return
+  await registerSession($)
 }
 
 /** The turn as the engine reported it: the server recognises a round, or ignores the turn. */
@@ -137,10 +179,13 @@ async function checkNode($: EngineInterface): Promise<'ok' | 'missing'> {
   }
 }
 
-/** `node launcher.cjs start | open`: one JSON line back, the server left running on its own. */
+/**
+ * `node launcher.cjs start | open <session>`: one JSON line back, the server left running on its own. The session
+ * is the launcher's to leave out when it counts the sessions an older server still serves (#102).
+ */
 async function launch($: EngineInterface, command: 'start' | 'open'): Promise<Launched> {
   const { CLAUDE_PLUGIN_ROOT: root } = await $.process.hookEnv()
-  const { stdout } = await $.process.run(['node', `${root}/server/launcher.cjs`, command], { timeoutMs: 30_000 })
+  const { stdout } = await $.process.run(['node', `${root}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
   const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '{}') as Partial<Launched> & { error?: string }
   if (typeof reply.port !== 'number' || typeof reply.secret !== 'string') throw new Error(reply.error ?? 'The launcher gave no server.')
   return { port: reply.port, secret: reply.secret, opened: reply.opened }

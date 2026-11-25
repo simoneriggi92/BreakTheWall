@@ -3,12 +3,20 @@ import { readFile, realpath } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { z } from 'zod';
-import { SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
+import { cwdSchema, SECRET_HEADER, sessionIdSchema, type ServerStatus } from '../core/local-server';
 import { parseRound } from '../core/round';
-import { draftSchema, fitsQuestions, messageLanguageSchema, returnMessage } from '../core/round-answers';
-import { freeBlockMessage, responseSchema } from '../core/round-phase';
+import { draftSchema, fitsQuestions, messageLanguageSchema } from '../core/round-answers';
+import { answersWithRemarks } from '../core/spec-remarks';
+import { freeBlockMessage, kindOfRoute, responseSchema } from '../core/round-phase';
+import type { GhRunner } from './gh';
+import { noContent, readJson, send, TRANSCRIPT_GONE } from './http';
 import { answers, createLock, ownsLock, readLock, releaseLock, removeLock, type ServerLock } from './lock';
-import { RoundStore, type Kind, type RoundRefusal } from './rounds';
+import { MESSAGE_MAX, RoundStore, type DeliveryKind, type RoundRefusal } from './rounds';
+import { handleSessions, SessionLabels, SessionModels, SessionTranscripts, transcriptPathSchema } from './sessions';
+import { modelSchema, sideChatRoutes, spawnSideChat, type SideChatRunner } from './side-chats';
+import { specRemarkRoutes } from './spec-remarks';
+import { openSpecs } from './specs';
+import type { ClaudeRunner } from '../desktop/claude/completer';
 
 /**
  * The local server behind the page `/break-the-wall` opens (#94): one per person, bound to 127.0.0.1, serving the
@@ -37,6 +45,11 @@ export interface LocalServerOptions {
    * `$.prompt.submit` first waits for the session to be idle: a shorter lease would deliver twice.
    */
   deliveryLeaseMs?: number;
+  /**
+   * The processes the server starts: the real CLIs unless a test passes fakes. `claude` writes a spec's structure, `gh`
+   * reads a spec from an issue (#104), `sideChat` streams a side chat's reply (#100).
+   */
+  runners?: { claude?: ClaudeRunner; gh?: GhRunner; sideChat?: SideChatRunner };
 }
 export interface LocalServer {
   port: number;
@@ -51,8 +64,16 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 
-const cwdSchema = z.string().min(1).max(4096);
-const registrationSchema = z.strictObject({ id: sessionIdSchema, cwd: cwdSchema });
+/**
+ * A session as the mod registers it: its id, its folder, the model it runs on, the side-chat model set in the
+ * plugin, if any (#100), and where Claude Code keeps its transcript (#103). A model name `--model` could not take, or a
+ * transcript path that is not one, is dropped, never the session with it.
+ */
+const registeredModelSchema = modelSchema.optional().catch(undefined);
+const registrationSchema = z.strictObject({
+  id: sessionIdSchema, cwd: cwdSchema, model: registeredModelSchema, sideChatModel: registeredModelSchema,
+  transcript: transcriptPathSchema.optional().catch(undefined),
+});
 /**
  * Every turn as the mod posts it on `turn.complete`, with how it ended and, for a subagent's run, its agent: the server
  * decides whether it holds a round, so the mod decides nothing.
@@ -64,18 +85,25 @@ const turnSchema = z.strictObject({
   reason: z.enum(['answer', 'aborted', 'refusal', 'error']),
   agent: z.string().min(1).max(200).optional(),
 });
-const MAX_BODY_BYTES = 64 * 1024;
 /** A turn's text, with room for the JSON escaping of a long round. */
 const MAX_TURN_BYTES = 4 * 1024 * 1024;
-const MAX_ANSWER_BYTES = 1024 * 1024;
+/**
+ * A draft or a Send: room for a side chat's longest reply attached whole, at up to six bytes a character as JSON
+ * escapes a control character, and the rest of the draft beside it.
+ */
+const MAX_ANSWER_BYTES = 8 * 1024 * 1024;
 const sendSchema = z.strictObject({ draft: draftSchema, language: messageLanguageSchema });
 const responseBodySchema = z.strictObject({ response: responseSchema });
-const phaseSchema = z.strictObject({ cwd: cwdSchema });
+/** The injection marker (#99), with the round skill that started and its arguments, which name the session (#102). */
+const phaseSchema = z.strictObject({ cwd: cwdSchema, skill: z.string().min(1).max(200).optional(), args: z.string().max(4000).optional() });
+/** Folding the agent's text of a round or a free block (#126). */
+const foldSchema = z.strictObject({ folded: z.boolean() });
+const FOLD_PATH = /^\/api\/(rounds|free)\/([^/]+)\/(\d{1,6})\/fold$/;
 const ROUND_PATH = /^\/api\/rounds\/([^/]+)\/(\d{1,6})\/(draft|send)$/;
 const FREE_PATH = /^\/api\/free\/([^/]+)\/(\d{1,6})\/(response|send)$/;
 const PHASE_PATH = /^\/api\/sessions\/([^/]+)\/phase$/;
 const DELIVERY_PATH = /^\/api\/sessions\/([^/]+)\/delivery$/;
-const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free)-(\d{1,6})$/;
+const CONFIRM_PATH = /^\/api\/sessions\/([^/]+)\/delivery\/(round|free|remarks)-(\d{1,6})$/;
 const REFUSED: Record<RoundRefusal, number> = { unknown: 404, sent: 409, superseded: 409 };
 
 export async function startLocalServer(options: LocalServerOptions): Promise<LocalServer | null> {
@@ -87,16 +115,41 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   const local = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   const staticRoot = await realpath(options.staticDir);
   const own: ServerLock = { port, pid: process.pid, version: options.version, secret };
+  // Requests are taken from the moment the lock can name this server and answered once its stores are open: a rival
+  // asking for the status meanwhile waits a moment rather than time out and take the lock for an orphan's.
+  let opened!: () => void;
+  const ready = new Promise<void>(done => { opened = done; });
+  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
+    void ready.then(() => handle(req, res)).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
+  });
   if (!await takeLock(options.dataDir, own)) { await close(server); return null; }
-  const rounds = await RoundStore.open(options.dataDir);
-
   // Presence: who keeps the server alive. A session holds a lease it renews; a page holds a poll open.
   const sessions = new Map<string, { cwd: string; until: number }>();
+  const live = (session: string) => (sessions.get(session)?.until ?? 0) > Date.now();
   /** Open page polls, answered early when what the page shows has changed. */
   const pagePolls = new Set<() => void>();
   /** Mod polls waiting for a message, by session, so a Send wakes only the session it answers. */
   const deliveryPolls = new Map<string, Set<() => void>>();
   const pageChanged = () => { for (const wake of [...pagePolls]) wake(); };
+  // Each store is opened before anything that reads it: the rounds' standing, which reads the later stores, is tied
+  // in last.
+  const rounds = await RoundStore.open(options.dataDir);
+  const labels = await SessionLabels.open(options.dataDir);
+  const transcripts = await SessionTranscripts.open(options.dataDir, rounds);
+  /** A newer version waiting for the other sessions to end before it replaces this server (#102). */
+  const update: { version: string | null } = { version: null };
+  const models = await SessionModels.open(options.dataDir, rounds);
+  const sideChats = sideChatRoutes({
+    dataDir: options.dataDir, rounds, runner: options.runners?.sideChat ?? spawnSideChat(), holdMs: pollHoldMs,
+    modelOf: session => models.sideChatModel(session),
+    readOnly: session => transcripts.gone(session),
+  });
+  const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: pageChanged, rounds });
+  const remarks = await specRemarkRoutes({
+    specOf: id => specs.specOf(id), allSpecs: () => specs.allSpecs(), rounds,
+    transcriptGone: session => transcripts.gone(session), queued: session => queued(session), changed: pageChanged,
+  });
+  rounds.standOn({ live, transcriptGone: session => transcripts.gone(session), riding: session => remarks.riding(session).map(x => x.section) });
   let openPolls = 0;
   let lastPollEnd = -Infinity;
   let lastBusy = Date.now();
@@ -111,6 +164,9 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   let stopping: Promise<void> | undefined;
   const stop = () => stopping ??= (async () => {
     clearInterval(idle);
+    // Before the lock goes: the next server reads the side chats back as soon as it holds it.
+    await sideChats.stop();
+    specs.close();
     releaseLock(options.dataDir, own);
     await close(server);
     finish();
@@ -122,9 +178,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     else if (Date.now() - lastBusy >= idleMs) void stop();
   }, checkEveryMs);
 
-  server.on('request', (req: IncomingMessage, res: ServerResponse) => {
-    void handle(req, res).catch(() => { if (!res.headersSent) send(res, 500, { error: 'internal' }); else res.destroy(); });
-  });
+  opened();
 
   async function handle(req: IncomingMessage, res: ServerResponse) {
     // A rebinding DNS name points another site at 127.0.0.1; its requests still carry its own Host.
@@ -138,13 +192,20 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && path === '/api/status') {
       // A launcher that just found this server is about to use it: the idle clock starts over.
       lastBusy = Date.now();
-      const status: ServerStatus = { app: 'break-the-wall', version: options.version, platform: process.platform, pageConnected: pageConnected() };
+      busy();
+      const status: ServerStatus = { app: 'break-the-wall', version: options.version, platform: process.platform, pageConnected: pageConnected(), sessions: [...sessions.keys()] };
       return send(res, 200, status);
     }
     if (req.method === 'POST' && path === '/api/sessions') {
       const registration = registrationSchema.safeParse(await readJson(req));
       if (!registration.success) return send(res, 400, { error: 'bad-request' });
-      sessions.set(registration.data.id, { cwd: registration.data.cwd, until: Date.now() + sessionTtlMs });
+      const { id, cwd, model, sideChatModel, transcript } = registration.data;
+      const resumed = !live(id);
+      sessions.set(id, { cwd, until: Date.now() + sessionTtlMs });
+      await models.remember(id, { model, sideChatModel });
+      if (transcript !== undefined) await transcripts.remember(id, transcript);
+      // A session coming back with `claude --resume`: what it had queued is no longer shown as waiting.
+      if (resumed) pageChanged();
       lastBusy = Date.now();
       return noContent(res);
     }
@@ -155,15 +216,24 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
       // A subagent's report is not the session asking the person, and an interrupted turn holds at most half a round:
       // neither is a turn of the round phase.
       if (turn.data.agent !== undefined || turn.data.reason !== 'answer') return send(res, 200, { round: null });
+      // A handed-over spec ends the round phase: what follows is reading the spec, not answering rounds.
+      const spec = await specs.handover({ session, cwd, text });
+      if (spec) {
+        await rounds.endPhase(session);
+        pageChanged();
+        return send(res, 200, { round: null, spec });
+      }
       const round = parseRound(text);
       if (round) {
         const stored = await rounds.add(session, cwd, round);
+        await kept(session);
         pageChanged();
         return send(res, 200, { round: stored.number });
       }
       // A turn with nothing to read asks the person nothing.
       const free = text.trim() === '' ? null : await rounds.addTurn(session, cwd, text);
       if (!free) return send(res, 200, { round: null });
+      await kept(session);
       pageChanged();
       return send(res, 200, { round: null, free: free.number });
     }
@@ -174,6 +244,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         const body = phaseSchema.safeParse(await readJson(req));
         if (!body.success) return send(res, 400, { error: 'bad-request' });
         await rounds.startPhase(phasePath[1], body.data.cwd);
+        if (body.data.skill) await labels.mark(phasePath[1], body.data.cwd, body.data.skill, body.data.args);
         pageChanged();
         return noContent(res);
       }
@@ -183,9 +254,19 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         return noContent(res);
       }
     }
+    // Before the answers' paths: a round whose transcript is gone, or that was sent, still folds, as reading does.
+    const foldPath = FOLD_PATH.exec(path);
+    const foldKind = foldPath && kindOfRoute(foldPath[1]);
+    if (req.method === 'PUT' && foldPath && foldKind && sessionIdSchema.safeParse(foldPath[2]).success) {
+      const body = foldSchema.safeParse(await readJson(req));
+      if (!body.success) return send(res, 400, { error: 'bad-request' });
+      if (!await rounds.foldTurn({ session: foldPath[2], kind: foldKind, number: Number(foldPath[3]) }, body.data.folded)) return send(res, 404, { error: 'unknown' });
+      return noContent(res);
+    }
     const freePath = FREE_PATH.exec(path);
     if (freePath && sessionIdSchema.safeParse(freePath[1]).success) {
       const [, session, number, action] = freePath;
+      if (transcripts.gone(session)) return send(res, 409, TRANSCRIPT_GONE);
       const body = responseBodySchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
       if (req.method === 'PUT' && action === 'response') {
         if (!body.success) return send(res, 400, { error: 'bad-request' });
@@ -207,6 +288,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     const roundPath = ROUND_PATH.exec(path);
     if (roundPath && sessionIdSchema.safeParse(roundPath[1]).success) {
       const [, session, number, action] = roundPath;
+      if (transcripts.gone(session)) return send(res, 409, TRANSCRIPT_GONE);
       if (req.method === 'PUT' && action === 'draft') {
         const draft = draftSchema.safeParse(await readJson(req, MAX_ANSWER_BYTES));
         if (!draft.success) return send(res, 400, { error: 'bad-request' });
@@ -223,10 +305,14 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
         if (!questions) return send(res, 404, { error: 'unknown' });
         if (!fitsQuestions(questions, body.data.draft)) return send(res, 400, { error: 'bad-request' });
         // The server words the message with the same function the page previews it with: what the person saw is
-        // what the agent receives.
-        const message = returnMessage(questions, body.data.draft, body.data.language);
+        // what the agent receives. Remarks on a spec written while the round awaited answers ride after them (#105).
+        const riding = rounds.awaiting(session) === Number(number) ? remarks.riding(session) : [];
+        const message = answersWithRemarks(questions, body.data.draft, body.data.language, riding.map(x => x.section));
+        // Kept longer, the round would not read back at the next start.
+        if (message.length > MESSAGE_MAX) return send(res, 400, { error: 'too-long' });
         const refused = await rounds.send(session, Number(number), body.data.draft, message);
         if (refused) return send(res, REFUSED[refused], { error: refused });
+        await remarks.rodeWith(session, Number(number), riding);
         queued(session);
         return send(res, 200, { message });
       }
@@ -235,11 +321,27 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
     if (req.method === 'GET' && deliveryPath && sessionIdSchema.safeParse(deliveryPath[1]).success) return holdDelivery(deliveryPath[1], req, res);
     const confirmPath = CONFIRM_PATH.exec(path);
     if (req.method === 'POST' && confirmPath && sessionIdSchema.safeParse(confirmPath[1]).success) {
-      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as Kind, Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
+      if (!await rounds.confirm(confirmPath[1], confirmPath[2] as DeliveryKind, Number(confirmPath[3]))) return send(res, 404, { error: 'unknown' });
       return noContent(res);
     }
     if (req.method === 'GET' && path === '/api/page/poll') return holdPoll(req, res);
+    if (await handleSessions(req, res, path, { rounds, labels, transcripts, models, sideChats, specs: { forget: forgetSpecs }, leases: sessions, live, update, pageChanged })) return;
+    if (await sideChats.handle(req, res, path)) return;
+    if (await remarks.handle(req, res, path)) return;
+    if (await specs.handle(req, res, path)) return;
     return send(res, 404, { error: 'not-found' });
+  }
+
+  /** A deleted session's specs go with their remarks (#102); true when it had handed any over. */
+  async function forgetSpecs(session: string) {
+    const gone = await specs.forget(session);
+    await remarks.forget(session, gone);
+    return gone.length > 0;
+  }
+
+  /** The session has a folder now: how its mod registered it is kept there too. */
+  async function kept(session: string) {
+    await Promise.all([transcripts.keep(session), models.keep(session)]);
   }
 
   /** A message waits for the session: a poll already waiting takes it, and the page shows it as sent. */
@@ -323,18 +425,6 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   return { port, secret, stopped, stop };
 }
 
-/** The request's JSON body, or undefined when it is too large or not JSON. */
-async function readJson(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req as AsyncIterable<Buffer>) {
-    size += chunk.byteLength;
-    if (size > maxBytes) return undefined;
-    chunks.push(chunk);
-  }
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return undefined; }
-}
-
 /**
  * Owns the lock, replacing an orphaned one. Listening comes first, so a rival that finds this lock can already reach
  * this server and step aside. Returns false when another live server owns it.
@@ -347,15 +437,6 @@ async function takeLock(dataDir: string, own: ServerLock): Promise<boolean> {
     removeLock(dataDir);
   }
   return false;
-}
-
-function send(res: ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
-  res.end(JSON.stringify(body));
-}
-
-function noContent(res: ServerResponse) {
-  res.writeHead(204, { 'cache-control': 'no-store' }).end();
 }
 
 function close(server: Server) {

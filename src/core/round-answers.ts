@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sessionIdSchema } from './local-server';
+import { cwdSchema, sessionIdSchema } from './local-server';
 import { optionLetterSchema, questionSchema, type Question } from './round';
 
 /**
@@ -22,6 +22,23 @@ export const remarkSchema = z.strictObject({
 }).refine(x => x.end > x.start);
 export type Remark = z.infer<typeof remarkSchema>;
 
+/** The longest reply a side chat keeps (#100), and so the longest one an answer takes attached whole (#101). */
+export const SIDE_CHAT_REPLY_MAX = 1_000_000;
+
+/**
+ * One exchange of a question's side chat the person attached to their answer (#101): what they asked, the passage
+ * they asked about if any, and the reply, copied whole from the side chat when attached. Kept in the draft, so the page's
+ * preview and the message the server sends come from the same text through the same function. `turn` names the
+ * exchange in its side chat: one turn is attached once.
+ */
+export const attachedSchema = z.strictObject({
+  turn: z.number().int().min(1),
+  ask: z.string().max(20_000),
+  passage: z.string().max(5_000).optional(),
+  reply: z.string().max(SIDE_CHAT_REPLY_MAX),
+});
+export type Attached = z.infer<typeof attachedSchema>;
+
 /**
  * A question takes the recommendation, one of its options by letter (#96), no choice, or only a note. Remarks ride
  * with the answer but are not one: a question with remarks alone is still unanswered.
@@ -31,6 +48,8 @@ export const answerSchema = z.strictObject({
   note: z.string().max(50_000),
   /** Absent rather than empty, so a draft kept before remarks existed reads the same. */
   remarks: z.array(remarkSchema).max(200).optional(),
+  /** Side-chat exchanges attached with 📎 (#101); absent rather than empty, like remarks. */
+  attached: z.array(attachedSchema).max(100).refine(x => new Set(x.map(a => a.turn)).size === x.length).optional(),
 });
 export const draftSchema = z.strictObject({
   /** One per round; it returns at the top of the message. */
@@ -45,6 +64,17 @@ export const emptyDraft = (): Draft => ({ generalNote: '', answers: {} });
 export const messageLanguageSchema = z.enum(['it', 'en']);
 export type MessageLanguage = z.infer<typeof messageLanguageSchema>;
 
+/** What the head of a round or a free block shows besides the agent's text (#126), the same on both views. */
+export const turnHeadFields = {
+  /**
+   * The project the session ran in, for the chip: its working directory's last folder, never the whole path, which the
+   * page has no use for. Bounded as the directory it is cut from.
+   */
+  project: cwdSchema,
+  /** The person folded the agent's text to one line: kept with the entry, so it holds for that round alone. */
+  turnFolded: z.boolean(),
+};
+
 /** The round as the page reads it from the server. */
 export const roundViewSchema = z.strictObject({
   session: sessionIdSchema,
@@ -57,6 +87,7 @@ export const roundViewSchema = z.strictObject({
   sent: z.strictObject({ message: z.string(), at: z.iso.datetime() }).nullable(),
   /** A later round of the same session arrived: this one no longer takes answers. */
   superseded: z.boolean(),
+  ...turnHeadFields,
 });
 export type RoundView = z.infer<typeof roundViewSchema>;
 
@@ -71,13 +102,14 @@ export function answerKind(answer: Answer | undefined): AnswerKind {
 }
 
 /**
- * Every option letter in the draft is one its question offers, and every remark sits on a question the round has: the
+ * Every option letter in the draft is one its question offers, and every remark and attached exchange sits on a
+ * question the round has: the
  * page offers no other, so another is a bad request.
  */
 export function fitsQuestions(questions: readonly Question[], draft: Draft): boolean {
   return Object.entries(draft.answers).every(([number, answer]) => {
     const question = questions.find(q => String(q.number) === number);
-    if (answer.remarks?.length && !question) return false;
+    if ((answer.remarks?.length || answer.attached?.length) && !question) return false;
     if (answerKind(answer) !== 'option') return true;
     return question?.options.some(x => x.letter === answer.choice) ?? false;
   });
@@ -94,6 +126,8 @@ export const sortRemarks = (remarks: readonly Remark[]): Remark[] =>
 export const remarksOf = (answer: Answer | undefined): Remark[] => sortRemarks(answer?.remarks ?? []);
 /** A remark is known by where it stands: one passage takes one remark. */
 export const remarkKey = (x: Pick<Remark, 'part' | 'start' | 'end'>) => `${x.part}:${x.start}:${x.end}`;
+/** Attached exchanges in the order they were asked in their side chat. */
+export const attachedOf = (answer: Answer | undefined): Attached[] => [...answer?.attached ?? []].sort((a, b) => a.turn - b.turn);
 export const isAnswered = (answer: Answer | undefined) => answerKind(answer) !== 'unanswered';
 
 /** The words on a question's title line, in the page's interface language; a note alone puts none there. */
@@ -102,10 +136,17 @@ const TITLE_WORDS: Record<MessageLanguage, Record<Exclude<AnswerKind, 'option'>,
   en: { recommendation: 'recommendation', none: 'no choice', unanswered: 'no answer', note: '' },
 };
 
+/** How an attached exchange is introduced, in the page's interface language. */
+const SIDE_CHAT_WORDS: Record<MessageLanguage, { question: string; reply: string }> = {
+  it: { question: 'Chat laterale — domanda:', reply: 'risposta:' },
+  en: { question: 'Side chat — question:', reply: 'reply:' },
+};
+
 /**
  * Plain Markdown that reads as the person's own words: the general note first, then every question by number and
  * title, so it still reads after compaction, the choice on the title line ("recommendation", the option's letter, "no
- * choice" or "no answer"), the note indented below, then its remarks that have words, as `- «passage» — text`.
+ * choice" or "no answer"), the note indented below, then its remarks that have words, as `- «passage» — text`, then
+ * the side-chat exchanges attached to it, the reply whole and verbatim, only indented to stay under its question.
  */
 export function returnMessage(questions: readonly Question[], draft: Draft, language: MessageLanguage): string {
   const lines: string[] = [];
@@ -119,11 +160,22 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
     const title = `**Q${question.number} · ${question.title}**`;
     lines.push(word ? `${title} ${word}` : title);
     const note = answer?.note.trim();
-    if (note) lines.push(...indented(note, '  '));
+    if (note) append(lines, indented(note, '  '));
     // A remark with no words yet is only a mark on the page: a bare quote would ask the agent to guess why.
     for (const remark of remarksOf(answer).filter(x => x.text.trim() !== '')) {
       const [first, ...rest] = remark.text.trim().split(/\r?\n/);
-      lines.push(`  - ${quoted(remark.passage)} — ${first}`, ...rest.flatMap(line => indented(line, '    ')));
+      lines.push(`  - ${quoted(remark.passage)} — ${first}`);
+      append(lines, rest.flatMap(line => indented(line, '    ')));
+    }
+    const words = SIDE_CHAT_WORDS[language];
+    for (const x of attachedOf(answer)) {
+      const [ask, ...askRest] = x.ask.trim().split(/\r?\n/);
+      const about = x.passage ? `${quoted(x.passage)} — ` : '';
+      const [reply, ...replyRest] = x.reply.trim().split(/\r?\n/);
+      lines.push(`  - ${words.question} ${about}${ask}`);
+      append(lines, askRest.flatMap(line => indented(line, '    ')));
+      lines.push(`    ${words.reply} ${reply}`);
+      append(lines, replyRest.flatMap(line => indented(line, '    ')));
     }
   }
   return asText(lines.join('\n'));
@@ -137,5 +189,13 @@ export function returnMessage(questions: readonly Question[], draft: Draft, lang
 export const asText = (message: string) => startsAsCommand(message) ? `\\${message.trimStart()}` : message;
 /** Whether Claude Code would take the text for a command: the page warns of the escape with the same rule. */
 export const startsAsCommand = (text: string) => /^[/!]/.test(text.trimStart());
+
+/**
+ * Adds every line, one at a time: a reply attached whole can run to hundreds of thousands of lines, more arguments
+ * than a spread into `push` can pass.
+ */
+export function append(lines: string[], more: readonly string[]) {
+  for (const line of more) lines.push(line);
+}
 
 const indented = (text: string, by: string) => text.split(/\r?\n/).map(line => line.trim() ? `${by}${line}` : '');

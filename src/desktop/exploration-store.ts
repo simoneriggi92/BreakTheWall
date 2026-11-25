@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateExploration, type Exploration } from '../core/exploration';
 import { idSchema } from '../core/lesson';
@@ -47,6 +47,10 @@ export class ExplorationStore {
     }
     explorations.sort((a, b) => (b.generation?.createdAt ?? '').localeCompare(a.generation?.createdAt ?? ''));
     return { explorations, skipped };
+  }
+  /** Every revision of one exploration goes, as when the spec it explored is deleted with its session (#102). */
+  async remove(id: string): Promise<void> {
+    await rm(join(this.root, idSchema.parse(id)), { recursive: true, force: true });
   }
   async find(id: string, revision: string): Promise<Exploration | undefined> {
     try {

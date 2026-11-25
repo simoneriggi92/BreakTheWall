@@ -434,6 +434,102 @@ describe('remarks on a question\'s passage (#98)', () => {
   });
 });
 
+describe('side-chat replies attached to an answer (#101)', () => {
+  const REPLY = 'Beside the rounds:\n\n```ts\nsessionFolder(projects, x)\n```\n\n  - one folder per session';
+
+  it('returns each attached exchange whole and verbatim under its question, after the note and the remarks', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    await api.send(1, {
+      generalNote: '',
+      answers: {
+        '1': {
+          choice: 'recommendation', note: 'Fine by me.',
+          remarks: [{ part: 'body', start: 4, end: 28, passage: 'server keeps every round', text: 'Every one?' }],
+          // Attached in any order, they return in the order they were asked.
+          attached: [
+            { turn: 3, ask: 'And on Linux?', passage: 'the per-user\ndata folder', reply: '`~/.config/Break the Wall`.' },
+            { turn: 1, ask: 'Where exactly?\nIn the repository?', reply: REPLY },
+          ],
+        },
+        // An attached reply alone is not an answer: the title line still reads "no answer".
+        '2': { note: '', attached: [{ turn: 1, ask: 'Why the server?', reply: 'Tests reach it.' }] },
+      },
+    }, 'en');
+    expect(await api.delivery()).toBe([
+      '**Q1 · Where do rounds live?** recommendation',
+      '  Fine by me.',
+      '  - «server keeps every round» — Every one?',
+      '  - Side chat — question: Where exactly?',
+      '    In the repository?',
+      '    reply: Beside the rounds:',
+      '',
+      '    ```ts',
+      '    sessionFolder(projects, x)',
+      '    ```',
+      '',
+      '      - one folder per session',
+      '  - Side chat — question: «the per-user data folder» — And on Linux?',
+      '    reply: `~/.config/Break the Wall`.',
+      '**Q2 · Who recognises a round?** no answer',
+      '  - Side chat — question: Why the server?',
+      '    reply: Tests reach it.',
+    ].join('\n'));
+  });
+
+  it('words the exchange in the page\'s language', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    await api.send(1, { generalNote: '', answers: { '2': { note: '', attached: [{ turn: 1, ask: 'Perché il server?', reply: 'I test lo raggiungono.' }] } } }, 'it');
+    expect(await api.delivery()).toBe([
+      '**Q1 · Where do rounds live?** nessuna risposta',
+      '**Q2 · Who recognises a round?** nessuna risposta',
+      '  - Chat laterale — domanda: Perché il server?',
+      '    risposta: I test lo raggiungono.',
+    ].join('\n'));
+  });
+
+  it('takes the longest reply a side chat can give, attached whole, and keeps the round it was sent with across a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir, deliveryHoldMs: 50 });
+    await client(first).turn(ROUND);
+    // A side chat's reply runs up to a million characters; three bytes each in UTF-8, the widest a BMP character takes.
+    const reply = '界'.repeat(1_000_000);
+    const draft = { generalNote: '', answers: { '1': { note: '', attached: [{ turn: 1, ask: 'Everything?', reply }] } } };
+    expect((await client(first).saveDraft(1, draft)).status).toBe(204);
+    expect((await client(first).send(1, draft)).status).toBe(200);
+    expect(await client(first).delivery()).toContain(reply);
+    await first.stop();
+    const api = client(await start({ dataDir }));
+    expect((await api.round())?.sent?.message).toContain(reply);
+  });
+
+  it('refuses a Send whose message would be too long to keep, rather than lose the round at the next start', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    // Each line of an attached reply is indented in the message: three replies of short lines outgrow what a round keeps.
+    const attached = [1, 2, 3].map(turn => ({ turn, ask: 'More?', reply: 'a\n'.repeat(500_000) }));
+    const draft = { generalNote: '', answers: { '1': { note: '', attached } } };
+    expect(await (await api.send(1, draft)).json()).toEqual({ error: 'too-long' });
+    expect((await api.round())?.sent).toBeNull();
+  });
+
+  it('keeps attached exchanges in the draft across a restart, and refuses one on a question the round does not have, or one turn twice', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir });
+    await client(first).turn(ROUND);
+    const draft = { generalNote: '', answers: { '1': { note: '', attached: [{ turn: 1, ask: 'Where?', reply: 'Here.' }] } } };
+    expect((await client(first).saveDraft(1, draft)).status).toBe(204);
+    await first.stop();
+    const api = client(await start({ dataDir }));
+    expect((await api.round()).draft).toEqual(draft);
+    const refused = async (attached: unknown[], question = '1') => (await api.saveDraft(1, { generalNote: '', answers: { [question]: { note: '', attached } } })).status;
+    expect(await refused([{ turn: 1, ask: 'Where?', reply: 'Here.' }], '9')).toBe(400);
+    expect(await refused([{ turn: 1, ask: 'Where?', reply: 'Here.' }, { turn: 1, ask: 'Where?', reply: 'Here.' }])).toBe(400);
+    expect(await refused([{ turn: 0, ask: 'Where?', reply: 'Here.' }])).toBe(400);
+  });
+});
+
 const CLARIFICATION = 'Before the next round: do you mean the page or the terminal when you say "the view"?';
 
 describe('a turn without a round, in the round phase, is a free block (#99)', () => {
@@ -633,5 +729,53 @@ describe('a response is sent as text, never as a command (#99)', () => {
     await api.turn(ROUND);
     await api.send(2, { generalNote: 'Use /grilling again', answers: {} });
     expect((await api.delivery())?.split('\n')[0]).toBe('Use /grilling again');
+  });
+});
+
+describe('the round head (#126)', () => {
+  it('names the project a round and a free block came from, for the chip at their head, and never the whole path', async () => {
+    const api = client(await start());
+    await api.turn(ROUND, SESSION, '/Users/someone/Projects/BreakTheWall/');
+    expect(await api.round()).toMatchObject({ project: 'BreakTheWall' });
+    expect(await api.round()).not.toHaveProperty('cwd');
+    await api.turn(CLARIFICATION, SESSION, '/Users/someone/Projects/BreakTheWall/');
+    expect(await api.free()).toMatchObject({ project: 'BreakTheWall' });
+    expect(await api.free()).not.toHaveProperty('cwd');
+  });
+
+  it('keeps the agent\'s text folded for that round alone, with its draft, across a restart', async () => {
+    const dataDir = folder();
+    const first = await start({ dataDir });
+    const api = client(first);
+    await api.turn(ROUND);
+    expect((await api.round()).turnFolded).toBe(false);
+    expect((await api.fold('rounds', 1, true)).status).toBe(204);
+    await api.saveDraft(1, ANSWERED);
+    expect(await api.round()).toMatchObject({ turnFolded: true, draft: ANSWERED });
+    await first.stop();
+    const again = client(await start({ dataDir }));
+    expect(await again.round()).toMatchObject({ turnFolded: true, draft: ANSWERED });
+    await again.turn(ROUND);
+    expect((await again.round()).turnFolded).toBe(false);
+  });
+
+  it('folds a sent or superseded round and a free block too: folding is reading, not answering', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    await api.send(1, ANSWERED);
+    expect((await api.fold('rounds', 1, true)).status).toBe(204);
+    expect((await api.round()).turnFolded).toBe(true);
+    await api.turn(CLARIFICATION);
+    expect((await api.fold('free', 1, true)).status).toBe(204);
+    expect((await api.free()).turnFolded).toBe(true);
+    expect((await api.fold('rounds', 1, false)).status).toBe(204);
+  });
+
+  it('refuses a fold that is not a yes or no, and one on a round or free block that does not exist', async () => {
+    const api = client(await start());
+    await api.turn(ROUND);
+    expect((await api.fold('rounds', 1, 'yes')).status).toBe(400);
+    expect((await api.fold('rounds', 7, true)).status).toBe(404);
+    expect((await api.fold('free', 1, true)).status).toBe(404);
   });
 });

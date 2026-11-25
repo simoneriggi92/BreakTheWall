@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { sessionIdSchema } from './local-server';
-import { asText, roundViewSchema } from './round-answers';
+import { asText, roundViewSchema, turnHeadFields } from './round-answers';
+import { specRemarksSectionSchema } from './spec-remarks';
 
 /**
  * The round phase of a session (#99): from the first round, or from the plugin asking a skill for rounds, until the
@@ -44,15 +45,42 @@ export const freeBlockViewSchema = z.strictObject({
   sent: z.strictObject({ message: z.string(), at: z.iso.datetime() }).nullable(),
   /** A later turn of the same session arrived on the page: this one no longer takes a response. */
   superseded: z.boolean(),
+  ...turnHeadFields,
 });
 export type FreeBlockView = z.infer<typeof freeBlockViewSchema>;
 
-/** What the page shows: the latest round or free block across sessions, and whether its session is in the phase. */
+/**
+ * Where the shown round or free block stands with its session (#103). Absent in a view kept from before, which then
+ * reads as answerable and not queued.
+ */
+const standingFields = {
+  /** Its message waits for an ended session, delivered when the person resumes it with `claude --resume <id>`. */
+  queued: z.boolean().default(false),
+  /** Claude Code no longer keeps the session's transcript: nothing can resume or fork it, so the round is read-only. */
+  transcriptGone: z.boolean().default(false),
+  /**
+   * Remarks on the specs the session handed over, written while this round awaits answers (#105): they ride in its
+   * message, after the answers. Empty on anything that takes no answers.
+   */
+  riding: z.array(specRemarksSectionSchema).default([]),
+};
+
+/** What the page shows: the latest round or free block across sessions, whether its session is in the phase, and where it stands. */
 export const currentViewSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('round'), round: roundViewSchema, phaseOpen: z.boolean() }),
-  z.strictObject({ kind: z.literal('free'), block: freeBlockViewSchema, phaseOpen: z.boolean() }),
+  z.strictObject({ kind: z.literal('round'), round: roundViewSchema, phaseOpen: z.boolean(), ...standingFields }),
+  z.strictObject({ kind: z.literal('free'), block: freeBlockViewSchema, phaseOpen: z.boolean(), ...standingFields }),
 ]);
 export type CurrentView = z.infer<typeof currentViewSchema>;
+
+/** A round or a free block, by the kind the page's view gives it and its number in the session. */
+export type TurnKey = Pick<FreeBlockView, 'session' | 'number'> & { kind: CurrentView['kind'] };
+/**
+ * Where each kind lives in the page's API (`/api/rounds/…`, `/api/free/…`): written once, for the page that builds a
+ * path and the server that reads one back.
+ */
+export const TURN_ROUTES = { round: 'rounds', free: 'free' } as const satisfies Record<TurnKey['kind'], string>;
+export const kindOfRoute = (route: string): TurnKey['kind'] | undefined =>
+  (Object.keys(TURN_ROUTES) as TurnKey['kind'][]).find(kind => TURN_ROUTES[kind] === route);
 
 /** The response as the agent receives it: the person's own words, never a command. */
 export const freeBlockMessage = (response: string) => asText(response.trim());

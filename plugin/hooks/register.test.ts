@@ -12,7 +12,11 @@ interface Fetched { url: string; method: string; body?: string }
 function engine(on: On) {
   const state = {
     session: 'sess-1',
+    /** Where Claude Code keeps the session's transcript; empty where it keeps none. */
+    transcript: '/home/me/.claude/projects/-work/sess-1.jsonl',
     fetched: [] as Fetched[],
+    /** Every launcher run, its arguments after the script. */
+    launched: [] as string[][],
     submitted: [] as { text: string; asUser: boolean }[],
     /** Messages the server holds for the session, handed to the next delivery polls in order. */
     deliveries: [] as { id: string; message: string }[],
@@ -22,17 +26,21 @@ function engine(on: On) {
   }
   on('session.start', () => ({ cwd: '/work' }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
+  on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('ui.log', () => ({ value: undefined }))
   on('process.hookEnv', () => ({ value: { CLAUDE_PLUGIN_ROOT: '/plugin' } }))
-  on('process.run', (_, e) => ({
-    value: {
+  on('process.run', (_, e) => {
+    if (e.argv[1] !== '--version') state.launched.push(e.argv.slice(2))
+    return { value: {
       exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
       stdout: e.argv[1] === '--version' ? 'v22.23.2\n' : JSON.stringify({ port: 4000, secret: 's3cret' }) + '\n',
-    },
-  }))
+    } }
+  })
   on('session.id', () => ({ value: state.session }))
   on('session.cwd', () => ({ value: '/work' }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.info', () => ({ value: { transcriptPath: state.transcript, platform: 'macos' as const, isHosted: false } }))
   on('http.fetch', (_, e) => {
     const method = e.init?.method ?? 'GET'
     state.fetched.push({ url: e.url, method, body: e.init?.body as string | undefined })
@@ -110,4 +118,72 @@ test('reads the session id again for each poll, as /clear and /resume change it 
     '/api/sessions/sess-2/delivery',
   ])
   expect(server.submitted.map(x => x.text)).toEqual(['after the clear'])
+})
+
+const posted = (server: ReturnType<typeof engine>, path: string) => server.fetched.filter(x => x.method === 'POST' && new URL(x.url).pathname === path).map(x => JSON.parse(x.body ?? '{}'))
+
+test('on /clear, reports the ending session ended and registers the id the session goes on under', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  await $.session.end({ reason: 'clear', sessionId: 'sess-1', resume: { id: 'sess-1' } })
+  expect(posted(server, '/api/sessions/sess-1/end')).toEqual([{ reason: 'clear' }])
+  server.session = 'sess-2'
+  await clock.advance(1_000)
+  expect(posted(server, '/api/sessions').at(-1)).toEqual({ id: 'sess-2', cwd: '/work', model: 'claude-opus-5-5', transcript: '/home/me/.claude/projects/-work/sess-1.jsonl' })
+})
+
+test('on an exit, reports the session ended and never registers its id again', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  const before = posted(server, '/api/sessions').length
+  await $.session.end({ reason: 'prompt_input_exit', sessionId: 'sess-1', resume: { id: 'sess-1' } })
+  await clock.advance(1_000)
+  expect(posted(server, '/api/sessions/sess-1/end')).toEqual([{ reason: 'prompt_input_exit' }])
+  expect(posted(server, '/api/sessions')).toHaveLength(before)
+})
+
+test('runs the launcher with its session, which does not count as another when an older server is replaced', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  expect(server.launched).toEqual([['start', 'sess-1']])
+})
+
+const registered = (server: ReturnType<typeof engine>) =>
+  server.fetched.filter(x => x.url === 'http://127.0.0.1:4000/api/sessions').map(x => JSON.parse(x.body ?? '{}'))
+
+test('registers the session with its model and the side-chat model set in the plugin', { options: { sideChatModel: 'haiku' } }, async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5', transcript: '/home/me/.claude/projects/-work/sess-1.jsonl', sideChatModel: 'haiku' })
+})
+
+test('leaves the side-chat model to the server\'s default when the plugin sets none', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5', transcript: '/home/me/.claude/projects/-work/sess-1.jsonl' })
+})
+
+test('registers the session with where Claude Code keeps its transcript, so the server knows when it is gone (#103)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  server.transcript = ''
+  await startSession($, clock)
+  // A session that keeps no transcript here names none: the server then never turns it read-only.
+  expect(registered(server)[0]).toEqual({ id: 'sess-1', cwd: '/work', model: 'claude-opus-5-5' })
+})
+
+test('delivers what was queued for a session resumed with claude --resume <id> as soon as it starts, before the person types (#103)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  server.session = 'sess-ended'
+  server.deliveries.push({ id: 'round-2', message: 'answered while the terminal was closed' })
+  await startSession($, clock)
+  expect(server.fetched.find(x => x.url.endsWith('/delivery'))?.url).toBe('http://127.0.0.1:4000/api/sessions/sess-ended/delivery')
+  expect(server.submitted).toEqual([{ text: 'answered while the terminal was closed', asUser: true }])
+  expect(server.order).toContain('POST /api/sessions/sess-ended/delivery/round-2')
 })

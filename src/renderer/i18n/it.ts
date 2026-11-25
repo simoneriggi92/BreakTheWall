@@ -17,11 +17,26 @@ export const it = {
     round: {
       title: (n: number) => `Round ${n}`,
       turnText: 'Il testo del turno',
+      /** The page's parts that fold and unfold: the outline, the right column, the turn's text. */
+      folds: {
+        foldOutline: 'Comprimi le domande', unfoldOutline: 'Espandi le domande',
+        foldSide: 'Comprimi la colonna destra', unfoldSide: 'Espandi la colonna destra',
+        hideTurn: 'Nascondi il testo dell’agente', showTurn: 'Mostra il testo dell’agente',
+        /** The server did not keep the fold of the agent's text (#126): it still holds on the page that made it. */
+        turnFoldFailed: 'Non salvato: il testo dell’agente resta così solo in questa pagina.',
+        resizeOutline: 'Ridimensiona le domande', resizeSide: 'Ridimensiona la colonna destra',
+        resizeHint: 'Trascina o usa ← → per ridimensionare · doppio clic per la larghezza iniziale',
+      },
       outline: 'Domande',
       progress: (answered: number, total: number) => `${answered}/${total} con risposta`,
+      /** The strip at the window's foot (#125): the round's progress, one segment per question and the count. */
+      strip: 'Avanzamento del round',
       question: (n: number, title: string) => `Q${n} · ${title}`,
       number: (n: number) => `Q${n}`,
       collapsed: (n: number, title: string, state: string) => `Q${n} · ${title} · ${state}`,
+      // The ruler's number (#124, #125), in the rail and the strip; a tick's name starts with it, so a voice command says what it sees.
+      tick: (n: number) => String(n).padStart(2, '0'),
+      tickName: (tick: string, title: string, state: string) => `${tick} · ${title} · ${state}`,
       states: { unanswered: 'nessuna risposta', recommendation: 'raccomandazione', none: 'nessuna scelta', note: 'nota' },
       optionState: (letter: string) => `opzione (${letter})`,
       options: 'Opzioni',
@@ -34,6 +49,8 @@ export const it = {
       writeNote: 'Scrivi una nota',
       writeGeneralNote: 'Aggiungi una nota generale',
       remark: 'Osservazione',
+      /** Beside "Remark" on a selected passage (#101): asks about it in the side chat. */
+      askHere: 'Chiedi qui',
       remarks: 'Osservazioni',
       remarkOn: (quote: string) => `Osservazione su ${quote}`,
       removeRemark: 'Togli',
@@ -43,6 +60,8 @@ export const it = {
       generalNote: 'Nota generale',
       generalNoteHint: 'Torna in cima al messaggio.',
       receives: 'Cosa riceve l’agente',
+      /** The right column's head while a side chat is open (#123): the answer folded above, the chat below. */
+      withSideChat: 'Risposta e chat laterale',
       closeReceives: 'Chiudi',
       send: 'Invia',
       sending: 'Invio…',
@@ -53,6 +72,8 @@ export const it = {
     /** A turn without a round, during the round phase (#99). */
     free: {
       title: 'Il turno dell’agente',
+      /** The chip's last part (#126): free blocks are numbered apart from rounds, so two of one session read apart. */
+      number: (n: number) => `Blocco ${n}`,
       response: 'La tua risposta',
       asText: 'Inizia con / o !: viene inviata come testo, Claude Code non esegue comandi né skill.',
       send: 'Invia',
@@ -69,6 +90,153 @@ export const it = {
       ended: 'Fase dei round conclusa',
       endedHint: 'I prossimi turni dell’agente senza un round restano nel terminale.',
       endFailed: 'La fase non si è chiusa. Riprova.',
+    },
+    /** The history column (#102): project → session → numbered rounds. */
+    history: {
+      open: 'Cronologia',
+      title: 'Cronologia',
+      close: 'Chiudi',
+      live: 'attiva',
+      ended: 'conclusa',
+      round: (n: number) => `Round ${n}`,
+      states: { open: 'aperto', sent: 'inviato', superseded: 'superato', queued: 'in coda' },
+      transcriptGone: 'sola lettura',
+      delete: 'Elimina la sessione',
+      confirmDelete: 'Eliminala per sempre',
+      keep: 'Tienila',
+      deleteFailed: 'La sessione non è stata eliminata. Riprova.',
+      openFailed: 'Il round non si è aperto. Riprova.',
+    },
+    /** A round of an ended session (#103): what waits for `claude --resume <id>`, and what is read-only once the transcript is gone. */
+    session: {
+      /** Followed by the command, shown as code. */
+      queued: 'In coda: arriva all’agente quando riprendi la sessione con',
+      copyCommand: 'Copia il comando',
+      copyMarkdown: 'Copia come Markdown',
+      copied: 'Copiato.',
+      copyFailed: 'Copia non riuscita: seleziona il testo e copialo a mano.',
+      transcriptGone: 'Claude Code non conserva più la conversazione di questa sessione: i suoi round e le chat laterali restano in sola lettura.',
+      sideChatGone: 'Claude Code non conserva più questa sessione: la chat laterale si può leggere, non continuare.',
+    },
+    /** What arrives while the person writes or reads history (#102), and an update that waits. */
+    notice: {
+      /** Followed by the project's name, emphasised. */
+      newRound: 'Nuovo round in',
+      newTurn: 'Nuovo turno dell’agente in',
+      /** A spec handed over while the person writes or reads history (#104). */
+      newSpec: 'Nuova specifica in',
+      /** A handover the server could not read (#104): the location as the agent wrote it, and why. */
+      unreadable: (location: string, why: string) => `La specifica in ${location} non si è potuta leggere: ${why}. Nessuna specifica è stata consegnata; la fase dei round non finisce.`,
+      unreadableWhy: {
+        'gh-failed': 'gh non l’ha trovata o non ha risposto',
+        missing: 'nella cartella della sessione non c’è questo file',
+        outside: 'il file è fuori dalla cartella della sessione',
+        'not-a-file': 'è una cartella, non un file',
+        'too-large': 'il file è troppo grande',
+        'not-text': 'il file non è testo UTF-8',
+        empty: 'la specifica è vuota',
+      },
+      open: 'Apri',
+      update: (version: string) => `Break the Wall ${version} è pronto: l’aggiornamento arriva quando le altre sessioni finiscono.`,
+    },
+    /** A side chat on one question (#100): a read-only copy of the session answers; nothing reaches the agent. */
+    sideChat: {
+      open: 'Chiedi su questa domanda',
+      openShort: '💬 Chiedi',
+      title: (n: number) => `Chat laterale · Q${n}`,
+      close: 'Chiudi la chat laterale',
+      fork: 'Copia della sessione in sola lettura · Read · Grep · Glob · niente di qui arriva all’agente',
+      empty: (n: number) => `Chiedi quello che vuoi su Q${n}. Risponde una copia della sessione che conosce la conversazione fino a questa domanda e legge il repository.`,
+      field: 'Chiedi nella chat laterale',
+      placeholder: 'Chiedi (Invio per inviare)',
+      send: 'Chiedi',
+      you: 'Tu',
+      reply: 'Risposta',
+      running: 'La copia della sessione legge…',
+      read: 'Cosa ha letto la risposta',
+      fresh: 'Non è stato possibile copiare la sessione: questa risposta conosce il round, non la conversazione.',
+      failed: 'Nessuna risposta. Chiedi di nuovo.',
+      askFailed: 'La domanda non è partita. Riprova.',
+      count: (n: number) => `${n} nella chat laterale`,
+      /** The passage the next question quotes (#101). */
+      askingAbout: 'Chiedi su',
+      wholeQuestion: 'Chiedi sull’intera domanda',
+      attach: '📎 Allega alla risposta',
+      /** Before Send: side chats none of whose replies the person attached. */
+      unattached: (n: number) => n === 1 ? '1 chat laterale senza una risposta allegata' : `${n} chat laterali senza una risposta allegata`,
+      key: 'c chat laterale',
+    },
+    /** A spec the agent handed over (#104), opened as a source. */
+    spec: {
+      /** The version's number and its location as the agent wrote it. */
+      version: (n: number, location: string) => `Versione ${n} · ${location}`,
+      /** Followed by `openNew`, as one line: "superseded · open the new version". */
+      superseded: 'superata',
+      openNew: 'apri la nuova versione',
+      /** The brand button over the spec: it closes the spec, back to the round or the library. */
+      close: 'Chiudi la specifica',
+      writing: 'Claude Code sta scrivendo la struttura della specifica…',
+      repairing: 'Claude Code sta correggendo la struttura della specifica…',
+      cancel: 'Annulla',
+      failed: 'La struttura della specifica non è stata scritta.',
+      cancelled: 'La scrittura della struttura è stata annullata.',
+      retry: 'Scrivi di nuovo la struttura',
+      notWritten: 'La struttura della specifica non è ancora stata scritta.',
+      write: 'Scrivi la struttura',
+      unreadable: 'Non è stato possibile leggere l’esplorazione della specifica.',
+      actionFailed: 'Il server non ha accettato la richiesta. Riprova.',
+      /** In the page's dock, beside History, while a round is shown: opens the newest spec again (#105). */
+      open: (title: string) => `Specifica · ${title}`,
+    },
+    /** Remarks on a handed-over spec (#105), returned to the agent with one Send as a request for a round. */
+    specRemarks: {
+      title: 'Osservazioni sulla specifica',
+      toggle: (n: number) => n > 0 ? `Osservazioni · ${n}` : 'Osservazioni',
+      close: 'Chiudi',
+      /** On a passage selected in the source. */
+      remark: 'Osservazione',
+      missingHere: 'Manca qui',
+      missing: '(manca qui)',
+      lines: (from: number, to: number) => from === to ? `riga ${from}` : `righe ${from}–${to}`,
+      remarkOn: (where: string) => `Osservazione su ${where}`,
+      remove: 'Togli',
+      removeOn: (where: string) => `Togli l’osservazione su ${where}`,
+      empty: 'Seleziona un passaggio della fonte per scriverci un’osservazione, o per dire che lì manca qualcosa.',
+      noNew: 'Questa versione è superata: non prende nuove osservazioni. Quelle già scritte su di essa si possono ancora inviare.',
+      generalNote: 'Nota generale',
+      generalNoteHint: 'Torna dopo le righe iniziali del messaggio.',
+      receives: 'Cosa riceve l’agente',
+      send: 'Invia',
+      sending: 'Invio…',
+      sent: 'Inviate. L’agente riceve esattamente questo messaggio.',
+      rides: (n: number) => `Il round ${n} aspetta le tue risposte: queste osservazioni viaggiano nel suo messaggio, dopo le risposte.`,
+      sendFailed: 'Invio non riuscito. Riprova.',
+      saveFailed: 'L’ultima modifica non è stata salvata.',
+      sentTitle: 'Già inviate',
+      sentAlone: 'Inviate da sole',
+      sentWith: (n: number) => `Inviate con le risposte al round ${n}`,
+    },
+    /** The backing of a handed-over spec (#106): what each statement declares it rests on, checked without a model. */
+    backing: {
+      title: 'Fondamento della specifica',
+      toggle: (unbacked: number, broken: number) => `Fondamento · ${unbacked} senza · ${broken} non ${broken === 1 ? 'trovato' : 'trovati'}`,
+      close: 'Chiudi',
+      /** A section's heading: its title, then what is flagged in it. */
+      section: (title: string, unbacked: number, broken: number) => [title, ...unbacked ? [`${unbacked} senza fondamento`] : [], ...broken ? [`${broken} ${broken === 1 ? 'rotto' : 'rotti'}`] : [], ...!unbacked && !broken ? ['con fondamento'] : []].join(' · '),
+      opening: 'Titolo e apertura',
+      states: { backed: 'Con fondamento', unbacked: 'Senza fondamento', broken: 'Fondamento non trovato' },
+      notFound: 'non trovato',
+      cited: (written: string) => `Risposta citata ${written}`,
+      question: (round: number, question: number) => `Round ${round} · Q${question}`,
+      choice: {
+        recommendation: (text: string) => `raccomandazione: ${text}`,
+        option: (letter: string, label: string) => `(${letter}) ${label}`,
+        none: 'nessuna scelta',
+      },
+      notSent: 'nessuna risposta inviata dalla pagina',
+      remarkOn: (lines: string) => `Osservazione su ${lines}`,
+      remark: 'Osservazione',
+      failed: 'Il fondamento non è stato controllato. Riapri la specifica per riprovare.',
     },
   },
   assistants: {

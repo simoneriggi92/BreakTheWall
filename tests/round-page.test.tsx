@@ -17,6 +17,8 @@ const SESSION = 'c0ffee00-0000-4000-8000-000000000001';
 
 const ROUND: RoundView = {
   session: SESSION,
+  project: 'BreakTheWall',
+  turnFolded: false,
   number: 1,
   receivedAt: '2026-11-23T10:00:00.000Z',
   turnText: 'I read the server and the plugin. Two decisions are open.',
@@ -36,7 +38,7 @@ interface Request { method: string; url: string; body: unknown }
  * The local server as the page sees it: one round, or a free block shown over it, whether the session is in the round
  * phase, and a poll that answers when any of them changes.
  */
-function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; phaseOpen?: boolean } = {}) {
+function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; phaseOpen?: boolean; foldFails?: boolean } = {}) {
   let round = initial;
   let free = more.free ?? null;
   let phaseOpen = more.phaseOpen ?? true;
@@ -56,11 +58,14 @@ function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; 
       free = free && { ...free, response: (body as { response: string }).response, sent: { message, at: '2026-11-23T10:06:00.000Z' } };
       return Response.json({ message });
     }
+    if (more.foldFails && method === 'PUT' && url.endsWith('/fold')) return new Response('{}', { status: 500 });
     if (url === '/api/page/poll') return new Promise<Response>((done, fail) => {
       polls.add(done);
       init?.signal?.addEventListener('abort', () => fail(new DOMException('aborted', 'AbortError')));
     });
     if (method === 'PUT' && url === `/api/rounds/${SESSION}/1/draft`) return new Response(null, { status: 204 });
+    if (method === 'PUT' && url === `/api/rounds/${SESSION}/${round?.number}/fold`) { round = round && { ...round, turnFolded: (body as { folded: boolean }).folded }; return new Response(null, { status: 204 }); }
+    if (method === 'PUT' && url === `/api/free/${SESSION}/1/fold`) { free = free && { ...free, turnFolded: (body as { folded: boolean }).folded }; return new Response(null, { status: 204 }); }
     if (method === 'POST' && url === `/api/rounds/${SESSION}/1/send`) {
       // The server words the message; the page must show the server's words, not its own preview.
       const message = `as delivered by the server (${(body as { language: string }).language})`;
@@ -76,12 +81,17 @@ function fakeServer(initial: View | null = ROUND, more: { free?: FreeBlockView; 
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
-beforeEach(() => { sessionStorage.clear(); window.history.replaceState(null, '', `/#t=${SECRET}`); setLanguage('en-GB'); });
+beforeEach(() => { sessionStorage.clear(); localStorage.clear(); window.history.replaceState(null, '', `/#t=${SECRET}`); setLanguage('en-GB'); });
 afterEach(() => setLanguage('it-IT'));
 
 const outline = () => screen.getByRole('navigation', { name: 'Questions' });
 const receives = () => screen.getByRole('region', { name: 'What the agent receives' });
 const returnText = () => within(receives()).getByTestId('return-message').textContent;
+/** The round's progress at the window's foot (#125): the segments, and the count as the text that is read. */
+const strip = () => screen.getByRole('contentinfo', { name: 'Round progress' });
+/** Each segment as the eye reads it: its number, filled or not, and whether it marks the question in focus. */
+const segments = () => [...strip().querySelectorAll('li')]
+  .map(x => `${x.textContent} ${x.classList.contains('is-answered') ? 'answered' : 'open'}${x.classList.contains('is-current') ? ' current' : ''}`);
 
 describe('a round in the page (#95)', () => {
   it('shows the turn\'s text, an outline of the questions with their state, and the first question in focus', async () => {
@@ -89,7 +99,7 @@ describe('a round in the page (#95)', () => {
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Two decisions are open.');
     const items = within(outline()).getAllByRole('button');
     expect(items.map(x => x.textContent)).toEqual(['Q1 · Where do rounds live?no answer', 'Q2 · Who recognises a round?no answer']);
-    expect(within(screen.getByRole('banner')).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
     const question = screen.getByRole('article');
     expect(within(question).getByRole('heading', { level: 2 })).toHaveTextContent('Q1 · Where do rounds live?');
     expect(question).toHaveTextContent('The server keeps every round it receives.');
@@ -108,7 +118,7 @@ describe('a round in the page (#95)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
     expect(screen.getByRole('button', { name: 'Accept the recommendation' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(screen.getByRole('banner')).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
     expect(returnText()).toBe('**Q1 · Where do rounds live?** recommendation\n**Q2 · Who recognises a round?** no answer');
 
     await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
@@ -176,7 +186,7 @@ describe('a round in the page (#95)', () => {
     render(<LocalPage fetch={fakeServer({ ...ROUND, draft: { generalNote: 'Kept.', answers: { '2': { choice: 'none', note: '' } } } }).fetch}/>);
     await screen.findByRole('article');
     expect(screen.getByRole('textbox', { name: 'General note' })).toHaveValue('Kept.');
-    expect(within(screen.getByRole('banner')).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
     // The first question still waiting for an answer is the one in focus.
     expect(screen.getByRole('article')).toHaveTextContent('Where do rounds live?');
   });
@@ -276,15 +286,14 @@ describe('reading one question comfortably (#97)', () => {
     expect(question).toHaveTextContent('broken diagram');
   });
 
-  it('keeps "n/m answered" in the top bar, and collapses an answered question in the outline once focus moves on', async () => {
+  it('keeps "n/m answered" in view, and collapses an answered question in the outline once focus moves on', async () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
     await screen.findByRole('article');
-    const bar = screen.getByRole('banner');
-    expect(within(bar).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
 
     await user.click(within(screen.getByRole('group', { name: 'Options' })).getByRole('button', { name: /On disk/ }));
-    expect(within(bar).getByText('1/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
     // The question in focus stays whole in the outline, answered or not.
     const first = () => within(outline()).getAllByRole('button')[0];
     expect(first()).toHaveTextContent('Q1 · Where does the question live?option (b)');
@@ -336,11 +345,12 @@ describe('reading one question comfortably (#97)', () => {
     const user = userEvent.setup();
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
     const question = await screen.findByRole('article');
-    // At first: the options, the recommendation, no choice, two small "write" buttons, and Send. No text fields.
+    // At first: the side chat's opener (#100), the options, the recommendation, no choice, two small "write" buttons,
+    // and Send. No text fields.
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /Previous question|Next question/ })).toBeNull();
     expect(within(question).getAllByRole('button').map(x => x.textContent)).toEqual([
-      expect.stringContaining('(a)'), expect.stringContaining('(b)'), expect.stringContaining('(c)'),
+      '💬 Ask', expect.stringContaining('(a)'), expect.stringContaining('(b)'), expect.stringContaining('(c)'),
       'Accept the recommendation', 'No choice', 'Write a note',
     ]);
 
@@ -361,15 +371,27 @@ describe('reading one question comfortably (#97)', () => {
 
   it('shows the keys on the question in focus, in both languages', async () => {
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
-    expect(within(await screen.findByRole('article')).getByText('j/k move · 1–3 pick · y accept · n note · Ctrl+Enter send')).toBeInTheDocument();
+    expect(within(await screen.findByRole('article')).getByText('j/k move · 1–3 pick · y accept · n note · c side chat · Ctrl+Enter send')).toBeInTheDocument();
     cleanup();
     setLanguage('it-IT');
     render(<LocalPage fetch={fakeServer(WITH_OPTIONS).fetch}/>);
-    expect(within(await screen.findByRole('article')).getByText('j/k sposta · 1–3 scegli · y accetta · n nota · Ctrl+Invio invia')).toBeInTheDocument();
+    expect(within(await screen.findByRole('article')).getByText('j/k sposta · 1–3 scegli · y accetta · n nota · c chat laterale · Ctrl+Invio invia')).toBeInTheDocument();
   });
 });
 
-/** A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. */
+/**
+ * The round on screen and listening to the window's width. It subscribes in an effect, which under load can run after
+ * the article is on screen: a resize or a count before then misses the page's listeners.
+ */
+async function shownAt(browser: ReturnType<typeof viewport>) {
+  await screen.findByRole('article');
+  await waitFor(() => expect(browser.subscriptions()).toBeGreaterThanOrEqual(2));
+}
+
+/**
+ * A window `width` pixels wide, as `matchMedia` reports it; resizing tells the listeners, as a browser does. It counts
+ * the listeners on the width only: the colour scheme's belong to the preferences, mounted again when the page appears.
+ */
 function viewport(width: number) {
   const lists = new Set<{ query: string; listeners: Set<() => void> }>();
   let subscribed = 0;
@@ -379,11 +401,131 @@ function viewport(width: number) {
     lists.add(list);
     return {
       get matches() { return matches(query); }, media: query,
-      addEventListener: (_: string, f: () => void) => { subscribed++; list.listeners.add(f); }, removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
+      addEventListener: (_: string, f: () => void) => { if (/max-width/.test(query)) subscribed++; list.listeners.add(f); }, removeEventListener: (_: string, f: () => void) => list.listeners.delete(f),
     };
   }) as unknown as typeof window.matchMedia;
   return { resize: (next: number) => { width = next; act(() => lists.forEach(l => l.listeners.forEach(f => f()))); }, subscriptions: () => subscribed };
 }
+
+describe('folding the parts of a round', () => {
+  it('folds the outline to its numbers and unfolds it again', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(outline()).toHaveTextContent('Where do rounds live?');
+
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    expect(outline()).not.toHaveTextContent('Where do rounds live?');
+    // Folded by hand on a wide window, the outline is the same rail as below ~1180 px: the ruler's ticks (#124).
+    expect(within(outline()).getByRole('button', { name: /^01 · Where do rounds live\?/ })).toHaveTextContent('01');
+
+    await user.click(screen.getByRole('button', { name: 'Unfold the questions' }));
+    expect(outline()).toHaveTextContent('Where do rounds live?');
+  });
+
+  it('folds the right column to a strip that still says how many are answered, and unfolds it', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Fold the right column' }));
+    expect(screen.queryByRole('region', { name: 'What the agent receives' })).toBeNull();
+
+    const unfold = screen.getByRole('button', { name: 'Unfold the right column' });
+    expect(unfold).toHaveTextContent('What the agent receives · 0/2 answered');
+    await user.click(unfold);
+    expect(receives()).toBeVisible();
+  });
+
+  it('remembers what was folded when the page opens again', async () => {
+    const user = userEvent.setup();
+    const first = render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    await user.click(screen.getByRole('button', { name: 'Fold the right column' }));
+    first.unmount();
+
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(outline()).not.toHaveTextContent('Where do rounds live?');
+    expect(screen.getByRole('button', { name: 'Unfold the right column' })).toBeInTheDocument();
+  });
+
+  it('names the folds in Italian', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(screen.getByRole('button', { name: 'Comprimi le domande' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comprimi la colonna destra' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nascondi il testo dell’agente' })).toBeInTheDocument();
+  });
+});
+
+describe('resizing the columns by their edge', () => {
+  const layout = () => screen.getByRole('main');
+  const resizeQuestions = () => screen.getByRole('separator', { name: 'Resize the questions' });
+  const resizeRight = () => screen.getByRole('separator', { name: 'Resize the right column' });
+
+  it('widens and narrows the outline from the keyboard, within bounds', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '240');
+    expect(resizeQuestions()).toHaveAttribute('aria-orientation', 'vertical');
+
+    resizeQuestions().focus();
+    await user.keyboard('{ArrowRight}');
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '256');
+    expect(layout().style.getPropertyValue('--col-left')).toBe('min(256px, 22vw)');
+
+    for (let i = 0; i < 30; i++) await user.keyboard('{ArrowLeft}');
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '160');
+  });
+
+  it('widens the right column when its edge is dragged to the left, and remembers it', async () => {
+    const first = render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(resizeRight()).toHaveAttribute('aria-valuenow', '360');
+
+    fireEvent.pointerDown(resizeRight(), { clientX: 1000, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 900, pointerId: 1 });
+    expect(resizeRight()).toHaveAttribute('aria-valuenow', '460');
+    expect(layout().style.getPropertyValue('--col-right')).toBe('min(460px, 32vw)');
+    first.unmount();
+
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(resizeRight()).toHaveAttribute('aria-valuenow', '460');
+  });
+
+  it('goes back to the default width on a double click', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    resizeQuestions().focus();
+    await user.keyboard('{ArrowRight}');
+    await user.dblClick(resizeQuestions());
+    expect(resizeQuestions()).toHaveAttribute('aria-valuenow', '240');
+    expect(layout().style.getPropertyValue('--col-left')).toBe('');
+  });
+
+  it('offers no edge on a folded column', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    await user.click(screen.getByRole('button', { name: 'Fold the right column' }));
+    expect(screen.queryByRole('separator')).toBeNull();
+  });
+
+  it('names the edges in Italian', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(screen.getByRole('separator', { name: 'Ridimensiona le domande' })).toBeInTheDocument();
+    expect(screen.getByRole('separator', { name: 'Ridimensiona la colonna destra' })).toBeInTheDocument();
+  });
+});
 
 describe('the round beside a terminal (#97)', () => {
   afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
@@ -392,15 +534,11 @@ describe('the round beside a terminal (#97)', () => {
     const user = userEvent.setup();
     const browser = viewport(1400);
     render(<LocalPage fetch={fakeServer().fetch}/>);
-    await screen.findByRole('article');
+    await shownAt(browser);
     expect(within(outline()).getAllByRole('button')[1]).toHaveTextContent('Q2 · Who recognises a round?no answer');
 
     browser.resize(1100);
-    const rail = within(outline()).getAllByRole('button');
-    expect(rail.map(x => x.textContent)).toEqual(['Q1', 'Q2']);
-    expect(rail[1]).toHaveAccessibleName('Q2 · Who recognises a round? · no answer');
-    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
-    expect(within(outline()).getAllByRole('button')[0]).toHaveTextContent('Q1 ✓');
+    expect(within(outline()).getAllByRole('button')[1]).toHaveAccessibleName('02 · Who recognises a round? · no answer');
     await user.click(within(outline()).getByRole('button', { name: /Who recognises a round/ }));
     expect(screen.getByRole('article')).toHaveTextContent('The mod or the server.');
     // The right column is still a column at this width.
@@ -411,7 +549,7 @@ describe('the round beside a terminal (#97)', () => {
     const user = userEvent.setup();
     const browser = viewport(1400);
     render(<LocalPage fetch={fakeServer().fetch}/>);
-    await screen.findByRole('article');
+    await shownAt(browser);
     const before = browser.subscriptions();
     await user.keyboard('yjy');
     expect(browser.subscriptions()).toBe(before);
@@ -449,6 +587,75 @@ describe('the round beside a terminal (#97)', () => {
     expect(server.requests.some(x => x.method === 'POST')).toBe(true);
     expect(await within(receives()).findByText('as delivered by the server (en)')).toBeInTheDocument();
     expect(within(receives()).getByRole('status')).toHaveTextContent('Sent.');
+  });
+});
+
+describe('the rail as a ruler (#124)', () => {
+  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+  const ticks = () => within(outline()).getAllByRole('button');
+
+  it('shows one numbered tick per question, each current, answered or open, and moves with the keys as before', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1100);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    expect(ticks().map(x => x.textContent)).toEqual(['01', '02']);
+    // Current and open: the first question has the focus, the second waits.
+    expect(ticks()[0]).toHaveAttribute('aria-current', 'true');
+    expect(ticks()[0]).toHaveAccessibleName('01 · Where do rounds live? · no answer');
+    expect(ticks()[1]).not.toHaveAttribute('aria-current');
+    expect(ticks()[1]).toHaveAccessibleName('02 · Who recognises a round? · no answer');
+
+    // Answered: the tick keeps its number with no mark beside it; its state is drawn by the tick and said by its name.
+    await user.keyboard('yj');
+    expect(ticks().map(x => x.textContent)).toEqual(['01', '02']);
+    expect(ticks()[0]).not.toHaveAttribute('aria-current');
+    expect(ticks()[0]).toHaveAccessibleName('01 · Where do rounds live? · recommendation');
+    expect(ticks()[1]).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('heading', { level: 2, name: 'Q2 · Who recognises a round?' })).toBeInTheDocument();
+  });
+
+  it('runs the current question\'s title under the ticks, in the rail only, for the eye only', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1100);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    // The heading already says it to a screen reader: the rail's copy is hidden from it, and sits after the ticks.
+    const title = screen.getByText('Where do rounds live?');
+    expect(title).toHaveAttribute('aria-hidden', 'true');
+    expect(outline().compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.keyboard('j');
+    expect(screen.queryByText('Where do rounds live?')).toBeNull();
+    expect(screen.getByText('Who recognises a round?')).toHaveAttribute('aria-hidden', 'true');
+
+    // The drawer's rail has it too; the wide outline, with its titles, does not.
+    browser.resize(700);
+    expect(screen.getByText('Who recognises a round?')).toHaveAttribute('aria-hidden', 'true');
+    browser.resize(1400);
+    expect(screen.queryByText('Who recognises a round?')).toBeNull();
+  });
+
+  it('stands the question\'s number large behind its heading on the wide layout, outline folded or not, and nowhere else', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    const numeral = () => within(screen.getByRole('article')).queryByText(/^\d\d$/);
+    // A figure for the eye: the real number stays in the heading, the one a screen reader hears.
+    expect(numeral()).toHaveTextContent('01');
+    expect(numeral()).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('heading', { level: 2, name: 'Q1 · Where do rounds live?' })).toBeInTheDocument();
+
+    await user.keyboard('j');
+    expect(numeral()).toHaveTextContent('02');
+    await user.click(screen.getByRole('button', { name: 'Fold the questions' }));
+    expect(numeral()).toHaveTextContent('02');
+
+    browser.resize(1100);
+    expect(numeral()).toBeNull();
+    browser.resize(700);
+    expect(numeral()).toBeNull();
   });
 });
 
@@ -498,7 +705,7 @@ describe('remarks on a question\'s passage (#98)', () => {
       '  - «server keeps every round» — Every one, forever?',
       '**Q2 · Who recognises a round?** no answer',
     ].join('\n'));
-    expect(within(screen.getByRole('banner')).getByText('0/2 answered')).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
     await waitFor(() => expect(server.requests.filter(x => x.method === 'PUT').at(-1)?.body).toEqual({
       generalNote: '',
       answers: { '1': { note: '', remarks: [{ part: 'body', start: 4, end: 28, passage: 'server keeps every round', text: 'Every one, forever?' }] } },
@@ -591,6 +798,8 @@ describe('remarks on a question\'s passage (#98)', () => {
 
 const FREE: FreeBlockView = {
   session: SESSION,
+  project: 'BreakTheWall',
+  turnFolded: false,
   number: 1,
   receivedAt: '2026-11-23T10:04:00.000Z',
   text: 'Before the next round: do you mean **the page** or the terminal when you say "the view"?',
@@ -691,5 +900,218 @@ describe('the round phase in the page (#99)', () => {
     render(<LocalPage fetch={fakeServer(ROUND, { free: FREE, phaseOpen: false }).fetch}/>);
     expect(await screen.findByText(/Fase dei round conclusa/)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'La tua risposta' })).toBeInTheDocument();
+  });
+});
+
+describe('the round page as a drafting sheet (#123)', () => {
+  it('keeps the top bar to the brand, without its tagline, on a round and on a free block', async () => {
+    const server = fakeServer();
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('banner')).getByText('Break the Wall')).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByText('Take the text apart.')).toBeNull();
+
+    server.changeFree(FREE);
+    await screen.findByRole('region', { name: 'The agent’s turn' });
+    expect(within(screen.getByRole('banner')).queryByText('Take the text apart.')).toBeNull();
+  });
+
+  it('heads each side panel with its name, its fold button in the head, before what the panel holds', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    const follows = (a: HTMLElement, b: HTMLElement) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    const questions = screen.getByRole('heading', { level: 2, name: 'Questions' });
+    const foldQuestions = screen.getByRole('button', { name: 'Fold the questions' });
+    expect(follows(questions, foldQuestions)).toBe(true);
+    expect(follows(foldQuestions, outline())).toBe(true);
+
+    const receiving = within(receives()).getByRole('heading', { level: 2, name: 'What the agent receives' });
+    const foldSide = within(receives()).getByRole('button', { name: 'Fold the right column' });
+    expect(follows(receiving, foldSide)).toBe(true);
+    expect(follows(foldSide, within(receives()).getByRole('button', { name: 'Add a general note' }))).toBe(true);
+
+    // With a side chat open the column keeps a head row, its fold in it, above what the agent receives and the chat.
+    await user.click(screen.getByRole('button', { name: 'Ask about this question' }));
+    const column = screen.getByRole('heading', { level: 2, name: 'Answer and side chat' });
+    const foldColumn = screen.getByRole('button', { name: 'Fold the right column' });
+    expect(column.parentElement).toHaveClass('round-panel-head');
+    expect(foldColumn.parentElement).toBe(column.parentElement);
+    expect(follows(foldColumn, screen.getByText(/^What the agent receives ·/))).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Close the side chat' }));
+
+    // Folded to a rail, the outline keeps only its button: the numbers below need no name above them.
+    await user.click(foldQuestions);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Questions' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Unfold the questions' })).toBeInTheDocument();
+  });
+
+  it('names the column with a side chat open in Italian', async () => {
+    const user = userEvent.setup();
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await user.click(await screen.findByRole('button', { name: 'Chiedi su questa domanda' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Risposta e chat laterale' })).toBeInTheDocument();
+  });
+});
+
+const CONTEXT: RoundView = {
+  ...ROUND,
+  turnText: '## What I read\n\n- The server keeps **every** round.\n- The plugin only injects.\n\nTwo decisions are open.',
+};
+const turnText = () => screen.getByRole('region', { name: 'The turn’s text' });
+const folds = (requests: Request[]) => requests.filter(x => x.method === 'PUT' && x.url.endsWith('/fold'));
+
+describe('the round head (#126)', () => {
+  it('heads the agent’s text with where the round came from: project · session · round', async () => {
+    render(<LocalPage fetch={fakeServer({ ...ROUND, number: 3 }).fetch}/>);
+    await screen.findByRole('article');
+    expect(within(turnText()).getByText('BreakTheWall · c0ffee00 · Round 3')).toBeInTheDocument();
+  });
+
+  it('folds the agent’s text to one line, the chip then its first line, and keeps that with the round', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(CONTEXT);
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    await user.click(within(turnText()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(turnText()).toHaveTextContent(/^BreakTheWall · c0ffee00 · Round 1\s*What I read\s*Show the agent’s text$/);
+    await waitFor(() => expect(folds(server.requests)).toEqual([{ method: 'PUT', url: `/api/rounds/${SESSION}/1/fold`, body: { folded: true } }]));
+
+    await user.click(within(turnText()).getByRole('button', { name: 'Show the agent’s text' }));
+    expect(turnText()).toHaveTextContent('The plugin only injects.');
+    await waitFor(() => expect(folds(server.requests).at(-1)?.body).toEqual({ folded: false }));
+  });
+
+  it('opens a round folded as the person left it, and the next round unfolded', async () => {
+    const server = fakeServer({ ...CONTEXT, turnFolded: true });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    expect(turnText()).not.toHaveTextContent('The plugin only injects.');
+    expect(within(turnText()).getByRole('button', { name: 'Show the agent’s text' })).toHaveAttribute('aria-expanded', 'false');
+
+    await act(async () => server.changeRound({ ...CONTEXT, number: 2 }));
+    await waitFor(() => expect(turnText()).toHaveTextContent('BreakTheWall · c0ffee00 · Round 2'));
+    expect(turnText()).toHaveTextContent('The plugin only injects.');
+  });
+
+  it('follows the fold the server keeps when the same round comes back changed, as from another tab', async () => {
+    const server = fakeServer(CONTEXT);
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    expect(turnText()).toHaveTextContent('The plugin only injects.');
+
+    await act(async () => server.changeRound({ ...CONTEXT, turnFolded: true }));
+    await waitFor(() => expect(turnText()).not.toHaveTextContent('The plugin only injects.'));
+    await act(async () => server.changeRound({ ...CONTEXT, turnFolded: false }));
+    await waitFor(() => expect(turnText()).toHaveTextContent('The plugin only injects.'));
+  });
+
+  it('says so when the server did not keep a fold, which still holds on this page, in both languages', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer(CONTEXT, { foldFails: true }).fetch}/>);
+    await screen.findByRole('article');
+    await user.click(within(turnText()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(await within(turnText()).findByRole('alert')).toHaveTextContent('Not saved: the agent’s text stays this way on this page only.');
+    expect(turnText()).not.toHaveTextContent('The plugin only injects.');
+    cleanup();
+
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer(ROUND, { free: FREE, foldFails: true }).fetch}/>);
+    await user.click(await within(await screen.findByRole('region', { name: 'Il turno dell’agente' })).findByRole('button', { name: 'Nascondi il testo dell’agente' }));
+    expect(await screen.findByText('Non salvato: il testo dell’agente resta così solo in questa pagina.')).toHaveAttribute('role', 'alert');
+  });
+
+  it('folds a sent round too: folding is reading, not answering', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ ...CONTEXT, sent: { message: 'done', at: '2026-11-23T10:05:00.000Z' } });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('article');
+    await user.click(within(turnText()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(turnText()).not.toHaveTextContent('The plugin only injects.');
+    await waitFor(() => expect(folds(server.requests)).toHaveLength(1));
+  });
+
+  it('gives a free block the same head and the same fold, naming its project and session', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer(ROUND, { free: { ...FREE, text: CONTEXT.turnText } });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('region', { name: 'The agent’s turn' });
+    expect(within(freeBlock()).getByText('BreakTheWall · c0ffee00 · Block 1')).toBeInTheDocument();
+    expect(within(freeBlock()).getByRole('heading', { name: 'What I read' })).toBeInTheDocument();
+    await user.click(within(freeBlock()).getByRole('button', { name: 'Hide the agent’s text' }));
+    expect(freeBlock()).toHaveTextContent(/^BreakTheWall · c0ffee00 · Block 1\s*What I read\s*Show the agent’s text$/);
+    await waitFor(() => expect(folds(server.requests)).toEqual([{ method: 'PUT', url: `/api/free/${SESSION}/1/fold`, body: { folded: true } }]));
+    // The response stays: folding the text never hides what the person writes.
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeInTheDocument();
+  });
+
+  it('numbers a free block in its chip, so two of one session never read the same', async () => {
+    render(<LocalPage fetch={fakeServer(ROUND, { free: FREE }).fetch}/>);
+    expect(await within(await screen.findByRole('region', { name: 'The agent’s turn' })).findByText('BreakTheWall · c0ffee00 · Block 1')).toBeInTheDocument();
+    cleanup();
+    render(<LocalPage fetch={fakeServer(ROUND, { free: { ...FREE, number: 2 } }).fetch}/>);
+    expect(await within(await screen.findByRole('region', { name: 'The agent’s turn' })).findByText('BreakTheWall · c0ffee00 · Block 2')).toBeInTheDocument();
+  });
+
+  it('names the fold and the block in Italian on a free block too', async () => {
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer(ROUND, { free: FREE }).fetch}/>);
+    expect(await screen.findByRole('button', { name: 'Nascondi il testo dell’agente' })).toBeInTheDocument();
+    expect(screen.getByText('BreakTheWall · c0ffee00 · Blocco 1')).toBeInTheDocument();
+  });
+});
+
+describe('the progress strip at the window\'s foot (#125)', () => {
+  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+
+  it('shows one segment per question, fills the answered ones and marks the current one, with the count beside them', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(segments()).toEqual(['01 open current', '02 open']);
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Accept the recommendation' }));
+    expect(segments()).toEqual(['01 answered current', '02 open']);
+    expect(within(strip()).getByText('1/2 answered')).toBeInTheDocument();
+
+    await user.click(within(outline()).getByRole('button', { name: /Q2/ }));
+    expect(segments()).toEqual(['01 answered', '02 open current']);
+  });
+
+  it('takes the count out of the top bar, announces it politely, and gives the segments nothing to click', async () => {
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('banner')).queryByText(/answered/)).toBeNull();
+    // The phase control stays in the bar.
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: /End the round phase/ })).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toHaveAttribute('aria-live', 'polite');
+    const ruler = strip().querySelector('ol')!;
+    expect(ruler).toHaveAttribute('aria-hidden', 'true');
+    expect(ruler.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0);
+    // The page says it holds a strip, which is what reserves its height in the stylesheet (tests/theme.test.ts).
+    expect(strip().closest('.round-page')).toHaveClass('has-strip');
+  });
+
+  it('stays at the wide, rail and drawer widths, with the drawer open too, and is named in Italian', async () => {
+    const user = userEvent.setup();
+    const browser = viewport(1400);
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await shownAt(browser);
+    expect(segments()).toEqual(['01 open current', '02 open']);
+    browser.resize(1100);
+    expect(segments()).toEqual(['01 open current', '02 open']);
+    browser.resize(700);
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'What the agent receives' }));
+    expect(receives()).toBeInTheDocument();
+    expect(within(strip()).getByText('0/2 answered')).toBeInTheDocument();
+    cleanup();
+
+    setLanguage('it-IT');
+    render(<LocalPage fetch={fakeServer().fetch}/>);
+    await screen.findByRole('article');
+    expect(within(screen.getByRole('contentinfo', { name: 'Avanzamento del round' })).getByText('0/2 con risposta')).toBeInTheDocument();
   });
 });
