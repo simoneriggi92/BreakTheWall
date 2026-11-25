@@ -138,9 +138,10 @@ describe('the marketplace on main (#107)', () => {
     expect(() => checkMarketplacePin(pinned, pluginTag(`v${version}`, version).tag)).not.toThrow();
   });
 
-  it('names package.json\'s version in the plugin\'s own manifest, which a --plugin-dir session reads unpacked', () => {
+  it('names package.json\'s version in the plugin\'s own manifest, which a --plugin-dir session reads unpacked, and in the lockfile', () => {
     const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
     expect(JSON.parse(readFileSync('plugin/.claude-plugin/plugin.json', 'utf8')).version).toBe(version);
+    expect(JSON.parse(readFileSync('package-lock.json', 'utf8')).version).toBe(version);
   });
 });
 
@@ -170,6 +171,11 @@ describe('the release notes a tag drafts (#130)', () => {
       title: 'Answer an agent\'s rounds in a local page',
       notes: '### Added\n- The round page.\n',
     });
+  });
+
+  it('takes a summary wrapped over several lines whole into the title', () => {
+    const wrapped = '## [1.0.0] - 2026-12-01\n\nBreak the Wall\nin Claude Code.\n\n### Added\n- The plugin.\n';
+    expect(releaseNotes(wrapped, '1.0.0')).toEqual({ title: 'Break the Wall in Claude Code', notes: '### Added\n- The plugin.\n' });
   });
 
   it('falls back to the version for a section that starts with a heading or a list, which stays whole in the notes', () => {

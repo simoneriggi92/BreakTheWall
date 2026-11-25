@@ -41,9 +41,11 @@ export function releaseNotes(changelog, version) {
   const end = rest.findIndex(line => /^## \[/.test(line) || /^\[[^\]]+\]: /.test(line));
   const section = trimBlank(end === -1 ? rest : rest.slice(0, end));
   if (section.length === 0) throw new Error(`CHANGELOG.md has no section for ${version}: add it with the version.`);
-  const [first] = section;
-  if (/^[#*-]/.test(first)) return { title: `Break the Wall v${version}`, notes: `${section.join('\n')}\n` };
-  return { title: first.replace(/\.$/, ''), notes: `${trimBlank(section.slice(1)).join('\n')}\n` };
+  if (/^[#*-]/.test(section[0])) return { title: `Break the Wall v${version}`, notes: `${section.join('\n')}\n` };
+  const blank = section.findIndex(line => line.trim() === '');
+  const summary = blank === -1 ? section : section.slice(0, blank);
+  const body = blank === -1 ? [] : section.slice(blank);
+  return { title: summary.map(line => line.trim()).join(' ').replace(/\.$/, ''), notes: `${trimBlank(body).join('\n')}\n` };
 }
 
 function trimBlank(lines) {
