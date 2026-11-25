@@ -29,6 +29,31 @@ export function checkMarketplacePin(marketplace, tag) {
   if (source.ref !== tag) throw new Error(`The marketplace pins ${source.ref ?? 'no ref'}, this release writes ${tag}: move the pin with package.json's version.`);
 }
 
+/**
+ * The draft GitHub release a tag makes takes its title and notes from the version's CHANGELOG section (#130). The
+ * first paragraph is the version's summary and becomes the title, unless the section starts with a heading or a list.
+ * Checked on every pull request by the packing, so a version with no section fails before its tag is pushed.
+ */
+export function releaseNotes(changelog, version) {
+  const lines = changelog.split(/\r?\n/);
+  const start = lines.findIndex(line => line.startsWith(`## [${version}]`));
+  const rest = start === -1 ? [] : lines.slice(start + 1);
+  const end = rest.findIndex(line => /^## \[/.test(line) || /^\[[^\]]+\]: /.test(line));
+  const section = trimBlank(end === -1 ? rest : rest.slice(0, end));
+  if (section.length === 0) throw new Error(`CHANGELOG.md has no section for ${version}: add it with the version.`);
+  const [first] = section;
+  if (/^[#*-]/.test(first)) return { title: `Break the Wall v${version}`, notes: `${section.join('\n')}\n` };
+  return { title: first.replace(/\.$/, ''), notes: `${trimBlank(section.slice(1)).join('\n')}\n` };
+}
+
+function trimBlank(lines) {
+  let from = 0;
+  let to = lines.length;
+  while (from < to && lines[from].trim() === '') from += 1;
+  while (to > from && lines[to - 1].trim() === '') to -= 1;
+  return lines.slice(from, to);
+}
+
 // Development files: the mod's tests run under `claude plugin test` in the repository, not in a person's session.
 const LEFT_OUT = [/\.test\.ts$/, /^AGENTS\.md$/, /^tsconfig\.json$/, /^\.claude-plugin\/types(\/|$)/];
 // Claude Code installs a plugin's Node dependencies when it finds a package manifest with a lockfile; the plugin is

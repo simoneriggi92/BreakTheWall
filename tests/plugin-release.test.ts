@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writ
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkMarketplacePin, packPlugin, pluginTag } from '../scripts/plugin-release.mjs';
+import { checkMarketplacePin, packPlugin, pluginTag, releaseNotes } from '../scripts/plugin-release.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -136,5 +136,56 @@ describe('the marketplace on main (#107)', () => {
     const pinned = JSON.parse(readFileSync('.claude-plugin/marketplace.json', 'utf8'));
     expect(pinned.name).toBe('break-the-wall');
     expect(() => checkMarketplacePin(pinned, pluginTag(`v${version}`, version).tag)).not.toThrow();
+  });
+
+  it('names package.json\'s version in the plugin\'s own manifest, which a --plugin-dir session reads unpacked', () => {
+    const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(JSON.parse(readFileSync('plugin/.claude-plugin/plugin.json', 'utf8')).version).toBe(version);
+  });
+});
+
+describe('the release notes a tag drafts (#130)', () => {
+  const changelog = [
+    '# Changelog',
+    '',
+    '## [Unreleased]',
+    '',
+    '## [1.0.0-rc.1] - 2026-11-25',
+    '',
+    'Answer an agent\'s rounds in a local page.',
+    '',
+    '### Added',
+    '- The round page.',
+    '',
+    '## [0.5.0-alpha] - 2026-11-10',
+    '',
+    '### Added',
+    '- The exploration.',
+    '',
+    '[Unreleased]: https://example.org/compare',
+  ].join('\n');
+
+  it('titles the release with the section\'s first paragraph, without its full stop, and keeps the rest as notes', () => {
+    expect(releaseNotes(changelog, '1.0.0-rc.1')).toEqual({
+      title: 'Answer an agent\'s rounds in a local page',
+      notes: '### Added\n- The round page.\n',
+    });
+  });
+
+  it('falls back to the version for a section that starts with a heading or a list, which stays whole in the notes', () => {
+    expect(releaseNotes(changelog, '0.5.0-alpha')).toEqual({
+      title: 'Break the Wall v0.5.0-alpha',
+      notes: '### Added\n- The exploration.\n',
+    });
+  });
+
+  it('refuses a version the CHANGELOG has no section for, so no tag is pushed without its notes', () => {
+    expect(() => releaseNotes(changelog, '1.0.0')).toThrow(/CHANGELOG\.md has no section for 1\.0\.0/);
+    expect(() => releaseNotes(changelog, 'Unreleased')).toThrow(/no section for Unreleased/);
+  });
+
+  it('finds a section for package.json\'s version in this repository\'s CHANGELOG', () => {
+    const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(releaseNotes(readFileSync('CHANGELOG.md', 'utf8'), version).title).not.toBe('');
   });
 });
