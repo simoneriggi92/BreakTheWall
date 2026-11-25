@@ -98,18 +98,24 @@ describe('statements no decision stands behind are flagged (#106)', () => {
     const host = await source();
     await vi.waitFor(() => expect(flags(host)).toEqual([['4-4', 'unbacked'], ['11-12', 'broken']]));
     await user.click(screen.getByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
-    const sections = within(panel()).getAllByRole('group').map(x => within(x).getByRole('heading').textContent);
-    expect(sections).toEqual([
+    const sections = () => within(panel()).getAllByRole('region').map(x => within(x).getByRole('heading', { level: 3 }).textContent);
+    // What needs fixing first: the sections with a flag, alone.
+    expect(within(panel()).getByRole('button', { name: 'To fix · 2' })).toHaveAttribute('aria-pressed', 'true');
+    expect(sections()).toEqual(['Why bread goes stale · 1 unbacked', 'The oven · 1 broken']);
+    await user.click(within(panel()).getByRole('button', { name: 'All · 4' }));
+    expect(sections()).toEqual([
       'Why bread goes stale · 1 unbacked',
       'The dough · backed',
       'The oven · 1 broken',
       'Selling · backed',
     ]);
-    // Broken backing is shown apart from unbacked, with the reference that was not found.
-    const oven = within(panel()).getByRole('group', { name: /The oven/ });
+    // Broken backing is shown apart from unbacked, with the reference that was not found and why.
+    const oven = within(panel()).getByRole('region', { name: /The oven/ });
     expect(oven).toHaveTextContent('Broken backing');
-    expect(oven).toHaveTextContent('[R4·Q1] not found');
-    expect(within(panel()).getByRole('group', { name: /Why bread/ })).toHaveTextContent('Unbacked');
+    expect(oven).toHaveTextContent(/\[R4·Q1\].*not found: no such round or question in this session/);
+    const stale = within(panel()).getByRole('region', { name: /Why bread/ });
+    expect(stale).toHaveTextContent('Unbacked');
+    expect(stale).toHaveTextContent('Rests onNothing: the statement cites no answer, issue or file.');
   });
 
   it('shows the cited answer beside its statement, and the issue a link names', async () => {
@@ -117,10 +123,50 @@ describe('statements no decision stands behind are flagged (#106)', () => {
     render(<LocalPage fetch={fakeServer({ specs: [version()], backing: CHECKED, exploration: await explored() }).fetch}/>);
     await source();
     await user.click(await screen.findByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
-    const dough = within(panel()).getByRole('group', { name: /The dough/ });
-    expect(dough).toHaveTextContent('lines 7–8 «Flour and water are mixed into a dough. The dough rests overnight in the cold room.»');
-    expect(within(dough).getByRole('note', { name: 'Cited answer [R1·Q2]' })).toHaveTextContent('Round 1 · Q2 How long does the dough rest? — (b) Overnight · In the cold room.');
-    expect(within(panel()).getByRole('group', { name: /Selling/ })).toHaveTextContent('#80 Spec intake');
+    await user.click(within(panel()).getByRole('button', { name: 'All · 4' }));
+    const dough = within(panel()).getByRole('region', { name: /The dough/ });
+    expect(dough).toHaveTextContent('Flour and water are mixed into a dough. The dough rests overnight in the cold room.');
+    expect(within(dough).getByRole('button', { name: 'Go to lines 7–8 in the source' })).toHaveTextContent('lines 7–8');
+    // Folded, the answer is one line: the question and what the person chose.
+    const answer = within(dough).getByRole('group', { name: 'Cited answer [R1·Q2]' });
+    expect(answer).not.toHaveAttribute('open');
+    expect(answer.querySelector('summary')).toHaveTextContent('[R1·Q2]How long does the dough rest?you chose (b)');
+    // Unfolded, the agent's words and the person's note stand apart, each named.
+    await user.click(answer.querySelector('summary')!);
+    expect(answer).toHaveAttribute('open');
+    expect(within(answer).getByText('The agent’s option (b)').nextElementSibling).toHaveTextContent('Overnight');
+    expect(within(answer).getByText('Your note').nextElementSibling).toHaveTextContent('In the cold room.');
+    expect(within(panel()).getByRole('region', { name: /Selling/ })).toHaveTextContent('#80Issue or PRSpec intake');
+  });
+
+  it('finds a statement in the source from the panel, and marks its lines there', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer({ specs: [version()], backing: CHECKED, exploration: await explored() }).fetch}/>);
+    const host = await source();
+    await user.click(await screen.findByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Go to lines 11–12 in the source' }));
+    const located = [...host.querySelectorAll<HTMLElement>('[data-located]')];
+    expect(located.map(x => `${x.dataset.from}-${x.dataset.to ?? x.dataset.from}`)).toEqual(['11-12']);
+    // Another statement moves the mark: one place at a time.
+    await user.click(within(panel()).getByRole('button', { name: 'Go to line 4 in the source' }));
+    expect([...host.querySelectorAll<HTMLElement>('[data-located]')].map(x => x.dataset.from)).toEqual(['4']);
+  });
+
+  it('says it in Italian too', async () => {
+    setLanguage('it-IT');
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer({ specs: [version()], backing: CHECKED, exploration: await explored() }).fetch}/>);
+    await source();
+    await user.click(await screen.findByRole('button', { name: /^Fondamento/ }));
+    const aside = screen.getByRole('complementary', { name: 'Fondamento della specifica' });
+    expect(within(aside).getByRole('button', { name: 'Da sistemare · 2' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(aside).getByRole('button', { name: 'Tutte · 4' }));
+    const answer = within(aside).getByRole('group', { name: 'Risposta citata [R1·Q2]' });
+    expect(answer.querySelector('summary')).toHaveTextContent('hai scelto (b)');
+    expect(answer).toHaveTextContent('L’opzione (b) dell’agente');
+    expect(answer).toHaveTextContent('La tua nota');
+    expect(within(aside).getByRole('button', { name: 'Vai a righe 7–8 nella sorgente' })).toBeInTheDocument();
+    expect(within(aside).getByRole('region', { name: /The oven/ })).toHaveTextContent('non trovato: questo round o questa domanda non esistono nella sessione');
   });
 });
 

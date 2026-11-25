@@ -88,6 +88,21 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     document.getSelection()?.removeAllRanges();
   };
   const count = remarks.draft?.remarks.length ?? 0;
+  /**
+   * A statement found in the source from the backing panel: the innermost block that holds its lines scrolls to the
+   * middle and is marked for a moment, in the document and in the numbered lines alike (both carry `data-from`).
+   */
+  const located = useRef<{ block: HTMLElement; timer: number }>(undefined);
+  const locate = (from: number, to: number) => {
+    const blocks = [...body.current?.querySelectorAll<HTMLElement>('.xp-source [data-from]') ?? []];
+    const holding = blocks.filter(x => Number(x.dataset.from) <= to && from <= Number(x.dataset.to ?? x.dataset.from));
+    const block = holding.find(x => !holding.some(y => y !== x && x.contains(y)));
+    if (!block) return;
+    if (located.current) { window.clearTimeout(located.current.timer); delete located.current.block.dataset.located; }
+    block.dataset.located = 'true';
+    block.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    located.current = { block, timer: window.setTimeout(() => { delete block.dataset.located; located.current = undefined; }, 2400) };
+  };
   const report = backing !== null && backing !== 'failed' && backing.declared ? backing : null;
   const flagged = report && totals(report);
   const offerButtons = offer && <div className="round-selection-offer spec-selection-offer" style={{ top: offer.top, left: offer.left }} onMouseDown={event => event.preventDefault()}>
@@ -121,7 +136,7 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
           {offerButtons}
         </div>}
       </main>}
-    {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)}
+    {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)} onLocate={locate}
       // A superseded version takes no new remarks: its flags stay marks.
       onRemark={spec.superseded ? undefined : anchor => { remarks.add(spec.number, anchor); setRemarksOpen(true); }}/>}
     {remarksOpen && <SpecRemarksPanel spec={spec} versions={versions} remarks={remarks} onClose={() => setRemarksOpen(false)}/>}
