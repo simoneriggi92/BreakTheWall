@@ -77,6 +77,9 @@
 
 /* ---------- layout (X12): the app bar, then index | structure, step, card | source; one panel at a time when narrow */
 .xp { height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+/* The body takes the filling row by name: on a wide window the tabs are display: none and leave the grid, and a body
+   placed automatically would slide into their auto row, leaving an empty band under the panels. */
+.xp > .xp-body { grid-row: 3; }
 .xp-bar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; }
 .xp-title { display: flex; flex-direction: column; min-width: 0; flex: 1; padding-inline-start: 16px; border-inline-start: 1px solid var(--line); }
 /* the bar (X27): the title stronger, and the sentence that sums up the source readable, on up to two lines */

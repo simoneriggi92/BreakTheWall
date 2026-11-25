@@ -92,6 +92,12 @@ describe('the exploration stylesheet (X11)', () => {
     expect(css).toMatch(/\.xp-aside-band \.xp-chip \{[^}]*var\(--x-aside\)[^}]*var\(--x-aside-soft\)/);
     expect(css).toMatch(/\.xp-aside-band \{[^}]*border-top: 1px dashed var\(--x-aside\)/);
   });
+  it('gives the panels the window\'s remaining height, whether the narrow tabs are shown or not', () => {
+    // The rows are bar, tabs, body; the tabs are display: none on a wide window and leave the grid, so a body placed
+    // automatically would slide into the tabs' auto row and leave the filling row empty under the panels.
+    expect(css).toMatch(/\.xp \{ height: 100vh; display: grid;[^}]*grid-template-rows: auto auto minmax\(0, 1fr\);/);
+    expect(css).toMatch(/\.xp > \.xp-body \{ grid-row: 3; \}/);
+  });
   it('shows no separator on a narrow window (X23)', () => {
     const narrow = css.slice(css.indexOf('@media (max-width: 899px)'));
     expect(narrow).toMatch(/\.xp-split, \.xp-structure-panel > \.splitter-horizontal \{ display: none; \}/);
