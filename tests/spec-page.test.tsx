@@ -28,7 +28,7 @@ const ROUND: RoundView = {
 };
 
 /** The local server as the page sees it: the latest round, the specs handed over, their explorations, and a poll. */
-function fakeServer(initial: { specs: SpecView[]; round?: RoundView; explorations: Exploration[]; unreadable?: UnreadableHandover[] }) {
+function fakeServer(initial: { specs: SpecView[]; round?: RoundView; explorations: Exploration[]; unreadable?: UnreadableHandover[]; text?: string }) {
   let { specs } = initial;
   const unreadable = initial.unreadable ?? [];
   const requests: { method: string; url: string }[] = [];
@@ -40,6 +40,11 @@ function fakeServer(initial: { specs: SpecView[]; round?: RoundView; exploration
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
     if (url === '/api/current') return Response.json({ current: initial.round ? { kind: 'round', round: initial.round, phaseOpen: false } : null });
     if (url === '/api/specs') return Response.json({ specs, unreadable });
+    const one = /^\/api\/specs\/([^/]+)$/.exec(url);
+    if (one) {
+      const spec = specs.find(x => x.id === one[1]);
+      return spec ? Response.json({ spec, text: initial.text ?? BAKERY }) : new Response('{}', { status: 404 });
+    }
     const found = /^\/api\/explorations\/([^/]+)\/([^/]+)$/.exec(url);
     if (found) {
       const x = initial.explorations.find(y => y.id === found[1] && y.revision === found[2]);
@@ -124,6 +129,56 @@ describe('a handed-over spec opens in the page (#104)', () => {
     await user.click(screen.getByRole('button', { name: 'Write the structure again' }));
     expect(server.requests).toContainEqual({ method: 'POST', url: `/api/specs/${V1}/exploration` });
     expect(await screen.findByText('Claude Code is writing the spec’s structure…')).toBeInTheDocument();
+  });
+});
+
+describe('the spec reads as numbered text while its structure is written (#128)', () => {
+  /** The spec's text as the waiting page shows it: one numbered item per line. */
+  const lines = async () => {
+    const list = await screen.findByRole('list', { name: 'Lines of The night bakery' });
+    return within(list).getAllByRole('listitem');
+  };
+
+  it('shows the spec as handed over, line by line with its numbers, beside the notice that the structure is being written', async () => {
+    const server = fakeServer({ specs: [version({ exploration: null, run: { state: 'running', repairing: false } })], explorations: [] });
+    render(<LocalPage fetch={server.fetch}/>);
+    const items = await lines();
+    expect(items).toHaveLength(BAKERY.split('\n').length);
+    expect(items[0]).toHaveTextContent('1# The night bakery');
+    expect(items[3]).toHaveTextContent(/^4.*loses water/);
+    expect(screen.getByText('Claude Code is writing the spec’s structure…')).toBeInTheDocument();
+    expect(server.requests).toContainEqual({ method: 'GET', url: `/api/specs/${V1}` });
+  });
+
+  it('keeps the text readable when the structure was not written, with the reason and the retry', async () => {
+    const server = fakeServer({ specs: [version({ exploration: null, run: { state: 'failed', failure: { code: 'unavailable', reason: 'claude-failed' } } })], explorations: [] });
+    render(<LocalPage fetch={server.fetch}/>);
+    expect(await lines()).toHaveLength(BAKERY.split('\n').length);
+    expect(screen.getByRole('alert')).toHaveTextContent('The spec’s structure was not written. Claude Code did not finish the request.');
+    expect(screen.getByRole('button', { name: 'Write the structure again' })).toBeInTheDocument();
+  });
+
+  it('keeps the text readable when writing was cancelled, or the saved structure cannot be read', async () => {
+    const cancelled = fakeServer({ specs: [version({ exploration: null, run: { state: 'failed', failure: { code: 'cancelled' } } })], explorations: [] });
+    const { unmount } = render(<LocalPage fetch={cancelled.fetch}/>);
+    expect(await lines()).toHaveLength(BAKERY.split('\n').length);
+    expect(screen.getByRole('alert')).toHaveTextContent('Writing the structure was cancelled.');
+    unmount();
+
+    // The exploration is named but the server no longer has it.
+    render(<LocalPage fetch={fakeServer({ specs: [version()], explorations: [] }).fetch}/>);
+    expect(await lines()).toHaveLength(BAKERY.split('\n').length);
+    expect(screen.getByRole('alert')).toHaveTextContent('The spec’s exploration could not be read.');
+  });
+
+  it('opens the exploration in place of the text once the structure is written', async () => {
+    const server = fakeServer({ specs: [version({ exploration: null, run: { state: 'running', repairing: false } })], explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await lines();
+    server.changeSpecs([version()]);
+    await title();
+    expect(screen.queryByText('Claude Code is writing the spec’s structure…')).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Lines of The night bakery' })).toBeNull();
   });
 });
 

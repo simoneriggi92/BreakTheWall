@@ -184,7 +184,7 @@ export function SourcePanel({ m, cites, view, onLine, flagOf }: { m: Model; cite
 }
 
 /** The raw lines, numbered: the first cite's lines are the focus, the others cited; the focus scrolls into view here. */
-function SourceLines({ text, title, code, cites }: { text: string; title: string; code: boolean; cites: ExplorationCite[] }) {
+export function SourceLines({ text, title, code, cites }: { text: string; title: string; code: boolean; cites: ExplorationCite[] }) {
   const { t } = usePreferences();
   const list = useRef<HTMLOListElement>(null);
   const within = (cs: ExplorationCite[], n: number) => cs.some(c => c.from <= n && n <= c.to);
