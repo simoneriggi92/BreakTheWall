@@ -269,6 +269,15 @@ describe('the progress strip at the window\'s foot (#125)', () => {
   });
 });
 
+describe('the dock beside the spec', () => {
+  it('stands at the bottom centre, clear of the index\'s legend in the bottom left corner', () => {
+    const rule = declarations('.spec-page ~ .page-dock');
+    expect(rule).toMatch(/left: 50%/);
+    expect(rule).toMatch(/transform: translateX\(-50%\)/);
+    expect(rule).toMatch(/align-items: center/);
+  });
+});
+
 describe('the rail as a ruler and the question\'s numeral (#124)', () => {
   /** `fg` laid over `bg` at `share` percent, as `color-mix(in srgb, fg share%, transparent)` draws it on that ground. */
   const over = (fg: string, share: number, bg: string) => '#' + [1, 3, 5]

@@ -215,6 +215,8 @@
 .page-history-confirm { display: flex; flex-wrap: wrap; gap: 6px; }
 .page-history-delete { color: var(--bad); border-color: var(--bad); }
 .page-dock { position: fixed; left: 16px; bottom: 16px; z-index: 31; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(560px, calc(100vw - 32px)); }
+/* The spec's index runs to the window's foot with its legend in the bottom left corner: the dock moves to the centre. */
+.spec-page ~ .page-dock { left: 50%; transform: translateX(-50%); align-items: center; }
 .page-history-toggle { box-shadow: 0 2px 10px var(--shadow); }
 .page-notice {
   display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; padding: 10px 12px;
