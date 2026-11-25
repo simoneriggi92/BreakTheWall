@@ -13,6 +13,7 @@ import { claudeCompleter, spawnClaude, type ClaudeRunner } from '../desktop/clau
 import type { Completer } from '../desktop/completion';
 import { ExplorationStore } from '../desktop/exploration-store';
 import { Generator } from '../desktop/generator';
+import type { BackingReport } from '../core/backing';
 import { backingChecker } from './backing';
 import { entries, fileInside, WriteQueue } from './files';
 import { GH_TIMEOUT_MS, ghIssueSchema, spawnGh, type GhRunner } from './gh';
@@ -64,6 +65,8 @@ export interface SpecRoutes {
   specOf(id: string): RemarkedSpec | undefined;
   /** Every spec handed over, as its remarks see it. */
   allSpecs(): RemarkedSpec[];
+  /** The backing check of version `number` of the spec `key` names, the one the page shows; undefined for no such version. */
+  backing(key: string, number: number): Promise<BackingReport | undefined>;
   /**
    * The session was deleted (#102): the versions it handed over go, with their explorations, and a structure still being
    * written for one stops. What went, by spec, for its remarks to follow.
@@ -102,6 +105,12 @@ export async function openSpecs(options: {
   const backing = backingChecker({ rounds: options.rounds, gh });
 
   const idOf = (x: Pick<StoredSpec, 'key' | 'number'>) => `spec-${hash(x.key)}-${x.number}`;
+  /** The backing check of one version, as the page reads it and as an approval counts its flags (#132). */
+  const backingOf = (spec: StoredSpec) => {
+    // `[R2·Q3]` names a round of the session that handed this version over, else of a session that handed over another.
+    const others = versionsOf(spec.key).filter(x => x !== spec).sort((a, b) => b.number - a.number).map(x => x.session);
+    return backing.check({ text: spec.text, sessions: [...new Set([spec.session, ...others])], cwd: spec.cwd });
+  };
   const versionsOf = (key: string) => [...specs.values()].filter(x => x.key === key);
   const latestOf = (key: string) => versionsOf(key).reduce((a, b) => b.number > a.number ? b : a);
   const view = (x: StoredSpec): SpecView => {
@@ -218,9 +227,7 @@ export async function openSpecs(options: {
     if (req.method === 'GET' && backingPath) {
       const spec = specIdSchema.safeParse(backingPath[1]).success ? specs.get(backingPath[1]) : undefined;
       if (!spec) { send(res, 404, { error: 'unknown' }); return true; }
-      // `[R2·Q3]` names a round of the session that handed this version over, else of a session that handed over another.
-      const others = versionsOf(spec.key).filter(x => x !== spec).sort((a, b) => b.number - a.number).map(x => x.session);
-      send(res, 200, await backing.check({ text: spec.text, sessions: [...new Set([spec.session, ...others])], cwd: spec.cwd }));
+      send(res, 200, await backingOf(spec));
       return true;
     }
     const explorePath = EXPLORE_PATH.exec(path);
@@ -294,6 +301,10 @@ export async function openSpecs(options: {
   return {
     handover, handle, close, forget,
     specOf: id => { const x = specs.get(id); return x && remarked(x.key); },
+    backing: (key, number) => {
+      const x = versionsOf(key).find(y => y.number === number);
+      return x ? backingOf(x) : Promise.resolve(undefined);
+    },
     allSpecs: () => [...new Set([...specs.values()].map(x => x.key))].map(remarked),
   };
 }

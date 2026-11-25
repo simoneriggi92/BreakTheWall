@@ -64,6 +64,8 @@ export interface PageBridge extends DesktopBridge {
    * `RidesError` when a round awaits answers: the remarks then go with that round's message.
    */
   sendSpecRemarks(id: string, draft: SpecRemarksDraft, language: MessageLanguage): Promise<string>;
+  /** Approves the newest version, named by its number (#132); resolves to the message exactly as the agent receives it. */
+  approveSpec(id: string, version: number, language: MessageLanguage): Promise<string>;
   /** What each statement of a version rests on (#106), checked by the server without a model. */
   getSpecBacking(id: string): Promise<BackingReport>;
 }
@@ -75,7 +77,7 @@ export type SideChatBridge = Pick<PageBridge, 'getSideChats' | 'askSideChat'>;
 export type RoundBridge = Pick<PageBridge, 'saveDraft' | 'sendRound'> & PhaseBridge & FoldBridge & SideChatBridge;
 export type FreeBlockBridge = Pick<PageBridge, 'saveResponse' | 'sendResponse'> & PhaseBridge & FoldBridge;
 export type HistoryBridge = Pick<PageBridge, 'getHistory' | 'getRound' | 'deleteSession'>;
-export type SpecRemarksBridge = Pick<PageBridge, 'getSpecRemarks' | 'saveSpecRemarks' | 'sendSpecRemarks'>;
+export type SpecRemarksBridge = Pick<PageBridge, 'getSpecRemarks' | 'saveSpecRemarks' | 'sendSpecRemarks' | 'approveSpec'>;
 export type SpecBridge = Pick<PageBridge, 'exploreSpec' | 'cancelSpec' | 'getSpecText' | 'findExploration' | 'getSpecBacking'> & SpecRemarksBridge;
 
 const currentReplySchema = z.object({ current: currentViewSchema.nullable() });
@@ -186,6 +188,9 @@ export function httpBridge(secret: string, fetcher: typeof fetch = (...args) => 
         if (rides.success) throw new RidesError(rides.data.round);
       }
       return sentReplySchema.parse(await (await ok(reply)).json()).message;
+    },
+    async approveSpec(id, version, language) {
+      return sentReplySchema.parse(await (await ok(await call(`/api/specs/${encodeURIComponent(id)}/approval`, json('POST', { version, language })))).json()).message;
     },
     async getSpecBacking(id) {
       return backingReportSchema.parse(await (await ok(await call(`/api/specs/${encodeURIComponent(id)}/backing`))).json());

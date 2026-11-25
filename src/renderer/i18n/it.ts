@@ -215,6 +215,18 @@ export const it = {
       sentTitle: 'Già inviate',
       sentAlone: 'Inviate da sole',
       sentWith: (n: number) => `Inviate con le risposte al round ${n}`,
+      /** Approve (#132): the newest version is ready as it is. */
+      approve: 'Approva',
+      approving: 'Approvazione…',
+      approveFailed: 'Approvazione non riuscita. Riprova.',
+      approved: (n: number, at: string) => `Versione ${n} approvata il ${at}.`,
+      /** What the backing check flagged when the version was approved, as the message said it; empty for nothing. */
+      approvedFlags: (unbacked: number, broken: number) => !unbacked && !broken ? '' : `Con ${[
+        ...unbacked ? [`${unbacked} ${unbacked === 1 ? 'affermazione' : 'affermazioni'} senza fondamento`] : [],
+        ...broken ? [`${broken} ${broken === 1 ? 'affermazione' : 'affermazioni'} con fondamento non trovato`] : [],
+      ].join(' e ')}.`,
+      approvedSent: 'Inviata all’agente.',
+      noRemarksApproved: 'Questa versione è approvata: non prende nuove osservazioni. Una versione consegnata dopo parte non approvata.',
     },
     /** The backing of a handed-over spec (#106): what each statement declares it rests on, checked without a model. */
     backing: {

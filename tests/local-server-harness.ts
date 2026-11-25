@@ -128,6 +128,8 @@ export function serverClient(server: LocalServer) {
     saveRemarks: (id: string, draft: unknown) => call(`/api/specs/${id}/remarks`, { method: 'PUT', body: draft }),
     /** The page's one Send for every remark so far. */
     sendRemarks: (id: string, draft: unknown, language = 'en') => call(`/api/specs/${id}/remarks/send`, { method: 'POST', body: { draft, language } }),
+    /** The page's Approve (#132): the newest version, named by its number, is ready as it is. */
+    approve: (id: string, version: number, language = 'en') => call(`/api/specs/${id}/approval`, { method: 'POST', body: { version, language } }),
     /** The page's question in a side chat (#100): answered at once, the reply streams into the round's side chats. */
     ask: (round: number, question: number, ask: string, session = SESSION) => call(`/api/side-chats/${session}/${round}/${question}`, { method: 'POST', body: { ask } }),
     /** The page's "Ask here" on a selected passage (#101): the question quotes the passage. */

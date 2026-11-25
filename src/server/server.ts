@@ -146,7 +146,7 @@ export async function startLocalServer(options: LocalServerOptions): Promise<Loc
   });
   const specs = await openSpecs({ dataDir: options.dataDir, runners: options.runners, changed: pageChanged, rounds });
   const remarks = await specRemarkRoutes({
-    specOf: id => specs.specOf(id), allSpecs: () => specs.allSpecs(), rounds,
+    specOf: id => specs.specOf(id), allSpecs: () => specs.allSpecs(), backing: (key, number) => specs.backing(key, number), rounds,
     transcriptGone: session => transcripts.gone(session), queued: session => queued(session), changed: pageChanged,
   });
   rounds.standOn({ live, transcriptGone: session => transcripts.gone(session), riding: session => remarks.riding(session).map(x => x.section) });

@@ -7,7 +7,7 @@ import type { SpecBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { usePreferences } from '../preferences';
 import { backingExtras, BackingPanel, totals, useSpecBacking } from './Backing';
-import { anchorIn, SpecRemarksPanel, useSpecRemarks } from './SpecRemarks';
+import { anchorIn, SpecRemarksPanel, takesRemarks, useSpecRemarks } from './SpecRemarks';
 
 /** The newest handover across every spec: the one the page opens. */
 export const newestSpec = (specs: SpecView[]) => specs.reduce<SpecView | undefined>((a, b) => !a || b.handedOverAt > a.handedOverAt ? b : a, undefined);
@@ -42,8 +42,8 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
   const readSelection = () => {
     const selection = document.getSelection();
     const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-    // A superseded version takes no new remarks: its text is no longer what the agent works on.
-    const anchor = range && body.current && spec && !spec.superseded ? anchorIn(body.current, range) : null;
+    // A superseded version takes no new remarks: its text is no longer what the agent works on; nor does an approved one.
+    const anchor = range && body.current && spec && takesRemarks(spec, remarks.view) ? anchorIn(body.current, range) : null;
     setOffer(anchor && range ? { anchor, ...below(range) } : null);
   };
   useEffect(() => {
@@ -132,8 +132,8 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
         </div>}
       </main>}
     {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)} onLocate={locate}
-      // A superseded version takes no new remarks: its flags stay marks.
-      onRemark={spec.superseded ? undefined : anchor => { remarks.add(spec.number, anchor); setRemarksOpen(true); }}/>}
+      // A superseded or approved version takes no new remarks: its flags stay marks.
+      onRemark={!takesRemarks(spec, remarks.view) ? undefined : anchor => { remarks.add(spec.number, anchor); setRemarksOpen(true); }}/>}
     {remarksOpen && <SpecRemarksPanel spec={spec} versions={versions} remarks={remarks} onClose={() => setRemarksOpen(false)}/>}
     </div>
   </div>;

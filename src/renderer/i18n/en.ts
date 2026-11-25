@@ -195,6 +195,16 @@ export const en: Messages = {
       sentTitle: 'Already sent',
       sentAlone: 'Sent on their own',
       sentWith: (n: number) => `Sent with the answers to round ${n}`,
+      approve: 'Approve',
+      approving: 'Approving…',
+      approveFailed: 'Approving failed. Try again.',
+      approved: (n: number, at: string) => `Version ${n} approved on ${at}.`,
+      approvedFlags: (unbacked: number, broken: number) => !unbacked && !broken ? '' : `With ${[
+        ...unbacked ? [`${unbacked} unbacked ${unbacked === 1 ? 'statement' : 'statements'}`] : [],
+        ...broken ? [`${broken} ${broken === 1 ? 'statement' : 'statements'} with broken backing`] : [],
+      ].join(' and ')}.`,
+      approvedSent: 'Sent to the agent.',
+      noRemarksApproved: 'This version is approved: it takes no new remarks. A later version handed over starts unapproved.',
     },
     backing: {
       title: 'Backing of the spec',
