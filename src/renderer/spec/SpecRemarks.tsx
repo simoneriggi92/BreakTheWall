@@ -193,7 +193,8 @@ export function SpecRemarksPanel({ spec, versions, remarks, onClose }: { spec: S
         : <div className="spec-remarks-actions">
           {message !== '' && <button type="button" className="primary" disabled={remarks.sending || remarks.approving} onClick={() => void remarks.send()}>{remarks.sending ? s.sending : s.send}</button>}
           {/* Approving and asking for changes never go together: words in the draft are for Send. */}
-          {!spec.superseded && <button type="button" disabled={message !== '' || remarks.sending || remarks.approving} onClick={() => void remarks.approve(newest.number)}>{remarks.approving ? s.approving : s.approve}</button>}
+          {/* The page's one action while nothing is written; beside Send, which then leads, it steps back. */}
+          {!spec.superseded && <button type="button" className={message === '' ? 'primary' : 'subtle'} disabled={message !== '' || remarks.sending || remarks.approving} onClick={() => void remarks.approve(newest.number)}>{remarks.approving ? s.approving : s.approve}</button>}
         </div>}
     {remarks.justSent !== null && <p role="status">{s.sent}</p>}
     </>}
