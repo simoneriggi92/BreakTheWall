@@ -55,8 +55,8 @@ const UNDECLARED: BackingReport = { declared: false, statements: [], sections: [
 
 type Request = { method: string; url: string; body?: unknown };
 /** The local server as the page sees it: one spec, its exploration, its backing and its remarks. */
-function fakeServer(initial: { specs: SpecView[]; backing: BackingReport; exploration: Exploration }) {
-  let remarks = { draft: { generalNote: '', remarks: [] as unknown[] }, sent: [], rides: null, transcriptGone: false };
+function fakeServer(initial: { specs: SpecView[]; backing: BackingReport; exploration: Exploration; approvals?: unknown[] }) {
+  let remarks = { draft: { generalNote: '', remarks: [] as unknown[] }, sent: [], approvals: initial.approvals ?? [], rides: null, transcriptGone: false };
   const requests: Request[] = [];
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input), method = init?.method ?? 'GET';
@@ -219,6 +219,16 @@ describe('one action turns a flag into a remark (#106)', () => {
     await source();
     await user.click(await screen.findByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
     expect(within(panel()).queryByRole('button', { name: /^Remark on/ })).toBeNull();
+  });
+
+  it('offers no remark on an approved version, which takes none (#132)', async () => {
+    const user = userEvent.setup();
+    const approvals = [{ version: 1, at: '2026-11-24T11:30:00.000Z', session: SESSION, queued: false, unbacked: 1, broken: 1 }];
+    render(<LocalPage fetch={fakeServer({ specs: [version()], backing: CHECKED, exploration: await explored(), approvals }).fetch}/>);
+    await source();
+    await user.click(await screen.findByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
+    // The approval arrives with the remarks, read beside the backing.
+    await vi.waitFor(() => expect(within(panel()).queryByRole('button', { name: /^Remark on/ })).toBeNull());
   });
 });
 

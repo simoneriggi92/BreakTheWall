@@ -102,6 +102,7 @@ describe('sent remarks stay as sent (#105)', () => {
     expect(await again.remarks(spec.id)).toEqual({
       draft: { generalNote: '', remarks: [marked] },
       sent: [{ at: expect.any(String), generalNote: 'One more thing.', remarks: [draft.remarks[0]], round: null, session: SESSION, queued: true }],
+      approvals: [],
       rides: null,
       transcriptGone: false,
     });
@@ -222,5 +223,140 @@ describe('remarks to an ended session (#105)', () => {
     expect(delivery).toEqual({ id: 'remarks-1', message: expect.stringContaining('- line 4 «loses water» — Why?') });
     expect((await api.confirm('remarks-1')).status).toBe(204);
     expect(await api.take()).toEqual({});
+  });
+});
+
+/** A spec that declares its backing: one statement backed, two unbacked, one whose file is not there. */
+const FLAGGED = [
+  '# The night bakery',
+  '',
+  '- The dough rests overnight. docs/notes.md:1',
+  '- The thermometer drifts.',
+  '- Customers pay at the till.',
+  '- Loaf 2, roll 1. docs/prices.md:1-2',
+  '',
+].join('\n');
+
+describe('Approve returns one fixed message to the session (#132)', () => {
+  it('names the spec, its location and the version\'s handover time, and nothing else when nothing is flagged', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start({ deliveryHoldMs: 50 }));
+    const spec = await handedOver(api, cwd);
+    const approved = await api.approve(spec.id, 1);
+    expect(approved.status).toBe(200);
+    const message = `I approve the spec «The night bakery» (docs/spec.md), version handed over on ${minute(spec.handedOverAt)}: it is ready as it is. Don't start a next step: I will ask for it.`;
+    expect(await approved.json()).toEqual({ message });
+    expect(await api.take()).toEqual({ id: 'remarks-1', message });
+  });
+
+  it('adds the counts of unbacked and broken statements the backing check finds when approving', async () => {
+    const cwd = project({ 'docs/spec.md': FLAGGED, 'docs/notes.md': 'Rest it overnight.\n' });
+    const api = serverClient(await start({ deliveryHoldMs: 50 }));
+    const spec = await handedOver(api, cwd);
+    const message = (await (await api.approve(spec.id, 1)).json()).message;
+    expect(message).toBe(`I approve the spec «The night bakery» (docs/spec.md), version handed over on ${minute(spec.handedOverAt)}: it is ready as it is, with 2 unbacked statements and 1 statement with broken backing. Don't start a next step: I will ask for it.`);
+    expect((await api.take()).message).toBe(message);
+  });
+
+  it('words it in Italian when the page is in Italian, one of each flag in the singular', async () => {
+    const cwd = project({ 'docs/spec.md': FLAGGED.replace('- The thermometer drifts.\n', ''), 'docs/notes.md': 'Rest it overnight.\n' });
+    const api = serverClient(await start());
+    const spec = await handedOver(api, cwd);
+    expect(await (await api.approve(spec.id, 1, 'it')).json()).toEqual({
+      message: `Approvo la specifica «The night bakery» (docs/spec.md), versione consegnata il ${minute(spec.handedOverAt)}: è pronta così com'è, con 1 affermazione senza fondamento e 1 affermazione con fondamento non trovato. Non avviare un passo successivo: te lo chiederò io.`,
+    });
+  });
+
+  it('refuses a body that is not a version and a language', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start());
+    const spec = await handedOver(api, cwd);
+    for (const body of [{}, { version: 1 }, { version: 1, language: 'fr' }, { version: 0, language: 'en' }, { version: 1, language: 'en', note: 'and tickets' }]) {
+      expect((await api.call(`/api/specs/${spec.id}/approval`, { method: 'POST', body })).status).toBe(400);
+    }
+    expect((await api.approve('spec-0000000000000000-1', 1)).status).toBe(404);
+  });
+});
+
+describe('an approval is kept with the spec\'s remarks (#132)', () => {
+  it('is shown in the view, sent to a live session, and kept across a restart', async () => {
+    const cwd = project({ 'docs/spec.md': FLAGGED, 'docs/notes.md': 'Rest it overnight.\n' });
+    const dataDir = folder();
+    const first = await start({ dataDir });
+    const api = serverClient(first);
+    const spec = await handedOver(api, cwd);
+    await api.approve(spec.id, 1);
+    const approvals = [{ version: 1, at: expect.any(String), session: SESSION, queued: false, unbacked: 2, broken: 1 }];
+    expect((await api.remarks(spec.id)).approvals).toEqual(approvals);
+    await first.stop();
+    expect((await serverClient(await start({ dataDir })).remarks(spec.id)).approvals).toEqual([{ ...approvals[0], queued: true }]);
+  });
+
+  it('to an ended session is queued, shown queued, and delivered once the session is resumed', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start({ deliveryHoldMs: 50 }));
+    const spec = await handedOver(api, cwd);
+    await api.end(SESSION, 'prompt_input_exit');
+    expect((await api.approve(spec.id, 1)).status).toBe(200);
+    expect((await api.remarks(spec.id)).approvals).toEqual([expect.objectContaining({ queued: true })]);
+
+    await api.register(SESSION, cwd);
+    expect((await api.remarks(spec.id)).approvals).toEqual([expect.objectContaining({ queued: false })]);
+    expect(await api.take()).toEqual({ id: 'remarks-1', message: expect.stringContaining('I approve the spec «The night bakery»') });
+    expect((await api.confirm('remarks-1')).status).toBe(204);
+    expect(await api.take()).toEqual({});
+  });
+});
+
+describe('an approved version is closed to remarks; a later one starts unapproved (#132)', () => {
+  it('refuses new remarks and a second approval on the approved version', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start({ deliveryHoldMs: 50 }));
+    const spec = await handedOver(api, cwd);
+    expect((await api.approve(spec.id, 1)).status).toBe(200);
+    expect(await api.take()).toMatchObject({ id: 'remarks-1' });
+    expect((await api.saveRemarks(spec.id, { generalNote: '', remarks: [quote(1, 4, 4, 'loses water', 'Why?')] })).status).toBe(409);
+    expect((await api.approve(spec.id, 1)).status).toBe(409);
+    expect((await api.remarks(spec.id)).draft).toEqual({ generalNote: '', remarks: [] });
+    expect((await api.remarks(spec.id)).approvals).toHaveLength(1);
+  });
+
+  it('leaves a later version unapproved, open to remarks, with the earlier approval still in the view', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start());
+    const older = await handedOver(api, cwd);
+    await api.approve(older.id, 1);
+    writeFileSync(join(cwd, 'docs/spec.md'), BAKERY.replace('Loaf 2, roll 1.', 'Loaf 3, roll 1.'));
+    await api.turn(handover('docs/spec.md'), SESSION, cwd);
+    const [newer] = await api.specs();
+    expect(newer.number).toBe(2);
+
+    expect((await api.remarks(newer.id)).approvals).toEqual([expect.objectContaining({ version: 1 })]);
+    expect((await api.saveRemarks(newer.id, { generalNote: '', remarks: [quote(2, 19, 19, 'Loaf 3', 'Why dearer?')] })).status).toBe(204);
+    // The approved version is superseded now: it takes no approval again, the newest takes its own.
+    expect((await api.approve(newer.id, 1)).status).toBe(409);
+    expect((await api.saveRemarks(newer.id, { generalNote: '', remarks: [] })).status).toBe(204);
+    expect((await api.approve(newer.id, 2)).status).toBe(200);
+    expect((await api.remarks(older.id)).approvals.map((x: { version: number }) => x.version)).toEqual([1, 2]);
+  });
+});
+
+describe('an approval goes with the version a deleted session handed over (#132)', () => {
+  it('leaves a version handed over again under the same number unapproved', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start());
+    const older = await handedOver(api, cwd, OTHER);
+    await api.approve(older.id, 1);
+    writeFileSync(join(cwd, 'docs/spec.md'), BAKERY.replace('Loaf 2, roll 1.', 'Loaf 3, roll 1.'));
+    await handedOver(api, cwd);
+    const [second] = await api.specs();
+    expect((await api.approve(second.id, 2)).status).toBe(200);
+
+    expect((await api.deleteSession(SESSION)).status).toBe(204);
+    expect((await api.remarks(older.id)).approvals).toEqual([expect.objectContaining({ version: 1, session: OTHER })]);
+    await api.turn(handover('docs/spec.md'), OTHER, cwd);
+    const [again] = await api.specs();
+    expect(again.number).toBe(2);
+    expect((await api.saveRemarks(again.id, { generalNote: '', remarks: [quote(2, 19, 19, 'Loaf 3', 'Why dearer?')] })).status).toBe(204);
   });
 });

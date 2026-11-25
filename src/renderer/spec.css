@@ -31,7 +31,8 @@
 .spec-remarks li > button { justify-self: start; }
 .spec-remark-anchor { font-family: var(--f-mono); font-size: 12px; color: var(--muted); border-left: 3px solid var(--amber); padding-left: 8px; overflow-wrap: anywhere; }
 .spec-remarks .round-message { max-height: 30vh; }
-.spec-remarks > .primary { align-self: flex-start; }
+.spec-remarks-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.spec-approval { display: grid; gap: 6px; }
 .spec-remarks-sent { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
 .spec-remarks-batch { display: grid; gap: 6px; }
 @media (max-width: 860px) {

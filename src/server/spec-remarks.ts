@@ -2,8 +2,9 @@ import { readFile, rm } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { z } from 'zod';
+import type { BackingReport } from '../core/backing';
 import {
-  emptySpecRemarks, hasWords, sendSpecRemarksSchema, specRemarkKey, specRemarkSchema, specRemarksDraftSchema, specRemarksMessage,
+  approveSpecSchema, emptySpecRemarks, hasWords, sendSpecRemarksSchema, specApprovalMessage, specRemarkKey, specRemarkSchema, specRemarksDraftSchema, specRemarksMessage,
   type SpecRemarksDraft, type SpecRemarksSection, type SpecRemarksView,
 } from '../core/spec-remarks';
 import { sessionIdSchema } from '../core/local-server';
@@ -37,6 +38,8 @@ export interface SpecRemarksContext {
   /** Every spec handed over, to find those whose remarks ride with a round. */
   allSpecs(): RemarkedSpec[];
   rounds: RoundStore;
+  /** The backing check of a version, the one the page shows: an approval counts its flags (#132). */
+  backing(key: string, number: number): Promise<BackingReport | undefined>;
   transcriptGone(session: string): boolean;
   /** A message waits for the session: a poll waiting takes it, and the page shows it as sent. */
   queued(session: string): void;
@@ -53,11 +56,22 @@ const sentBatchSchema = z.strictObject({
   delivery: z.strictObject({ kind: z.enum(['remarks', 'round']), number: z.number().int().min(1) }),
 });
 type SentBatch = z.infer<typeof sentBatchSchema>;
+/** One version approved (#132): when, to which session, under which `remarks-<n>` of its queue, and what was flagged. */
+const approvalSchema = z.strictObject({
+  version: z.number().int().min(1),
+  at: z.iso.datetime(),
+  session: sessionIdSchema,
+  delivery: z.number().int().min(1),
+  unbacked: z.number().int().min(0),
+  broken: z.number().int().min(0),
+});
 const storedSchema = z.strictObject({
   version: z.literal(1),
   key: z.string().min(1).max(4200),
   draft: specRemarksDraftSchema,
   sent: z.array(sentBatchSchema),
+  // Absent from a file kept before approvals existed.
+  approvals: z.array(approvalSchema).default([]),
 });
 type Stored = z.infer<typeof storedSchema>;
 
@@ -67,12 +81,16 @@ const sameRemark = (x: SpecRemarksDraft['remarks'][number]) => `${specRemarkKey(
 export interface Riding { key: string; section: SpecRemarksSection }
 
 const REMARKS_PATH = /^\/api\/specs\/([^/]+)\/remarks(\/send)?$/;
+const APPROVAL_PATH = /^\/api\/specs\/([^/]+)\/approval$/;
+const MAX_APPROVAL_BYTES = 1024;
 const MAX_REMARKS_BYTES = 1024 * 1024;
 
 export async function specRemarkRoutes(context: SpecRemarksContext) {
   const { rounds } = context;
   const stored = new Map<string, Stored>();
   const writes = new WriteQueue();
+  /** Specs being approved: the backing check runs between the check for an approval and its save. */
+  const approving = new Set<string>();
   for (const spec of context.allSpecs()) await load(spec);
 
   async function load(spec: RemarkedSpec) {
@@ -81,7 +99,7 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
       if (x.key === spec.key) stored.set(spec.key, x);
     } catch { /* No remarks yet, or a file that does not parse, left on disk untouched. */ }
   }
-  const of = (key: string): Stored => stored.get(key) ?? { version: 1, key, draft: emptySpecRemarks(), sent: [] };
+  const of = (key: string): Stored => stored.get(key) ?? { version: 1, key, draft: emptySpecRemarks(), sent: [], approvals: [] };
   function save(spec: RemarkedSpec, x: Stored): Promise<void> {
     stored.set(spec.key, x);
     return writes.write(spec.key, join(spec.folder, 'remarks.json'), x);
@@ -94,15 +112,19 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
 
   /**
    * Whether a draft fits the spec: every remark on a version it has, inside its lines. A remark new to the draft on a
-   * superseded version is refused: its text is no longer what the agent works on.
+   * superseded version is refused: its text is no longer what the agent works on. So is one on an approved version
+   * (#132): the person said it is ready as it is.
    */
-  function check(spec: RemarkedSpec, draft: SpecRemarksDraft): 'bad-request' | 'superseded' | null {
+  function check(spec: RemarkedSpec, draft: SpecRemarksDraft): 'bad-request' | 'superseded' | 'approved' | null {
     const latest = newest(spec).number;
-    const kept = new Set(of(spec.key).draft.remarks.map(specRemarkKey));
+    const { draft: before, approvals } = of(spec.key);
+    const kept = new Set(before.remarks.map(specRemarkKey));
     for (const remark of draft.remarks) {
       const version = spec.versions.find(x => x.number === remark.version);
       if (!version || remark.to > version.lines) return 'bad-request';
-      if (remark.version !== latest && !kept.has(specRemarkKey(remark))) return 'superseded';
+      if (kept.has(specRemarkKey(remark))) continue;
+      if (remark.version !== latest) return 'superseded';
+      if (approvals.some(x => x.version === latest)) return 'approved';
     }
     return new Set(draft.remarks.map(specRemarkKey)).size === draft.remarks.length ? null : 'bad-request';
   }
@@ -139,6 +161,10 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
         round: b.delivery.kind === 'round' ? b.delivery.number : null,
         queued: rounds.waitsForResume(b.session, b.delivery.kind, b.delivery.number),
       })),
+      approvals: x.approvals.map(a => ({
+        version: a.version, at: a.at, session: a.session, unbacked: a.unbacked, broken: a.broken,
+        queued: rounds.waitsForResume(a.session, 'remarks', a.delivery),
+      })),
       rides: transcriptGone ? null : rounds.awaiting(session) ?? null,
       transcriptGone,
     };
@@ -162,7 +188,41 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
     }
   }
 
+  /**
+   * Approve (#132): the newest version is ready as it is. One fixed message goes to the session that handed it over,
+   * through its queue as remarks do, with the flags the backing check finds now; the approval is kept, read-only.
+   */
+  async function approve(req: IncomingMessage, res: ServerResponse, spec: RemarkedSpec) {
+    const body = approveSpecSchema.safeParse(await readJson(req, MAX_APPROVAL_BYTES));
+    if (!body.success || !spec.versions.some(x => x.number === body.data.version)) { send(res, 400, { error: 'bad-request' }); return; }
+    const target = newest(spec);
+    if (body.data.version !== target.number) { send(res, 409, { error: 'superseded' }); return; }
+    if (approving.has(spec.key) || of(spec.key).approvals.some(x => x.version === target.number)) { send(res, 409, { error: 'approved' }); return; }
+    approving.add(spec.key);
+    try {
+      const report = await context.backing(spec.key, target.number);
+      const flagged = (state: 'unbacked' | 'broken') => report?.statements.filter(x => x.state === state).length ?? 0;
+      const unbacked = flagged('unbacked'), broken = flagged('broken');
+      const message = specApprovalMessage({ title: target.title, location: target.location, handedOverAt: target.handedOverAt, unbacked, broken }, body.data.language);
+      const delivery = await rounds.sendRemarks(target.session, target.cwd, message);
+      const before = of(spec.key);
+      await save(spec, { ...before, approvals: [...before.approvals, { version: target.number, at: new Date().toISOString(), session: target.session, delivery, unbacked, broken }] });
+      context.queued(target.session);
+      send(res, 200, { message });
+    } finally {
+      approving.delete(spec.key);
+    }
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse, path: string): Promise<boolean> {
+    const approval = APPROVAL_PATH.exec(path);
+    if (approval) {
+      if (req.method !== 'POST') return false;
+      const spec = specIdSchema.safeParse(approval[1]).success ? context.specOf(approval[1]) : undefined;
+      if (!spec) send(res, 404, { error: 'unknown' });
+      else await approve(req, res, spec);
+      return true;
+    }
     const found = REMARKS_PATH.exec(path);
     if (!found) return false;
     const [, id, sending] = found;
@@ -175,7 +235,7 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
       if (!parsed.success) { send(res, 400, { error: 'bad-request' }); return true; }
       const draft = unsent(spec, parsed.data);
       const refused = check(spec, draft);
-      if (refused) { send(res, refused === 'superseded' ? 409 : 400, { error: refused }); return true; }
+      if (refused) { send(res, refused === 'bad-request' ? 400 : 409, { error: refused }); return true; }
       await save(spec, { ...of(spec.key), draft });
       context.changed();
       noContent(res);
@@ -186,7 +246,7 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
       if (!body.success) { send(res, 400, { error: 'bad-request' }); return true; }
       const draft = unsent(spec, body.data.draft);
       const refused = check(spec, draft);
-      if (refused) { send(res, refused === 'superseded' ? 409 : 400, { error: refused }); return true; }
+      if (refused) { send(res, refused === 'bad-request' ? 400 : 409, { error: refused }); return true; }
       if (context.transcriptGone(target.session)) { send(res, 409, TRANSCRIPT_GONE); return true; }
       await save(spec, { ...of(spec.key), draft });
       // The agent waits on a round: the remarks go with its answers, so one turn carries everything.
@@ -205,7 +265,8 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
 
   /**
    * The session was deleted with the versions it handed over (#102): remarks on those versions go from the draft and
-   * from what was sent, and so does what was sent to it; a spec with no version left loses its folder.
+   * from what was sent, and so does what was sent to it, and their approvals (#132); a spec with no version left loses
+   * its folder.
    */
   async function forget(session: string, gone: readonly { key: string; folder: string; numbers: number[]; whole: boolean }[]) {
     for (const x of gone) {
@@ -221,7 +282,9 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
       const sent = before.sent.filter(b => b.session !== session).map(b => ({ ...b, remarks: b.remarks.filter(kept) }))
         .filter(b => b.remarks.length > 0 || b.generalNote !== '');
       const spec = context.allSpecs().find(y => y.key === x.key);
-      if (spec) await save(spec, { ...before, draft: { ...before.draft, remarks: before.draft.remarks.filter(kept) }, sent });
+      // A version handed over later may take a deleted one's number: it must not find that version's approval.
+      const approvals = before.approvals.filter(kept);
+      if (spec) await save(spec, { ...before, draft: { ...before.draft, remarks: before.draft.remarks.filter(kept) }, sent, approvals });
     }
   }
 

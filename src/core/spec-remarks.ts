@@ -163,13 +163,80 @@ export const sentSpecRemarksSchema = z.strictObject({
 });
 export type SentSpecRemarks = z.infer<typeof sentSpecRemarksSchema>;
 
+/** A version the person approved (#132), kept read-only: a later version starts unapproved, this one stays. */
+export const specApprovalSchema = z.strictObject({
+  version: z.number().int().min(1),
+  at: z.iso.datetime(),
+  session: z.string(),
+  /** Sent, not delivered, and the session ended: it waits for `claude --resume <id>`. */
+  queued: z.boolean(),
+  /** What the backing check flagged when it was approved, as the message said. */
+  unbacked: z.number().int().min(0),
+  broken: z.number().int().min(0),
+});
+export type SpecApproval = z.infer<typeof specApprovalSchema>;
+
 /** A spec's remarks as the page reads them, whichever of its versions names it. */
 export const specRemarksViewSchema = z.strictObject({
   draft: specRemarksDraftSchema,
   sent: z.array(sentSpecRemarksSchema),
+  /** Every approval, oldest first; the newest version is approved when one names it. */
+  approvals: z.array(specApprovalSchema),
   /** A round of the receiving session awaits answers: the remarks ride in its message, and Send is that round's. */
   rides: z.number().int().min(1).nullable(),
   /** Claude Code no longer keeps the receiving session's transcript: nothing more can be sent to it. */
   transcriptGone: z.boolean(),
 });
 export type SpecRemarksView = z.infer<typeof specRemarksViewSchema>;
+
+/**
+ * The page's Approve (#132): the number of the version the person read and approves, which must be the newest, and the
+ * language of the message. No note: an approval carries no words of the person's.
+ */
+export const approveSpecSchema = z.strictObject({ version: z.number().int().min(1).max(999_999), language: messageLanguageSchema });
+
+/** The version an approval names, and what the backing check flagged in it when it was made. */
+export interface SpecApprovalSubject {
+  title: string;
+  location: string;
+  handedOverAt: string;
+  unbacked: number;
+  broken: number;
+}
+
+const APPROVAL_WORDS: Record<MessageLanguage, {
+  approve: (title: string, location: string, at: string) => string;
+  flags: (unbacked: number, broken: number) => string;
+  with: string;
+  wait: string;
+}> = {
+  it: {
+    approve: (title, location, at) => `Approvo la specifica «${title}» (${location}), versione consegnata il ${at}: è pronta così com'è`,
+    flags: (unbacked, broken) => [
+      ...unbacked ? [`${unbacked} ${unbacked === 1 ? 'affermazione' : 'affermazioni'} senza fondamento`] : [],
+      ...broken ? [`${broken} ${broken === 1 ? 'affermazione' : 'affermazioni'} con fondamento non trovato`] : [],
+    ].join(' e '),
+    with: 'con',
+    wait: 'Non avviare un passo successivo: te lo chiederò io.',
+  },
+  en: {
+    approve: (title, location, at) => `I approve the spec «${title}» (${location}), version handed over on ${at}: it is ready as it is`,
+    flags: (unbacked, broken) => [
+      ...unbacked ? [`${unbacked} unbacked ${unbacked === 1 ? 'statement' : 'statements'}`] : [],
+      ...broken ? [`${broken} ${broken === 1 ? 'statement' : 'statements'} with broken backing`] : [],
+    ].join(' and '),
+    with: 'with',
+    wait: 'Don\'t start a next step: I will ask for it.',
+  },
+};
+
+/**
+ * The approval as the agent receives it, in the page's interface language: one fixed sentence naming the spec, its
+ * location and the version's handover time, the counts of unbacked and broken statements only when there are any, and
+ * that the next step is the person's to ask for. Open flags inform the agent; they never stop an approval.
+ */
+export function specApprovalMessage(x: SpecApprovalSubject, language: MessageLanguage): string {
+  const words = APPROVAL_WORDS[language];
+  const flags = words.flags(x.unbacked, x.broken);
+  return `${words.approve(x.title, x.location, handoverMinute(x.handedOverAt))}${flags ? `, ${words.with} ${flags}` : ''}. ${words.wait}`;
+}

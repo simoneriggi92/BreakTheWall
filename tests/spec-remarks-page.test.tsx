@@ -28,7 +28,7 @@ const version = (fields: Partial<SpecView> = {}): SpecView => ({
   id: V1, location: 'docs/spec.md', title: 'The night bakery', number: 1, handedOverAt: HANDED_OVER, session: SESSION,
   superseded: false, latest: V1, exploration: { id: 'x-one', revision: 'v1' }, run: null, ...fields,
 });
-const noRemarks = (): SpecRemarksView => ({ draft: { generalNote: '', remarks: [] }, sent: [], rides: null, transcriptGone: false });
+const noRemarks = (): SpecRemarksView => ({ draft: { generalNote: '', remarks: [] }, sent: [], approvals: [], rides: null, transcriptGone: false });
 
 type Request = { method: string; url: string; body?: unknown };
 /** The local server as the page sees it: the specs, their explorations and remarks, the latest round, and a poll. */
@@ -65,6 +65,11 @@ function fakeServer(initial: { specs: SpecView[]; remarks?: SpecRemarksView; rou
       const { draft } = JSON.parse(String(init?.body));
       remarks = { ...remarks, draft: { generalNote: '', remarks: [] }, sent: [{ at: '2026-11-24T11:00:00.000Z', generalNote: draft.generalNote, remarks: draft.remarks, round: null, session: SESSION, queued: false }] };
       return Response.json({ message: 'as sent' });
+    }
+    if (/^\/api\/specs\/[^/]+\/approval$/.test(url)) {
+      const { version } = JSON.parse(String(init?.body));
+      remarks = { ...remarks, approvals: [...remarks.approvals, { version, at: '2026-11-24T11:30:00.000Z', session: SESSION, queued: false, unbacked: 0, broken: 0 }] };
+      return Response.json({ message: 'approved' });
     }
     if (url === '/api/page/poll') return new Promise<Response>((done, fail) => {
       polls.add(done);
@@ -328,3 +333,59 @@ function minute(iso: string) {
   const d = new Date(iso), two = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
+
+describe('Approve the newest version from the remarks panel (#132)', () => {
+  it('stands beside Send with an empty draft, and once approved shows the approval and takes no remarks', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [version()], explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await source();
+    await user.click(screen.getByRole('button', { name: 'Remarks' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Approve' }));
+    expect(server.requests.find(x => x.method === 'POST')).toEqual({ method: 'POST', url: `/api/specs/${V1}/approval`, body: { version: 1, language: 'en' } });
+    expect(await within(panel()).findByText(`Version 1 approved on ${minute('2026-11-24T11:30:00.000Z')}.`)).toBeInTheDocument();
+    expect(within(panel()).getByText('Sent to the agent.')).toBeInTheDocument();
+    expect(within(panel()).queryByRole('textbox')).toBeNull();
+    expect(within(panel()).queryByRole('button', { name: 'Approve' })).toBeNull();
+    selectText(await source(), 'loses water');
+    expect(screen.queryByRole('button', { name: 'Remark' })).toBeNull();
+  });
+
+  it('stands beside Send when remarks have words, and cannot be used then', async () => {
+    const user = userEvent.setup();
+    const draft = { generalNote: '', remarks: [{ version: 1, from: 4, to: 4, passage: 'loses water', text: 'Why?' }] };
+    const server = fakeServer({ specs: [version()], remarks: { ...noRemarks(), draft }, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await source();
+    await user.click(screen.getByRole('button', { name: 'Remarks · 1' }));
+    expect(within(panel()).getByRole('button', { name: 'Send' })).toBeEnabled();
+    expect(within(panel()).getByRole('button', { name: 'Approve' })).toBeDisabled();
+  });
+
+  it('shows an approval to an ended session as queued, with the command that resumes it, in Italian too', async () => {
+    setLanguage('it-IT');
+    const user = userEvent.setup();
+    const approvals = [{ version: 1, at: '2026-11-24T11:30:00.000Z', session: SESSION, queued: true, unbacked: 2, broken: 1 }];
+    const server = fakeServer({ specs: [version()], remarks: { ...noRemarks(), approvals }, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await source();
+    await user.click(screen.getByRole('button', { name: 'Osservazioni' }));
+    const aside = screen.getByRole('complementary', { name: 'Osservazioni sulla specifica' });
+    expect(within(aside).getByText(`Versione 1 approvata il ${minute('2026-11-24T11:30:00.000Z')}.`)).toBeInTheDocument();
+    expect(within(aside).getByText('Con 2 affermazioni senza fondamento e 1 con fondamento non trovato.')).toBeInTheDocument();
+    expect(within(aside).getByRole('status')).toHaveTextContent(`claude --resume ${SESSION}`);
+  });
+
+  it('offers Approve again on a later version, with the earlier approval kept below', async () => {
+    const user = userEvent.setup();
+    const approvals = [{ version: 1, at: '2026-11-24T09:30:00.000Z', session: SESSION, queued: false, unbacked: 0, broken: 0 }];
+    const specs = [version({ id: V2, number: 2, latest: V2, handedOverAt: '2026-11-24T12:00:00.000Z' }), version({ superseded: true, latest: V2 })];
+    const server = fakeServer({ specs, remarks: { ...noRemarks(), approvals }, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await source();
+    expect(screen.getByText('Version 2 · docs/spec.md')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remarks' }));
+    expect(within(panel()).getByRole('button', { name: 'Approve' })).toBeEnabled();
+    expect(within(panel()).getByRole('region', { name: 'Already sent' })).toHaveTextContent(`Version 1 approved on ${minute('2026-11-24T09:30:00.000Z')}.`);
+  });
+});
