@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { TurnKey } from '../../core/round-phase';
 import type { FoldBridge, PhaseBridge } from '../http-bridge';
-import { renderMarkdown } from '../markdown';
+import { renderInlineMarkdown, renderMarkdown } from '../markdown';
 import { usePreferences } from '../preferences';
 import { useDiagrams } from '../use-diagrams';
 import { markPassages, type Passage } from './passages';
@@ -170,4 +170,13 @@ export function QueuedNotice({ session }: { session: string }) {
   const x = t.page.session;
   const command = `claude --resume ${session}`;
   return <p role="status" className="round-queued">{x.queued} <code>{command}</code> <CopyButton text={command} label={x.copyCommand}/></p>;
+}
+
+/**
+ * The agent's words or a spec's statement on one line: inline Markdown only, so it can sit inside a button (an option's
+ * label) or a sentence (a statement in the backing panel). Raw HTML is off and links render as text, as for `Markdown`.
+ */
+export function InlineMarkdown({ text, className }: { text: string; className?: string }) {
+  const html = useMemo(() => renderInlineMarkdown(text), [text]);
+  return <span className={className} dangerouslySetInnerHTML={{ __html: html }}/>;
 }

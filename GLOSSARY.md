@@ -92,6 +92,10 @@ _Avoid_: plan, PRD, design doc
 What a statement of a spec declares it rests on: an answer, a decision recorded elsewhere, or lines of a file. A statement without backing is unbacked; one whose backing cannot be found has a broken backing.
 _Avoid_: basis (a link's, declared or interpreted), evidence, source
 
+**Approval**:
+The person's decision that one version of a spec is ready as it is, returned to the agent with no remarks. It is the way out of a spec's review, where a remark is the way back into the rounds. An approved version takes no new remarks; a later version starts unapproved. Open backing flags never stop an approval.
+_Avoid_: confirmation, sign-off, acceptance (an exploration's structure passing its checks)
+
 **Exploration**:
 The in-depth reading of a source within the budget, or of one focus of a large source, saved with the files it read. A focus's exploration refers to the overview it came from; another focus of the same snapshot is another exploration sharing that overview.
 _Avoid_: lesson, session, analysis

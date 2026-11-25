@@ -13,7 +13,7 @@ export const xEn: typeof xIt = {
     premise: 'Where the source starts', premiseCount: 'first of all',
     layer: (k: number, n: number) => `layer ${k} of ${n}`, nucleus: (k: number, n: number) => `aspect ${k} of ${n}`,
     question: (k: number, n: number) => `step ${k} of ${n}`,
-    premiseIs: 'the premise:', startFrom: 'starting from:', entering: 'entering now:',
+    startFrom: 'starting from:', entering: 'entering now:',
     banner: (name: string, main: string) => `You change aspect of the document. "${name}" is not bonded to "${main}": it is another subject of the same source.`,
     bannerTouch: (links: string) => ` Its only contact is a reference: ${links}.`, bannerNone: ' It does not touch it anywhere.',
     otherNucleus: 'Go to another aspect →', toWhole: 'Now the whole source →', otherQuestions: 'Other questions of the source',

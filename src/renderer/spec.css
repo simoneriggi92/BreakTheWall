@@ -45,14 +45,54 @@
 .spec-body .xp-source [data-backing="broken"] { --flag: var(--bad); background: var(--bad-soft); }
 .spec-backing-toggle { margin-left: auto; }
 .spec-backing-toggle + .spec-remarks-toggle { margin-left: 0; }
-.spec-backing-statement { border-left: 3px solid transparent; padding-left: 8px; }
-.spec-backing-statement[data-state="unbacked"] { border-left: 3px dashed var(--amber); }
+/* The panel wraps whatever it quotes: a long URL or path never pushes it, or the page, sideways. */
+.spec-backing { overflow-wrap: anywhere; min-width: 0; }
+.spec-backing-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.spec-backing-filter button { padding: 4px 12px; border-radius: 999px; font-size: 13px; }
+.spec-backing-filter button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.spec-backing-empty { color: var(--muted); }
+.spec-backing-section { gap: 10px; }
+.spec-backing-section h3 { padding-bottom: 4px; border-bottom: 1px solid var(--line); text-transform: none; }
+/* A statement is a card; its left edge carries the same mark as its lines in the source. */
+.spec-backing .spec-backing-statement { gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: var(--radius); background: var(--surface); }
+.spec-backing-statement[data-state="unbacked"] { border-left: 4px dashed var(--amber); }
 .spec-backing-statement[data-state="broken"] { border-left-color: var(--bad); }
-.spec-backing-statement .spec-remark-anchor { border-left: 0; padding-left: 0; }
-.spec-backing-state { font-size: 12px; font-weight: 700; color: var(--muted); }
-.spec-backing-statement[data-state="broken"] .spec-backing-state { color: var(--bad); }
-.spec-backing .spec-backing-references { gap: 4px; font-size: 13px; }
-.spec-backing-references code { font-family: var(--f-mono); font-size: 12px; }
-.spec-backing-answer { background: var(--sunk); border-radius: 8px; padding: 6px 8px; }
-.spec-backing-question { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
-.spec-backing-statement > button { justify-self: start; }
+.spec-backing-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.spec-backing-state { font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 1px 8px; border-radius: 999px; background: var(--good-soft); color: var(--ink); }
+.spec-backing-statement[data-state="unbacked"] .spec-backing-state { background: var(--amber-soft); }
+.spec-backing-statement[data-state="broken"] .spec-backing-state { background: var(--bad-soft); color: var(--bad); }
+.spec-backing-where { font-family: var(--f-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+button.spec-backing-where { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; color: var(--accent); cursor: pointer; }
+button.spec-backing-where::before { content: "↗ "; }
+button.spec-backing-where:hover { border-color: var(--accent); }
+/* The statement's own words, at full ink: what the card is about. */
+.spec-backing-quote { display: block; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.spec-backing-rests { display: grid; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.spec-backing-label { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.spec-backing-nothing { color: var(--muted); font-size: 13px; }
+.spec-backing .spec-backing-references { gap: 6px; font-size: 13px; }
+.spec-backing-references > li { display: block; }
+.spec-backing-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0; }
+.spec-backing-ref { font-family: var(--f-mono); font-size: 12px; padding: 0 6px; border-radius: 6px; background: var(--sunk); border: 1px solid var(--line); }
+.spec-backing-references li[data-found="false"] .spec-backing-ref { border-color: var(--bad); color: var(--bad); }
+.spec-backing-kind { font-size: 11px; color: var(--muted); }
+.spec-backing-missing { flex-basis: 100%; color: var(--bad); }
+.spec-backing-question { font-weight: 600; }
+.spec-backing-choice { color: var(--muted); }
+.spec-backing-choice::before { content: "→ "; }
+details.spec-backing-answer > summary { cursor: pointer; list-style: none; }
+details.spec-backing-answer > summary::-webkit-details-marker { display: none; }
+/* The caret leads the row, where the eye starts: one answer folded, its words a click away. */
+details.spec-backing-answer > summary::before { content: "▸"; color: var(--accent); font-size: 15px; line-height: 1; }
+details.spec-backing-answer[open] > summary::before { content: "▾"; }
+.spec-backing-answer dl { margin: 6px 0 2px; display: grid; gap: 6px; }
+/* Who said it reads apart: the agent's words on the sunk ground, the person's note against an accent rule. */
+.spec-backing-said { padding: 6px 10px; border-radius: 8px; }
+.spec-backing-said[data-who="agent"] { background: var(--sunk); }
+.spec-backing-said[data-who="person"] { border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.spec-backing-said dt { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 2px; }
+.spec-backing-said dd { margin: 0; }
+/* A statement found from the panel: its block in the source, marked for a moment. */
+.xp-source [data-located] { outline: 2px solid var(--accent); outline-offset: 2px; animation: spec-located 2.4s var(--x-ease, ease) both; }
+@keyframes spec-located { 0%, 60% { outline-color: var(--accent); } 100% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .xp-source [data-located] { animation: none; } }

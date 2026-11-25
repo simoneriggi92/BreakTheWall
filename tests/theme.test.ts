@@ -92,6 +92,12 @@ describe('the exploration stylesheet (X11)', () => {
     expect(css).toMatch(/\.xp-aside-band \.xp-chip \{[^}]*var\(--x-aside\)[^}]*var\(--x-aside-soft\)/);
     expect(css).toMatch(/\.xp-aside-band \{[^}]*border-top: 1px dashed var\(--x-aside\)/);
   });
+  it('gives the panels the window\'s remaining height, whether the narrow tabs are shown or not', () => {
+    // The rows are bar, tabs, body; the tabs are display: none on a wide window and leave the grid, so a body placed
+    // automatically would slide into the tabs' auto row and leave the filling row empty under the panels.
+    expect(css).toMatch(/\.xp \{ height: 100vh; display: grid;[^}]*grid-template-rows: auto auto minmax\(0, 1fr\);/);
+    expect(css).toMatch(/\.xp > \.xp-body \{ grid-row: 3; \}/);
+  });
   it('shows no separator on a narrow window (X23)', () => {
     const narrow = css.slice(css.indexOf('@media (max-width: 899px)'));
     expect(narrow).toMatch(/\.xp-split, \.xp-structure-panel > \.splitter-horizontal \{ display: none; \}/);
@@ -266,6 +272,15 @@ describe('the progress strip at the window\'s foot (#125)', () => {
     for (const sibling of ['.round-page.has-strip ~ .page-dock', '.round-page.has-strip ~ .page-history']) {
       expect(declarations(sibling), sibling).toMatch(/--strip-h: 42px/);
     }
+  });
+});
+
+describe('the dock beside the spec', () => {
+  it('stands at the bottom centre, clear of the index\'s legend in the bottom left corner', () => {
+    const rule = declarations('.spec-page ~ .page-dock');
+    expect(rule).toMatch(/left: 50%/);
+    expect(rule).toMatch(/transform: translateX\(-50%\)/);
+    expect(rule).toMatch(/align-items: center/);
   });
 });
 

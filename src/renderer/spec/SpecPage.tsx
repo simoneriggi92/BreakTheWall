@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { validateExploration, type Exploration } from '../../core/exploration';
 import type { SpecFailure, SpecView } from '../../core/spec';
 import { ExplorationView } from '../exploration/ExplorationView';
-import { SourceLines } from '../exploration/Panels';
+import { markLines, SourceLines } from '../exploration/Panels';
 import type { SpecBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { usePreferences } from '../preferences';
@@ -33,7 +33,9 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
   const [remarksOpen, setRemarksOpen] = useState(false);
   // Checked again on every poll: an answer sent meanwhile shows beside the statement that cites it.
   const backing = useSpecBacking(spec?.id, specs, bridge);
-  const extras = useMemo(() => backingExtras(backing, t.x.report), [backing, t]);
+  /** The lines the backing panel last asked the exploration to show. */
+  const [reveal, setReveal] = useState<{ from: number; to: number; at: number }>();
+  const extras = useMemo(() => ({ ...backingExtras(backing, t.x.report), reveal }), [backing, t, reveal]);
   const [backingOpen, setBackingOpen] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const [offer, setOffer] = useState<{ anchor: { from: number; to: number; passage: string }; top: number; left: number } | null>(null);
@@ -88,6 +90,14 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
     document.getSelection()?.removeAllRanges();
   };
   const count = remarks.draft?.remarks.length ?? 0;
+  /**
+   * A statement found in the source from the backing panel: the exploration opens its source if hidden and marks the
+   * lines; while there is no exploration, the spec's numbered lines are marked here.
+   */
+  const locate = (from: number, to: number) => {
+    if (exploration) return setReveal(r => ({ from, to, at: (r?.at ?? 0) + 1 }));
+    if (body.current) markLines(body.current, from, to);
+  };
   const report = backing !== null && backing !== 'failed' && backing.declared ? backing : null;
   const flagged = report && totals(report);
   const offerButtons = offer && <div className="round-selection-offer spec-selection-offer" style={{ top: offer.top, left: offer.left }} onMouseDown={event => event.preventDefault()}>
@@ -121,7 +131,7 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
           {offerButtons}
         </div>}
       </main>}
-    {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)}
+    {backingOpen && report && <BackingPanel report={report} onClose={() => setBackingOpen(false)} onLocate={locate}
       // A superseded version takes no new remarks: its flags stay marks.
       onRemark={spec.superseded ? undefined : anchor => { remarks.add(spec.number, anchor); setRemarksOpen(true); }}/>}
     {remarksOpen && <SpecRemarksPanel spec={spec} versions={versions} remarks={remarks} onClose={() => setRemarksOpen(false)}/>}
