@@ -150,8 +150,8 @@ export function SpecRemarksPanel({ spec, versions, remarks, onClose }: { spec: S
   const approval = view.approvals.find(x => x.version === newest.number);
   // Newest first: what was just sent stands under the Send that sent it. Earlier versions' approvals stay among them.
   const history = [
-    ...view.sent.map(batch => ({ at: batch.at, batch, earlier: undefined })),
-    ...view.approvals.filter(x => x !== approval).map(earlier => ({ at: earlier.at, batch: undefined, earlier })),
+    ...view.sent.map(batch => ({ at: batch.at, batch, earlierApproval: undefined })),
+    ...view.approvals.filter(x => x !== approval).map(earlierApproval => ({ at: earlierApproval.at, batch: undefined, earlierApproval })),
   ].sort((a, b) => b.at.localeCompare(a.at));
   const failed = remarks.failure && { save: s.saveFailed, send: s.sendFailed, approve: s.approveFailed }[remarks.failure];
 
@@ -200,7 +200,7 @@ export function SpecRemarksPanel({ spec, versions, remarks, onClose }: { spec: S
     {failed && <p role="alert">{failed}</p>}
     {history.length > 0 && <section className="spec-remarks-sent" aria-label={s.sentTitle}>
       <h3>{s.sentTitle}</h3>
-      {history.map(({ at, batch, earlier }) => earlier ? <ApprovalNote key={`approval-${at}`} approval={earlier} s={s}/> : batch && <div key={at} className="spec-remarks-batch">
+      {history.map(({ at, batch, earlierApproval }) => earlierApproval ? <ApprovalNote key={`approval-${at}`} approval={earlierApproval} s={s}/> : batch && <div key={at} className="spec-remarks-batch">
         <p>{batch.round === null ? s.sentAlone : s.sentWith(batch.round)}</p>
         {batch.queued && <QueuedNotice session={batch.session}/>}
         {batch.generalNote && <p className="round-remark-text">{batch.generalNote}</p>}

@@ -201,7 +201,7 @@ export const en: Messages = {
       approved: (n: number, at: string) => `Version ${n} approved on ${at}.`,
       approvedFlags: (unbacked: number, broken: number) => !unbacked && !broken ? '' : `With ${[
         ...unbacked ? [`${unbacked} unbacked ${unbacked === 1 ? 'statement' : 'statements'}`] : [],
-        ...broken ? [`${broken} with broken backing`] : [],
+        ...broken ? [`${broken} ${broken === 1 ? 'statement' : 'statements'} with broken backing`] : [],
       ].join(' and ')}.`,
       approvedSent: 'Sent to the agent.',
       noRemarksApproved: 'This version is approved: it takes no new remarks. A later version handed over starts unapproved.',

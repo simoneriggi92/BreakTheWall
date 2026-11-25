@@ -372,7 +372,7 @@ describe('Approve the newest version from the remarks panel (#132)', () => {
     await user.click(screen.getByRole('button', { name: 'Osservazioni' }));
     const aside = screen.getByRole('complementary', { name: 'Osservazioni sulla specifica' });
     expect(within(aside).getByText(`Versione 1 approvata il ${minute('2026-11-24T11:30:00.000Z')}.`)).toBeInTheDocument();
-    expect(within(aside).getByText('Con 2 affermazioni senza fondamento e 1 con fondamento non trovato.')).toBeInTheDocument();
+    expect(within(aside).getByText('Con 2 affermazioni senza fondamento e 1 affermazione con fondamento non trovato.')).toBeInTheDocument();
     expect(within(aside).getByRole('status')).toHaveTextContent(`claude --resume ${SESSION}`);
   });
 

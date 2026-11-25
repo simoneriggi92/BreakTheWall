@@ -244,7 +244,7 @@ describe('Approve returns one fixed message to the session (#132)', () => {
     const spec = await handedOver(api, cwd);
     const approved = await api.approve(spec.id, 1);
     expect(approved.status).toBe(200);
-    const message = `I approve the spec «The night bakery» (docs/spec.md), version handed over on ${minute(spec.handedOverAt)}: it is ready as it is. Don't start a next step: I will ask for it.`;
+    const message = `I approve the spec «The night bakery» (docs/spec.md), version handed over on ${minute(spec.handedOverAt)}: it is ready as it is.`;
     expect(await approved.json()).toEqual({ message });
     expect(await api.take()).toEqual({ id: 'remarks-1', message });
   });
@@ -254,7 +254,7 @@ describe('Approve returns one fixed message to the session (#132)', () => {
     const api = serverClient(await start({ deliveryHoldMs: 50 }));
     const spec = await handedOver(api, cwd);
     const message = (await (await api.approve(spec.id, 1)).json()).message;
-    expect(message).toBe(`I approve the spec «The night bakery» (docs/spec.md), version handed over on ${minute(spec.handedOverAt)}: it is ready as it is, with 2 unbacked statements and 1 statement with broken backing. Don't start a next step: I will ask for it.`);
+    expect(message).toBe(`I approve the spec «The night bakery» (docs/spec.md), version handed over on ${minute(spec.handedOverAt)}: it is ready as it is, with 2 unbacked statements and 1 statement with broken backing.`);
     expect((await api.take()).message).toBe(message);
   });
 
@@ -263,7 +263,7 @@ describe('Approve returns one fixed message to the session (#132)', () => {
     const api = serverClient(await start());
     const spec = await handedOver(api, cwd);
     expect(await (await api.approve(spec.id, 1, 'it')).json()).toEqual({
-      message: `Approvo la specifica «The night bakery» (docs/spec.md), versione consegnata il ${minute(spec.handedOverAt)}: è pronta così com'è, con 1 affermazione senza fondamento e 1 affermazione con fondamento non trovato. Non avviare un passo successivo: te lo chiederò io.`,
+      message: `Approvo la specifica «The night bakery» (docs/spec.md), versione consegnata il ${minute(spec.handedOverAt)}: è pronta così com'è, con 1 affermazione senza fondamento e 1 affermazione con fondamento non trovato.`,
     });
   });
 
@@ -358,5 +358,20 @@ describe('an approval goes with the version a deleted session handed over (#132)
     const [again] = await api.specs();
     expect(again.number).toBe(2);
     expect((await api.saveRemarks(again.id, { generalNote: '', remarks: [quote(2, 19, 19, 'Loaf 3', 'Why dearer?')] })).status).toBe(204);
+  });
+});
+
+describe('an approved version takes no words at all (#132)', () => {
+  it('refuses a general note, and words on a mark left in the draft, but lets a mark be removed', async () => {
+    const cwd = project({ 'docs/spec.md': BAKERY });
+    const api = serverClient(await start());
+    const spec = await handedOver(api, cwd);
+    const mark = quote(1, 4, 4, 'loses water', '');
+    expect((await api.saveRemarks(spec.id, { generalNote: '', remarks: [mark] })).status).toBe(204);
+    expect((await api.approve(spec.id, 1)).status).toBe(200);
+    expect((await api.saveRemarks(spec.id, { generalNote: 'One more thing.', remarks: [mark] })).status).toBe(409);
+    expect((await api.saveRemarks(spec.id, { generalNote: '', remarks: [{ ...mark, text: 'Why?' }] })).status).toBe(409);
+    expect((await api.sendRemarks(spec.id, { generalNote: 'One more thing.', remarks: [] })).status).toBe(409);
+    expect((await api.saveRemarks(spec.id, { generalNote: '', remarks: [] })).status).toBe(204);
   });
 });

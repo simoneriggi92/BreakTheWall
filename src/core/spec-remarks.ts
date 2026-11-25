@@ -208,7 +208,6 @@ const APPROVAL_WORDS: Record<MessageLanguage, {
   approve: (title: string, location: string, at: string) => string;
   flags: (unbacked: number, broken: number) => string;
   with: string;
-  wait: string;
 }> = {
   it: {
     approve: (title, location, at) => `Approvo la specifica «${title}» (${location}), versione consegnata il ${at}: è pronta così com'è`,
@@ -217,7 +216,6 @@ const APPROVAL_WORDS: Record<MessageLanguage, {
       ...broken ? [`${broken} ${broken === 1 ? 'affermazione' : 'affermazioni'} con fondamento non trovato`] : [],
     ].join(' e '),
     with: 'con',
-    wait: 'Non avviare un passo successivo: te lo chiederò io.',
   },
   en: {
     approve: (title, location, at) => `I approve the spec «${title}» (${location}), version handed over on ${at}: it is ready as it is`,
@@ -226,17 +224,16 @@ const APPROVAL_WORDS: Record<MessageLanguage, {
       ...broken ? [`${broken} ${broken === 1 ? 'statement' : 'statements'} with broken backing`] : [],
     ].join(' and '),
     with: 'with',
-    wait: 'Don\'t start a next step: I will ask for it.',
   },
 };
 
 /**
  * The approval as the agent receives it, in the page's interface language: one fixed sentence naming the spec, its
- * location and the version's handover time, the counts of unbacked and broken statements only when there are any, and
- * that the next step is the person's to ask for. Open flags inform the agent; they never stop an approval.
+ * location and the version's handover time, and the counts of unbacked and broken statements only when there are any.
+ * No note and no command: the next step is the person's to type. Open flags inform the agent; they never stop an approval.
  */
 export function specApprovalMessage(x: SpecApprovalSubject, language: MessageLanguage): string {
   const words = APPROVAL_WORDS[language];
   const flags = words.flags(x.unbacked, x.broken);
-  return `${words.approve(x.title, x.location, handoverMinute(x.handedOverAt))}${flags ? `, ${words.with} ${flags}` : ''}. ${words.wait}`;
+  return `${words.approve(x.title, x.location, handoverMinute(x.handedOverAt))}${flags ? `, ${words.with} ${flags}` : ''}.`;
 }

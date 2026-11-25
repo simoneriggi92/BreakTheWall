@@ -112,19 +112,22 @@ export async function specRemarkRoutes(context: SpecRemarksContext) {
 
   /**
    * Whether a draft fits the spec: every remark on a version it has, inside its lines. A remark new to the draft on a
-   * superseded version is refused: its text is no longer what the agent works on. So is one on an approved version
-   * (#132): the person said it is ready as it is.
+   * superseded version is refused: its text is no longer what the agent works on. Once the newest version is
+   * approved (#132), the person said it is ready as it is: no word is added anywhere, a remark or the general note,
+   * and only removing what is left stays open.
    */
   function check(spec: RemarkedSpec, draft: SpecRemarksDraft): 'bad-request' | 'superseded' | 'approved' | null {
     const latest = newest(spec).number;
     const { draft: before, approvals } = of(spec.key);
-    const kept = new Set(before.remarks.map(specRemarkKey));
+    const approved = approvals.some(x => x.version === latest);
+    const kept = new Map(before.remarks.map(x => [specRemarkKey(x), x.text.trim()]));
+    if (approved && draft.generalNote.trim() !== '' && draft.generalNote.trim() !== before.generalNote.trim()) return 'approved';
     for (const remark of draft.remarks) {
       const version = spec.versions.find(x => x.number === remark.version);
       if (!version || remark.to > version.lines) return 'bad-request';
-      if (kept.has(specRemarkKey(remark))) continue;
-      if (remark.version !== latest) return 'superseded';
-      if (approvals.some(x => x.version === latest)) return 'approved';
+      const words = kept.get(specRemarkKey(remark));
+      if (approved && words !== remark.text.trim()) return 'approved';
+      if (words === undefined && remark.version !== latest) return 'superseded';
     }
     return new Set(draft.remarks.map(specRemarkKey)).size === draft.remarks.length ? null : 'bad-request';
   }

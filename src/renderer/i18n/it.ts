@@ -223,7 +223,7 @@ export const it = {
       /** What the backing check flagged when the version was approved, as the message said it; empty for nothing. */
       approvedFlags: (unbacked: number, broken: number) => !unbacked && !broken ? '' : `Con ${[
         ...unbacked ? [`${unbacked} ${unbacked === 1 ? 'affermazione' : 'affermazioni'} senza fondamento`] : [],
-        ...broken ? [`${broken} con fondamento non trovato`] : [],
+        ...broken ? [`${broken} ${broken === 1 ? 'affermazione' : 'affermazioni'} con fondamento non trovato`] : [],
       ].join(' e ')}.`,
       approvedSent: 'Inviata all’agente.',
       noRemarksApproved: 'Questa versione è approvata: non prende nuove osservazioni. Una versione consegnata dopo parte non approvata.',
