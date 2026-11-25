@@ -35,14 +35,17 @@ function Lines({ text, cites, title }: { text: string; cites: ExplorationCite[];
  * - a role or another part: what it does for the whole, its points, its annotations;
  * - a link, chosen on its label: its ends, its basis and its bonds as who → what → whom;
  * - a component: what it does, and its role as the way back.
- * Name, kind and position stay, because they orient.
+ * Name and position stay, because they orient. The kind is on the part's node, so the card names it only for a part off
+ * the drawing (a piece set apart, an annotation), where no node says it.
  */
-export function Card({ m, target, tone, pick, onPoint, onUnpick, onNote, onBackToRole, onRole, sub, onToggleSub }: {
+export function Card({ m, target, tone, pick, onPoint, onUnpick, onNote, onBackToRole, onRole, sub, onToggleSub, offDrawing = false }: {
   m: Model; target: CardTarget | null; tone: Tone | null; pick: { point: number } | { link: Link } | null;
   onPoint: (i: number | null) => void; onUnpick: () => void; onNote: (id: string) => void; onBackToRole: () => void;
   /** A role chosen in an aspect's card: it opens in the aspect's sub-level. */
   onRole: (aspect: string, role: string) => void;
   sub: string | null; onToggleSub: (id: string) => void;
+  /** The part has no node on screen: its kind is said here. */
+  offDrawing?: boolean;
 }) {
   const { t } = usePreferences(), x = t.x;
   const text = m.x.source.text;
@@ -87,7 +90,7 @@ export function Card({ m, target, tone, pick, onPoint, onUnpick, onNote, onBackT
   const kind = p.kind === 'part' ? (aspect ? x.kinds.aspect : x.kinds.role) : x.kinds[p.kind];
   const point = pick && 'point' in pick ? pick.point : null;
   return <section className="xp-card" data-tone={tone ?? undefined} aria-label={x.card.label}>
-    <div className="xp-card-head"><h3>{p.name}</h3><span className="xp-tag">{kind}</span>
+    <div className="xp-card-head"><h3>{p.name}</h3>{offDrawing && <span className="xp-tag">{kind}</span>}
       {target.aspect && <span className="xp-tag">{x.card.in(name(m, target.aspect))}</span>}
       {p.on && <span className="xp-tag">{x.card.on(name(level, p.on))}</span>}</div>
     {!aspect && <p className="xp-lead">{p.role}</p>}
@@ -156,6 +159,27 @@ function IndexLegend({ m, walked, unextracted }: { m: Model; walked: boolean; un
   return <details className="xp-legend" open><summary>{l.legend}</summary>
     <p className="xp-hint">{l.dot}</p>
     <ul>{rows.map(r => <li key={r.key}><span className="xp-legend-mark">{r.mark}</span>{r.text}</li>)}</ul></details>;
+}
+
+/** Tells one marking from the next, so a mark's timer never clears a later one. */
+let marking = 0;
+
+/**
+ * Lines asked for from outside the view (the spec's backing, #106): every innermost block of `host` that meets them is
+ * marked for a moment, and the first scrolls to the middle. A statement spans several paragraphs, or several numbered
+ * lines, so all of them are marked; a later call moves the mark. Answers whether anything was found.
+ */
+export function markLines(host: ParentNode, from: number, to: number): boolean {
+  const meets = (b: HTMLElement) => Number(b.dataset.from) <= to && from <= Number(b.dataset.to ?? b.dataset.from);
+  const blocks = [...host.querySelectorAll<HTMLElement>('[data-from]')];
+  const hit = blocks.filter(b => meets(b) && ![...b.querySelectorAll<HTMLElement>('[data-from]')].some(meets));
+  host.querySelectorAll<HTMLElement>('[data-located]').forEach(b => { delete b.dataset.located; });
+  if (hit.length === 0) return false;
+  const mark = String(++marking);
+  for (const b of hit) b.dataset.located = mark;
+  hit[0].scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+  window.setTimeout(() => hit.forEach(b => { if (b.dataset.located === mark) delete b.dataset.located; }), 2400);
+  return true;
 }
 
 /**

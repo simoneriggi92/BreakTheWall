@@ -550,6 +550,17 @@ describe('the polish of the view (X22–X26)', () => {
     const ref = x.parts.find(p => p.id === 'glossary')!;
     await user().click(within(band).getByRole('button', { name: ref.name }));
     expect(cardTitle()).toBe(ref.name);
+    // Off the drawing, no node names its kind: the card does.
+    expect(document.querySelector('.xp-card-head')).toHaveTextContent('riferimento');
+  });
+
+  it('names an annotation\'s kind on its card, as it has no node of its own', async () => {
+    await view(byId('mill-harm-map'));
+    await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
+    await user().click(node('principle'));
+    await user().click(card().getByRole('button', { name: /Solo per persone mature/ }));
+    expect(cardTitle()).toBe('Solo per persone mature');
+    expect(document.querySelector('.xp-card-head')).toHaveTextContent('annotazione');
   });
 
   it('X26: builds the index legend from the exploration, and folds it', async () => {
@@ -583,15 +594,19 @@ describe('the bar and the strip (X27, X28)', () => {
     expect(document.querySelector('.xp-bar h1')).toHaveAttribute('title', x.title);
   });
 
-  it('X28: names the premise at its step without repeating its sentence, and its chip opens the card', async () => {
+  it('X28: at the premise\'s step the card shows it, and neither the strip nor the card repeats what the drawing says', async () => {
     const x = byId('importer-signals-map'); await view(x);
     await user().click(screen.getByRole('button', { name: 'Tutta la fonte' }));
     const premise = modelOf(x).premise!;
     expect(strip()).toHaveTextContent('Il punto di partenza della fonte');
-    expect(strip()).not.toHaveTextContent(premise.role);
-    await user().click(within(strip()).getByRole('button', { name: premise.name }));
     expect(cardTitle()).toBe(premise.name);
     expect(card().getByText(premise.role)).toBeInTheDocument();
+    // The card below names the premise: the strip does not name it again, nor quote its sentence.
+    expect(strip()).not.toHaveTextContent(premise.name);
+    expect(strip()).not.toHaveTextContent(premise.role);
+    // Its node names its kind: the card's head keeps only its name.
+    expect(node(premise.id)).toHaveTextContent('prerequisito');
+    expect(document.querySelector('.xp-card-head')).toHaveTextContent(new RegExp(`^${premise.name}$`));
     expect(strip()).not.toHaveTextContent('Esplori fuori dalla guida');
     expect(strip()).not.toHaveClass('xp-paused');
   });

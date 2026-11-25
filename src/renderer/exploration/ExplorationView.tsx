@@ -9,7 +9,7 @@ import { isProse } from '../markdown';
 import { originText, PreferencesMenu, usePreferences } from '../preferences';
 import { Graph, heightOf, type NodeState, type StripState } from './Graph';
 import { citing, crossing, guided, modelOf, sectionOf, shown, standIn, type Model, type Shaped } from './model';
-import { Card, IndexPanel, SourcePanel, type CardTarget } from './Panels';
+import { Card, IndexPanel, markLines, SourcePanel, type CardTarget } from './Panels';
 import { Report, type MoreReading } from './Report';
 import { initialState, reduce, type Action, type Link, type ViewState } from './state';
 
@@ -25,7 +25,12 @@ const DURATION = 320, EASE = 'cubic-bezier(.2, .8, .2, 1)';
  * What a host adds to the view of its source (#106): a mark on the source's lines, named by the lines a block spans,
  * and readings after the view's own in "how it was read". A handed-over spec adds its backing this way.
  */
-export interface SourceExtras { flagOf?: (from: number, to: number) => string | undefined; readings?: MoreReading[] }
+export interface SourceExtras {
+  flagOf?: (from: number, to: number) => string | undefined;
+  readings?: MoreReading[];
+  /** Lines to bring into view in the source and mark; `at` changes with every request, even for the same lines. */
+  reveal?: { from: number; to: number; at: number };
+}
 
 /** `backLabel` names where the brand button leads when it is not the library: a spec closes back to its round (#104). */
 export function ExplorationView({ x, goHome, backLabel, extras }: { x: Exploration; goHome: () => void; backLabel?: string; extras?: SourceExtras }) {
@@ -45,6 +50,22 @@ export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: {
   const near = new Set(hot ? m.level.links.filter(l => l.class !== 'group' && (l.from === hot || l.to === hot)).flatMap(l => [l.from, l.to]).filter(i => i !== hot) : []);
   const membersOf = (level: Shaped, id: string) => level.parts.get(id)?.members ?? [];
   const sub = s.sub ? m.sub(s.sub) : null;
+
+  // Lines asked for from outside (the spec's backing): the source is opened where it is hidden (the reading report in
+  // its place, the column folded, another tab on a narrow window), one step a render, then the lines are marked there.
+  const root = useRef<HTMLDivElement>(null);
+  const revealed = useRef(0);
+  const reveal = extras?.reveal;
+  useEffect(() => {
+    if (!reveal || reveal.at === revealed.current) return;
+    if (s.report) return dispatch({ type: 'report', on: false });
+    if (s.folded.source) return dispatch({ type: 'fold', panel: 'source' });
+    if (s.tab !== 'source') return dispatch({ type: 'tab', tab: 'source' });
+    const host = root.current?.querySelector('.xp-source');
+    if (!host) return;
+    revealed.current = reveal.at;
+    markLines(host, reveal.from, reveal.to);
+  }, [reveal, s.report, s.folded.source, s.tab, dispatch]);
 
   // ---------- layout of the whole: positions never change while a sub-level is open
   const step = m.steps[s.guide.kind === 'whole' ? s.guide.at : -1];
@@ -283,8 +304,6 @@ export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: {
         : s.all ? <p className="xp-step-text">{xt.step.allText}</p>
         : <>
           {question && <p className="xp-step-text">{question.steps[s.guide.at].text}</p>}
-          {!question && step && 'premise' in step && <span className="xp-chips"><span className="xp-hint">{xt.step.premiseIs}</span>
-            <button className="xp-chip" aria-pressed={focus === m.premise!.id} onClick={() => dispatch({ type: 'explore', id: m.premise!.id })}>{m.premise!.name}</button></span>}
           {banner && <p className="xp-banner" role="status">{banner}</p>}
           {!question && step && !('premise' in step) && entering.length > 0 && <span className="xp-chips"><span className="xp-hint">{s.guide.at === (m.premise ? 1 : 0) ? xt.step.startFrom : xt.step.entering}</span>
             {entering.map(p => <button key={p!.id} className="xp-chip" aria-pressed={focus === p!.id} onClick={() => dispatch({ type: 'explore', id: p!.id })}>{p!.name}</button>)}</span>}
@@ -328,7 +347,7 @@ export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: {
     {fold && <button className="xp-icon" aria-label={s.folded[fold] ? xt.unfold(title) : xt.fold(title)} aria-expanded={!s.folded[fold]} onClick={() => dispatch({ type: 'fold', panel: fold })}>
       {fold === 'index' ? (s.folded.index ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>) : (s.folded.source ? <PanelRightOpen size={18}/> : <PanelRightClose size={18}/>)}</button>}</div>;
 
-  return <div className="xp" lang={x.language}>
+  return <div ref={root} className="xp" lang={x.language}>
     <header className="xp-bar">
       <button className="brand-button" onClick={goHome} aria-label={backLabel ?? xt.back}><Brand/></button>
       <div className="xp-title"><h1 title={x.title}>{x.title}</h1><p className="xp-meta" title={x.whole}>{x.whole}</p></div>
@@ -357,7 +376,7 @@ export function ExplorationBody({ m, s, dispatch, goHome, backLabel, extras }: {
           </div>
           {stepStrip}
           {splitter('xCard')}
-          <Card m={m} target={card} tone={cardTone} pick={s.pick} sub={s.sub}
+          <Card m={m} target={card} tone={cardTone} pick={s.pick} sub={s.sub} offDrawing={card?.kind === 'part' && (aside.some(p => p.id === card.id) || m.parts.get(card.id)?.kind === 'annotation')}
             onPoint={i => dispatch({ type: 'pick', pick: i === null ? null : { point: i } })} onUnpick={() => dispatch({ type: 'pick', pick: null })}
             onNote={id => sub ? dispatch({ type: 'sub-select', id }) : dispatch({ type: 'explore', id })}
             onBackToRole={() => dispatch({ type: 'member', part: card?.kind === 'member' ? card.part : '', id: null })}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { z } from 'zod';
 import { answerKind, answerOf, attachedOf, isAnswered, quoted, REMARK_PARTS, remarkKey, remarksOf, sortRemarks, type Answer, type Draft, type Remark, type RemarkPart, type RoundView } from '../../core/round-answers';
 import type { SideChatPassage } from '../../core/side-chat';
@@ -6,10 +6,9 @@ import { answersWithRemarks, type SpecRemarksSection } from '../../core/spec-rem
 import type { RoundBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { Brand } from '../icons';
-import { renderInlineMarkdown } from '../markdown';
 import { PreferencesMenu, usePreferences } from '../preferences';
 import { passageIn, type Passage } from './passages';
-import { AgentText, CopyButton, Markdown, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
+import { AgentText, CopyButton, InlineMarkdown, Markdown, PhaseControl, QueuedNotice, useLatestSaver } from './shared';
 import { SideChat, useSideChats } from './SideChat';
 
 /**
@@ -342,10 +341,10 @@ export function RoundPage({ round, phaseOpen, queued = false, transcriptGone = f
                 >
                   <span className="round-option-head">
                     <span className="round-option-letter">({option.letter})</span>
-                    <Inline className="round-option-label" text={option.label}/>
+                    <InlineMarkdown className="round-option-label" text={option.label}/>
                     {option.letter === question.recommended && <span className="round-option-badge">{r.recommended}</span>}
                   </span>
-                  {option.consequence && <Inline className="round-option-consequence" text={option.consequence}/>}
+                  {option.consequence && <InlineMarkdown className="round-option-consequence" text={option.consequence}/>}
                 </button>
               ))}
             </div>
@@ -622,8 +621,3 @@ function useRoundKeys(handle: (event: KeyboardEvent) => boolean) {
   }, []);
 }
 
-/** An option's label or consequence: inline Markdown only, as it sits inside a button. */
-function Inline({ text, className }: { text: string; className: string }) {
-  const html = useMemo(() => renderInlineMarkdown(text), [text]);
-  return <span className={className} dangerouslySetInnerHTML={{ __html: html }}/>;
-}
