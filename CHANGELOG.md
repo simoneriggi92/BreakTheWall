@@ -4,6 +4,29 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-11-25
+
+Break the Wall moves into Claude Code.
+
+Answer an agent's question rounds one question at a time in a local page, then explore the spec they lead to. This release candidate is the first plugin published to the marketplace on main, to witness the install from GitHub before 1.0.0. It ships the plugin only: the desktop app is frozen and has no build in this release.
+
+### Added
+- **The Claude Code plugin.** `/plugin marketplace add simoneriggi92/BreakTheWall`, then `/plugin install break-the-wall@break-the-wall`. It carries its server bundled into one file and the built page, so installing it downloads nothing else.
+- **`/break-the-wall` opens one local page** beside your sessions, served by one server per person on `127.0.0.1` behind a per-launch secret.
+- **Rounds, one question at a time:** an agent's round arrives in the page; options side by side, Mermaid diagrams, a rail, and remarks on a passage of a question. Only your answers return to the session.
+- **A side chat anchored to one question**, on a read-only fork of the session; replies you attach go back verbatim under the question.
+- **Sessions across projects:** every session's rounds by project, a past round reopened, answers queued for an ended session until it is resumed.
+- **The spec as a source:** a spec the agent hands over opens as its exploration, with what each statement rests on (an answer, a link, lines of a file) flagged on its lines; remarks on the spec go back as a request for the next round.
+- **`/break-the-wall:doctor`** asks Claude why the page does not open, even when a setting blocks the plugin's mod.
+
+### Changed
+- The README and the guides describe the plugin first; the desktop app is frozen.
+- A release publishes the plugin to the `plugin` branch at the tag the marketplace pins, and drafts the GitHub release without desktop builds.
+
+### Known limits
+- Requires Claude Code 2.1.330 or later and Node.js 22 or later on the `PATH`.
+- Auto-update is off for this marketplace until you turn it on in `/plugin`.
+
 ## [0.5.0-alpha] - 2026-11-10
 
 Exploring a source is the core: the app reads how a text holds together and lets you explore it, down to its source lines.
@@ -117,7 +140,9 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v0.4.0-alpha...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v1.0.0-rc.1...HEAD
+[1.0.0-rc.1]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v1.0.0-rc.1
+[0.5.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.5.0-alpha
 [0.4.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.4.0-alpha
 [0.3.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.3.0-alpha
 [0.2.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.2.0-alpha
