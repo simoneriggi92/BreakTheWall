@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { validateExploration, type Exploration } from '../../core/exploration';
 import type { SpecFailure, SpecView } from '../../core/spec';
 import { ExplorationView } from '../exploration/ExplorationView';
-import { SourceLines } from '../exploration/Panels';
+import { markLines, SourceLines } from '../exploration/Panels';
 import type { SpecBridge } from '../http-bridge';
 import type { Messages } from '../i18n/it';
 import { usePreferences } from '../preferences';
@@ -33,7 +33,9 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
   const [remarksOpen, setRemarksOpen] = useState(false);
   // Checked again on every poll: an answer sent meanwhile shows beside the statement that cites it.
   const backing = useSpecBacking(spec?.id, specs, bridge);
-  const extras = useMemo(() => backingExtras(backing, t.x.report), [backing, t]);
+  /** The lines the backing panel last asked the exploration to show. */
+  const [reveal, setReveal] = useState<{ from: number; to: number; at: number }>();
+  const extras = useMemo(() => ({ ...backingExtras(backing, t.x.report), reveal }), [backing, t, reveal]);
   const [backingOpen, setBackingOpen] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const [offer, setOffer] = useState<{ anchor: { from: number; to: number; passage: string }; top: number; left: number } | null>(null);
@@ -89,19 +91,12 @@ export function SpecPage({ specs, bridge, onClose }: { specs: SpecView[]; bridge
   };
   const count = remarks.draft?.remarks.length ?? 0;
   /**
-   * A statement found in the source from the backing panel: the innermost block that holds its lines scrolls to the
-   * middle and is marked for a moment, in the document and in the numbered lines alike (both carry `data-from`).
+   * A statement found in the source from the backing panel: the exploration opens its source if hidden and marks the
+   * lines; while there is no exploration, the spec's numbered lines are marked here.
    */
-  const located = useRef<{ block: HTMLElement; timer: number }>(undefined);
   const locate = (from: number, to: number) => {
-    const blocks = [...body.current?.querySelectorAll<HTMLElement>('.xp-source [data-from]') ?? []];
-    const holding = blocks.filter(x => Number(x.dataset.from) <= to && from <= Number(x.dataset.to ?? x.dataset.from));
-    const block = holding.find(x => !holding.some(y => y !== x && x.contains(y)));
-    if (!block) return;
-    if (located.current) { window.clearTimeout(located.current.timer); delete located.current.block.dataset.located; }
-    block.dataset.located = 'true';
-    block.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    located.current = { block, timer: window.setTimeout(() => { delete block.dataset.located; located.current = undefined; }, 2400) };
+    if (exploration) return setReveal(r => ({ from, to, at: (r?.at ?? 0) + 1 }));
+    if (body.current) markLines(body.current, from, to);
   };
   const report = backing !== null && backing !== 'failed' && backing.declared ? backing : null;
   const flagged = report && totals(report);

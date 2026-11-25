@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BackingReport, CheckedReference, CheckedStatement, CitedAnswer } from '../../core/backing';
 import type { SpecAnchor } from '../../core/spec-remarks';
 import type { SpecBridge } from '../http-bridge';
-import { renderInlineMarkdown } from '../markdown';
+import { InlineMarkdown } from '../round/shared';
 import type { Messages } from '../i18n/it';
 import type { SourceExtras } from '../exploration/ExplorationView';
 import { usePreferences } from '../preferences';
@@ -94,7 +94,7 @@ export function BackingPanel({ report, onRemark, onLocate, onClose }: {
                 ? <button type="button" className="spec-backing-where" aria-label={b.locate(where)} onClick={() => onLocate(s.from, s.to)}>{where}</button>
                 : <span className="spec-backing-where">{where}</span>}
             </div>
-            {s.quote && <Inline className="spec-backing-quote" text={s.quote}/>}
+            {s.quote && <InlineMarkdown className="spec-backing-quote" text={s.quote}/>}
             <div className="spec-backing-rests">
               <span className="spec-backing-label">{b.restsOn}</span>
               {s.references.length === 0
@@ -114,37 +114,33 @@ function Reference({ reference: r, b }: { reference: CheckedReference; b: Messag
   const kind = <span className="spec-backing-kind">{b.kinds[r.kind]}</span>;
   if (!r.found) return <p className="spec-backing-row">{written}{kind}<span className="spec-backing-missing">{b.notFound}: {b.notFoundWhy[r.kind]}</span></p>;
   if (r.kind === 'answer' && r.answer) return <CitedAnswerRow written={r.written} answer={r.answer} b={b}/>;
-  return <p className="spec-backing-row">{written}{kind}{r.kind === 'link' && r.title && <span className="spec-backing-title">{r.title}</span>}</p>;
+  return <p className="spec-backing-row">{written}{kind}{r.kind === 'link' && r.title && <span>{r.title}</span>}</p>;
 }
 
 /** A cited answer: one line folded (the question, and what the person chose); unfolded, the agent's words and the note. */
 function CitedAnswerRow({ written, answer, b }: { written: string; answer: CitedAnswer; b: Messages['page']['backing'] }) {
   const { choice, option, note } = answer;
   const letter = choice !== null && choice !== 'recommendation' && choice !== 'none' ? choice : null;
+  const personNote = note.trim();
   const answered = !answer.sent ? b.answered.notSent
     : choice === 'recommendation' ? b.answered.recommendation
     : letter ? b.answered.option(letter)
-    : choice === 'none' ? b.answered.none
-    : b.answered.noteOnly;
-  const agent = answer.sent && option && (choice === 'recommendation' || letter) ? option : null;
-  const said = note.trim();
+    : choice === null && personNote ? b.answered.noteOnly
+    : b.answered.none;
+  /** The words the person chose: the agent's recommendation or option, as the agent wrote them. */
+  const chosenWords = answer.sent && option && (choice === 'recommendation' || letter) ? option : null;
   const head = <>
     <code className="spec-backing-ref">{written}</code>
     <span className="spec-backing-question">{answer.title}</span>
     <span className="spec-backing-choice">{answered}</span>
   </>;
-  if (!agent && !said) return <p className="spec-backing-row spec-backing-answer" role="note" aria-label={b.cited(written)}>{head}</p>;
+  if (!chosenWords && !personNote) return <p className="spec-backing-row spec-backing-answer" role="note" aria-label={b.cited(written)}>{head}</p>;
   return <details className="spec-backing-answer" aria-label={b.cited(written)}>
     <summary className="spec-backing-row">{head}</summary>
     <dl>
-      {agent && <div className="spec-backing-said" data-who="agent"><dt>{b.agentWrote(letter)}</dt><dd><Inline text={agent}/></dd></div>}
-      {said && <div className="spec-backing-said" data-who="person"><dt>{b.yourNote}</dt><dd>{said}</dd></div>}
+      {chosenWords && <div className="spec-backing-said" data-who="agent"><dt>{b.agentWrote(letter)}</dt><dd><InlineMarkdown text={chosenWords}/></dd></div>}
+      {personNote && <div className="spec-backing-said" data-who="person"><dt>{b.yourNote}</dt><dd>{personNote}</dd></div>}
     </dl>
   </details>;
 }
 
-/** The agent's words and a statement's: inline Markdown, rendered safely (no HTML, links as text), as an option's label is. */
-function Inline({ text, className }: { text: string; className?: string }) {
-  const html = useMemo(() => renderInlineMarkdown(text), [text]);
-  return <span className={className} dangerouslySetInnerHTML={{ __html: html }}/>;
-}

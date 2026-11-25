@@ -554,6 +554,15 @@ describe('the polish of the view (X22–X26)', () => {
     expect(document.querySelector('.xp-card-head')).toHaveTextContent('riferimento');
   });
 
+  it('names an annotation\'s kind on its card, as it has no node of its own', async () => {
+    await view(byId('mill-harm-map'));
+    await user().click(screen.getByRole('button', { name: 'Tutti i livelli' }));
+    await user().click(node('principle'));
+    await user().click(card().getByRole('button', { name: /Solo per persone mature/ }));
+    expect(cardTitle()).toBe('Solo per persone mature');
+    expect(document.querySelector('.xp-card-head')).toHaveTextContent('annotazione');
+  });
+
   it('X26: builds the index legend from the exploration, and folds it', async () => {
     const x = await importer();
     const legend = document.querySelector<HTMLDetailsElement>('.xp-legend')!;

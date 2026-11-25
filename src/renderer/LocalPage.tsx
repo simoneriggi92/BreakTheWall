@@ -51,6 +51,8 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   const followed = useRef<string | null>(null);
   /** The person opened an earlier round from the history column. */
   const reading = useRef(false);
+  /** The page has read the server's latest once: from then on, what arrives behind the spec waits for the person. */
+  const primed = useRef(false);
   const show = (view: CurrentView | null) => { shown.current = view; setCurrent(view); };
   const hold = (view: CurrentView | null) => { held.current = view; setArrived(view); };
   /** The page shows the latest again, and follows the ones after it. */
@@ -67,11 +69,13 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
    * part being explored, and a round that slipped in behind it would go unseen.
    */
   const follow = (latest: CurrentView | null) => {
+    // The first read is what the page opens on, never held; after it, a spec in front holds what comes behind it, even
+    // when no round came before the spec.
+    const behindSpec = specInFront.current && primed.current;
+    primed.current = true;
     const key = viewKey(latest);
     if (key === viewKey(shown.current)) { followed.current = key; show(latest); return; }
     if (key === followed.current) return;
-    // Before anything is shown the spec's place is not decided yet, so the first round is taken, never held.
-    const behindSpec = specInFront.current && shown.current !== null;
     if (latest && (reading.current || held.current || behindSpec || isWriting())) return hold(latest);
     followNow(latest);
   };
@@ -162,7 +166,9 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
       const cwd = history?.projects.find(p => p.sessions.some(x => x.session === session))?.cwd;
       return cwd ? projectName(cwd) : null;
     };
-    const openArrived = () => { setSpecOpened(false); followNow(held.current); };
+    // Opening it leaves the spec, whatever put the spec in front: a version handed over after the round would otherwise
+    // keep it there. The spec stays a click away in the dock.
+    const openArrived = () => { setSpecOpened(false); if (spec) setClosedSpec(spec.id); followNow(held.current); };
     if (spec && specInFront.current) {
       const close = () => { setSpecOpened(false); setClosedSpec(spec.id); };
       return <PreferencesProvider bridge={bridge}>

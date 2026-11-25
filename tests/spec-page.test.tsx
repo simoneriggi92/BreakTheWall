@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { acceptExploration } from '../src/core/exploration-generation';
 import type { Exploration } from '../src/core/exploration';
 import type { RoundView } from '../src/core/round-answers';
+import type { FreeBlockView } from '../src/core/round-phase';
 import type { SpecView, UnreadableHandover } from '../src/core/spec';
 import { importSource } from '../src/core/source';
 import { LocalPage } from '../src/renderer/LocalPage';
@@ -30,7 +31,8 @@ const ROUND: RoundView = {
 /** The local server as the page sees it: the latest round, the specs handed over, their explorations, and a poll. */
 function fakeServer(initial: { specs: SpecView[]; round?: RoundView; explorations: Exploration[]; unreadable?: UnreadableHandover[]; text?: string }) {
   let { specs } = initial;
-  let round = initial.round;
+  let current: { kind: 'round'; round: RoundView; phaseOpen: boolean } | { kind: 'free'; block: FreeBlockView; phaseOpen: boolean } | null =
+    initial.round ? { kind: 'round', round: initial.round, phaseOpen: false } : null;
   const unreadable = initial.unreadable ?? [];
   const requests: { method: string; url: string }[] = [];
   const polls = new Set<(reply: Response) => void>();
@@ -39,7 +41,7 @@ function fakeServer(initial: { specs: SpecView[]; round?: RoundView; exploration
     requests.push({ method, url });
     if (new Headers(init?.headers).get('x-btw-secret') !== SECRET) return new Response('{}', { status: 401 });
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
-    if (url === '/api/current') return Response.json({ current: round ? { kind: 'round', round, phaseOpen: false } : null });
+    if (url === '/api/current') return Response.json({ current });
     if (url === '/api/specs') return Response.json({ specs, unreadable });
     const one = /^\/api\/specs\/([^/]+)$/.exec(url);
     if (one) {
@@ -63,8 +65,10 @@ function fakeServer(initial: { specs: SpecView[]; round?: RoundView; exploration
   function wake() { for (const done of polls) done(Response.json({ changed: true })); polls.clear(); }
   const changeSpecs = (next: SpecView[]) => act(() => { specs = next; wake(); });
   /** The agent's next round, as the server holds it from now on. */
-  const changeRound = (next: RoundView) => act(() => { round = next; wake(); });
-  return { fetch: fetch as unknown as typeof window.fetch, requests, changeSpecs, changeRound };
+  const changeRound = (next: RoundView) => act(() => { current = { kind: 'round', round: next, phaseOpen: false }; wake(); });
+  /** The agent's next turn without a round: a free block. */
+  const changeFree = (block: FreeBlockView) => act(() => { current = { kind: 'free', block, phaseOpen: true }; wake(); });
+  return { fetch: fetch as unknown as typeof window.fetch, requests, changeSpecs, changeRound, changeFree };
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
@@ -177,6 +181,45 @@ describe('a round that arrives while the spec is in front', () => {
     const notice = await screen.findByRole('status', { name: 'New round in' });
     await user.click(within(notice).getByRole('button', { name: 'Open' }));
     expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Your remarks raised one question.');
+  });
+
+  it('opens the round on request even when a newer version of the spec arrived while it was held', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one'), await explored('x-two')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await title();
+    server.changeRound(NEXT);
+    const notice = await screen.findByRole('status', { name: 'New round in' });
+    // The agent revises the spec after the round it asked: version 2 is newer than the round.
+    server.changeSpecs([
+      version({ id: V2, number: 2, latest: V2, handedOverAt: '2026-11-24T13:00:00.000Z', exploration: { id: 'x-two', revision: 'v1' } }),
+      version({ superseded: true, latest: V2 }),
+    ]);
+    expect(await screen.findByRole('button', { name: 'open the new version' })).toBeInTheDocument();
+    await user.click(within(screen.getByRole('status', { name: 'New round in' })).getByRole('button', { name: 'Open' }));
+    expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Your remarks raised one question.');
+    expect(notice).not.toBeInTheDocument();
+  });
+
+  it('is announced when the spec came before any round', async () => {
+    const server = fakeServer({ specs: [version()], explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await title();
+    server.changeRound(NEXT);
+    expect(await screen.findByRole('status', { name: 'New round in' })).toBeInTheDocument();
+    expect(screen.getByText('Version 1 · docs/spec.md')).toBeInTheDocument();
+  });
+
+  it('announces a free block as it announces a round', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await title();
+    server.changeFree({ session: SESSION, project: 'BreakTheWall', turnFolded: false, number: 1, receivedAt: '2026-11-24T12:00:00.000Z', text: 'Done: the spec is revised.', response: '', sent: null, superseded: false });
+    const notice = await screen.findByRole('status', { name: 'The agent’s new turn in' });
+    expect(screen.getByText('Version 1 · docs/spec.md')).toBeInTheDocument();
+    await user.click(within(notice).getByRole('button', { name: 'Open' }));
+    expect(await screen.findByText('Done: the spec is revised.')).toBeInTheDocument();
   });
 
   it('says it in Italian too', async () => {

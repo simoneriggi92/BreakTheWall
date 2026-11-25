@@ -41,6 +41,7 @@ const CHECKED: BackingReport = {
     ] },
     { from: 15, to: 16, section: 14, quote: 'The baker sets the loaves on the counter. Customers pay at the till.', state: 'backed', references: [
       { kind: 'link', written: '#80', found: true, title: 'Spec intake' },
+      { kind: 'answer', written: '[R1·Q3]', found: true, answer: { session: SESSION, round: 1, question: 3, title: 'Who keeps the till?', sent: true, choice: null, option: null, note: '' } },
     ] },
   ],
   sections: [
@@ -136,7 +137,10 @@ describe('statements no decision stands behind are flagged (#106)', () => {
     expect(answer).toHaveAttribute('open');
     expect(within(answer).getByText('The agent’s option (b)').nextElementSibling).toHaveTextContent('Overnight');
     expect(within(answer).getByText('Your note').nextElementSibling).toHaveTextContent('In the cold room.');
-    expect(within(panel()).getByRole('region', { name: /Selling/ })).toHaveTextContent('#80Issue or PRSpec intake');
+    const selling = within(panel()).getByRole('region', { name: /Selling/ });
+    expect(selling).toHaveTextContent('#80Issue or PRSpec intake');
+    // Sent with neither a choice nor a note: no choice, not "a note only".
+    expect(within(selling).getByRole('note', { name: 'Cited answer [R1·Q3]' })).toHaveTextContent('[R1·Q3]Who keeps the till?you made no choice');
   });
 
   it('finds a statement in the source from the panel, and marks its lines there', async () => {
@@ -150,6 +154,27 @@ describe('statements no decision stands behind are flagged (#106)', () => {
     // Another statement moves the mark: one place at a time.
     await user.click(within(panel()).getByRole('button', { name: 'Go to line 4 in the source' }));
     expect([...host.querySelectorAll<HTMLElement>('[data-located]')].map(x => x.dataset.from)).toEqual(['4']);
+  });
+
+  it('marks every line of a statement in the numbered lines, not only its first', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer({ specs: [version()], backing: CHECKED, exploration: await explored() }).fetch}/>);
+    const host = await source();
+    await user.click(screen.getByRole('button', { name: 'Lines' }));
+    await user.click(await screen.findByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Go to lines 11–12 in the source' }));
+    expect([...host.querySelectorAll<HTMLElement>('[data-located]')].map(x => x.dataset.from)).toEqual(['11', '12']);
+  });
+
+  it('opens the source column when it is folded, then marks the statement there', async () => {
+    const user = userEvent.setup();
+    render(<LocalPage fetch={fakeServer({ specs: [version()], backing: CHECKED, exploration: await explored() }).fetch}/>);
+    await source();
+    await user.click(screen.getByRole('button', { name: 'Fold: Source' }));
+    expect(document.querySelector('.xp-source')).toBeNull();
+    await user.click(await screen.findByRole('button', { name: 'Backing · 1 unbacked · 1 broken' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Go to lines 11–12 in the source' }));
+    await vi.waitFor(() => expect([...document.querySelectorAll<HTMLElement>('.xp-source [data-located]')].map(x => `${x.dataset.from}-${x.dataset.to}`)).toEqual(['11-12']));
   });
 
   it('says it in Italian too', async () => {
