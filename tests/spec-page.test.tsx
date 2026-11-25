@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { acceptExploration } from '../src/core/exploration-generation';
 import type { Exploration } from '../src/core/exploration';
 import type { RoundView } from '../src/core/round-answers';
@@ -30,6 +30,7 @@ const ROUND: RoundView = {
 /** The local server as the page sees it: the latest round, the specs handed over, their explorations, and a poll. */
 function fakeServer(initial: { specs: SpecView[]; round?: RoundView; explorations: Exploration[]; unreadable?: UnreadableHandover[]; text?: string }) {
   let { specs } = initial;
+  let round = initial.round;
   const unreadable = initial.unreadable ?? [];
   const requests: { method: string; url: string }[] = [];
   const polls = new Set<(reply: Response) => void>();
@@ -38,7 +39,7 @@ function fakeServer(initial: { specs: SpecView[]; round?: RoundView; exploration
     requests.push({ method, url });
     if (new Headers(init?.headers).get('x-btw-secret') !== SECRET) return new Response('{}', { status: 401 });
     if (url === '/api/status') return Response.json({ app: 'break-the-wall', version: '0.6.0-test', pageConnected: true, platform: 'darwin' });
-    if (url === '/api/current') return Response.json({ current: initial.round ? { kind: 'round', round: initial.round, phaseOpen: false } : null });
+    if (url === '/api/current') return Response.json({ current: round ? { kind: 'round', round, phaseOpen: false } : null });
     if (url === '/api/specs') return Response.json({ specs, unreadable });
     const one = /^\/api\/specs\/([^/]+)$/.exec(url);
     if (one) {
@@ -61,7 +62,9 @@ function fakeServer(initial: { specs: SpecView[]; round?: RoundView; exploration
   });
   function wake() { for (const done of polls) done(Response.json({ changed: true })); polls.clear(); }
   const changeSpecs = (next: SpecView[]) => act(() => { specs = next; wake(); });
-  return { fetch: fetch as unknown as typeof window.fetch, requests, changeSpecs };
+  /** The agent's next round, as the server holds it from now on. */
+  const changeRound = (next: RoundView) => act(() => { round = next; wake(); });
+  return { fetch: fetch as unknown as typeof window.fetch, requests, changeSpecs, changeRound };
 }
 
 const setLanguage = (value: string) => Object.defineProperty(navigator, 'language', { value, configurable: true });
@@ -129,6 +132,61 @@ describe('a handed-over spec opens in the page (#104)', () => {
     await user.click(screen.getByRole('button', { name: 'Write the structure again' }));
     expect(server.requests).toContainEqual({ method: 'POST', url: `/api/specs/${V1}/exploration` });
     expect(await screen.findByText('Claude Code is writing the spec’s structure…')).toBeInTheDocument();
+  });
+});
+
+describe('a round that arrives while the spec is in front', () => {
+  /** The round the agent asks after the person's remarks, later than the spec. */
+  const NEXT: RoundView = { ...ROUND, number: 2, receivedAt: '2026-11-24T12:00:00.000Z', turnText: 'Your remarks raised one question.' };
+
+  it('is announced beside the spec, which stays in front, and opens on request', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await title();
+    server.changeRound(NEXT);
+    const notice = await screen.findByRole('status', { name: 'New round in' });
+    // The person keeps reading the spec until they choose to open the round.
+    expect(screen.getByText('Version 1 · docs/spec.md')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'The turn’s text' })).toBeNull();
+    await user.click(within(notice).getByRole('button', { name: 'Open' }));
+    expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Your remarks raised one question.');
+    expect(screen.queryByRole('status', { name: 'New round in' })).toBeNull();
+  });
+
+  it('is announced too while the person writes in the spec', async () => {
+    const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await title();
+    const field = document.body.appendChild(document.createElement('textarea'));
+    onTestFinished(() => field.remove());
+    field.focus();
+    server.changeRound(NEXT);
+    expect(await screen.findByRole('status', { name: 'New round in' })).toBeInTheDocument();
+    expect(field).toHaveFocus();
+  });
+
+  it('is announced when the person opened the spec again from a round, and leaves the spec when opened', async () => {
+    const user = userEvent.setup();
+    const server = fakeServer({ specs: [version()], round: { ...ROUND, receivedAt: '2026-11-24T11:00:00.000Z' }, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('region', { name: 'The turn’s text' });
+    await user.click(screen.getByRole('button', { name: /The night bakery/ }));
+    await title();
+    server.changeRound(NEXT);
+    const notice = await screen.findByRole('status', { name: 'New round in' });
+    await user.click(within(notice).getByRole('button', { name: 'Open' }));
+    expect(await screen.findByRole('region', { name: 'The turn’s text' })).toHaveTextContent('Your remarks raised one question.');
+  });
+
+  it('says it in Italian too', async () => {
+    setLanguage('it-IT');
+    const server = fakeServer({ specs: [version()], round: ROUND, explorations: [await explored('x-one')] });
+    render(<LocalPage fetch={server.fetch}/>);
+    await screen.findByRole('button', { name: 'Chiudi la specifica' });
+    server.changeRound(NEXT);
+    const notice = await screen.findByRole('status', { name: 'Nuovo round in' });
+    expect(within(notice).getByRole('button', { name: 'Apri' })).toBeInTheDocument();
   });
 });
 

@@ -62,13 +62,17 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
   };
   /**
    * The latest round or free block, as the server holds it. The page follows it, except while the person writes in a
-   * field or reads history: then a newer one is only announced, and stays announced until the person opens it.
+   * field, reads history or has the spec in front: then a newer one is only announced, and stays announced until the
+   * person opens it. The spec is held like history because it is read at length: leaving it unasked would drop the
+   * part being explored, and a round that slipped in behind it would go unseen.
    */
   const follow = (latest: CurrentView | null) => {
     const key = viewKey(latest);
     if (key === viewKey(shown.current)) { followed.current = key; show(latest); return; }
     if (key === followed.current) return;
-    if (latest && (reading.current || held.current || isWriting())) return hold(latest);
+    // Before anything is shown the spec's place is not decided yet, so the first round is taken, never held.
+    const behindSpec = specInFront.current && shown.current !== null;
+    if (latest && (reading.current || held.current || behindSpec || isWriting())) return hold(latest);
     followNow(latest);
   };
   const followRef = useRef(follow);
@@ -154,15 +158,23 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
     specInFront.current = Boolean(spec && (specOpened || (spec.id === takenSpec.current && spec.id !== closedSpec && (shownAt === undefined || spec.handedOverAt >= shownAt))));
     const notReadNotices = <UnreadableNotices unreadable={unreadable.filter(x => !closedUnreadable.includes(unreadableKey(x)))}
       onClose={x => setClosedUnreadable(kept => [...kept, unreadableKey(x)])}/>;
+    const projectOf = (session: string | null) => {
+      const cwd = history?.projects.find(p => p.sessions.some(x => x.session === session))?.cwd;
+      return cwd ? projectName(cwd) : null;
+    };
+    const openArrived = () => { setSpecOpened(false); followNow(held.current); };
     if (spec && specInFront.current) {
       const close = () => { setSpecOpened(false); setClosedSpec(spec.id); };
       return <PreferencesProvider bridge={bridge}>
         <SpecPage specs={specs} bridge={bridge} onClose={close}/>
-        <div className="page-dock">{notReadNotices}</div>
+        <div className="page-dock">
+          <PageNotices arrived={arrived?.kind ?? null} project={projectOf(sessionOf(arrived))} onOpen={openArrived}
+            spec={null} update={history?.update ?? null}/>
+          {notReadNotices}
+        </div>
       </PreferencesProvider>;
     }
     if (!current) return <App bridge={bridge}/>;
-    const openArrived = () => followNow(held.current);
     const openRound = (round: RoundKey) => {
       setHistoryOpen(false);
       void bridge.getRound(round).then(view => {
@@ -176,10 +188,6 @@ export function LocalPage({ fetch: fetcher }: { fetch?: typeof fetch }) {
       if (sessionOf(shown.current) === session) { reading.current = false; followed.current = null; shown.current = null; }
       if (sessionOf(held.current) === session) hold(null);
       void Promise.all([bridge.getCurrent(), bridge.getHistory()]).then(([next, column]) => { setHistory(column); followRef.current(next); }, () => {});
-    };
-    const projectOf = (session: string | null) => {
-      const cwd = history?.projects.find(p => p.sessions.some(x => x.session === session))?.cwd;
-      return cwd ? projectName(cwd) : null;
     };
     const openSpec = () => {
       // Opened by the person, the newest spec is the one the page follows from now on.
