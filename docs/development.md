@@ -1,6 +1,6 @@
 # Local development
 
-The app targets macOS and Windows x64; CI runs every check on both. Use Node 22.23.2 and npm 10.9.8 (the versions verified for this alpha). Dependencies are pinned in `package.json` and `package-lock.json`; use npm rather than mixing lockfiles.
+The app targets macOS and Windows x64; CI runs every check on both. Use Node 22.23.2 and npm 10.9.8 (the versions verified for this release). Dependencies are pinned in `package.json` and `package-lock.json`; use npm rather than mixing lockfiles.
 
 ```sh
 npm ci
@@ -76,7 +76,7 @@ Ad-hoc signing lets the app run but not pass Gatekeeper: after a browser downloa
 
 ## The MCP server (Claude Desktop and Claude Code)
 
-Plan [P-20261028-mcp-integration](workflow/plans/P-20261028-mcp-integration/plan.md); the README's [Use with Claude](../README.md#use-with-claude) is the user's side. The arrows below mean "sends to".
+Plan [P-20261028-mcp-integration](workflow/plans/P-20261028-mcp-integration/plan.md); the desktop app's [Use with Claude](desktop-app.md#use-with-claude) is the user's side. The arrows below mean "sends to".
 
 ```
 Claude Desktop (.mcpb, its own Node) / Claude Code (the app's Electron, ELECTRON_RUN_AS_NODE=1)
