@@ -4,6 +4,8 @@ import { expect, mock, test, type Engine } from 'claude-code/testing'
 import { modMessages } from './messages'
 
 const t = modMessages(Intl.DateTimeFormat().resolvedOptions().locale)
+/** The page's address as the launcher hands it; the mod prints it as given. */
+const PAGE_URL = 'http://127.0.0.1:4000/#t=s3cret'
 
 /**
  * The mod against the engine's test kit (`claude plugin test plugin`): the test answers what the mod asks of Claude
@@ -27,6 +29,10 @@ function engine(on: On) {
     failSubmit: false,
     /** Every call in the order the mod made it, to read submit-then-confirm. */
     order: [] as string[],
+    /** Whether the launcher opens a tab: false while a page is connected. */
+    opens: true,
+    /** The fields the launcher's `open` line leaves out, as a launcher at fault would. */
+    omits: [] as string[],
     /** How many times the mod asked for the hook environment. */
     hookEnvCalls: 0,
     /** What a launcher run throws instead of answering: a call the engine lacks throws a TypeError where it is made. */
@@ -47,7 +53,7 @@ function engine(on: On) {
     }
     return { value: {
       exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
-      stdout: e.argv[1] === '--version' ? 'v22.23.2\n' : JSON.stringify({ port: 4000, secret: 's3cret' }) + '\n',
+      stdout: e.argv[1] === '--version' ? 'v22.23.2\n' : JSON.stringify(launcherLine(state.opens, state.omits)) + '\n',
     } }
   })
   on('session.id', () => ({ value: state.session }))
@@ -73,6 +79,13 @@ function engine(on: On) {
     return { text: e.text }
   })
   return state
+}
+
+/** The launcher's reply: `start` names the server, `open` also whether it opened a tab and the page's address. */
+function launcherLine(opens: boolean, omits: string[]) {
+  const line: Record<string, unknown> = { port: 4000, secret: 's3cret', opened: opens, url: PAGE_URL }
+  for (const field of omits) delete line[field]
+  return line
 }
 
 async function startSession($: Engine, clock: { settle(): Promise<void> }) {
@@ -244,4 +257,28 @@ test('/break-the-wall still says the page did not open when the launch fails on 
   server.launchThrows = new Error('The local server did not start.')
   const { text } = await $.command.run(slash)
   expect(text).toBe(t.failed)
+})
+
+test('/break-the-wall prints the page\'s address for the person alone, whether it opened a tab or one was already open (#147)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  const opened = await $.command.run(slash)
+  expect(opened.text).toBe(t.opened(PAGE_URL))
+  // The address carries the per-launch secret: display-only keeps it out of every model request.
+  expect(opened.isTextDisplayOnly).toBe(true)
+  server.opens = false
+  const already = await $.command.run(slash)
+  expect(already.text).toBe(t.alreadyOpen(PAGE_URL))
+  expect(already.isTextDisplayOnly).toBe(true)
+})
+
+test('/break-the-wall says the page did not open when the launcher\'s open line lacks the address or whether it opened one (#147)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  server.omits = ['url']
+  expect((await $.command.run(slash)).text).toBe(t.failed)
+  server.omits = ['opened']
+  expect((await $.command.run(slash)).text).toBe(t.failed)
 })

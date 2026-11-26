@@ -73,3 +73,17 @@ describe('the plugin folder the mod launches from (#145)', () => {
     await expect(pluginRootFrom(() => undefined, hookEnv({}).read)).rejects.toThrow(/CLAUDE_PLUGIN_ROOT/);
   });
 });
+
+describe('where /break-the-wall says the page is (#147)', () => {
+  const url = 'http://127.0.0.1:4000/#t=s3cret';
+
+  it('names the address once it opened the page, in both languages', () => {
+    expect(MOD_MESSAGES.en.opened(url)).toBe(`Break the Wall is open in the browser: ${url}`);
+    expect(MOD_MESSAGES.it.opened(url)).toBe(`Break the Wall è aperto nel browser: ${url}`);
+  });
+
+  it('names the address when a page is already open, to reopen a tab closed a moment ago', () => {
+    expect(MOD_MESSAGES.en.alreadyOpen(url)).toBe(`Break the Wall is already open in a browser tab. If you closed it, open ${url}`);
+    expect(MOD_MESSAGES.it.alreadyOpen(url)).toBe(`Break the Wall è già aperto in una scheda del browser. Se l’hai chiusa, apri ${url}`);
+  });
+});

@@ -153,6 +153,8 @@ describe('/break-the-wall opens a tab only when no page is connected (#94)', () 
     expect(result.opened).toBe(true);
     expect(opened).toEqual([`http://127.0.0.1:${server.port}/#t=${server.secret}`]);
     expect(pageUrl({ port: server.port, secret: server.secret })).toBe(opened[0]);
+    // The mod prints it, so a tab closed later can be opened by hand (#147).
+    expect(result.url).toBe(opened[0]);
   });
 
   it('opens nothing while a page is polling', async () => {
@@ -166,6 +168,8 @@ describe('/break-the-wall opens a tab only when no page is connected (#94)', () 
     poll.destroy();
     expect(result.opened).toBe(false);
     expect(opened).toEqual([]);
+    // No tab opens, so the address is the way back to a tab closed a moment ago (#147).
+    expect(result.url).toBe(pageUrl(server));
   });
 });
 
