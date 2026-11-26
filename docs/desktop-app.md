@@ -70,6 +70,9 @@ The prepared explorations start with what happens when you type an address and p
 
 ## Try the alpha
 
+> [!NOTE]
+> No newer desktop release will come: `v0.5.0-alpha` is the last. The update steps below describe how the alpha worked.
+
 ### Download for Mac
 
 **Requirements:** a Mac with Apple Silicon (M1 or later) and macOS 13 Ventura or later.
@@ -309,6 +312,9 @@ The exploration was built under plan [P-20261105-exploration](workflow/plans/P-2
 Not claimed: learning effectiveness, correctness of generated explorations, platforms other than macOS and Windows x64, Intel Mac or Windows on ARM builds, or apps signed by Apple or Microsoft.
 
 ## Roadmap
+
+> [!NOTE]
+> Frozen with the app: the open items below are not planned. What comes next for Break the Wall is in [the issues](https://github.com/simoneriggi92/BreakTheWall/issues).
 
 - [x] Exploration: structure read in one request, checked links with their basis, levels of abstraction, two guides, "How it was read"
 - [x] Claude Desktop and Claude Code write explorations (MCP); ChatGPT generates them in the app

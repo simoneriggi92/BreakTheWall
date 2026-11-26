@@ -1,6 +1,6 @@
 # Local development
 
-The app targets macOS and Windows x64; CI runs every check on both. Use Node 22.23.2 and npm 10.9.8 (the versions verified for this release). Dependencies are pinned in `package.json` and `package-lock.json`; use npm rather than mixing lockfiles.
+The app targets macOS and Windows x64; CI runs every check on both. Use Node 22.23.2 and npm 10.9.8 (the versions pinned in `package.json`, used for the plugin and the frozen desktop app alike). Dependencies are pinned in `package.json` and `package-lock.json`; use npm rather than mixing lockfiles.
 
 ```sh
 npm ci

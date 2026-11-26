@@ -7,7 +7,7 @@
 
 <p align="center"><strong>Answer your agent's questions one at a time. Check the spec they lead to, line by line.</strong></p>
 
-<p align="center">A Claude Code plugin for the grilling skills of <a href="https://github.com/mattpocock/skills">Matt Pocock's skills</a> · English &amp; Italian · Apache-2.0</p>
+<p align="center">A Claude Code plugin for <a href="https://github.com/mattpocock/skills">Matt Pocock's grilling skills</a> · English &amp; Italian · Apache-2.0</p>
 
 <p align="center">
   <a href="https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="CI"></a>
@@ -30,7 +30,7 @@ claude plugin install break-the-wall@break-the-wall
 
 The install says one option is not set yet: the side-chat model. Leave it empty to run side chats on the session's own model, or set it later with `/plugin configure break-the-wall@break-the-wall`.
 
-**2. Matt Pocock's grilling skills.** The plugin works with the grilling skills of [mattpocock/skills](https://github.com/mattpocock/skills), and does nothing without them: [`/grilling`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), [`/grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) and [`/grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) ask the rounds, and [`/to-spec`](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-spec) hands over the spec they lead to. Install them from their own marketplace:
+**2. Matt Pocock's skills.** The plugin works with the grilling skills of [mattpocock/skills](https://github.com/mattpocock/skills), and does nothing without them: [`/grilling`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), [`/grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) and [`/grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) ask the rounds, and [`/to-spec`](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-spec) hands over the spec they lead to. Install them from their own marketplace:
 
 ```bash
 claude plugin marketplace add mattpocock/skills
@@ -39,7 +39,7 @@ claude plugin install mattpocock-skills@mattpocock
 
 **3. `/break-the-wall`.** Start `claude` in your project and type `/break-the-wall`: the page opens in your browser, and its address is printed in case you close the tab. Then start a grilling, for example `/grill-with-docs` and the ticket you want to build, and its rounds arrive in the page.
 
-Each command above took under four seconds in a clean Claude Code profile (2.1.332, `v1.0.0-rc.2`). Already in a session? Run the same commands as `/plugin marketplace add …` and `/plugin install …`, choose **Install for you**, then `/reload-plugins`.
+Each command above took under four seconds in a clean Claude Code profile (2.1.332, `v1.0.0-rc.2`).
 
 ## How it works
 

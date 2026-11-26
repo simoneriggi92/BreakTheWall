@@ -4,7 +4,7 @@ Break the Wall handles two things that must not leak: the learner's sources, and
 
 ## Supported versions
 
-Only the latest commit on `main` and the plugin of the latest release receive security fixes. The desktop app is frozen at `v0.5.0-alpha` and receives none: its macOS app is signed ad-hoc and not notarized by Apple, and its Windows setup is not code-signed, so download them only from this repository's releases and check each against the `.sha256` file published with it.
+Only the latest commit on `main` and the latest release receive security fixes. The desktop app's macOS build is signed ad-hoc and not notarized by Apple, and its Windows setup is not code-signed: download them only from this repository's releases, and check each against the `.sha256` file published with it.
 
 ## Reporting a vulnerability
 
