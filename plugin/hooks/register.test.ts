@@ -27,8 +27,7 @@ function engine(on: On) {
     failSubmit: false,
     /** Every call in the order the mod made it, to read submit-then-confirm. */
     order: [] as string[],
-    /** The script of every launcher run, and how many times the mod asked for the hook environment. */
-    launchers: [] as string[],
+    /** How many times the mod asked for the hook environment. */
     hookEnvCalls: 0,
     /** What a launcher run throws instead of answering: a call the engine lacks throws a TypeError where it is made. */
     launchThrows: undefined as Error | undefined,
@@ -45,7 +44,6 @@ function engine(on: On) {
     if (e.argv[1] !== '--version') {
       if (state.launchThrows) throw state.launchThrows
       state.launched.push(e.argv.slice(2))
-      state.launchers.push(e.argv[1] ?? '')
     }
     return { value: {
       exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
@@ -139,9 +137,6 @@ test('reads the session id again for each poll, as /clear and /resume change it 
   expect(server.submitted.map(x => x.text)).toEqual(['after the clear'])
 })
 
-/** `/break-the-wall` typed in the composer. */
-const slash = { command: 'break-the-wall', args: '', origin: { kind: 'composer' as const }, presentation: { isFullscreen: false, columns: 80 } }
-
 const posted = (server: ReturnType<typeof engine>, path: string) => server.fetched.filter(x => x.method === 'POST' && new URL(x.url).pathname === path).map(x => JSON.parse(x.body ?? '{}'))
 
 test('on /clear, reports the ending session ended and registers the id the session goes on under', async ($, on) => {
@@ -210,14 +205,16 @@ test('delivers what was queued for a session resumed with claude --resume <id> a
   expect(server.order).toContain('POST /api/sessions/sess-ended/delivery/round-2')
 })
 
+/** `/break-the-wall` typed in the composer. */
+const slash = { command: 'break-the-wall', args: '', origin: { kind: 'composer' as const }, presentation: { isFullscreen: false, columns: 80 } }
+
 test('finds the launcher under the plugin\'s own folder, with no call on hookEnv, which Claude Code before 2.1.326 lacks (#145)', async ($, on) => {
   const clock = mock.clock(on)
   const server = engine(on)
   await startSession($, clock)
   await $.command.run(slash)
+  expect(server.launched.map(argv => argv[0])).toEqual(['start', 'open'])
   expect(server.hookEnvCalls).toBe(0)
-  expect(server.launchers).toHaveLength(2)
-  for (const script of server.launchers) expect(script.replaceAll('\\', '/')).toMatch(/^\/.+\/server\/launcher\.cjs$|^[A-Za-z]:\/.+\/server\/launcher\.cjs$/)
 })
 
 test('/break-the-wall asks for a newer Claude Code when the launch fails on one older than plugin.json allows (#145)', async ($, on) => {

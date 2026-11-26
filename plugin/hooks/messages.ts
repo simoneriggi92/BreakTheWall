@@ -1,5 +1,4 @@
-/** The oldest Claude Code the mod has been witnessed on; plugin.json's `engines` range starts here too (#145). */
-export const MIN_CLAUDE_CODE = '2.1.330';
+import { MIN_CLAUDE_CODE } from './engine-support';
 
 /**
  * The mod's own words, in both interface languages (#94). They live in the mod because the one that matters most,
@@ -31,14 +30,4 @@ export const modMessages = (locale: string | undefined): ModMessages => locale?.
 export function nodeIsSupported(versionOutput: string): boolean {
   const major = /^v(\d+)\./.exec(versionOutput.trim())?.[1];
   return major !== undefined && Number(major) >= 22;
-}
-
-/** Whether a Claude Code version (`2.1.332`, or a development build's `2.1.332-dev.…`) is at least `MIN_CLAUDE_CODE`. */
-export function claudeCodeIsSupported(version: string): boolean {
-  const parts = (v: string) => /^(\d+)\.(\d+)\.(\d+)/.exec(v)?.slice(1).map(Number)
-  const have = parts(version.trim())
-  const need = parts(MIN_CLAUDE_CODE)
-  if (!have || !need) return false
-  for (let i = 0; i < 3; i++) if (have[i] !== need[i]) return have[i]! > need[i]!
-  return true
 }

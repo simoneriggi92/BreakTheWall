@@ -1,6 +1,7 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { claudeCodeIsSupported, modMessages, nodeIsSupported } from './messages'
+import { claudeCodeIsSupported, pluginRootFrom } from './engine-support'
+import { modMessages, nodeIsSupported } from './messages'
 
 /**
  * Break the Wall's mod (#94, #95): a thin adapter between a Claude Code session and the local server. It checks
@@ -83,7 +84,7 @@ export const register: Register = (on, options) => {
       return { text: reply.opened ? t.opened : t.alreadyOpen, isTextDisplayOnly: true }
     } catch (error) {
       $.ui.log(`break-the-wall: ${String(error)}`, { to: 'debug' })
-      return { text: await claudeCodeFits($) ? t.failed : t.outdated, isTextDisplayOnly: true }
+      return { text: await sessionClaudeCodeIsSupported($) ? t.failed : t.outdated, isTextDisplayOnly: true }
     }
   })
 }
@@ -170,23 +171,16 @@ async function pollDelivery($: EngineInterface) {
   $.clock.after(wait, () => { void pollDelivery($) })
 }
 
-/**
- * The plugin's folder: `$.plugin.root`, a property and no call, and `hookEnv()` only on a build without it (#145).
- * Claude Code before 2.1.326 has no `hookEnv`; which build first has `$.plugin.root` is not known, so neither is
- * assumed. Reading it on a build without `$.plugin` throws, hence the try.
- */
-async function pluginRoot($: EngineInterface): Promise<string> {
-  let root: unknown
-  try { root = $.plugin.root } catch { root = undefined }
-  if (typeof root === 'string' && root) return root
-  return (await $.process.hookEnv()).CLAUDE_PLUGIN_ROOT ?? ''
+/** The plugin's folder, as `pluginRootFrom` picks it from what this build offers (#145). */
+function pluginRoot($: EngineInterface): Promise<string> {
+  return pluginRootFrom(() => $.plugin.root, () => $.process.hookEnv())
 }
 
 /**
  * Asked only once a launch failed (#145): a Claude Code older than plugin.json's `engines` range, which it ignores
  * before 2.1.323, lacks calls the mod makes. A build without `$.session.version` is older still.
  */
-async function claudeCodeFits($: EngineInterface): Promise<boolean> {
+async function sessionClaudeCodeIsSupported($: EngineInterface): Promise<boolean> {
   try {
     return claudeCodeIsSupported((await $.session.version()).version)
   } catch {
