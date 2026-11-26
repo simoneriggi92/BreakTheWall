@@ -11,6 +11,7 @@ The plugin installs and opens on more machines, and says where its page is.
 The first installs outside the owner's Mac, on Windows, failed twice before the page opened: the plugin's source was cloned over SSH, and the mod called a function an older Claude Code does not have. This release candidate fixes both, and prints the page's address so a closed tab can be reopened.
 
 ### Added
+- **Approve a spec's version from the page.** The remarks panel approves the newest version of a handed-over spec. One fixed message goes back to the session that handed it over, naming any unbacked statements or statements with broken backing (#143).
 - **`/break-the-wall` prints the page's address**, `http://127.0.0.1:<port>/#t=…`, both when it opens a tab and when one is already open. A tab closed a moment ago still counts as open for a few seconds; the address reopens it by hand. The line is shown to you alone and is never sent to the model (#147).
 
 ### Fixed
