@@ -5,6 +5,7 @@
   "author": { "name": "Simone Riggi" },
   "license": "Apache-2.0",
   "repository": "https://github.com/simoneriggi92/BreakTheWall",
+  "engines": { "claude-code": ">=2.1.330" },
   "userConfig": {
     "sideChatModel": {
       "type": "string",

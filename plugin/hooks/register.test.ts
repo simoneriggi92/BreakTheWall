@@ -1,6 +1,10 @@
 import type { On } from 'claude-code'
 import { expect, mock, test, type Engine } from 'claude-code/testing'
 
+import { modMessages } from './messages'
+
+const t = modMessages(Intl.DateTimeFormat().resolvedOptions().locale)
+
 /**
  * The mod against the engine's test kit (`claude plugin test plugin`): the test answers what the mod asks of Claude
  * Code (processes, the session, fetches, prompts) as the local server and the session would, and reads back what the
@@ -23,21 +27,36 @@ function engine(on: On) {
     failSubmit: false,
     /** Every call in the order the mod made it, to read submit-then-confirm. */
     order: [] as string[],
+    /** The script of every launcher run, and how many times the mod asked for the hook environment. */
+    launchers: [] as string[],
+    hookEnvCalls: 0,
+    /** What a launcher run throws instead of answering: a call the engine lacks throws a TypeError where it is made. */
+    launchThrows: undefined as Error | undefined,
+    /** The Claude Code the session runs on, or what asking for it throws on a build that lacks the call. */
+    version: '2.1.332' as string | Error,
   }
   on('session.start', () => ({ cwd: '/work' }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
   on('session.end', (_, e) => ({ sessionId: e.sessionId }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
   on('ui.log', () => ({ value: undefined }))
-  on('process.hookEnv', () => ({ value: { CLAUDE_PLUGIN_ROOT: '/plugin' } }))
+  on('process.hookEnv', () => { state.hookEnvCalls++; return { value: { CLAUDE_PLUGIN_ROOT: '/plugin' } } })
   on('process.run', (_, e) => {
-    if (e.argv[1] !== '--version') state.launched.push(e.argv.slice(2))
+    if (e.argv[1] !== '--version') {
+      if (state.launchThrows) throw state.launchThrows
+      state.launched.push(e.argv.slice(2))
+      state.launchers.push(e.argv[1] ?? '')
+    }
     return { value: {
       exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
       stdout: e.argv[1] === '--version' ? 'v22.23.2\n' : JSON.stringify({ port: 4000, secret: 's3cret' }) + '\n',
     } }
   })
   on('session.id', () => ({ value: state.session }))
+  on('session.version', () => {
+    if (state.version instanceof Error) throw state.version
+    return { value: { version: state.version, base: state.version } }
+  })
   on('session.cwd', () => ({ value: '/work' }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }))
   on('session.info', () => ({ value: { transcriptPath: state.transcript, platform: 'macos' as const, isHosted: false } }))
@@ -120,6 +139,9 @@ test('reads the session id again for each poll, as /clear and /resume change it 
   expect(server.submitted.map(x => x.text)).toEqual(['after the clear'])
 })
 
+/** `/break-the-wall` typed in the composer. */
+const slash = { command: 'break-the-wall', args: '', origin: { kind: 'composer' as const }, presentation: { isFullscreen: false, columns: 80 } }
+
 const posted = (server: ReturnType<typeof engine>, path: string) => server.fetched.filter(x => x.method === 'POST' && new URL(x.url).pathname === path).map(x => JSON.parse(x.body ?? '{}'))
 
 test('on /clear, reports the ending session ended and registers the id the session goes on under', async ($, on) => {
@@ -186,4 +208,43 @@ test('delivers what was queued for a session resumed with claude --resume <id> a
   expect(server.fetched.find(x => x.url.endsWith('/delivery'))?.url).toBe('http://127.0.0.1:4000/api/sessions/sess-ended/delivery')
   expect(server.submitted).toEqual([{ text: 'answered while the terminal was closed', asUser: true }])
   expect(server.order).toContain('POST /api/sessions/sess-ended/delivery/round-2')
+})
+
+test('finds the launcher under the plugin\'s own folder, with no call on hookEnv, which Claude Code before 2.1.326 lacks (#145)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  await $.command.run(slash)
+  expect(server.hookEnvCalls).toBe(0)
+  expect(server.launchers).toHaveLength(2)
+  for (const script of server.launchers) expect(script.replaceAll('\\', '/')).toMatch(/^\/.+\/server\/launcher\.cjs$|^[A-Za-z]:\/.+\/server\/launcher\.cjs$/)
+})
+
+test('/break-the-wall asks for a newer Claude Code when the launch fails on one older than plugin.json allows (#145)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  server.version = '2.1.318'
+  server.launchThrows = new Error('$.process.hookEnv is not a function')
+  const { text } = await $.command.run(slash)
+  expect(text).toBe(t.outdated)
+})
+
+test('/break-the-wall asks for a newer Claude Code when the launch fails and the build cannot even say its version (#145)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  server.version = new Error('$.session.version is not a function')
+  server.launchThrows = new Error('$.process.hookEnv is not a function')
+  const { text } = await $.command.run(slash)
+  expect(text).toBe(t.outdated)
+})
+
+test('/break-the-wall still says the page did not open when the launch fails on a Claude Code new enough (#145)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  server.launchThrows = new Error('The local server did not start.')
+  const { text } = await $.command.run(slash)
+  expect(text).toBe(t.failed)
 })

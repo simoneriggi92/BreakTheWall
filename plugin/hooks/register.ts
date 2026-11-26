@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { modMessages, nodeIsSupported } from './messages'
+import { claudeCodeIsSupported, modMessages, nodeIsSupported } from './messages'
 
 /**
  * Break the Wall's mod (#94, #95): a thin adapter between a Claude Code session and the local server. It checks
@@ -83,7 +83,7 @@ export const register: Register = (on, options) => {
       return { text: reply.opened ? t.opened : t.alreadyOpen, isTextDisplayOnly: true }
     } catch (error) {
       $.ui.log(`break-the-wall: ${String(error)}`, { to: 'debug' })
-      return { text: t.failed, isTextDisplayOnly: true }
+      return { text: await claudeCodeFits($) ? t.failed : t.outdated, isTextDisplayOnly: true }
     }
   })
 }
@@ -170,6 +170,30 @@ async function pollDelivery($: EngineInterface) {
   $.clock.after(wait, () => { void pollDelivery($) })
 }
 
+/**
+ * The plugin's folder: `$.plugin.root`, a property and no call, and `hookEnv()` only on a build without it (#145).
+ * Claude Code before 2.1.326 has no `hookEnv`; which build first has `$.plugin.root` is not known, so neither is
+ * assumed. Reading it on a build without `$.plugin` throws, hence the try.
+ */
+async function pluginRoot($: EngineInterface): Promise<string> {
+  let root: unknown
+  try { root = $.plugin.root } catch { root = undefined }
+  if (typeof root === 'string' && root) return root
+  return (await $.process.hookEnv()).CLAUDE_PLUGIN_ROOT ?? ''
+}
+
+/**
+ * Asked only once a launch failed (#145): a Claude Code older than plugin.json's `engines` range, which it ignores
+ * before 2.1.323, lacks calls the mod makes. A build without `$.session.version` is older still.
+ */
+async function claudeCodeFits($: EngineInterface): Promise<boolean> {
+  try {
+    return claudeCodeIsSupported((await $.session.version()).version)
+  } catch {
+    return false
+  }
+}
+
 async function checkNode($: EngineInterface): Promise<'ok' | 'missing'> {
   try {
     const { exitCode, stdout } = await $.process.run(['node', '--version'], { timeoutMs: 10_000 })
@@ -184,8 +208,7 @@ async function checkNode($: EngineInterface): Promise<'ok' | 'missing'> {
  * is the launcher's to leave out when it counts the sessions an older server still serves (#102).
  */
 async function launch($: EngineInterface, command: 'start' | 'open'): Promise<Launched> {
-  const { CLAUDE_PLUGIN_ROOT: root } = await $.process.hookEnv()
-  const { stdout } = await $.process.run(['node', `${root}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
+  const { stdout } = await $.process.run(['node', `${await pluginRoot($)}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
   const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '{}') as Partial<Launched> & { error?: string }
   if (typeof reply.port !== 'number' || typeof reply.secret !== 'string') throw new Error(reply.error ?? 'The launcher gave no server.')
   return { port: reply.port, secret: reply.secret, opened: reply.opened }
