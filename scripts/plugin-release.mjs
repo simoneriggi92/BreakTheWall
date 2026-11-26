@@ -7,7 +7,10 @@ import { basename, dirname, join } from 'node:path';
  * .github/workflows/release.yml runs these through scripts/pack-plugin.mjs.
  */
 export const PLUGIN_NAME = 'break-the-wall';
-export const PLUGIN_REPO = 'simoneriggi92/BreakTheWall';
+// A full https URL, not the `github` owner/repo shorthand: Claude Code clones the shorthand over SSH when a key for
+// github.com looks configured, with StrictHostKeyChecking on, so a machine that never accepted GitHub's host key failed
+// the install with "Host key verification failed". The repository is public, so https needs no credentials.
+export const PLUGIN_GIT_URL = 'https://github.com/simoneriggi92/BreakTheWall.git';
 
 /** `v0.6.0` → `plugin-v0.6.0`. The release tag, package.json, plugin.json and the server's own version are one. */
 export function pluginTag(releaseTag, packageVersion) {
@@ -25,7 +28,7 @@ export function checkMarketplacePin(marketplace, tag) {
   const entry = marketplace?.plugins?.find?.(plugin => plugin?.name === PLUGIN_NAME);
   if (!entry) throw new Error(`.claude-plugin/marketplace.json lists no ${PLUGIN_NAME} plugin.`);
   const { source } = entry;
-  if (source?.source !== 'github' || source.repo !== PLUGIN_REPO) throw new Error(`The marketplace's ${PLUGIN_NAME} entry must come from github ${PLUGIN_REPO}.`);
+  if (source?.source !== 'url' || source.url !== PLUGIN_GIT_URL) throw new Error(`The marketplace's ${PLUGIN_NAME} entry must come from { "source": "url", "url": "${PLUGIN_GIT_URL}" }.`);
   if (source.ref !== tag) throw new Error(`The marketplace pins ${source.ref ?? 'no ref'}, this release writes ${tag}: move the pin with package.json's version.`);
 }
 

@@ -119,7 +119,7 @@ describe('the marketplace on main (#107)', () => {
   const marketplace = (ref: string) => ({
     name: 'break-the-wall',
     owner: { name: 'Simone Riggi' },
-    plugins: [{ name: 'break-the-wall', source: { source: 'github', repo: 'simoneriggi92/BreakTheWall', ref } }],
+    plugins: [{ name: 'break-the-wall', source: { source: 'url', url: 'https://github.com/simoneriggi92/BreakTheWall.git', ref } }],
   });
 
   it('accepts an entry pinned at the tag the release writes', () => {
@@ -129,6 +129,12 @@ describe('the marketplace on main (#107)', () => {
   it('refuses a release the marketplace does not pin, so no installer is left on an older tag unnoticed', () => {
     expect(() => checkMarketplacePin(marketplace('plugin-v0.5.0'), 'plugin-v0.6.0')).toThrow(/plugin-v0\.5\.0/);
     expect(() => checkMarketplacePin({ ...marketplace('plugin-v0.6.0'), plugins: [] }, 'plugin-v0.6.0')).toThrow(/break-the-wall/);
+  });
+
+  it('refuses a source cloned over SSH, which a machine without github.com in known_hosts refuses', () => {
+    const entry = (source: object) => ({ ...marketplace('plugin-v0.6.0'), plugins: [{ name: 'break-the-wall', source: { ...source, ref: 'plugin-v0.6.0' } }] });
+    expect(() => checkMarketplacePin(entry({ source: 'github', repo: 'simoneriggi92/BreakTheWall' }), 'plugin-v0.6.0')).toThrow(/https:\/\/github\.com\/simoneriggi92\/BreakTheWall\.git/);
+    expect(() => checkMarketplacePin(entry({ source: 'url', url: 'git@github.com:simoneriggi92/BreakTheWall.git' }), 'plugin-v0.6.0')).toThrow(/must come from/);
   });
 
   it('pins this repository\'s plugin at the tag of package.json\'s version, installed as break-the-wall@break-the-wall', () => {
