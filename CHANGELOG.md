@@ -4,12 +4,22 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-11-26
+
+The plugin installs and opens on more machines, and says where its page is.
+
+The first installs outside the owner's Mac, on Windows, failed twice before the page opened: the plugin's source was cloned over SSH, and the mod called a function an older Claude Code does not have. This release candidate fixes both, and prints the page's address so a closed tab can be reopened.
+
 ### Added
 - **`/break-the-wall` prints the page's address**, `http://127.0.0.1:<port>/#t=…`, both when it opens a tab and when one is already open. A tab closed a moment ago still counts as open for a few seconds; the address reopens it by hand. The line is shown to you alone and is never sent to the model (#147).
 
 ### Fixed
 - **An older Claude Code is told to update.** The plugin needs Claude Code 2.1.330 or later, and declares it in `plugin.json`. Before 2.1.326, `/break-the-wall` failed with "the page did not open", because the mod called a function that Claude Code did not have yet (`$.process.hookEnv`). It now finds its folder without that call where it can, and otherwise asks you to run `claude update` (#145).
 - **The plugin installs without SSH.** The marketplace now gives the plugin's source as `https://github.com/simoneriggi92/BreakTheWall.git`. The `simoneriggi92/BreakTheWall` shorthand made Claude Code clone over SSH, and a machine that had never accepted GitHub's host key failed with "Host key verification failed". If you added the marketplace before, run `/plugin marketplace update break-the-wall`, then `/plugin install break-the-wall@break-the-wall` again.
+
+### Known limits
+- Requires Claude Code 2.1.330 or later and Node.js 22 or later on the `PATH`.
+- Linux and Windows are not verified end to end: on Windows, the install and the launcher were witnessed, a full round was not.
 
 ## [1.0.0-rc.1] - 2026-11-25
 
@@ -147,7 +157,8 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v1.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v1.0.0-rc.2...HEAD
+[1.0.0-rc.2]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v1.0.0-rc.1
 [0.5.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.5.0-alpha
 [0.4.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.4.0-alpha
