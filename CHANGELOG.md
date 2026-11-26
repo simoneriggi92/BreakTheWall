@@ -4,8 +4,20 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-26
+
+Answer your agent's questions one at a time. Check the spec they lead to, line by line.
+
+Break the Wall 1.0 is a Claude Code plugin: `/break-the-wall` opens one local page beside your sessions, where the rounds of Matt Pocock's grilling skills arrive one question at a time, a side chat answers beside a question, and the spec `/to-spec` hands over opens as a source, each statement traced to what backs it, until you approve it. It is the first stable release: the plugin is what `1.0.0-rc.1` and `1.0.0-rc.2` brought, unchanged; the desktop app stays frozen at `0.5.0-alpha` and has no build in this release.
+
 ### Changed
 - **The README is rewritten for the plugin** (#137): one heading GIF and three clips from a real session, an install measured in a clean profile, the commands to use it (`/break-the-wall`, a grilling, `/to-spec`), how it works, why, and a reference. The desktop app, frozen at `v0.5.0-alpha`, moves with its demos, features, local models, tech stack and roadmap to [docs/desktop-app.md](docs/desktop-app.md).
+
+### Known limits
+- Requires Claude Code 2.1.330 or later and Node.js 22 or later on the `PATH`.
+- Linux and Windows are not verified end to end: on Windows, the install and the launcher were witnessed, a full round was not.
+- Approve does not yet say why it is disabled, and the server still accepts it while a round of the session awaits answers (#134).
+- Auto-update is off for this marketplace until you turn it on in `/plugin`.
 
 ## [1.0.0-rc.2] - 2026-11-26
 
@@ -161,7 +173,8 @@ The first public alpha. It runs from source on macOS; there is no installer yet.
 ### Earlier lessons
 - Lessons generated before disassemblies stay readable, with their progress, under "Earlier paths".
 
-[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v1.0.0-rc.2...HEAD
+[Unreleased]: https://github.com/simoneriggi92/BreakTheWall/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v1.0.0
 [1.0.0-rc.2]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v1.0.0-rc.1
 [0.5.0-alpha]: https://github.com/simoneriggi92/BreakTheWall/releases/tag/v0.5.0-alpha
