@@ -4,7 +4,7 @@ Break the Wall handles two things that must not leak: the learner's sources, and
 
 ## Supported versions
 
-Break the Wall is an alpha. Only the latest commit on `main` and the app attached to the latest release receive security fixes. The macOS app is signed ad-hoc and not notarized by Apple, and the Windows setup is not code-signed: download them only from this repository's releases, and check each against the `.sha256` file published with it.
+Only the latest commit on `main` and the latest release receive security fixes. The desktop app's macOS build is signed ad-hoc and not notarized by Apple, and its Windows setup is not code-signed: download them only from this repository's releases, and check each against the `.sha256` file published with it.
 
 ## Reporting a vulnerability
 
@@ -30,5 +30,5 @@ Include what you found, how to reproduce it, and what an attacker could reach. Y
 
 ## Out of scope
 
-- The correctness of generated explanations: they are checked for structure and citations, not for truth, as the README states.
+- The correctness of generated explanations: they are checked for structure and citations, not for truth.
 - Vulnerabilities in a model provider's own service; report those to the provider.

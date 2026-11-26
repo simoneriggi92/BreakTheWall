@@ -1,6 +1,6 @@
 # Contributing to Break the Wall
 
-Thank you for your interest. Break the Wall is an alpha, and contributions of every size help: a bug report, a translation fix, a new prepared exploration, a layout improvement, or a step on the [roadmap](README.md#roadmap).
+Thank you for your interest. Contributions of every size help: a bug report, a translation fix, a layout improvement, or a step in [the issues](https://github.com/simoneriggi92/BreakTheWall/issues).
 
 Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md). Questions and ideas are welcome in [Discussions](https://github.com/simoneriggi92/BreakTheWall/discussions); security problems go to the private channel in [SECURITY.md](SECURITY.md).
 

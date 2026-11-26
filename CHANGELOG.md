@@ -4,6 +4,9 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- **The README is rewritten for the plugin** (#137): one heading GIF and three clips from a real session, an install measured in a clean profile, the commands to use it (`/break-the-wall`, a grilling, `/to-spec`), how it works, why, and a reference. The desktop app, frozen at `v0.5.0-alpha`, moves with its demos, features, local models, tech stack and roadmap to [docs/desktop-app.md](docs/desktop-app.md).
+
 ## [1.0.0-rc.2] - 2026-11-26
 
 The plugin installs and opens on more machines, and says where its page is.

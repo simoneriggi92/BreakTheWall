@@ -7,7 +7,7 @@
       "name": "break-the-wall",
       "description": "Answer an agent's question rounds one question at a time in a local page, then explore the spec they lead to.",
       "source": { "source": "url", "url": "https://github.com/simoneriggi92/BreakTheWall.git", "ref": "plugin-v1.0.0-rc.2" },
-      "homepage": "https://github.com/simoneriggi92/BreakTheWall#use-in-claude-code",
+      "homepage": "https://github.com/simoneriggi92/BreakTheWall#install",
       "license": "Apache-2.0"
     }
   ]
