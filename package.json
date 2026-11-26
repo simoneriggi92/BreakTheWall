@@ -1,6 +1,6 @@
 {
   "name": "break-the-wall",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0",
   "private": true,
   "license": "Apache-2.0",
   "description": "Read the structure of a source and explore how it holds together, down to its source lines.",
