@@ -27,6 +27,8 @@ function engine(on: On) {
     failSubmit: false,
     /** Every call in the order the mod made it, to read submit-then-confirm. */
     order: [] as string[],
+    /** Whether the launcher opens a tab: false while a page is connected. */
+    opens: true,
     /** How many times the mod asked for the hook environment. */
     hookEnvCalls: 0,
     /** What a launcher run throws instead of answering: a call the engine lacks throws a TypeError where it is made. */
@@ -47,7 +49,7 @@ function engine(on: On) {
     }
     return { value: {
       exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
-      stdout: e.argv[1] === '--version' ? 'v22.23.2\n' : JSON.stringify({ port: 4000, secret: 's3cret' }) + '\n',
+      stdout: e.argv[1] === '--version' ? 'v22.23.2\n' : JSON.stringify({ port: 4000, secret: 's3cret', url: 'http://127.0.0.1:4000/#t=s3cret', opened: state.opens }) + '\n',
     } }
   })
   on('session.id', () => ({ value: state.session }))
@@ -244,4 +246,14 @@ test('/break-the-wall still says the page did not open when the launch fails on 
   server.launchThrows = new Error('The local server did not start.')
   const { text } = await $.command.run(slash)
   expect(text).toBe(t.failed)
+})
+
+test('/break-the-wall prints the page\'s address, whether it opened a tab or one was already open (#147)', async ($, on) => {
+  const clock = mock.clock(on)
+  const server = engine(on)
+  await startSession($, clock)
+  const url = 'http://127.0.0.1:4000/#t=s3cret'
+  expect((await $.command.run(slash)).text).toBe(t.opened(url))
+  server.opens = false
+  expect((await $.command.run(slash)).text).toBe(t.alreadyOpen(url))
 })

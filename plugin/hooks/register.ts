@@ -20,7 +20,8 @@ const REREGISTER_MS = 1_000
 const DELIVERY_RETRY_MS = 5_000
 
 interface Server { port: number; secret: string }
-type Launched = Server & { opened?: boolean }
+/** `url` is the page's address with its secret, printed for the person alone (#147). */
+type Launched = Server & { opened?: boolean; url?: string }
 
 const t = modMessages(Intl.DateTimeFormat().resolvedOptions().locale)
 /** This session's view of the server; a reload of the module starts it over, and the next call finds the server again. */
@@ -81,7 +82,10 @@ export const register: Register = (on, options) => {
       const reply = await launch($, 'open')
       server = reply
       void registerSession($).catch(() => {})
-      return { text: reply.opened ? t.opened : t.alreadyOpen, isTextDisplayOnly: true }
+      // The launcher ships with this mod, so an `open` without the address is a fault like any other.
+      if (!reply.url) throw new Error('The launcher gave no page address.')
+      // Display-only: the address carries the per-launch secret, which must reach no model request (#147).
+      return { text: reply.opened ? t.opened(reply.url) : t.alreadyOpen(reply.url), isTextDisplayOnly: true }
     } catch (error) {
       $.ui.log(`break-the-wall: ${String(error)}`, { to: 'debug' })
       return { text: await sessionClaudeCodeIsSupported($) ? t.failed : t.outdated, isTextDisplayOnly: true }
@@ -205,5 +209,5 @@ async function launch($: EngineInterface, command: 'start' | 'open'): Promise<La
   const { stdout } = await $.process.run(['node', `${await pluginRoot($)}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
   const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '{}') as Partial<Launched> & { error?: string }
   if (typeof reply.port !== 'number' || typeof reply.secret !== 'string') throw new Error(reply.error ?? 'The launcher gave no server.')
-  return { port: reply.port, secret: reply.secret, opened: reply.opened }
+  return { port: reply.port, secret: reply.secret, opened: reply.opened, url: typeof reply.url === 'string' ? reply.url : undefined }
 }
