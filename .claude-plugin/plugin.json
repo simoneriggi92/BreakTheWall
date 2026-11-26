@@ -1,0 +1,18 @@
+{
+  "name": "break-the-wall",
+  "version": "1.0.0-rc.1",
+  "description": "Answer an agent's question rounds one question at a time in a local page, then explore the spec they lead to.",
+  "author": {
+    "name": "Simone Riggi"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/simoneriggi92/BreakTheWall",
+  "userConfig": {
+    "sideChatModel": {
+      "type": "string",
+      "title": "Side-chat model",
+      "description": "The model a side chat on a question runs on, as claude --model takes it (an alias such as haiku, or a full name). Empty: the session's own model.",
+      "default": ""
+    }
+  }
+}
