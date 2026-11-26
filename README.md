@@ -19,22 +19,24 @@
 
 ## Install
 
-You need Claude Code 2.1.330 or later, and Node.js 22 or later on the `PATH` Claude Code starts with.
-
-**1. The plugin.** In a shell:
+Needs Claude Code 2.1.330+ and Node.js 22+ on the `PATH`.
 
 ```bash
 claude plugin marketplace add simoneriggi92/BreakTheWall
 claude plugin install break-the-wall@break-the-wall
 ```
 
-The install says one option is not set yet: the side-chat model. Leave it empty to run side chats on the session's own model, or set it later with `/plugin configure break-the-wall@break-the-wall`.
+Then install [Matt Pocock's skills](https://github.com/mattpocock/skills#installation-30-second-setup): the plugin works on their grilling, and shows nothing without it.
 
-**2. Matt Pocock's skills.** The plugin works with the grilling skills of [mattpocock/skills](https://github.com/mattpocock/skills), and does nothing without them: [`/grilling`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), [`/grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) and [`/grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) ask the rounds, and [`/to-spec`](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-spec) hands over the spec they lead to. Install them as [its README](https://github.com/mattpocock/skills#installation-30-second-setup) says.
+## Use
 
-**3. `/break-the-wall`.** Start `claude` in your project and type `/break-the-wall`: the page opens in your browser, and its address is printed in case you close the tab. Then start a grilling, for example `/grill-with-docs` and the ticket you want to build, and its rounds arrive in the page.
+In Claude Code, in your project:
 
-Each command above took under four seconds in a clean Claude Code profile (2.1.332, `v1.0.0-rc.2`).
+```text
+/break-the-wall                  opens the page beside the session
+/grill-with-docs <your ticket>   the rounds arrive in the page, one question at a time
+/to-spec                         the spec opens in the page: check it, then Approve
+```
 
 ## How it works
 
@@ -106,7 +108,16 @@ Break the Wall keeps the agent, its skills and the terminal as they are, and cha
 | `/break-the-wall` | Opens the page, or says it is already open; prints its address either way |
 | `/break-the-wall:doctor` | Asks Claude why the page does not open (below) |
 
-The skills of [mattpocock/skills](https://github.com/mattpocock/skills) are recognised by name, with or without their plugin's prefix (`/mattpocock-skills:grill-with-docs`): `grilling`, `grill-me` and `grill-with-docs` open the rounds, `to-spec` hands over the spec.
+The plugin recognises these skills of [mattpocock/skills](https://github.com/mattpocock/skills) by name, with or without their plugin's prefix (`/mattpocock-skills:grill-with-docs`):
+
+| Skill | In the page |
+|---|---|
+| [`/grilling`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), [`/grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me), [`/grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) | Their rounds, one question at a time |
+| [`/to-spec`](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-spec) | The spec it hands over, with its backing, remarks and Approve |
+
+### Side-chat model
+
+The install says one option is not set: the side-chat model. Left empty, side chats run on the session's own model; set it with `/plugin configure break-the-wall@break-the-wall`, as `claude --model` takes it (an alias such as `haiku`, or a full name).
 
 ### Nothing opens?
 
