@@ -30,7 +30,7 @@ claude plugin install break-the-wall@break-the-wall
 
 The install says one option is not set yet: the side-chat model. Leave it empty to run side chats on the session's own model, or set it later with `/plugin configure break-the-wall@break-the-wall`.
 
-**2. Matt Pocock's grilling skills.** The plugin works with the grilling skills of [mattpocock/skills](https://github.com/mattpocock/skills), and does nothing without them: `/grilling`, `/grill-me` and `/grill-with-docs` ask the rounds, and `/to-spec` hands over the spec they lead to. Install them from their own marketplace:
+**2. Matt Pocock's grilling skills.** The plugin works with the grilling skills of [mattpocock/skills](https://github.com/mattpocock/skills), and does nothing without them: [`/grilling`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), [`/grill-me`](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me) and [`/grill-with-docs`](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) ask the rounds, and [`/to-spec`](https://github.com/mattpocock/skills/tree/main/skills/engineering/to-spec) hands over the spec they lead to. Install them from their own marketplace:
 
 ```bash
 claude plugin marketplace add mattpocock/skills
@@ -111,7 +111,7 @@ Break the Wall keeps the agent, its skills and the terminal as they are, and cha
 | `/break-the-wall` | Opens the page, or says it is already open; prints its address either way |
 | `/break-the-wall:doctor` | Asks Claude why the page does not open (below) |
 
-The skills are recognised by name, with or without their plugin's prefix (`/mattpocock-skills:grill-with-docs`): `grilling`, `grill-me` and `grill-with-docs` open the rounds, `to-spec` hands over the spec.
+The skills of [mattpocock/skills](https://github.com/mattpocock/skills) are recognised by name, with or without their plugin's prefix (`/mattpocock-skills:grill-with-docs`): `grilling`, `grill-me` and `grill-with-docs` open the rounds, `to-spec` hands over the spec.
 
 ### Nothing opens?
 
