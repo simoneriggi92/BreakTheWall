@@ -1,12 +1,15 @@
 {
   "name": "break-the-wall",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Answer an agent's question rounds one question at a time in a local page, then explore the spec they lead to.",
   "author": {
     "name": "Simone Riggi"
   },
   "license": "Apache-2.0",
   "repository": "https://github.com/simoneriggi92/BreakTheWall",
+  "engines": {
+    "claude-code": ">=2.1.330"
+  },
   "userConfig": {
     "sideChatModel": {
       "type": "string",

@@ -1,5 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
+import { claudeCodeIsSupported, pluginRootFrom } from './engine-support'
 import { modMessages, nodeIsSupported } from './messages'
 
 /**
@@ -19,7 +20,8 @@ const REREGISTER_MS = 1_000
 const DELIVERY_RETRY_MS = 5_000
 
 interface Server { port: number; secret: string }
-type Launched = Server & { opened?: boolean }
+/** What `open` adds: whether it opened a tab, and the page's address with its secret, printed for the person alone (#147). */
+type Opened = Server & { opened: boolean; url: string }
 
 const t = modMessages(Intl.DateTimeFormat().resolvedOptions().locale)
 /** This session's view of the server; a reload of the module starts it over, and the next call finds the server again. */
@@ -43,7 +45,7 @@ export const register: Register = (on, options) => {
       node = await checkNode($)
       if (node !== 'ok') return
       try {
-        server = await launch($, 'start')
+        server = await launch($)
         await registerSession($)
         renewal ??= $.clock.every(RENEW_MS, () => { void registerSession($).catch(() => {}) })
         if (!delivering) { delivering = true; void pollDelivery($) }
@@ -77,13 +79,14 @@ export const register: Register = (on, options) => {
     if (node !== 'ok') node = await checkNode($)
     if (node !== 'ok') return { text: t.nodeMissing, isTextDisplayOnly: true }
     try {
-      const reply = await launch($, 'open')
+      const reply = await openPage($)
       server = reply
       void registerSession($).catch(() => {})
-      return { text: reply.opened ? t.opened : t.alreadyOpen, isTextDisplayOnly: true }
+      // Display-only: the address carries the per-launch secret, which must reach no model request (#147).
+      return { text: reply.opened ? t.opened(reply.url) : t.alreadyOpen(reply.url), isTextDisplayOnly: true }
     } catch (error) {
       $.ui.log(`break-the-wall: ${String(error)}`, { to: 'debug' })
-      return { text: t.failed, isTextDisplayOnly: true }
+      return { text: await sessionClaudeCodeIsSupported($) ? t.failed : t.outdated, isTextDisplayOnly: true }
     }
   })
 }
@@ -130,7 +133,7 @@ async function post($: EngineInterface, path: string, body: string) {
   const first = server ? await postTo($, server, path, body).catch(() => undefined) : undefined
   if (first?.ok) return
   // The server is gone or was replaced: find or start it again, then post once more.
-  server = await launch($, 'start')
+  server = await launch($)
   const second = await postTo($, server, path, body)
   if (!second.ok) throw new Error(`${path} answered ${second.status}`)
 }
@@ -170,6 +173,23 @@ async function pollDelivery($: EngineInterface) {
   $.clock.after(wait, () => { void pollDelivery($) })
 }
 
+/** The plugin's folder, as `pluginRootFrom` picks it from what this build offers (#145). */
+function pluginRoot($: EngineInterface): Promise<string> {
+  return pluginRootFrom(() => $.plugin.root, () => $.process.hookEnv())
+}
+
+/**
+ * Asked only once a launch failed (#145): a Claude Code older than plugin.json's `engines` range, which it ignores
+ * before 2.1.323, lacks calls the mod makes. A build without `$.session.version` is older still.
+ */
+async function sessionClaudeCodeIsSupported($: EngineInterface): Promise<boolean> {
+  try {
+    return claudeCodeIsSupported((await $.session.version()).version)
+  } catch {
+    return false
+  }
+}
+
 async function checkNode($: EngineInterface): Promise<'ok' | 'missing'> {
   try {
     const { exitCode, stdout } = await $.process.run(['node', '--version'], { timeoutMs: 10_000 })
@@ -183,10 +203,22 @@ async function checkNode($: EngineInterface): Promise<'ok' | 'missing'> {
  * `node launcher.cjs start | open <session>`: one JSON line back, the server left running on its own. The session
  * is the launcher's to leave out when it counts the sessions an older server still serves (#102).
  */
-async function launch($: EngineInterface, command: 'start' | 'open'): Promise<Launched> {
-  const { CLAUDE_PLUGIN_ROOT: root } = await $.process.hookEnv()
-  const { stdout } = await $.process.run(['node', `${root}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
-  const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '{}') as Partial<Launched> & { error?: string }
-  if (typeof reply.port !== 'number' || typeof reply.secret !== 'string') throw new Error(reply.error ?? 'The launcher gave no server.')
-  return { port: reply.port, secret: reply.secret, opened: reply.opened }
+async function runLauncher($: EngineInterface, command: 'start' | 'open'): Promise<Server & Record<string, unknown>> {
+  const { stdout } = await $.process.run(['node', `${await pluginRoot($)}/server/launcher.cjs`, command, await $.session.id()], { timeoutMs: 30_000 })
+  const reply = JSON.parse(stdout.trim().split('\n').at(-1) ?? '{}') as Record<string, unknown>
+  if (typeof reply.port !== 'number' || typeof reply.secret !== 'string') throw new Error(typeof reply.error === 'string' ? reply.error : 'The launcher gave no server.')
+  return { ...reply, port: reply.port, secret: reply.secret }
+}
+
+/** Finds or starts the server. */
+async function launch($: EngineInterface): Promise<Server> {
+  const { port, secret } = await runLauncher($, 'start')
+  return { port, secret }
+}
+
+/** Also opens the page when none is connected. The launcher ships with this mod: a reply missing a field is a fault. */
+async function openPage($: EngineInterface): Promise<Opened> {
+  const { port, secret, opened, url } = await runLauncher($, 'open')
+  if (typeof opened !== 'boolean' || typeof url !== 'string' || !url) throw new Error('The launcher\'s open reply lacks the page address or whether it opened a tab.')
+  return { port, secret, opened, url }
 }

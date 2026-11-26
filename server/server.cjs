@@ -21003,14 +21003,50 @@ var sentSpecRemarksSchema = external_exports.strictObject({
   /** Sent, not delivered, and the session ended: they wait for `claude --resume <id>`. */
   queued: external_exports.boolean()
 });
+var specApprovalSchema = external_exports.strictObject({
+  version: external_exports.number().int().min(1),
+  at: external_exports.iso.datetime(),
+  session: external_exports.string(),
+  /** Sent, not delivered, and the session ended: it waits for `claude --resume <id>`. */
+  queued: external_exports.boolean(),
+  /** What the backing check flagged when it was approved, as the message said. */
+  unbacked: external_exports.number().int().min(0),
+  broken: external_exports.number().int().min(0)
+});
 var specRemarksViewSchema = external_exports.strictObject({
   draft: specRemarksDraftSchema,
   sent: external_exports.array(sentSpecRemarksSchema),
+  /** Every approval, oldest first; the newest version is approved when one names it. */
+  approvals: external_exports.array(specApprovalSchema),
   /** A round of the receiving session awaits answers: the remarks ride in its message, and Send is that round's. */
   rides: external_exports.number().int().min(1).nullable(),
   /** Claude Code no longer keeps the receiving session's transcript: nothing more can be sent to it. */
   transcriptGone: external_exports.boolean()
 });
+var approveSpecSchema = external_exports.strictObject({ version: external_exports.number().int().min(1).max(999999), language: messageLanguageSchema });
+var APPROVAL_WORDS = {
+  it: {
+    approve: (title, location, at) => `Approvo la specifica \xAB${title}\xBB (${location}), versione consegnata il ${at}: \xE8 pronta cos\xEC com'\xE8`,
+    flags: (unbacked, broken) => [
+      ...unbacked ? [`${unbacked} ${unbacked === 1 ? "affermazione" : "affermazioni"} senza fondamento`] : [],
+      ...broken ? [`${broken} ${broken === 1 ? "affermazione" : "affermazioni"} con fondamento non trovato`] : []
+    ].join(" e "),
+    with: "con"
+  },
+  en: {
+    approve: (title, location, at) => `I approve the spec \xAB${title}\xBB (${location}), version handed over on ${at}: it is ready as it is`,
+    flags: (unbacked, broken) => [
+      ...unbacked ? [`${unbacked} unbacked ${unbacked === 1 ? "statement" : "statements"}`] : [],
+      ...broken ? [`${broken} ${broken === 1 ? "statement" : "statements"} with broken backing`] : []
+    ].join(" and "),
+    with: "with"
+  }
+};
+function specApprovalMessage(x, language) {
+  const words2 = APPROVAL_WORDS[language];
+  const flags = words2.flags(x.unbacked, x.broken);
+  return `${words2.approve(x.title, x.location, handoverMinute(x.handedOverAt))}${flags ? `, ${words2.with} ${flags}` : ""}.`;
+}
 
 // src/core/round-phase.ts
 var QUIET_TURNS_END_PHASE = 3;
@@ -22208,20 +22244,33 @@ var sentBatchSchema = external_exports.strictObject({
   /** The message that carried them: their own (`remarks-<n>`) or a round's answers (`round-<n>`). */
   delivery: external_exports.strictObject({ kind: external_exports.enum(["remarks", "round"]), number: external_exports.number().int().min(1) })
 });
+var approvalSchema = external_exports.strictObject({
+  version: external_exports.number().int().min(1),
+  at: external_exports.iso.datetime(),
+  session: sessionIdSchema,
+  delivery: external_exports.number().int().min(1),
+  unbacked: external_exports.number().int().min(0),
+  broken: external_exports.number().int().min(0)
+});
 var storedSchema = external_exports.strictObject({
   version: external_exports.literal(1),
   key: external_exports.string().min(1).max(4200),
   draft: specRemarksDraftSchema,
-  sent: external_exports.array(sentBatchSchema)
+  sent: external_exports.array(sentBatchSchema),
+  // Absent from a file kept before approvals existed.
+  approvals: external_exports.array(approvalSchema).default([])
 });
 var sameRemark = (x) => `${specRemarkKey(x)}
 ${x.text.trim()}`;
 var REMARKS_PATH = /^\/api\/specs\/([^/]+)\/remarks(\/send)?$/;
+var APPROVAL_PATH = /^\/api\/specs\/([^/]+)\/approval$/;
+var MAX_APPROVAL_BYTES = 1024;
 var MAX_REMARKS_BYTES = 1024 * 1024;
 async function specRemarkRoutes(context) {
   const { rounds } = context;
   const stored = /* @__PURE__ */ new Map();
   const writes = new WriteQueue();
+  const approving = /* @__PURE__ */ new Set();
   for (const spec of context.allSpecs()) await load2(spec);
   async function load2(spec) {
     try {
@@ -22230,7 +22279,7 @@ async function specRemarkRoutes(context) {
     } catch {
     }
   }
-  const of = (key2) => stored.get(key2) ?? { version: 1, key: key2, draft: emptySpecRemarks(), sent: [] };
+  const of = (key2) => stored.get(key2) ?? { version: 1, key: key2, draft: emptySpecRemarks(), sent: [], approvals: [] };
   function save(spec, x) {
     stored.set(spec.key, x);
     return writes.write(spec.key, (0, import_node_path7.join)(spec.folder, "remarks.json"), x);
@@ -22242,11 +22291,16 @@ async function specRemarkRoutes(context) {
   };
   function check2(spec, draft) {
     const latest = newest(spec).number;
-    const kept = new Set(of(spec.key).draft.remarks.map(specRemarkKey));
+    const { draft: before, approvals } = of(spec.key);
+    const approved = approvals.some((x) => x.version === latest);
+    const kept = new Map(before.remarks.map((x) => [specRemarkKey(x), x.text.trim()]));
+    if (approved && draft.generalNote.trim() !== "" && draft.generalNote.trim() !== before.generalNote.trim()) return "approved";
     for (const remark of draft.remarks) {
       const version2 = spec.versions.find((x) => x.number === remark.version);
       if (!version2 || remark.to > version2.lines) return "bad-request";
-      if (remark.version !== latest && !kept.has(specRemarkKey(remark))) return "superseded";
+      const words2 = kept.get(specRemarkKey(remark));
+      if (approved && words2 !== remark.text.trim()) return "approved";
+      if (words2 === void 0 && remark.version !== latest) return "superseded";
     }
     return new Set(draft.remarks.map(specRemarkKey)).size === draft.remarks.length ? null : "bad-request";
   }
@@ -22277,6 +22331,14 @@ async function specRemarkRoutes(context) {
         round: b.delivery.kind === "round" ? b.delivery.number : null,
         queued: rounds.waitsForResume(b.session, b.delivery.kind, b.delivery.number)
       })),
+      approvals: x.approvals.map((a) => ({
+        version: a.version,
+        at: a.at,
+        session: a.session,
+        unbacked: a.unbacked,
+        broken: a.broken,
+        queued: rounds.waitsForResume(a.session, "remarks", a.delivery)
+      })),
       rides: transcriptGone ? null : rounds.awaiting(session) ?? null,
       transcriptGone
     };
@@ -22295,7 +22357,45 @@ async function specRemarkRoutes(context) {
       if (spec) await markSent(spec, x.section.draft, session, { kind: "round", number: round });
     }
   }
+  async function approve(req, res, spec) {
+    const body = approveSpecSchema.safeParse(await readJson(req, MAX_APPROVAL_BYTES));
+    if (!body.success || !spec.versions.some((x) => x.number === body.data.version)) {
+      send(res, 400, { error: "bad-request" });
+      return;
+    }
+    const target = newest(spec);
+    if (body.data.version !== target.number) {
+      send(res, 409, { error: "superseded" });
+      return;
+    }
+    if (approving.has(spec.key) || of(spec.key).approvals.some((x) => x.version === target.number)) {
+      send(res, 409, { error: "approved" });
+      return;
+    }
+    approving.add(spec.key);
+    try {
+      const report = await context.backing(spec.key, target.number);
+      const flagged = (state) => report?.statements.filter((x) => x.state === state).length ?? 0;
+      const unbacked = flagged("unbacked"), broken = flagged("broken");
+      const message = specApprovalMessage({ title: target.title, location: target.location, handedOverAt: target.handedOverAt, unbacked, broken }, body.data.language);
+      const delivery = await rounds.sendRemarks(target.session, target.cwd, message);
+      const before = of(spec.key);
+      await save(spec, { ...before, approvals: [...before.approvals, { version: target.number, at: (/* @__PURE__ */ new Date()).toISOString(), session: target.session, delivery, unbacked, broken }] });
+      context.queued(target.session);
+      send(res, 200, { message });
+    } finally {
+      approving.delete(spec.key);
+    }
+  }
   async function handle(req, res, path) {
+    const approval = APPROVAL_PATH.exec(path);
+    if (approval) {
+      if (req.method !== "POST") return false;
+      const spec2 = specIdSchema.safeParse(approval[1]).success ? context.specOf(approval[1]) : void 0;
+      if (!spec2) send(res, 404, { error: "unknown" });
+      else await approve(req, res, spec2);
+      return true;
+    }
     const found = REMARKS_PATH.exec(path);
     if (!found) return false;
     const [, id5, sending] = found;
@@ -22318,7 +22418,7 @@ async function specRemarkRoutes(context) {
       const draft = unsent(spec, parsed2.data);
       const refused = check2(spec, draft);
       if (refused) {
-        send(res, refused === "superseded" ? 409 : 400, { error: refused });
+        send(res, refused === "bad-request" ? 400 : 409, { error: refused });
         return true;
       }
       await save(spec, { ...of(spec.key), draft });
@@ -22335,7 +22435,7 @@ async function specRemarkRoutes(context) {
       const draft = unsent(spec, body.data.draft);
       const refused = check2(spec, draft);
       if (refused) {
-        send(res, refused === "superseded" ? 409 : 400, { error: refused });
+        send(res, refused === "bad-request" ? 400 : 409, { error: refused });
         return true;
       }
       if (context.transcriptGone(target.session)) {
@@ -22375,7 +22475,8 @@ async function specRemarkRoutes(context) {
       const kept = (remark) => !x.numbers.includes(remark.version);
       const sent = before.sent.filter((b) => b.session !== session).map((b) => ({ ...b, remarks: b.remarks.filter(kept) })).filter((b) => b.remarks.length > 0 || b.generalNote !== "");
       const spec = context.allSpecs().find((y) => y.key === x.key);
-      if (spec) await save(spec, { ...before, draft: { ...before.draft, remarks: before.draft.remarks.filter(kept) }, sent });
+      const approvals = before.approvals.filter(kept);
+      if (spec) await save(spec, { ...before, draft: { ...before.draft, remarks: before.draft.remarks.filter(kept) }, sent, approvals });
     }
   }
   return { handle, riding, rodeWith, forget };
@@ -24277,6 +24378,10 @@ async function openSpecs(options) {
   const unreadable = /* @__PURE__ */ new Map();
   const backing = backingChecker({ rounds: options.rounds, gh });
   const idOf = (x) => `spec-${hash2(x.key)}-${x.number}`;
+  const backingOf = (spec) => {
+    const others = versionsOf(spec.key).filter((x) => x !== spec).sort((a, b) => b.number - a.number).map((x) => x.session);
+    return backing.check({ text: spec.text, sessions: [.../* @__PURE__ */ new Set([spec.session, ...others])], cwd: spec.cwd });
+  };
   const versionsOf = (key2) => [...specs.values()].filter((x) => x.key === key2);
   const latestOf = (key2) => versionsOf(key2).reduce((a, b) => b.number > a.number ? b : a);
   const view = (x) => {
@@ -24409,8 +24514,7 @@ async function openSpecs(options) {
         send(res, 404, { error: "unknown" });
         return true;
       }
-      const others = versionsOf(spec.key).filter((x) => x !== spec).sort((a, b) => b.number - a.number).map((x) => x.session);
-      send(res, 200, await backing.check({ text: spec.text, sessions: [.../* @__PURE__ */ new Set([spec.session, ...others])], cwd: spec.cwd }));
+      send(res, 200, await backingOf(spec));
       return true;
     }
     const explorePath = EXPLORE_PATH.exec(path);
@@ -24494,6 +24598,10 @@ async function openSpecs(options) {
     specOf: (id5) => {
       const x = specs.get(id5);
       return x && remarked(x.key);
+    },
+    backing: (key2, number4) => {
+      const x = versionsOf(key2).find((y) => y.number === number4);
+      return x ? backingOf(x) : Promise.resolve(void 0);
     },
     allSpecs: () => [...new Set([...specs.values()].map((x) => x.key))].map(remarked)
   };
@@ -24606,6 +24714,7 @@ async function startLocalServer(options) {
   const remarks = await specRemarkRoutes({
     specOf: (id5) => specs.specOf(id5),
     allSpecs: () => specs.allSpecs(),
+    backing: (key2, number4) => specs.backing(key2, number4),
     rounds,
     transcriptGone: (session) => transcripts.gone(session),
     queued: (session) => queued(session),
@@ -24890,7 +24999,7 @@ async function main() {
   const server = await startLocalServer({
     dataDir: serverDataDir(process.platform, process.env, (0, import_node_os2.homedir)()),
     staticDir: (0, import_node_path11.join)(__dirname, "..", "page"),
-    version: "1.0.0-rc.1"
+    version: "1.0.0-rc.2"
   });
   if (!server) return;
   for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => {

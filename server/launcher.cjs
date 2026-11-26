@@ -20255,9 +20255,10 @@ async function openPage(options) {
   const lock = await ensureServer(options);
   const status = await serverStatus(lock, 3e3);
   if (!status) throw new Error("The local server stopped answering.");
-  if (status.pageConnected) return { ...lock, opened: false };
-  await (options.open ?? openInBrowser)(pageUrl(lock));
-  return { ...lock, opened: true };
+  const url2 = pageUrl(lock);
+  if (status.pageConnected) return { ...lock, opened: false, url: url2 };
+  await (options.open ?? openInBrowser)(url2);
+  return { ...lock, opened: true, url: url2 };
 }
 async function markPhase({ dataDir, session, cwd, skill, args, timeoutMs = 3e3 }) {
   const lock = readLock(dataDir);
@@ -20288,7 +20289,7 @@ function openInBrowser(url2) {
 async function main() {
   const command = process.argv[2];
   const options = { dataDir: serverDataDir(process.platform, process.env, (0, import_node_os.homedir)()), serverScript: (0, import_node_path3.join)(__dirname, "server.cjs") };
-  const replacing = { ...options, version: "1.0.0-rc.1", session: process.argv[3] || void 0 };
+  const replacing = { ...options, version: "1.0.0-rc.2", session: process.argv[3] || void 0 };
   if (command === "start") return ensureServer(replacing);
   if (command === "open") return openPage(replacing);
   if (command === "phase") return markPhase({ dataDir: options.dataDir, session: process.argv[3] ?? "", cwd: process.argv[4] ?? "", skill: process.argv[5], args: process.argv[6] });
