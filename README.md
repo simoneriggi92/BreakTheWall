@@ -100,7 +100,7 @@ The Claude Code plugin opens one local page beside your session: an agent's ques
 **Install** inside Claude Code:
 
 ```text
-/plugin marketplace add https://github.com/simoneriggi92/BreakTheWall.git
+/plugin marketplace add simoneriggi92/BreakTheWall
 /plugin install break-the-wall@break-the-wall
 ```
 

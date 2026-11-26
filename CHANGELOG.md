@@ -5,7 +5,7 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 ## [Unreleased]
 
 ### Fixed
-- **The plugin installs without SSH.** The marketplace now gives the plugin's source as `https://github.com/simoneriggi92/BreakTheWall.git`. The `simoneriggi92/BreakTheWall` shorthand made Claude Code clone over SSH, and a machine that had never accepted GitHub's host key failed with "Host key verification failed". Add the marketplace with `/plugin marketplace add https://github.com/simoneriggi92/BreakTheWall.git`.
+- **The plugin installs without SSH.** The marketplace now gives the plugin's source as `https://github.com/simoneriggi92/BreakTheWall.git`. The `simoneriggi92/BreakTheWall` shorthand made Claude Code clone over SSH, and a machine that had never accepted GitHub's host key failed with "Host key verification failed". If you added the marketplace before, run `/plugin marketplace update break-the-wall`, then `/plugin install break-the-wall@break-the-wall` again.
 
 ## [1.0.0-rc.1] - 2026-11-25
 

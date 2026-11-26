@@ -7,11 +7,10 @@ import { basename, dirname, join } from 'node:path';
  * .github/workflows/release.yml runs these through scripts/pack-plugin.mjs.
  */
 export const PLUGIN_NAME = 'break-the-wall';
-export const PLUGIN_REPO = 'simoneriggi92/BreakTheWall';
 // A full https URL, not the `github` owner/repo shorthand: Claude Code clones the shorthand over SSH when a key for
 // github.com looks configured, with StrictHostKeyChecking on, so a machine that never accepted GitHub's host key failed
 // the install with "Host key verification failed". The repository is public, so https needs no credentials.
-export const PLUGIN_GIT_URL = `https://github.com/${PLUGIN_REPO}.git`;
+export const PLUGIN_GIT_URL = 'https://github.com/simoneriggi92/BreakTheWall.git';
 
 /** `v0.6.0` → `plugin-v0.6.0`. The release tag, package.json, plugin.json and the server's own version are one. */
 export function pluginTag(releaseTag, packageVersion) {
