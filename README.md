@@ -7,7 +7,7 @@
 
 <p align="center"><strong>Answer your agent's questions one at a time. Check the spec they lead to, line by line.</strong></p>
 
-<p align="center">A Claude Code plugin · English &amp; Italian · Apache-2.0</p>
+<p align="center">A Claude Code plugin for the grilling skills of <a href="https://github.com/mattpocock/skills">Matt Pocock's skills</a> · English &amp; Italian · Apache-2.0</p>
 
 <p align="center">
   <a href="https://github.com/simoneriggi92/BreakTheWall/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/simoneriggi92/BreakTheWall/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="CI"></a>
@@ -30,7 +30,7 @@ claude plugin install break-the-wall@break-the-wall
 
 The install says one option is not set yet: the side-chat model. Leave it empty to run side chats on the session's own model, or set it later with `/plugin configure break-the-wall@break-the-wall`.
 
-**2. A round skill.** The plugin acts on the skills that ask an agent's questions in rounds, and does nothing without one. It recognises `/grilling`, `/grill-me` and `/grill-with-docs` for the rounds, and `/to-spec` for the spec they lead to, from [mattpocock/skills](https://github.com/mattpocock/skills):
+**2. Matt Pocock's grilling skills.** The plugin works with the grilling skills of [mattpocock/skills](https://github.com/mattpocock/skills), and does nothing without them: `/grilling`, `/grill-me` and `/grill-with-docs` ask the rounds, and `/to-spec` hands over the spec they lead to. Install them from their own marketplace:
 
 ```bash
 claude plugin marketplace add mattpocock/skills
@@ -49,7 +49,7 @@ Each command above took under four seconds in a clean Claude Code profile (2.1.3
 
 ### Answer one question at a time
 
-A grilling asks its questions in rounds. In the page, each round shows one question at a time, its options side by side, the agent's recommendation marked, and the diagrams it draws. Accept the recommendation, choose another option, or write a note.
+A grilling from Matt Pocock's skills asks its questions in rounds. In the page, each round shows one question at a time, its options side by side, the agent's recommendation marked, and the diagrams it draws. Accept the recommendation, choose another option, or write a note.
 
 Send, and only your answers go back to the session: the agent goes on in the terminal.
 
