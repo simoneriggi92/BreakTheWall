@@ -4,7 +4,7 @@ All notable changes to Break the Wall are recorded here. The format follows [Kee
 
 ## [Unreleased]
 
-### Changed
+### Added
 - **`/break-the-wall` prints the page's address**, `http://127.0.0.1:<port>/#t=…`, both when it opens a tab and when one is already open. A tab closed a moment ago still counts as open for a few seconds; the address reopens it by hand. The line is shown to you alone and is never sent to the model (#147).
 
 ### Fixed

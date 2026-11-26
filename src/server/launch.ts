@@ -102,7 +102,8 @@ export async function openPage(options: LaunchOptions & { open?: (url: string) =
   const lock = await ensureServer(options);
   const status = await serverStatus(lock, 3000);
   if (!status) throw new Error('The local server stopped answering.');
-  // The mod prints the address either way (#147): a tab closed within the grace below opens no new one.
+  // The mod prints the address either way (#147): a tab closed within the server's grace for a page (`pageGraceMs`)
+  // still counts as connected, and no new one opens.
   const url = pageUrl(lock);
   // A connected page will show what comes next by itself; a second tab would only multiply tabs.
   if (status.pageConnected) return { ...lock, opened: false, url };

@@ -169,7 +169,7 @@ describe('/break-the-wall opens a tab only when no page is connected (#94)', () 
     expect(result.opened).toBe(false);
     expect(opened).toEqual([]);
     // No tab opens, so the address is the way back to a tab closed a moment ago (#147).
-    expect(result.url).toBe(`http://127.0.0.1:${server.port}/#t=${server.secret}`);
+    expect(result.url).toBe(pageUrl(server));
   });
 });
 
