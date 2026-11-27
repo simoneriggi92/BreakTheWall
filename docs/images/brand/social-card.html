@@ -5,18 +5,33 @@ html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; backgrou
 .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(29, 39, 51, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(29, 39, 51, .06) 1px, transparent 1px); background-size: 24px 24px; }
 .text { position: absolute; left: 64px; top: 70px; width: 540px; }
 .text img { width: 470px; display: block; }
-h1 { font-size: 30px; line-height: 1.3; font-weight: 600; margin: 38px 0 18px; }
+h1 { font-size: 32px; line-height: 1.24; font-weight: 700; letter-spacing: -.012em; margin: 40px 0 24px; }
 .loop { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 21px; color: #4c5866; letter-spacing: .03em; }
 .loop b { color: #b4532f; font-weight: 600; }
 .facts { position: absolute; left: 64px; bottom: 56px; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 15px; color: #4c5866; letter-spacing: .08em; text-transform: uppercase; }
+/* Behind, as on the earlier card: a source explored down to its structure. */
 .shot { position: absolute; right: -60px; top: 70px; width: 680px; height: 500px; border: 1px solid #cdc4b1; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 60px rgba(29, 39, 51, .18); }
 .shot img { width: 100%; display: block; }
+/* In front, what the plugin adds: a round answered one question at a time. It covers the index, never the structure. */
+.round { position: absolute; left: 596px; top: 336px; width: 540px; height: 330px; border-radius: 12px; overflow: hidden; background: #f1ede4; box-shadow: 0 0 0 1.5px rgba(29, 39, 51, .22), 0 28px 70px rgba(29, 39, 51, .34); }
+.bar { height: 28px; box-sizing: border-box; background: #e8e4dc; border-bottom: 1px solid #d3cec4; color: #4a4f57; font-size: 12px; font-weight: 600; line-height: 27px; text-align: center; position: relative; }
+.dots { position: absolute; left: 13px; top: 9px; display: flex; gap: 7px; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+.new { position: absolute; right: 10px; top: 5px; height: 18px; line-height: 18px; padding: 0 8px; border-radius: 9px; background: #b4532f; color: #f4f0e6; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; }
+.round .crop { position: relative; height: 302px; overflow: hidden; }
+/* The frame is 1400 px wide: from the question's title down to its recommendation. */
+.round .crop img { position: absolute; width: 540px; left: 0; top: -18px; }
 </style></head><body><div class="grid"></div>
 <div class="text">
   <img src="wordmark.svg" alt="Break the Wall: take the text apart.">
-  <h1>AI gives you a wall of text. Break the Wall reads its structure and lets you explore how it holds together, down to its source lines.</h1>
-  <div class="loop">a source <b>→</b> its structure <b>→</b> explore it</div>
+  <h1>Answer your agent's questions one at a time. Check the spec they lead to, line by line.</h1>
+  <div class="loop">grill <b>→</b> answer <b>→</b> spec <b>→</b> approve</div>
 </div>
-<div class="facts">Open source · Apache-2.0 · Alpha · macOS and Windows</div>
+<div class="facts">Claude Code plugin · Open source · Apache-2.0</div>
 <div class="shot"><img src="../exploration-press-enter-paper.png" alt=""></div>
+<!-- A real round in the page: the first question of a grilling, with its recommendation. -->
+<div class="round">
+  <div class="bar"><div class="dots"><i style="background:#ee6a5f"></i><i style="background:#f5bd4f"></i><i style="background:#61c454"></i></div>Break the Wall · Round 1<span class="new">New</span></div>
+  <div class="crop"><img src="../question-card-paper.png" alt=""></div>
+</div>
 </body></html>
