@@ -15,7 +15,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-102B46?style=flat-square" alt="License: Apache-2.0"></a>
 </p>
 
-![A real Claude Code session beside the Break the Wall page: /break-the-wall opens the page beside the session; /grill-with-docs starts a grilling; the agent's questions arrive in the page, one at a time with a recommendation; a passage is selected and asked about in a side chat, which a read-only copy of the session answers; the round is accepted and sent, and only the answers go back to the terminal; Claude sends the next round, until nothing is left open; /to-spec writes the spec, which opens as its structure beside its source, down to the next layer; the statements without backing are listed, one gets the remark "Never said that", and Claude asks about it in a new round instead of guessing; the revised spec comes back and is approved](docs/images/use-in-claude-code.gif)
+![A real Claude Code session beside the Break the Wall page: /break-the-wall opens the page beside the session; /grill-with-docs starts a grilling; the agent's questions arrive in the page, one at a time with a recommendation; a passage is selected and asked about in a side chat, which a read-only copy of the session answers; the round is accepted and sent, and only the answers go back to the session; /to-spec writes the spec, which opens as its structure beside its source, and one part opens down to its roles; the statements without backing are listed, one gets the remark "Never said that", and Claude asks about it in a new round instead of guessing; the revised spec is approved and goes to the agent](docs/images/use-in-claude-code.webp)
 
 ## Install
 
@@ -85,7 +85,7 @@ Remark on a passage and send, and the agent asks the next round. When the spec i
 </td>
 <td width="60%">
 
-<img src="docs/images/check-the-spec-then-approve.webp" alt="The spec's statements without backing are listed; one gets a remark; the revised spec comes back and is approved" width="100%">
+<img src="docs/images/check-the-spec-then-approve.webp" alt="The spec's statements without backing are listed; one gets the remark &quot;Never said that&quot;, and Claude asks about it in a new round instead of guessing; the revised spec is approved and goes to the agent" width="100%">
 
 </td>
 </tr>
